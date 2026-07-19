@@ -16,14 +16,16 @@ class ConfigurationSnapshotService
     /** @return array<string, mixed> */
     public function latestForDevice(QueclinkDevice $device): array
     {
-        $frames = QueclinkRawFrame::query()
-            ->where('queclink_device_id', $device->id)
-            ->where('direction', QueclinkRawFrame::DIRECTION_INBOUND)
-            ->where('command_word', 'GTALM')
-            ->where('parse_ok', true)
-            ->orderByDesc('id')
-            ->limit(30)
-            ->get();
+        $frames = $device->relationLoaded('rawFrames')
+            ? $device->rawFrames->sortByDesc('id')->take(30)->values()
+            : QueclinkRawFrame::query()
+                ->where('queclink_device_id', $device->id)
+                ->where('direction', QueclinkRawFrame::DIRECTION_INBOUND)
+                ->where('command_word', 'GTALM')
+                ->where('parse_ok', true)
+                ->orderByDesc('id')
+                ->limit(30)
+                ->get();
 
         if ($frames->isEmpty()) {
             return [

@@ -1,0 +1,62 @@
+<?php
+
+namespace App\Domain\SecurityDevices\Presenters;
+
+use App\Models\Integration\IntegrationSiteSecret;
+
+class IntegrationSiteCredentialsPresenter
+{
+    public const STATE_CONNECTED = 'connected';
+
+    public const STATE_UNTESTED = 'untested';
+
+    public const STATE_DISABLED = 'disabled';
+
+    public const STATE_ERROR = 'error';
+
+    /** @return array<int, array<string, mixed>> */
+    public function present(int $tenantId, string $provider): array
+    {
+        return IntegrationSiteSecret::query()
+            ->forTenant($tenantId)
+            ->where('provider', $provider)
+            ->whereHas('site', fn ($site) => $site->where('tenant_id', $tenantId))
+            ->with('site:id,name,tenant_id')
+            ->orderBy('site_id')
+            ->orderBy('capability')
+            ->get()
+            ->map(fn (IntegrationSiteSecret $credential): array => $this->project($credential))
+            ->values()
+            ->all();
+    }
+
+    /** @return array<string, mixed> */
+    public function project(IntegrationSiteSecret $credential): array
+    {
+        $state = self::state($credential);
+
+        return [
+            'id' => $credential->id,
+            'site_id' => (int) $credential->site_id,
+            'site_name' => $credential->site?->name ?? 'Unknown site',
+            'provider' => $credential->provider,
+            'capability' => $credential->capability,
+            'configured' => true,
+            'enabled' => (bool) $credential->is_enabled,
+            'tested' => $credential->last_tested_at !== null,
+            'state' => $state,
+            'failure_category' => $state === self::STATE_ERROR ? 'provider_failure' : null,
+            'last_tested_at' => $credential->last_tested_at?->toISOString(),
+        ];
+    }
+
+    public static function state(IntegrationSiteSecret $credential): string
+    {
+        return match (true) {
+            filled($credential->last_error) => self::STATE_ERROR,
+            ! $credential->is_enabled => self::STATE_DISABLED,
+            $credential->last_tested_at === null => self::STATE_UNTESTED,
+            default => self::STATE_CONNECTED,
+        };
+    }
+}

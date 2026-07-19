@@ -6,6 +6,7 @@ use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationTenantSecret;
 use App\Services\Integration\IntegrationAdapterInterface;
 use App\Services\Integration\SyncResult;
+use App\Support\SafeOperationalData;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -68,10 +69,10 @@ class QueclinkAdapter implements IntegrationAdapterInterface
 
             return $response->successful();
         } catch (\Throwable $e) {
-            Log::info('Queclink testConnection failed', [
+            Log::info('Queclink testConnection failed', SafeOperationalData::logContext([
                 'tenant_id' => $secret->tenant_id,
-                'error' => $e->getMessage(),
-            ]);
+                'error_category' => SafeOperationalData::failureCategory($e),
+            ]));
 
             return false;
         }
@@ -127,10 +128,10 @@ class QueclinkAdapter implements IntegrationAdapterInterface
         try {
             return Crypt::decryptString($secret->secret_encrypted);
         } catch (\Throwable $e) {
-            Log::warning('Queclink secret decryption failed', [
+            Log::warning('Queclink secret decryption failed', SafeOperationalData::logContext([
                 'tenant_id' => $secret->tenant_id,
-                'error' => $e->getMessage(),
-            ]);
+                'error_category' => SafeOperationalData::failureCategory($e),
+            ]));
 
             return null;
         }

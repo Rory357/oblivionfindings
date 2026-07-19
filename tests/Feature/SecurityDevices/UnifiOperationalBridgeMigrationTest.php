@@ -7,6 +7,7 @@ use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Jobs\Integration\PullIntegrationHealthJob;
+use App\Models\AuditLog;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\LocationHardware;
@@ -15,11 +16,11 @@ use App\Models\SiteRoom;
 use App\Services\Integration\Adapters\UnifiAdapter;
 use App\Services\Integration\IntegrationAdapterInterface;
 use App\Services\Integration\IntegrationAdapterRegistry;
-use App\Services\Integration\SyncResult;
 use App\Services\Integration\UnifiOperationalBridgeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tests\TestCase;
 
 class UnifiOperationalBridgeMigrationTest extends TestCase
@@ -196,47 +197,14 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
             'assigned_at' => now(),
         ]);
 
-        $adapter = new class implements IntegrationAdapterInterface
-        {
-            public function testConnection(IntegrationTenantSecret $secret): bool
-            {
-                return true;
-            }
-
-            public function discoverSites(IntegrationTenantSecret $secret): array
-            {
-                return [];
-            }
-
-            public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): SyncResult
-            {
-                return new SyncResult();
-            }
-
-            public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): array
-            {
-                return [[
-                    'provider_entity_id' => 'health-ap-1',
-                    'status' => 'offline',
-                    'last_seen_at' => now()->subMinutes(10)->toIso8601String(),
-                ]];
-            }
-
-            public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret, ?\DateTimeInterface $since = null): array
-            {
-                return [];
-            }
-
-            public function capabilities(): array
-            {
-                return ['device_health'];
-            }
-
-            public function provider(): string
-            {
-                return 'unifi';
-            }
-        };
+        $adapter = \Mockery::mock(IntegrationAdapterInterface::class);
+        $adapter->shouldReceive('pullHealth')
+            ->once()
+            ->andReturn([[
+                'provider_entity_id' => 'health-ap-1',
+                'status' => 'offline',
+                'last_seen_at' => now()->subMinutes(10)->toIso8601String(),
+            ]]);
 
         $registry = \Mockery::mock(IntegrationAdapterRegistry::class);
         $registry->shouldReceive('resolve')
@@ -259,6 +227,84 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
         // values.
         $this->assertSame(LocationHardware::STATUS_ONLINE, $shadow->status);
         $this->assertEquals($originalShadowUpdatedAt, $shadow->updated_at);
+    }
+
+    public function test_room_assignment_revalidates_fresh_current_provenance_before_non_null_replacement(): void
+    {
+        $localSite = Site::factory()->create(['tenant_id' => 1]);
+        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
+        $originalRoom = SiteRoom::create([
+            'tenant_id' => 1,
+            'site_id' => $localSite->id,
+            'name' => 'Original local room',
+        ]);
+        $targetRoom = SiteRoom::create([
+            'tenant_id' => 1,
+            'site_id' => $localSite->id,
+            'name' => 'Target local room',
+        ]);
+        $contradictoryRoom = SiteRoom::create([
+            'tenant_id' => 1,
+            'site_id' => $foreignSite->id,
+            'name' => 'Contradictory current room',
+        ]);
+        $shadow = LocationHardware::create([
+            'tenant_id' => 1,
+            'site_id' => $localSite->id,
+            'room_id' => $originalRoom->id,
+            'provider' => 'unifi',
+            'category' => LocationHardware::CATEGORY_AP,
+            'name' => 'Local historical shadow',
+            'status' => LocationHardware::STATUS_ONLINE,
+            'external_ref' => ['provider_entity_id' => 'stale-room-device'],
+        ]);
+        $device = Device::factory()->itInfrastructure()->create([
+            'tenant_id' => 1,
+            'provider' => 'unifi',
+            'legacy_location_hardware_id' => $shadow->id,
+            'external_ref' => ['provider_entity_id' => 'stale-room-device'],
+        ]);
+        $assignment = DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_ROOM,
+            'assignable_id' => $originalRoom->id,
+            'assigned_at' => now(),
+        ]);
+
+        $staleDevice = $device->fresh();
+        $assignment->update(['assignable_id' => $contradictoryRoom->id]);
+        $before = [
+            'device' => $device->fresh()->getAttributes(),
+            'hardware' => $shadow->fresh()->getAttributes(),
+            'assignments' => DeviceAssignment::query()->where('device_id', $device->id)->get()->map->getAttributes()->all(),
+            'audits' => AuditLog::query()->orderBy('id')->get()->map->getAttributes()->all(),
+        ];
+
+        $caught = null;
+        try {
+            app(UnifiOperationalBridgeService::class)->syncRoomAssignment(
+                $staleDevice,
+                $targetRoom,
+                null,
+                1,
+                $localSite->id,
+            );
+        } catch (NotFoundHttpException $exception) {
+            $caught = $exception::class;
+        }
+
+        $this->assertSame([
+            'exception' => NotFoundHttpException::class,
+            'state_unchanged' => true,
+        ], [
+            'exception' => $caught,
+            'state_unchanged' => $before === [
+                'device' => $device->fresh()->getAttributes(),
+                'hardware' => $shadow->fresh()->getAttributes(),
+                'assignments' => DeviceAssignment::query()->where('device_id', $device->id)->get()->map->getAttributes()->all(),
+                'audits' => AuditLog::query()->orderBy('id')->get()->map->getAttributes()->all(),
+            ],
+        ]);
     }
 
     private function makeSiteConfig(Site $site): IntegrationSiteConfig

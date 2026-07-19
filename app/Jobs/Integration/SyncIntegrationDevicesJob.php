@@ -6,7 +6,7 @@ use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Integration\IntegrationTenantSecret;
 use App\Services\Integration\IntegrationAdapterRegistry;
-use App\Services\Integration\SyncResult;
+use App\Support\SafeOperationalData;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -36,10 +36,10 @@ class SyncIntegrationDevicesJob implements ShouldQueue
         try {
             $adapter = $registry->resolve($this->provider);
         } catch (\RuntimeException $e) {
-            Log::error('SyncIntegrationDevicesJob: adapter not found', [
+            Log::error('SyncIntegrationDevicesJob: adapter not found', SafeOperationalData::logContext([
                 'provider' => $this->provider,
-                'error' => $e->getMessage(),
-            ]);
+                'error_category' => SafeOperationalData::failureCategory($e),
+            ]));
 
             return;
         }
@@ -49,11 +49,11 @@ class SyncIntegrationDevicesJob implements ShouldQueue
             ->connected()
             ->first();
 
-        if (!$tenantSecret) {
-            Log::warning('SyncIntegrationDevicesJob: no connected secret found', [
+        if (! $tenantSecret) {
+            Log::warning('SyncIntegrationDevicesJob: no connected secret found', SafeOperationalData::logContext([
                 'tenant_id' => $this->tenantId,
                 'provider' => $this->provider,
-            ]);
+            ]));
 
             return;
         }
@@ -65,11 +65,11 @@ class SyncIntegrationDevicesJob implements ShouldQueue
             ->get();
 
         if ($siteConfigs->isEmpty()) {
-            Log::info('SyncIntegrationDevicesJob: no active site configs found', [
+            Log::info('SyncIntegrationDevicesJob: no active site configs found', SafeOperationalData::logContext([
                 'tenant_id' => $this->tenantId,
                 'provider' => $this->provider,
                 'site_id' => $this->siteId,
-            ]);
+            ]));
 
             return;
         }
@@ -99,20 +99,20 @@ class SyncIntegrationDevicesJob implements ShouldQueue
                 } elseif ($result->isPartial()) {
                     $syncLog->markCompleted(IntegrationSyncLog::STATUS_PARTIAL);
                 } else {
-                    $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, $result->error);
+                    $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, SafeOperationalData::failureSummary());
                 }
 
                 // Update tenant secret last_synced_at timestamp
                 $tenantSecret->update(['last_synced_at' => now()]);
             } catch (\Throwable $e) {
-                Log::error('SyncIntegrationDevicesJob: sync failed for site', [
+                Log::error('SyncIntegrationDevicesJob: sync failed for site', SafeOperationalData::logContext([
                     'tenant_id' => $this->tenantId,
                     'provider' => $this->provider,
                     'site_id' => $siteConfig->site_id,
-                    'error' => $e->getMessage(),
-                ]);
+                    'error_category' => SafeOperationalData::failureCategory($e),
+                ]));
 
-                $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, $e->getMessage());
+                $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, SafeOperationalData::failureSummary());
             }
         }
     }

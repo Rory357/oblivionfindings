@@ -4,12 +4,14 @@ namespace Tests\Feature\SecurityDevices;
 
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\AuditLog;
 use App\Models\LocationHardware;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\SiteTypePlanPin;
 use App\Models\User;
+use App\Services\Integration\UnifiOperationalBridgeService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,8 +24,11 @@ class SiteHardwareRefactorTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $noPerms;
+
     private Site $siteA;
+
     private Site $siteB;
 
     protected function setUp(): void
@@ -294,6 +299,197 @@ class SiteHardwareRefactorTest extends TestCase
         // UnifiOperationalBridgeService::syncRoomAssignment.
     }
 
+    public function test_assign_room_route_does_not_reveal_missing_or_inaccessible_rooms_or_mutate_state(): void
+    {
+        config()->set('app.debug', false);
+        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
+        $foreignRoom = SiteRoom::create([
+            'tenant_id' => 77,
+            'site_id' => $foreignSite->id,
+            'name' => 'Foreign tenant room',
+        ]);
+        $wrongSiteRoom = SiteRoom::create([
+            'tenant_id' => 1,
+            'site_id' => $this->siteB->id,
+            'name' => 'Wrong route site room',
+        ]);
+        $contradictoryRoom = SiteRoom::create([
+            'tenant_id' => 1,
+            'site_id' => $foreignSite->id,
+            'name' => 'Contradictory tenant and parent site room',
+        ]);
+        $shadow = LocationHardware::create([
+            'tenant_id' => 1,
+            'site_id' => $this->siteA->id,
+            'provider' => 'unifi',
+            'category' => LocationHardware::CATEGORY_SWITCH,
+            'name' => 'Protected shadow',
+            'status' => LocationHardware::STATUS_ONLINE,
+            'external_ref' => ['provider_entity_id' => 'protected-site-route-switch'],
+        ]);
+        $device = Device::factory()->itInfrastructure()->create([
+            'tenant_id' => 1,
+            'provider' => 'unifi',
+            'legacy_location_hardware_id' => $shadow->id,
+            'external_ref' => ['provider_entity_id' => 'protected-site-route-switch'],
+            'latitude' => '-36.84850000',
+            'longitude' => '174.76330000',
+            'location_description' => 'Protected rack',
+        ]);
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $this->siteA->id,
+            'assigned_at' => now(),
+        ]);
+
+        $before = $this->captureRoomAssignmentMutationState($device->id);
+        $roomIds = [
+            SiteRoom::query()->max('id') + 1000,
+            $foreignRoom->id,
+            $wrongSiteRoom->id,
+            $contradictoryRoom->id,
+        ];
+        $responses = collect($roomIds)->map(fn (int $roomId) => $this->actingAs($this->admin)
+            ->postJson("/sites/{$this->siteA->id}/hardware/{$device->id}/assign-room", [
+                'room_id' => $roomId,
+            ]));
+
+        $this->assertSame([
+            'statuses' => [404, 404, 404, 404],
+            'responses_match' => true,
+            'state_unchanged' => true,
+        ], [
+            'statuses' => $responses->map->getStatusCode()->all(),
+            'responses_match' => $responses->map->getContent()->unique()->count() === 1,
+            'state_unchanged' => $before === $this->captureRoomAssignmentMutationState($device->id),
+        ]);
+    }
+
+    public function test_assign_room_route_clears_room_to_the_current_site(): void
+    {
+        $room = SiteRoom::create([
+            'tenant_id' => 1,
+            'site_id' => $this->siteA->id,
+            'name' => 'Network Closet',
+        ]);
+        $device = Device::factory()->itInfrastructure()->create([
+            'tenant_id' => 1,
+            'provider' => 'unifi',
+        ]);
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_ROOM,
+            'assignable_id' => $room->id,
+            'assigned_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/sites/{$this->siteA->id}/hardware/{$device->id}/assign-room", [
+                'room_id' => null,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Hardware room assignment updated.');
+
+        $active = $device->fresh()->assignments()->active()->sole();
+        $this->assertSame(DeviceAssignment::TARGET_SITE, $active->assignable_type);
+        $this->assertSame($this->siteA->id, $active->assignable_id);
+    }
+
+    public function test_clear_rechecks_the_authorized_route_site_after_a_stale_provenance_move(): void
+    {
+        config()->set('app.debug', false);
+        $roomA = SiteRoom::create([
+            'tenant_id' => 1,
+            'site_id' => $this->siteA->id,
+            'name' => 'Initially authorized room',
+        ]);
+        $roomB = SiteRoom::create([
+            'tenant_id' => 1,
+            'site_id' => $this->siteB->id,
+            'name' => 'Concurrently moved room',
+        ]);
+        $shadow = LocationHardware::create([
+            'tenant_id' => 1,
+            'site_id' => $this->siteA->id,
+            'provider' => 'unifi',
+            'category' => LocationHardware::CATEGORY_AP,
+            'name' => 'Stale authorization shadow',
+            'status' => LocationHardware::STATUS_ONLINE,
+            'external_ref' => ['provider_entity_id' => 'stale-site-clear-ap'],
+        ]);
+        $device = Device::factory()->itInfrastructure()->create([
+            'tenant_id' => 1,
+            'provider' => 'unifi',
+            'legacy_location_hardware_id' => $shadow->id,
+            'external_ref' => ['provider_entity_id' => 'stale-site-clear-ap'],
+            'latitude' => '-36.84850000',
+            'longitude' => '174.76330000',
+            'location_description' => 'Initially authorized rack',
+        ]);
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_ROOM,
+            'assignable_id' => $roomA->id,
+            'assigned_at' => now(),
+        ]);
+
+        $racedState = null;
+        $bridge = new class(function () use ($device, $roomB, &$racedState): void {
+            $active = $device->fresh()->assignments()->active()->sole();
+            $active->update([
+                'released_at' => now(),
+                'released_by' => $this->admin->id,
+            ]);
+            DeviceAssignment::create([
+                'device_id' => $device->id,
+                'assignable_type' => DeviceAssignment::TARGET_ROOM,
+                'assignable_id' => $roomB->id,
+                'assigned_at' => now(),
+                'assigned_by' => $this->admin->id,
+            ]);
+            $racedState = $this->captureRoomAssignmentMutationState($device->id);
+        }) extends UnifiOperationalBridgeService
+        {
+
+            public function __construct(private readonly \Closure $beforeTransaction) {}
+
+            public function syncRoomAssignment(
+                Device $device,
+                ?SiteRoom $room,
+                ?int $userId,
+                int $tenantId,
+                ?int $expectedSiteId,
+            ): DeviceAssignment {
+                ($this->beforeTransaction)();
+
+                return parent::syncRoomAssignment($device, $room, $userId, $tenantId, $expectedSiteId);
+            }
+        };
+        $this->app->instance(UnifiOperationalBridgeService::class, $bridge);
+
+        $denied = $this->actingAs($this->admin)->postJson(
+            "/sites/{$this->siteA->id}/hardware/{$device->id}/assign-room",
+            ['room_id' => $roomB->id],
+        );
+        $response = $this->actingAs($this->admin)->postJson(
+            "/sites/{$this->siteA->id}/hardware/{$device->id}/assign-room",
+            ['room_id' => null],
+        );
+
+        $this->assertSame([
+            'statuses' => [404, 404],
+            'responses_match' => true,
+            'race_captured' => true,
+            'state_unchanged_after_race' => true,
+        ], [
+            'statuses' => [$denied->getStatusCode(), $response->getStatusCode()],
+            'responses_match' => $denied->getContent() === $response->getContent(),
+            'race_captured' => $racedState !== null,
+            'state_unchanged_after_race' => $racedState === $this->captureRoomAssignmentMutationState($device->id),
+        ]);
+    }
+
     public function test_release_marks_device_plan_pin_stale(): void
     {
         $device = Device::factory()->security()->create(['name' => 'Front Camera']);
@@ -315,6 +511,29 @@ class SiteHardwareRefactorTest extends TestCase
         $this->assertTrue($pin->meta['stale'] ?? false);
         $this->assertArrayHasKey('released_at', $pin->meta);
         $this->assertSame('assignment_released', $pin->meta['stale_reason'] ?? null);
+    }
+
+    private function captureRoomAssignmentMutationState(int $deviceId): array
+    {
+        return [
+            'device' => Device::query()->findOrFail($deviceId)->getAttributes(),
+            'location_hardware' => LocationHardware::withTrashed()
+                ->orderBy('id')
+                ->get()
+                ->map(fn (LocationHardware $hardware) => $hardware->getAttributes())
+                ->all(),
+            'device_assignments' => DeviceAssignment::query()
+                ->where('device_id', $deviceId)
+                ->orderBy('id')
+                ->get()
+                ->map(fn (DeviceAssignment $assignment) => $assignment->getAttributes())
+                ->all(),
+            'audit_logs' => AuditLog::query()
+                ->orderBy('id')
+                ->get()
+                ->map(fn (AuditLog $audit) => $audit->getAttributes())
+                ->all(),
+        ];
     }
 
     public function test_room_move_marks_device_plan_pin_stale(): void

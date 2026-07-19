@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\User;
+use App\Support\SafeOperationalData;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -16,10 +17,10 @@ class AuditLogger
         try {
             self::logOrFail($action, $auditable, $meta, $request);
         } catch (\Throwable $e) {
-            Log::error('AuditLogger failed: '.$e->getMessage(), [
+            Log::error('AuditLogger failed', SafeOperationalData::logContext([
                 'action' => $action,
-                'exception' => $e,
-            ]);
+                'error_category' => SafeOperationalData::failureCategory($e),
+            ]));
         }
     }
 
@@ -49,12 +50,13 @@ class AuditLogger
             $actor = User::query()->find($actorId);
         }
 
+        $protectRequestContext = SafeOperationalData::protectsRequestContext($auditable);
         $clientId = null;
         if ($auditable instanceof Client) {
             $clientId = $auditable->id;
         } elseif ($auditable && isset($auditable->client_id)) {
             $clientId = $auditable->client_id;
-        } elseif (isset($meta['client_id'])) {
+        } elseif (! $protectRequestContext && isset($meta['client_id'])) {
             $clientId = $meta['client_id'];
         }
 
@@ -62,14 +64,24 @@ class AuditLogger
             ? $auditable
             : ($clientId ? Client::query()->find($clientId) : null);
 
-        $organizationId = $meta['organization_id'] ?? null;
-        $organizationId ??= $auditable?->getAttribute('organization_id');
-        $organizationId ??= $auditable?->getAttribute('tenant_id');
-        $organizationId ??= $client?->organization_id;
-        $organizationId ??= $actor?->organization_id;
+        $canonicalScope = $protectRequestContext && $auditable !== null
+            ? SafeOperationalData::auditScope($auditable)
+            : [];
+        if ($protectRequestContext) {
+            $organizationId = $canonicalScope['organization_id'] ?? $canonicalScope['tenant_id'] ?? null;
+        } else {
+            $organizationId = $meta['organization_id'] ?? null;
+            $organizationId ??= $auditable?->getAttribute('organization_id');
+            $organizationId ??= $auditable?->getAttribute('tenant_id');
+            $organizationId ??= $client?->organization_id;
+            $organizationId ??= $actor?->organization_id;
+        }
         $organizationId = is_numeric($organizationId) ? (int) $organizationId : null;
 
         unset($meta['organization_id']);
+        if ($protectRequestContext && $auditable !== null) {
+            $meta = SafeOperationalData::auditMeta($meta, $auditable, $canonicalScope);
+        }
 
         AuditLog::create([
             'organization_id' => $organizationId,
@@ -79,8 +91,8 @@ class AuditLogger
             'auditable_type' => $auditable ? $auditable->getMorphClass() : null,
             'auditable_id' => $auditable ? $auditable->getKey() : null,
             'meta' => $meta,
-            'ip_address' => $request?->ip(),
-            'user_agent' => substr((string) $request?->userAgent(), 0, 5000),
+            'ip_address' => $protectRequestContext ? null : $request?->ip(),
+            'user_agent' => $protectRequestContext ? null : substr((string) $request?->userAgent(), 0, 5000),
         ]);
     }
 }

@@ -125,8 +125,7 @@ class SiteHardwareController extends Controller
         Site $site,
         int $hardware,
         UnifiOperationalBridgeService $runtime,
-    )
-    {
+    ) {
         $this->authorize('update', $site);
 
         $device = Device::query()
@@ -134,21 +133,26 @@ class SiteHardwareController extends Controller
             ->byProvider('unifi')
             ->findOrFail($hardware);
 
-        $currentSiteId = $runtime->resolveSiteId($device);
+        $tenantId = (int) ($site->tenant_id ?? 1);
+        $currentSiteId = $runtime->resolveSiteId($device, $tenantId);
         abort_unless($currentSiteId === null || $currentSiteId === $site->id, 404);
 
         $validated = $request->validate([
-            'room_id' => 'nullable|exists:site_rooms,id',
+            'room_id' => ['nullable', 'integer'],
         ]);
 
         $room = null;
-        if (!empty($validated['room_id'])) {
+        $roomId = $validated['room_id'] ?? null;
+        if ($roomId !== null) {
             $room = SiteRoom::query()
+                ->where('tenant_id', $tenantId)
                 ->where('site_id', $site->id)
-                ->findOrFail($validated['room_id']);
+                ->whereHas('site', fn ($siteQuery) => $siteQuery->where('tenant_id', $tenantId))
+                ->find($roomId);
+            abort_unless($room, 404);
         }
 
-        $runtime->syncRoomAssignment($device, $room, $request->user()?->id);
+        $runtime->syncRoomAssignment($device, $room, $request->user()?->id, $tenantId, $site->id);
 
         return redirect()->back()->with('success', 'Hardware room assignment updated.');
     }

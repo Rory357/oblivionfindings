@@ -17,7 +17,7 @@ class BulkActionRequest extends FormRequest
     {
         return [
             'device_ids' => ['required', 'array', 'min:1', 'max:100'],
-            'device_ids.*' => ['required', 'integer', 'exists:queclink_devices,id'],
+            'device_ids.*' => ['required', 'integer'],
             'action' => ['required', 'string', Rule::in([
                 'read_configuration',
                 'reboot',
@@ -25,7 +25,7 @@ class BulkActionRequest extends FormRequest
                 'apply_preset',
             ])],
             'section' => ['nullable', 'string', 'in:all,BSI,SRI,CFG,PIN,DOG,TMA,NMD,PDS,GEO,BTS,WFI,BID,UPC,WLT,FVR'],
-            'preset_id' => ['nullable', 'required_if:action,apply_preset', 'integer', 'exists:queclink_presets,id'],
+            'preset_id' => ['nullable', 'required_if:action,apply_preset', 'integer'],
         ];
     }
 }

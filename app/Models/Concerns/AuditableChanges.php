@@ -3,18 +3,21 @@
 namespace App\Models\Concerns;
 
 use App\Services\AuditLogger;
+use App\Support\SafeOperationalData;
 
 trait AuditableChanges
 {
     public static function bootAuditableChanges(): void
     {
         static::created(function ($model) {
+            $attributes = $model->auditSafeAttributes($model->getAttributes());
+            $protected = SafeOperationalData::protectsRequestContext($model);
             AuditLogger::log(
-                strtolower(class_basename($model)) . '.create',
+                strtolower(class_basename($model)).'.create',
                 $model,
                 [
-                    'fields' => array_keys($model->getAttributes()),
-                    'after' => self::auditSnapshot($model->getAttributes()),
+                    'fields' => $protected ? SafeOperationalData::auditFields($attributes) : array_keys($attributes),
+                    'after' => $protected ? SafeOperationalData::auditValues($attributes) : self::auditSnapshot($attributes),
                 ]
             );
         });
@@ -22,8 +25,9 @@ trait AuditableChanges
         static::updated(function ($model) {
             $rawChanges = $model->getChanges();
             unset($rawChanges['updated_at']);
-
-            $changes = array_keys($rawChanges);
+            $rawChanges = $model->auditSafeAttributes($rawChanges);
+            $protected = SafeOperationalData::protectsRequestContext($model);
+            $changes = $protected ? SafeOperationalData::auditFields($rawChanges) : array_keys($rawChanges);
             if (empty($changes)) {
                 return;
             }
@@ -37,40 +41,62 @@ trait AuditableChanges
             }
 
             AuditLogger::log(
-                strtolower(class_basename($model)) . '.update',
+                strtolower(class_basename($model)).'.update',
                 $model,
                 [
                     'fields' => $changes,
-                    'before' => self::auditSnapshot($before),
-                    'after' => self::auditSnapshot($after),
+                    'before' => $protected ? SafeOperationalData::auditValues($before) : self::auditSnapshot($before),
+                    'after' => $protected ? SafeOperationalData::auditValues($after) : self::auditSnapshot($after),
                 ]
             );
         });
 
         static::deleted(function ($model) {
+            $attributes = $model->auditSafeAttributes($model->getOriginal());
+            $protected = SafeOperationalData::protectsRequestContext($model);
             AuditLogger::log(
-                strtolower(class_basename($model)) . '.delete',
+                strtolower(class_basename($model)).'.delete',
                 $model,
-                ['before' => self::auditSnapshot($model->getOriginal())]
+                [
+                    'fields' => $protected ? SafeOperationalData::auditFields($attributes) : array_keys($attributes),
+                    'before' => $protected ? SafeOperationalData::auditValues($attributes) : self::auditSnapshot($attributes),
+                ]
             );
         });
     }
 
     private static function auditSnapshot(array $data): array
     {
-        // Keep audit payload small + safe.
         $out = [];
-        foreach ($data as $k => $v) {
-            if (is_string($v) && mb_strlen($v) > 500) {
-                $out[$k] = mb_substr($v, 0, 500) . '…';
+        foreach ($data as $key => $value) {
+            if (is_string($value) && mb_strlen($value) > 500) {
+                $out[$key] = mb_substr($value, 0, 500).'…';
+
                 continue;
             }
-            if (is_array($v)) {
-                $out[$k] = array_slice($v, 0, 50);
+            if (is_array($value)) {
+                $out[$key] = array_slice($value, 0, 50);
+
                 continue;
             }
-            $out[$k] = $v;
+            $out[$key] = $value;
         }
+
         return $out;
+    }
+
+    /** @return array<int, string> */
+    private function auditExcludedAttributes(): array
+    {
+        if (! property_exists($this, 'auditExcludedAttributes')) {
+            return [];
+        }
+
+        return is_array($this->auditExcludedAttributes) ? $this->auditExcludedAttributes : [];
+    }
+
+    private function auditSafeAttributes(array $data): array
+    {
+        return array_diff_key($data, array_flip($this->auditExcludedAttributes()));
     }
 }

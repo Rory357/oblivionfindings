@@ -8,6 +8,7 @@ use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceDocument;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\Permission;
@@ -305,6 +306,112 @@ class DeviceMutationAccessBoundaryTest extends TestCase
                 'assignable_type' => $targetType,
                 'assignable_id' => $targetId,
                 'released_at' => null,
+            ]);
+        }
+    }
+
+    public function test_vehicle_assignment_rejects_a_client_whose_site_belongs_to_another_tenant(): void
+    {
+        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
+        $mismatchedClient = Client::factory()->create([
+            'organization_id' => 42,
+            'site_id' => $foreignSite->id,
+        ]);
+        $vehicle = Asset::factory()->create([
+            'category' => 'Vehicle',
+            'site_id' => null,
+            'home_site_id' => null,
+            'client_id' => $mismatchedClient->id,
+        ]);
+        $platformAdmin = User::factory()->create(['organization_id' => null]);
+        $platformAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+        $access = app(SecurityDevicesAccessService::class);
+
+        $this->actingAs($this->admin)
+            ->get("/security-devices/devices/{$this->allowedDevice->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('assignmentTargets.vehicles', fn ($targets): bool => collect($targets)->doesntContain('id', $vehicle->id)));
+        $this->assertFalse($access->canAccessAssignmentTarget(
+            $platformAdmin,
+            $this->allowedDevice,
+            DeviceAssignment::TARGET_VEHICLE,
+            $vehicle->id,
+        ));
+        $this->assertFalse($access->assignableVehicles($this->admin)->contains('id', $vehicle->id));
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/devices/{$this->allowedDevice->id}/assign", [
+                'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
+                'assignable_id' => $vehicle->id,
+            ])
+            ->assertNotFound();
+        $this->assertDatabaseMissing('device_assignments', [
+            'device_id' => $this->allowedDevice->id,
+            'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
+            'assignable_id' => $vehicle->id,
+        ]);
+    }
+
+    public function test_vehicle_assignment_accepts_consistent_client_site_and_home_site_tenant_evidence(): void
+    {
+        $siteLessClient = Client::factory()->create(['organization_id' => 42, 'site_id' => null]);
+        $siteClient = Client::factory()->create(['organization_id' => 42, 'site_id' => $this->allowedSite->id]);
+        $vehicles = [
+            Asset::factory()->create([
+                'category' => 'Vehicle', 'site_id' => null, 'home_site_id' => null, 'client_id' => $siteLessClient->id,
+            ]),
+            Asset::factory()->create([
+                'category' => 'Vehicle', 'site_id' => null, 'home_site_id' => null, 'client_id' => $siteClient->id,
+            ]),
+            Asset::factory()->create([
+                'category' => 'Vehicle', 'site_id' => $this->allowedSite->id, 'home_site_id' => null, 'client_id' => null,
+            ]),
+            Asset::factory()->create([
+                'category' => 'Vehicle', 'site_id' => null, 'home_site_id' => $this->allowedSite->id, 'client_id' => null,
+            ]),
+        ];
+        $platformAdmin = User::factory()->create(['organization_id' => null]);
+        $platformAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+        $access = app(SecurityDevicesAccessService::class);
+        $assignableIds = $access->assignableVehicles($this->admin)->pluck('id')->map(fn ($id): int => (int) $id)->all();
+
+        foreach ($vehicles as $index => $vehicle) {
+            $this->assertTrue($access->canAccessAssignmentTarget(
+                $platformAdmin,
+                $this->allowedDevice,
+                DeviceAssignment::TARGET_VEHICLE,
+                $vehicle->id,
+            ));
+            $this->assertContains($vehicle->id, $assignableIds);
+            if ($index === 0) {
+                $this->assertFalse($access->canAccessAssignmentTarget(
+                    $this->admin,
+                    $this->allowedDevice,
+                    DeviceAssignment::TARGET_VEHICLE,
+                    $vehicle->id,
+                ));
+
+                continue;
+            }
+
+            $this->assertTrue($access->canAccessAssignmentTarget(
+                $this->admin,
+                $this->allowedDevice,
+                DeviceAssignment::TARGET_VEHICLE,
+                $vehicle->id,
+            ));
+
+            $this->actingAs($this->admin)
+                ->post("/security-devices/devices/{$this->allowedDevice->id}/assign", [
+                    'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
+                    'assignable_id' => $vehicle->id,
+                ])
+                ->assertRedirect();
+            $this->assertDatabaseHas('device_assignments', [
+                'device_id' => $this->allowedDevice->id,
+                'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
+                'assignable_id' => $vehicle->id,
             ]);
         }
     }

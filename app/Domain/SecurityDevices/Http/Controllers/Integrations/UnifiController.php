@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Http\Controllers\Integrations;
 
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Presenters\IntegrationSiteCredentialsPresenter;
 use App\Http\Controllers\Controller;
 use App\Models\Integration\Integration;
 use App\Models\Integration\IntegrationSiteConfig;
@@ -12,6 +13,7 @@ use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Services\Integration\UnifiOperationalBridgeService;
+use App\Support\SafeOperationalData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Inertia\Inertia;
@@ -21,6 +23,8 @@ class UnifiController extends Controller
     private const PROVIDER = 'unifi';
 
     private const PERMISSION_MANAGE = 'securityDevices.integrations.manage';
+
+    public function __construct(private readonly IntegrationSiteCredentialsPresenter $siteCredentials) {}
 
     /**
      * Show the UniFi integration settings page.
@@ -41,11 +45,11 @@ class UnifiController extends Controller
         $secretConfig = is_array($tenantSecret?->config) ? $tenantSecret->config : [];
         $discoveredSites = collect($secretConfig['discovered_sites'] ?? [])
             ->map(fn (array $site) => [
-                'external_id' => (string) ($site['external_id'] ?? ''),
+                'mapping_token' => $this->mappingToken($tenantId, (string) ($site['external_id'] ?? '')),
                 'name' => $site['name'] ?? 'Unknown',
-                'meta' => $site['meta'] ?? [],
+                'device_count' => is_numeric(data_get($site, 'meta.device_count')) ? (int) data_get($site, 'meta.device_count') : null,
             ])
-            ->filter(fn (array $site) => $site['external_id'] !== '')
+            ->filter(fn (array $site) => $site['mapping_token'] !== '')
             ->values()
             ->all();
 
@@ -53,7 +57,8 @@ class UnifiController extends Controller
         $siteConfigs = IntegrationSiteConfig::query()
             ->forTenant($tenantId)
             ->forProvider(self::PROVIDER)
-            ->with('site:id,name,type')
+            ->whereHas('site', fn ($site) => $site->where('tenant_id', $tenantId))
+            ->with('site:id,name,type,tenant_id')
             ->orderBy('site_id')
             ->get()
             ->map(fn (IntegrationSiteConfig $config) => [
@@ -62,7 +67,6 @@ class UnifiController extends Controller
                 'site_name' => $config->site?->name ?? 'Unknown site',
                 'site_type' => $config->site?->type,
                 'status' => $config->status,
-                'mapped_external_site_id' => $config->mapped_external_site_id,
                 'mapped_external_site_name' => $config->mapped_external_site_name,
                 'is_active' => (bool) $config->is_active,
             ])
@@ -110,12 +114,9 @@ class UnifiController extends Controller
 
                 $site = $siteId ? $sites->firstWhere('id', $siteId) : null;
                 $room = $roomId ? $rooms->firstWhere('id', $roomId) : null;
-                $extRef = $device->external_ref ?? [];
-                $meta = $device->meta ?? [];
 
                 return [
                     'id' => $device->id,
-                    'device_uid' => $device->device_uid,
                     'site_id' => $siteId,
                     'site_name' => $site?->name ?? 'Unassigned',
                     'site_type' => $site?->type,
@@ -127,13 +128,8 @@ class UnifiController extends Controller
                     'subcategory' => $device->subcategory,
                     'status' => $device->status?->value,
                     'health_status' => $device->health_status?->value,
-                    'provider_entity_id' => $extRef['provider_entity_id'] ?? null,
-                    'provider_type' => $meta['provider_type'] ?? $extRef['provider_type'] ?? null,
-                    'model' => $device->model ?? $extRef['model'] ?? $meta['model_long'] ?? null,
+                    'model' => $device->model,
                     'manufacturer' => $device->manufacturer,
-                    'serial_number' => $device->serial_number,
-                    'mac_address' => $device->mac_address,
-                    'ip_address' => $device->ip_address,
                     'firmware_version' => $device->firmware_version,
                     'last_seen_at' => $device->last_seen_at?->toISOString(),
                     'detail_url' => "/security-devices/devices/{$device->id}",
@@ -158,7 +154,7 @@ class UnifiController extends Controller
                 'items_created' => $log->items_created,
                 'items_updated' => $log->items_updated,
                 'items_errored' => $log->items_errored,
-                'error_message' => $log->error_message,
+                'failure_category' => $log->status === IntegrationSyncLog::STATUS_FAILED ? 'provider_failure' : null,
                 'started_at' => $log->started_at?->toDateTimeString(),
                 'completed_at' => $log->completed_at?->toDateTimeString(),
             ])
@@ -172,7 +168,10 @@ class UnifiController extends Controller
                 'last_tested_at' => $tenantSecret->last_tested_at?->toDateTimeString(),
                 'last_synced_at' => $tenantSecret->last_synced_at?->toDateTimeString(),
                 'sites_synced_at' => $secretConfig['sites_synced_at'] ?? null,
-                'config' => collect($secretConfig)->except(['discovered_sites', 'sites_synced_at'])->all(),
+                'defaults' => collect($secretConfig)->only([
+                    'refresh_interval_minutes', 'alert_motion_events', 'alert_device_offline',
+                    'quiet_hours_start', 'quiet_hours_end',
+                ])->all(),
             ] : null,
             'discoveredSites' => $discoveredSites,
             'siteConfigs' => $siteConfigs,
@@ -180,6 +179,7 @@ class UnifiController extends Controller
             'rooms' => $rooms,
             'syncedDevices' => $syncedDevices,
             'syncLogs' => $syncLogs,
+            'siteCredentials' => $this->siteCredentials->present($tenantId, self::PROVIDER),
             'can' => [
                 'manage' => $this->userCanManage($user),
             ],
@@ -249,7 +249,7 @@ class UnifiController extends Controller
             ->where('provider', self::PROVIDER)
             ->firstOrFail();
 
-        if (!$registry->has(self::PROVIDER)) {
+        if (! $registry->has(self::PROVIDER)) {
             return redirect()->back()->with('error', 'UniFi adapter is not registered.');
         }
 
@@ -346,7 +346,7 @@ class UnifiController extends Controller
             ->where('provider', self::PROVIDER)
             ->firstOrFail();
 
-        if (!$registry->has(self::PROVIDER)) {
+        if (! $registry->has(self::PROVIDER)) {
             return redirect()->back()->with('error', 'UniFi adapter is not registered.');
         }
 
@@ -365,8 +365,10 @@ class UnifiController extends Controller
             if (method_exists($adapter, 'discoverHosts')) {
                 try {
                     $hosts = $adapter->discoverHosts($secret);
-                } catch (\Throwable $e) {
-                    $hosts = [];
+                } catch (\Throwable) {
+                    $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, SafeOperationalData::failureSummary());
+
+                    return redirect()->back()->with('error', 'Failed to sync UniFi hosts. Existing discovery state was preserved; review the bounded diagnostic state and retry.');
                 }
             }
 
@@ -374,7 +376,7 @@ class UnifiController extends Controller
                 $secret->config,
                 [
                     'discovered_sites' => array_values($sites),
-                    'discovered_hosts' => array_values($hosts),
+                    'discovered_host_count' => count($hosts),
                     'sites_synced_at' => now()->toISOString(),
                 ]
             );
@@ -392,20 +394,22 @@ class UnifiController extends Controller
 
             if (count($sites) > 0) {
                 $syncLog->markCompleted(IntegrationSyncLog::STATUS_SUCCESS);
+
                 return redirect()->back()->with('success', 'UniFi sites synced successfully.');
             }
 
             $syncLog->markCompleted(IntegrationSyncLog::STATUS_PARTIAL, 'No sites returned by UniFi API.');
+
             return redirect()->back()->with('warning', 'No UniFi sites returned by API.');
         } catch (\Throwable $e) {
-            $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, $e->getMessage());
+            $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, SafeOperationalData::failureSummary());
 
             $secret->update([
                 'status' => IntegrationTenantSecret::STATUS_ERROR,
-                'last_error' => $e->getMessage(),
+                'last_error' => SafeOperationalData::failureSummary(),
             ]);
 
-            return redirect()->back()->with('error', 'Failed to sync UniFi sites: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to sync UniFi sites. Review the bounded diagnostic state and retry.');
         }
     }
 
@@ -418,16 +422,31 @@ class UnifiController extends Controller
         abort_unless($this->userCanManage($user), 403);
 
         $request->validate([
-            'site_id' => ['required', 'integer', 'exists:sites,id'],
-            'external_site_id' => ['required', 'string', 'max:255'],
-            'external_site_name' => ['nullable', 'string', 'max:255'],
+            'site_id' => ['required', 'integer'],
+            'mapping_token' => ['required', 'string', 'size:64'],
         ]);
 
         $tenantId = $this->resolveTenantId($user);
 
         $site = Site::query()
             ->where('tenant_id', $tenantId)
-            ->findOrFail((int) $request->input('site_id'));
+            ->find((int) $request->input('site_id'));
+        abort_unless($site, 404);
+
+        $secret = IntegrationTenantSecret::query()
+            ->forTenant($tenantId)
+            ->where('provider', self::PROVIDER)
+            ->firstOrFail();
+        $discoveredSite = collect(data_get($secret->config, 'discovered_sites', []))
+            ->first(function ($candidate) use ($tenantId, $request): bool {
+                $externalId = is_array($candidate) ? (string) ($candidate['external_id'] ?? '') : '';
+
+                return $externalId !== '' && hash_equals(
+                    $this->mappingToken($tenantId, $externalId),
+                    (string) $request->input('mapping_token'),
+                );
+            });
+        abort_unless(is_array($discoveredSite), 422, 'The selected provider location is no longer available. Sync locations and try again.');
 
         IntegrationSiteConfig::updateOrCreate(
             [
@@ -436,14 +455,23 @@ class UnifiController extends Controller
                 'provider' => self::PROVIDER,
             ],
             [
-                'mapped_external_site_id' => $request->input('external_site_id'),
-                'mapped_external_site_name' => $request->input('external_site_name'),
+                'mapped_external_site_id' => (string) $discoveredSite['external_id'],
+                'mapped_external_site_name' => (string) ($discoveredSite['name'] ?? 'Provider location'),
                 'status' => IntegrationSiteConfig::STATUS_HYBRID,
                 'is_active' => true,
             ],
         );
 
         return redirect()->back()->with('success', 'Site mapping saved.');
+    }
+
+    private function mappingToken(int $tenantId, string $externalId): string
+    {
+        if ($externalId === '') {
+            return '';
+        }
+
+        return hash_hmac('sha256', self::PROVIDER.'|'.$tenantId.'|'.$externalId, (string) config('app.key'));
     }
 
     /**
@@ -474,7 +502,7 @@ class UnifiController extends Controller
         abort_unless($this->userCanManage($user), 403);
 
         $request->validate([
-            'site_config_id' => ['required', 'integer', 'exists:integration_site_configs,id'],
+            'site_config_id' => ['required', 'integer'],
         ]);
 
         $tenantId = $this->resolveTenantId($user);
@@ -482,7 +510,10 @@ class UnifiController extends Controller
         $siteConfig = IntegrationSiteConfig::query()
             ->forTenant($tenantId)
             ->forProvider(self::PROVIDER)
-            ->findOrFail((int) $request->input('site_config_id'));
+            ->active()
+            ->whereHas('site', fn ($site) => $site->where('tenant_id', $tenantId))
+            ->find((int) $request->input('site_config_id'));
+        abort_unless($siteConfig, 404);
 
         if (empty($siteConfig->mapped_external_site_id)) {
             return redirect()->back()->with('error', 'Map a UniFi site before syncing devices.');
@@ -494,11 +525,11 @@ class UnifiController extends Controller
             ->connected()
             ->first();
 
-        if (!$secret) {
+        if (! $secret) {
             return redirect()->back()->with('error', 'Test and connect your UniFi API key before syncing devices.');
         }
 
-        if (!$registry->has(self::PROVIDER)) {
+        if (! $registry->has(self::PROVIDER)) {
             return redirect()->back()->with('error', 'UniFi adapter is not registered.');
         }
 
@@ -527,16 +558,16 @@ class UnifiController extends Controller
             } elseif ($result->isPartial()) {
                 $syncLog->markCompleted(IntegrationSyncLog::STATUS_PARTIAL);
             } else {
-                $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, $result->error);
+                $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, SafeOperationalData::failureSummary());
             }
 
             $secret->update([
                 'last_synced_at' => now(),
-                'last_error' => $result->error,
+                'last_error' => $result->isSuccess() ? null : SafeOperationalData::failureSummary(),
             ]);
 
-            if (!$result->isSuccess() && !$result->isPartial()) {
-                return redirect()->back()->with('error', $result->error ?? 'UniFi device sync failed.');
+            if (! $result->isSuccess() && ! $result->isPartial()) {
+                return redirect()->back()->with('error', 'UniFi device sync failed. Review the bounded diagnostic state and retry.');
             }
 
             return redirect()->back()->with(
@@ -544,9 +575,9 @@ class UnifiController extends Controller
                 "Device sync complete. Processed {$result->processed}, created {$result->created}, updated {$result->updated}, errored {$result->errored}."
             );
         } catch (\Throwable $e) {
-            $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, $e->getMessage());
+            $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, SafeOperationalData::failureSummary());
 
-            return redirect()->back()->with('error', 'Failed to sync UniFi devices: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to sync UniFi devices. Review the bounded diagnostic state and retry.');
         }
     }
 
@@ -560,8 +591,7 @@ class UnifiController extends Controller
         Request $request,
         int $hardware,
         UnifiOperationalBridgeService $runtime,
-    )
-    {
+    ) {
         $user = $request->user();
         abort_unless($this->userCanManage($user), 403);
         $tenantId = $this->resolveTenantId($user);
@@ -569,30 +599,28 @@ class UnifiController extends Controller
         $device = Device::query()
             ->forTenant($tenantId)
             ->byProvider(self::PROVIDER)
-            ->findOrFail($hardware);
+            ->find($hardware);
+        abort_unless($device, 404);
 
         $validated = $request->validate([
-            'room_id' => ['nullable', 'integer', 'exists:site_rooms,id'],
+            'room_id' => ['nullable', 'integer'],
         ]);
 
         $roomId = $validated['room_id'] ?? null;
 
         if ($roomId !== null) {
+            $currentSiteId = $runtime->resolveSiteId($device, $tenantId);
+            abort_unless($currentSiteId !== null, 404);
+
             $room = SiteRoom::query()
                 ->where('tenant_id', $tenantId)
+                ->where('site_id', $currentSiteId)
+                ->whereHas('site', fn ($site) => $site->where('tenant_id', $tenantId))
                 ->find($roomId);
-
-            if (!$room) {
-                return redirect()->back()->with('error', 'Selected room does not belong to this tenant.');
-            }
-
-            $currentSiteId = $runtime->resolveSiteId($device);
-            if ($currentSiteId !== null && $room->site_id !== $currentSiteId) {
-                return redirect()->back()->with('error', 'Selected room does not belong to the device location.');
-            }
+            abort_unless($room, 404);
         }
 
-        $runtime->syncRoomAssignment($device, $room ?? null, $user?->id);
+        $runtime->syncRoomAssignment($device, $room ?? null, $user?->id, $tenantId, null);
 
         return redirect()->back()->with('success', 'Device room assignment updated.');
     }
@@ -640,11 +668,16 @@ class UnifiController extends Controller
 
         $preserved = [
             'discovered_sites' => $existing['discovered_sites'] ?? [],
-            'discovered_hosts' => $existing['discovered_hosts'] ?? [],
+            'discovered_host_count' => is_numeric($existing['discovered_host_count'] ?? null)
+                ? max(0, (int) $existing['discovered_host_count'])
+                : count(is_array($existing['discovered_hosts'] ?? null) ? $existing['discovered_hosts'] : []),
             'sites_synced_at' => $existing['sites_synced_at'] ?? null,
         ];
 
-        return array_merge($preserved, $existing, $newConfig);
+        $merged = array_merge($preserved, $existing, $newConfig);
+        unset($merged['discovered_hosts']);
+
+        return $merged;
     }
 
     private function resolveTenantId($user): int

@@ -7,6 +7,7 @@ use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Jobs\Integration\PullIntegrationHealthJob;
 use App\Models\Integration\IntegrationSiteConfig;
+use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\LocationHardware;
 use App\Models\Site;
@@ -16,6 +17,7 @@ use App\Services\Integration\SyncResult;
 use App\Services\Integration\UnifiOperationalBridgeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 /**
@@ -158,6 +160,35 @@ class NonUnifiHealthPullMigrationTest extends TestCase
         $this->assertSame(0, LocationHardware::query()->count());
     }
 
+    public function test_provider_exception_is_sanitized_in_sync_evidence_and_application_logs(): void
+    {
+        $site = Site::factory()->create(['tenant_id' => 1]);
+        $this->makeSiteConfig($site, 'hikvision');
+        $this->makeTenantSecret('hikvision');
+        $adapter = new NonUnifiHealthPullFakeAdapter(
+            'hikvision',
+            [],
+            new \RuntimeException('https://RAW-PROVIDER-HOST.test/?token=RAW-TOKEN'),
+        );
+        $registry = \Mockery::mock(IntegrationAdapterRegistry::class);
+        $registry->shouldReceive('resolve')->once()->andReturn($adapter);
+        Log::spy();
+
+        (new PullIntegrationHealthJob(1, 'hikvision', $site->id))
+            ->handle($registry, app(UnifiOperationalBridgeService::class));
+
+        $encodedEvidence = IntegrationSyncLog::query()->pluck('error_message')->toJson();
+        $this->assertStringNotContainsString('RAW-', $encodedEvidence);
+        $this->assertStringNotContainsString('provider-host.test', strtolower($encodedEvidence));
+        Log::shouldHaveReceived('error')->withArgs(function (string $message, array $context): bool {
+            $encoded = json_encode($context, JSON_THROW_ON_ERROR);
+
+            return str_contains($message, 'pull failed')
+                && ! str_contains($encoded, 'RAW-')
+                && ! str_contains(strtolower($encoded), 'provider-host.test');
+        })->once();
+    }
+
     private function makeSiteConfig(Site $site, string $provider): IntegrationSiteConfig
     {
         return IntegrationSiteConfig::create([
@@ -184,44 +215,54 @@ class NonUnifiHealthPullMigrationTest extends TestCase
 
     private function makeFakeAdapter(string $provider, array $healthResults): IntegrationAdapterInterface
     {
-        return new class($provider, $healthResults) implements IntegrationAdapterInterface
-        {
-            public function __construct(private string $providerSlug, private array $healthResults) {}
+        return new NonUnifiHealthPullFakeAdapter($provider, $healthResults);
+    }
+}
 
-            public function testConnection(IntegrationTenantSecret $secret): bool
-            {
-                return true;
-            }
+final class NonUnifiHealthPullFakeAdapter implements IntegrationAdapterInterface
+{
+    public function __construct(
+        private string $providerSlug,
+        private array $healthResults,
+        private ?\Throwable $pullFailure = null,
+    ) {}
 
-            public function discoverSites(IntegrationTenantSecret $secret): array
-            {
-                return [];
-            }
+    public function testConnection(IntegrationTenantSecret $secret): bool
+    {
+        return true;
+    }
 
-            public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): SyncResult
-            {
-                return new SyncResult;
-            }
+    public function discoverSites(IntegrationTenantSecret $secret): array
+    {
+        return [];
+    }
 
-            public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): array
-            {
-                return $this->healthResults;
-            }
+    public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): SyncResult
+    {
+        return new SyncResult;
+    }
 
-            public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret, ?\DateTimeInterface $since = null): array
-            {
-                return [];
-            }
+    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): array
+    {
+        if ($this->pullFailure !== null) {
+            throw $this->pullFailure;
+        }
 
-            public function capabilities(): array
-            {
-                return ['device_health'];
-            }
+        return $this->healthResults;
+    }
 
-            public function provider(): string
-            {
-                return $this->providerSlug;
-            }
-        };
+    public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret, ?\DateTimeInterface $since = null): array
+    {
+        return [];
+    }
+
+    public function capabilities(): array
+    {
+        return ['device_health'];
+    }
+
+    public function provider(): string
+    {
+        return $this->providerSlug;
     }
 }

@@ -309,6 +309,8 @@ Route::middleware([
                 ->name('security-devices.integrations.queclink.claim');
             Route::post('/devices/{queclinkDevice}/reject', [QueclinkHubController::class, 'rejectDevice'])
                 ->name('security-devices.integrations.queclink.reject');
+            Route::post('/devices/{queclinkDevice}/restore', [QueclinkHubController::class, 'restoreDevice'])
+                ->name('security-devices.integrations.queclink.restore');
             Route::post('/devices/{queclinkDevice}/release', [QueclinkHubController::class, 'releaseDevice'])
                 ->name('security-devices.integrations.queclink.release');
 

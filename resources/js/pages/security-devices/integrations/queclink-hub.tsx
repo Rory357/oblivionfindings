@@ -52,7 +52,6 @@ import {
     BookMarked,
     CheckCircle,
     Clock,
-    Copy,
     Database,
     Gauge,
     Inbox,
@@ -79,6 +78,10 @@ import {
     useRef,
     useState,
 } from 'react';
+import {
+    SiteCredentialsCard,
+    type SiteCredentialRow,
+} from './site-credentials';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -89,8 +92,9 @@ type FrameType = 'RESP' | 'ACK' | 'SACK' | 'BUFF' | 'AT' | 'unknown';
 
 type Device = {
     id: number;
-    imei: string;
+    reference: string;
     status: DeviceStatus;
+    pending_pairing_type?: PairingType | null;
     model_hint: string | null;
     protocol_version: string | null;
     firmware_version: string | null;
@@ -98,10 +102,8 @@ type Device = {
     first_seen_at: string | null;
     last_seen_at: string | null;
     last_frame_at: string | null;
-    remote_address: string | null;
     assignment: {
         type: PairingType;
-        target_id: number;
         assigned_at: string | null;
         label: string;
     } | null;
@@ -113,19 +115,12 @@ type Target = { id: number; label: string };
 
 type Frame = {
     id: number;
-    imei: string | null;
     direction: Direction;
     frame_type: FrameType;
     command_word: string | null;
-    raw_frame: string;
     parse_ok: boolean;
-    parse_error: string | null;
+    failure_category: string | null;
     created_at: string | null;
-};
-
-type DeviceConfigurationSection = {
-    name: string;
-    values: string[];
 };
 
 type DeviceConfigurationSummary =
@@ -134,29 +129,21 @@ type DeviceConfigurationSummary =
     | null;
 
 type DeviceConfiguration = {
-    available: boolean;
-    received_at: string | null;
-    raw: string;
-    sections: Record<string, DeviceConfigurationSection>;
-    summary: Record<string, DeviceConfigurationSummary> & {
-        server: Record<string, string> | null;
-        global: Record<string, string> | null;
-    };
+    state: 'observed' | 'not_observed';
+    observed_at: string | null;
+    sections: string[];
 };
 
 type RecentCommand = {
     id: number;
     command_word: string;
-    raw_command: string;
-    serial_number: string;
     status: 'queued' | 'sent' | 'acked' | 'failed' | 'expired' | 'cancelled';
     created_at: string | null;
     sent_at: string | null;
     acked_at: string | null;
     cancelled_at?: string | null;
     expires_at: string | null;
-    failed_reason: string | null;
-    ack_response?: string | null;
+    failure_category: string | null;
 };
 
 type Preset = {
@@ -167,14 +154,22 @@ type Preset = {
     target_category: string;
     is_system: boolean;
     sections: string[];
-    payload: Record<string, Record<string, unknown>>;
     created_at: string | null;
+};
+
+type DevicePagination = {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    prev_page_url: string | null;
+    next_page_url: string | null;
 };
 
 type Props = {
     listener: {
         port: number;
-        public_hostname: string;
+        endpoint_configured: boolean;
         service_state: string;
         connected_count: number;
     };
@@ -183,6 +178,9 @@ type Props = {
         pending: Device[];
         rejected: Device[];
         total: number;
+        counts?: Record<DeviceStatus, number>;
+        search?: string;
+        pagination?: Record<DeviceStatus, DevicePagination>;
     };
     statistics: {
         frames_last_hour: number;
@@ -193,6 +191,7 @@ type Props = {
         secret_last4?: string | null;
         last_tested_at?: string | null;
     } | null;
+    siteCredentials: SiteCredentialRow[];
     targets: {
         vehicles: Target[];
         staff: Target[];
@@ -217,16 +216,13 @@ function mergeFrames(existing: Frame[], incoming: Frame[]): Frame[] {
 }
 
 type FrameFilters = {
-    imei: string;
     direction: 'all' | Direction;
     commandWord: string;
     parseStatus: 'all' | 'ok' | 'error';
-    search: string;
 };
 
 function framesUrl(filters: FrameFilters): string {
     const params = new URLSearchParams();
-    if (filters.imei) params.set('imei', filters.imei);
     if (filters.direction !== 'all') params.set('direction', filters.direction);
     if (filters.commandWord.trim()) {
         params.set('command_word', filters.commandWord.trim().toUpperCase());
@@ -234,14 +230,12 @@ function framesUrl(filters: FrameFilters): string {
     if (filters.parseStatus !== 'all') {
         params.set('parse_status', filters.parseStatus);
     }
-    if (filters.search.trim()) params.set('search', filters.search.trim());
 
     return `/security-devices/integrations/queclink/frames${params.toString() ? '?' + params.toString() : ''}`;
 }
 
 function frameStreamUrl(filters: FrameFilters): string {
     const params = new URLSearchParams();
-    if (filters.imei) params.set('imei', filters.imei);
     if (filters.direction !== 'all') params.set('direction', filters.direction);
     if (filters.commandWord.trim()) {
         params.set('command_word', filters.commandWord.trim().toUpperCase());
@@ -249,7 +243,6 @@ function frameStreamUrl(filters: FrameFilters): string {
     if (filters.parseStatus !== 'all') {
         params.set('parse_status', filters.parseStatus);
     }
-    if (filters.search.trim()) params.set('search', filters.search.trim());
 
     return `/security-devices/integrations/queclink/stream${params.toString() ? '?' + params.toString() : ''}`;
 }
@@ -271,6 +264,10 @@ function fmtRel(iso: string | null): string {
     return `${Math.floor(diff / 86_400_000)}d ago`;
 }
 
+function deviceCount(devices: Props['devices'], status: DeviceStatus): number {
+    return devices.counts?.[status] ?? devices[status].length;
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Security & Devices', href: '/security-devices' },
     { title: 'APIs & Integrations', href: '/security-devices/integrations' },
@@ -287,12 +284,17 @@ export default function QueclinkHub({
     devices,
     statistics,
     imsCloud,
+    siteCredentials,
     targets,
     presets,
     can,
 }: Props) {
+    const [deviceSearch, setDeviceSearch] = useState(devices.search ?? '');
+    const pendingCount = deviceCount(devices, 'pending');
+    const pairedCount = deviceCount(devices, 'paired');
+    const rejectedCount = deviceCount(devices, 'rejected');
     const [activeTab, setActiveTab] = useState<string>(
-        devices.pending.length > 0 ? 'pending' : 'overview',
+        pendingCount > 0 ? 'pending' : 'overview',
     );
 
     return (
@@ -313,6 +315,39 @@ export default function QueclinkHub({
                     data-testid="queclink-page-shell"
                     className="w-full space-y-6"
                 >
+                    <SiteCredentialsCard rows={siteCredentials} />
+                    <form
+                        className="flex max-w-xl gap-2"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            router.get(
+                                '/security-devices/integrations/queclink',
+                                { device_search: deviceSearch },
+                                {
+                                    only: ['devices'],
+                                    preserveScroll: true,
+                                    preserveState: true,
+                                    replace: true,
+                                },
+                            );
+                        }}
+                    >
+                        <Input
+                            value={deviceSearch}
+                            onChange={(event) =>
+                                setDeviceSearch(event.target.value)
+                            }
+                            placeholder="Search devices…"
+                            aria-label="Search devices"
+                        />
+                        <Button type="submit" variant="outline">
+                            Search devices
+                        </Button>
+                    </form>
+                    <DevicePager
+                        pagination={devices.pagination?.paired}
+                        label="devices"
+                    />
                     {/* ── Tabs ────────────────────────────────────── */}
                     <Tabs
                         value={activeTab}
@@ -337,12 +372,12 @@ export default function QueclinkHub({
                                 >
                                     <Inbox className="h-4 w-4" />
                                     Pending
-                                    {devices.pending.length > 0 && (
+                                    {pendingCount > 0 && (
                                         <Badge
                                             variant="outline"
                                             className="ml-1 px-1.5 py-0 text-xs"
                                         >
-                                            {devices.pending.length}
+                                            {pendingCount}
                                         </Badge>
                                     )}
                                 </TabsTrigger>
@@ -351,7 +386,14 @@ export default function QueclinkHub({
                                     className={hubTabClassName}
                                 >
                                     <Smartphone className="h-4 w-4" />
-                                    Devices ({devices.paired.length})
+                                    Devices ({pairedCount})
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="rejected"
+                                    className={hubTabClassName}
+                                >
+                                    <XCircle className="h-4 w-4" />
+                                    Rejected ({rejectedCount})
                                 </TabsTrigger>
                                 <TabsTrigger
                                     value="settings"
@@ -392,6 +434,7 @@ export default function QueclinkHub({
                         <TabsContent value="pending" className="space-y-6 pt-6">
                             <PendingTab
                                 pending={devices.pending}
+                                pagination={devices.pagination?.pending}
                                 targets={targets}
                                 can={can}
                             />
@@ -401,6 +444,17 @@ export default function QueclinkHub({
                             <DevicesTab
                                 paired={devices.paired}
                                 presets={presets}
+                                can={can}
+                            />
+                        </TabsContent>
+
+                        <TabsContent
+                            value="rejected"
+                            className="space-y-6 pt-6"
+                        >
+                            <RejectedTab
+                                rejected={devices.rejected}
+                                pagination={devices.pagination?.rejected}
                                 can={can}
                             />
                         </TabsContent>
@@ -490,10 +544,10 @@ function OverviewTab({
 }) {
     const settings = useForm<{ port: number; public_hostname: string }>({
         port: listener.port,
-        public_hostname: listener.public_hostname,
+        public_hostname: '',
     });
     const [provisioning, setProvisioning] = useState<{
-        config_string: string;
+        state: string;
         instructions: string[];
     } | null>(null);
     const [family, setFamily] = useState<'gv500cg' | 'gl30m'>('gv500cg');
@@ -523,12 +577,16 @@ function OverviewTab({
             <div className="grid gap-4 md:grid-cols-4">
                 <StatCard
                     label="Paired devices"
-                    value={devices.paired.length}
+                    value={deviceCount(devices, 'paired')}
                 />
                 <StatCard
                     label="Pending"
-                    value={devices.pending.length}
-                    tone={devices.pending.length > 0 ? 'warning' : undefined}
+                    value={deviceCount(devices, 'pending')}
+                    tone={
+                        deviceCount(devices, 'pending') > 0
+                            ? 'warning'
+                            : undefined
+                    }
                 />
                 <StatCard
                     label="Connected now"
@@ -584,20 +642,23 @@ function OverviewTab({
                                 </code>{' '}
                                 to point at this port.
                             </p>
-                            {portChanged && devices.paired.length > 0 && (
-                                <p className="flex items-start gap-1 rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
-                                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                                    <span>
-                                        {devices.paired.length} paired{' '}
-                                        {devices.paired.length === 1
-                                            ? 'device'
-                                            : 'devices'}{' '}
-                                        will need to be reconfigured to dial
-                                        port {settings.data.port} before they
-                                        reconnect.
-                                    </span>
-                                </p>
-                            )}
+                            {portChanged &&
+                                deviceCount(devices, 'paired') > 0 && (
+                                    <p className="flex items-start gap-1 rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
+                                        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                                        <span>
+                                            {deviceCount(devices, 'paired')}{' '}
+                                            paired{' '}
+                                            {deviceCount(devices, 'paired') ===
+                                            1
+                                                ? 'device'
+                                                : 'devices'}{' '}
+                                            will need to be reconfigured to dial
+                                            port {settings.data.port} before
+                                            they reconnect.
+                                        </span>
+                                    </p>
+                                )}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="hostname">Public hostname</Label>
@@ -679,28 +740,14 @@ function OverviewTab({
                             ) : (
                                 <Play className="mr-2 h-4 w-4" />
                             )}
-                            Generate
+                            Check readiness
                         </Button>
                     </div>
                     {provisioning && (
                         <div className="space-y-3 rounded-lg border p-4">
-                            <div className="flex items-center justify-between gap-2">
-                                <code className="block max-w-full overflow-x-auto rounded bg-muted px-2 py-1.5 font-mono text-xs">
-                                    {provisioning.config_string}
-                                </code>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                        navigator.clipboard.writeText(
-                                            provisioning.config_string,
-                                        )
-                                    }
-                                >
-                                    <Copy className="h-3 w-3" />
-                                </Button>
-                            </div>
+                            <Badge variant="outline">
+                                {provisioning.state}
+                            </Badge>
                             <ol className="space-y-1 text-sm text-muted-foreground">
                                 {provisioning.instructions.map((step, i) => (
                                     <li key={i}>
@@ -731,19 +778,9 @@ function OverviewTab({
                         <Step n={1} title="Insert and activate the SIM card">
                             Insert a data SIM (any NZ carrier — One NZ, Spark,
                             2degrees). Confirm the APN with your carrier and
-                            program it into the device with{' '}
-                            <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                                AT+GTBSI=&lt;password&gt;,&lt;APN&gt;,&lt;user&gt;,&lt;pass&gt;,,,,0,,,FFFF$
-                            </code>{' '}
-                            (factory password is{' '}
-                            <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                                gv500cg
-                            </code>{' '}
-                            for GV-series,{' '}
-                            <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                                gl30
-                            </code>{' '}
-                            for GL-series).
+                            complete carrier provisioning using the approved
+                            secure device-management process. Credentials and
+                            command content are not displayed in this workspace.
                         </Step>
                         <Step n={2} title="Connect via USB">
                             Plug the CH340G USB cable into the device's config
@@ -758,10 +795,9 @@ function OverviewTab({
                         </Step>
                         <Step n={4} title="Point the device at this server">
                             Make sure the <strong>Public hostname</strong> above
-                            is set, then generate the provisioning string with
-                            the button below. Paste it into the @Track MT Setup
-                            tool's command field and click Send. The device will
-                            ACK and reboot.
+                            is set, then check provisioning readiness. Use the
+                            approved secure device-management process to apply
+                            the protected server configuration.
                         </Step>
                         <Step
                             n={5}
@@ -775,16 +811,9 @@ function OverviewTab({
                         </Step>
                         <Step n={6} title="Confirm in the Debug Console">
                             Open the <strong>Debug console</strong> tab and
-                            filter by the new IMEI. You should see{' '}
-                            <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                                +RESP:GTHBD
-                            </code>{' '}
-                            heartbeats every 5 minutes and{' '}
-                            <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                                +RESP:GTFRI
-                            </code>{' '}
-                            location reports every 30 seconds (defaults —
-                            adjustable per device).
+                            confirm bounded heartbeat and location-report
+                            states. Raw frame and device identifiers remain
+                            protected.
                         </Step>
                     </ol>
                     <div className="mt-4 rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-xs text-status-warning">
@@ -851,12 +880,64 @@ function StatCard({
 
 // ── Pending tab ───────────────────────────────────────────────────
 
+function DevicePager({
+    pagination,
+    label,
+}: {
+    pagination?: DevicePagination;
+    label: string;
+}) {
+    if (!pagination || pagination.last_page <= 1) return null;
+
+    const visit = (url: string | null) => {
+        if (!url) return;
+        router.get(
+            url,
+            {},
+            {
+                only: ['devices'],
+                preserveScroll: true,
+                preserveState: true,
+                replace: true,
+            },
+        );
+    };
+
+    return (
+        <div className="flex items-center justify-between gap-3 pt-3">
+            <Button
+                type="button"
+                variant="outline"
+                disabled={!pagination.prev_page_url}
+                onClick={() => visit(pagination.prev_page_url)}
+                aria-label={`Previous ${label}`}
+            >
+                Previous
+            </Button>
+            <p className="text-sm text-muted-foreground">
+                Page {pagination.current_page} of {pagination.last_page}
+            </p>
+            <Button
+                type="button"
+                variant="outline"
+                disabled={!pagination.next_page_url}
+                onClick={() => visit(pagination.next_page_url)}
+                aria-label={`Next ${label}`}
+            >
+                Next
+            </Button>
+        </div>
+    );
+}
+
 function PendingTab({
     pending,
+    pagination,
     targets,
     can,
 }: {
     pending: Device[];
+    pagination?: DevicePagination;
     targets: Props['targets'];
     can: Props['can'];
 }) {
@@ -864,19 +945,22 @@ function PendingTab({
 
     if (pending.length === 0) {
         return (
-            <Card>
-                <CardContent className="flex flex-col items-center gap-2 p-12 text-center">
-                    <Inbox className="h-10 w-10 text-muted-foreground" />
-                    <p className="text-sm font-medium">
-                        No devices waiting for pairing
-                    </p>
-                    <p className="max-w-md text-xs text-muted-foreground">
-                        When a device dials in for the first time it lands here.
-                        Configure it with the provisioning string from the
-                        Overview tab.
-                    </p>
-                </CardContent>
-            </Card>
+            <>
+                <Card>
+                    <CardContent className="flex flex-col items-center gap-2 p-12 text-center">
+                        <Inbox className="h-10 w-10 text-muted-foreground" />
+                        <p className="text-sm font-medium">
+                            No devices waiting for pairing
+                        </p>
+                        <p className="max-w-md text-xs text-muted-foreground">
+                            When a device dials in for the first time it lands
+                            here. Configure it with the provisioning string from
+                            the Overview tab.
+                        </p>
+                    </CardContent>
+                </Card>
+                <DevicePager pagination={pagination} label="pending" />
+            </>
         );
     }
 
@@ -909,7 +993,7 @@ function PendingTab({
                             {pending.map((d) => (
                                 <TableRow key={d.id}>
                                     <TableCell className="font-mono text-xs">
-                                        {d.imei}
+                                        {d.reference}
                                     </TableCell>
                                     <TableCell>{d.model_hint ?? '—'}</TableCell>
                                     <TableCell className="text-xs">
@@ -919,7 +1003,7 @@ function PendingTab({
                                         {fmtRel(d.last_seen_at)}
                                     </TableCell>
                                     <TableCell className="font-mono text-xs text-muted-foreground">
-                                        {d.remote_address ?? '—'}
+                                        Provider address protected
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <Button
@@ -937,7 +1021,7 @@ function PendingTab({
                                             onClick={() => {
                                                 if (
                                                     confirm(
-                                                        `Reject IMEI ${d.imei}? It will be ignored until manually re-allowed.`,
+                                                        `Reject ${d.reference}? It will be ignored until manually re-allowed.`,
                                                     )
                                                 ) {
                                                     router.post(
@@ -959,6 +1043,7 @@ function PendingTab({
                     </Table>
                 </CardContent>
             </Card>
+            <DevicePager pagination={pagination} label="pending" />
 
             {claiming && (
                 <ClaimDialog
@@ -971,7 +1056,108 @@ function PendingTab({
     );
 }
 
-function ClaimDialog({
+export function RejectedTab({
+    rejected,
+    pagination,
+    can,
+}: {
+    rejected: Device[];
+    pagination?: DevicePagination;
+    can: Props['can'];
+}) {
+    return (
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Rejected devices</CardTitle>
+                    <CardDescription>
+                        Devices blocked from pairing. Restore a recognised
+                        tracker to return it to the pending tray for review.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {rejected.length === 0 ? (
+                        <div className="flex flex-col items-center gap-2 p-10 text-center">
+                            <ShieldCheck className="h-10 w-10 text-muted-foreground" />
+                            <p className="text-sm font-medium">
+                                No rejected devices
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                                Rejected trackers remain visible here for safe
+                                review and recovery.
+                            </p>
+                        </div>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>IMEI</TableHead>
+                                    <TableHead>Model</TableHead>
+                                    <TableHead>Last seen</TableHead>
+                                    <TableHead>Connection</TableHead>
+                                    <TableHead className="text-right">
+                                        Actions
+                                    </TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {rejected.map((device) => (
+                                    <TableRow key={device.id}>
+                                        <TableCell className="font-mono text-xs">
+                                            {device.reference}
+                                        </TableCell>
+                                        <TableCell className="text-xs">
+                                            {device.model_hint ?? '—'}
+                                        </TableCell>
+                                        <TableCell className="text-xs">
+                                            {fmtRel(device.last_seen_at)}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline">
+                                                {device.connection_state ===
+                                                'connected'
+                                                    ? 'online'
+                                                    : 'offline'}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                disabled={!can.manage}
+                                                onClick={() => {
+                                                    if (
+                                                        confirm(
+                                                            `Restore ${device.reference} to the pending tray?`,
+                                                        )
+                                                    ) {
+                                                        router.post(
+                                                            `/security-devices/integrations/queclink/devices/${device.id}/restore`,
+                                                            {},
+                                                            {
+                                                                preserveScroll: true,
+                                                            },
+                                                        );
+                                                    }
+                                                }}
+                                            >
+                                                <RefreshCw className="mr-1 h-3 w-3" />
+                                                Restore
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
+                </CardContent>
+            </Card>
+            <DevicePager pagination={pagination} label="rejected" />
+        </>
+    );
+}
+
+export function ClaimDialog({
     device,
     targets,
     onClose,
@@ -985,10 +1171,28 @@ function ClaimDialog({
         target_id: string;
         consent_id: string;
     }>({
-        pairing_type: 'vehicle',
+        pairing_type: device.pending_pairing_type ?? 'vehicle',
         target_id: '',
         consent_id: '',
     });
+    const [targetSearch, setTargetSearch] = useState('');
+    const errorSummaryRef = useRef<HTMLDivElement>(null);
+    const claimErrors = Object.entries(form.errors).filter(
+        (error): error is [string, string] => Boolean(error[1]),
+    );
+    const pairingTypeId = `claim-device-${device.id}-pairing-type`;
+    const pairingTypeErrorId = `${pairingTypeId}-error`;
+    const targetId = `claim-device-${device.id}-target`;
+    const targetErrorId = `${targetId}-error`;
+    const consentId = `claim-device-${device.id}-consent`;
+    const consentHelpId = `${consentId}-help`;
+    const consentErrorId = `${consentId}-error`;
+
+    useEffect(() => {
+        if (Object.values(form.errors).some(Boolean)) {
+            errorSummaryRef.current?.focus();
+        }
+    }, [form.errors]);
 
     const availableTargets = useMemo(() => {
         return form.data.pairing_type === 'vehicle'
@@ -1000,13 +1204,21 @@ function ClaimDialog({
 
     return (
         <Dialog open onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent
+                className="sm:max-w-md"
+                onOpenAutoFocus={(event) => {
+                    if (claimErrors.length > 0) {
+                        event.preventDefault();
+                        errorSummaryRef.current?.focus();
+                    }
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle>Claim device</DialogTitle>
                     <DialogDescription>
                         IMEI{' '}
                         <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                            {device.imei}
+                            {device.reference}
                         </code>{' '}
                         — choose what this device is tracking.
                     </DialogDescription>
@@ -1025,8 +1237,42 @@ function ClaimDialog({
                     }}
                     className="space-y-4"
                 >
+                    {claimErrors.length > 0 && (
+                        <div
+                            ref={errorSummaryRef}
+                            role="alert"
+                            tabIndex={-1}
+                            aria-labelledby={`claim-device-${device.id}-error-title`}
+                            className="flex gap-2.5 rounded-lg border border-status-critical/35 bg-status-critical-bg p-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-status-critical focus-visible:ring-offset-2"
+                        >
+                            <AlertTriangle
+                                className="mt-0.5 h-4 w-4 shrink-0 text-status-critical"
+                                aria-hidden="true"
+                            />
+                            <div>
+                                <p
+                                    id={`claim-device-${device.id}-error-title`}
+                                    className="font-semibold text-status-critical"
+                                >
+                                    We couldn't claim this device
+                                </p>
+                                <p className="mt-1">
+                                    Check the highlighted details below and try
+                                    again.
+                                </p>
+                                <ul className="mt-1 list-disc space-y-1 pl-4">
+                                    {claimErrors.map(([field, error]) => (
+                                        <li key={field}>{error}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="space-y-2">
-                        <Label>What is this device?</Label>
+                        <Label htmlFor={pairingTypeId}>
+                            What is this device?
+                        </Label>
                         <Select
                             value={form.data.pairing_type}
                             onValueChange={(v) => {
@@ -1037,7 +1283,15 @@ function ClaimDialog({
                                 });
                             }}
                         >
-                            <SelectTrigger>
+                            <SelectTrigger
+                                id={pairingTypeId}
+                                aria-invalid={Boolean(form.errors.pairing_type)}
+                                aria-describedby={
+                                    form.errors.pairing_type
+                                        ? pairingTypeErrorId
+                                        : undefined
+                                }
+                            >
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1052,21 +1306,84 @@ function ClaimDialog({
                                 </SelectItem>
                             </SelectContent>
                         </Select>
+                        {form.errors.pairing_type && (
+                            <p
+                                id={pairingTypeErrorId}
+                                className="text-sm text-destructive"
+                            >
+                                {form.errors.pairing_type}
+                            </p>
+                        )}
+                        {form.data.pairing_type === 'staff' && (
+                            <p className="text-xs text-muted-foreground">
+                                Staff appear only when they have an active HR
+                                profile with a primary site. Update the staff
+                                profile before pairing if they are missing.
+                            </p>
+                        )}
+                        {form.data.pairing_type === 'client' && (
+                            <p className="text-xs text-muted-foreground">
+                                Clients appear only when their profile has a
+                                current site. Update the client profile before
+                                pairing if they are missing.
+                            </p>
+                        )}
                     </div>
 
                     <div className="space-y-2">
-                        <Label>
+                        <Label htmlFor={targetId}>
                             {form.data.pairing_type === 'vehicle'
                                 ? 'Vehicle'
                                 : form.data.pairing_type === 'staff'
                                   ? 'Staff member'
                                   : 'Client'}
                         </Label>
+                        <div className="flex gap-2">
+                            <Input
+                                value={targetSearch}
+                                onChange={(event) =>
+                                    setTargetSearch(event.target.value)
+                                }
+                                placeholder={`Search ${form.data.pairing_type === 'vehicle' ? 'vehicles' : form.data.pairing_type === 'staff' ? 'staff' : 'clients'}…`}
+                            />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() =>
+                                    router.get(
+                                        '/security-devices/integrations/queclink',
+                                        {
+                                            target_type: form.data.pairing_type,
+                                            target_search: targetSearch,
+                                            selected_target_id:
+                                                form.data.target_id ||
+                                                undefined,
+                                        },
+                                        {
+                                            only: ['targets'],
+                                            preserveScroll: true,
+                                            preserveState: true,
+                                            replace: true,
+                                        },
+                                    )
+                                }
+                            >
+                                Search
+                            </Button>
+                        </div>
                         <Select
                             value={form.data.target_id}
                             onValueChange={(v) => form.setData('target_id', v)}
                         >
-                            <SelectTrigger>
+                            <SelectTrigger
+                                id={targetId}
+                                aria-invalid={Boolean(form.errors.target_id)}
+                                aria-describedby={
+                                    form.errors.target_id
+                                        ? targetErrorId
+                                        : undefined
+                                }
+                            >
                                 <SelectValue placeholder="Select…" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1077,24 +1394,52 @@ function ClaimDialog({
                                 ))}
                             </SelectContent>
                         </Select>
+                        {form.errors.target_id && (
+                            <p
+                                id={targetErrorId}
+                                className="text-sm text-destructive"
+                            >
+                                {form.errors.target_id}
+                            </p>
+                        )}
                     </div>
 
                     {form.data.pairing_type === 'client' && (
                         <div className="space-y-2">
-                            <Label>Consent record ID (optional)</Label>
+                            <Label htmlFor={consentId}>
+                                Consent record ID (optional when current consent
+                                exists)
+                            </Label>
                             <Input
+                                id={consentId}
                                 type="number"
                                 value={form.data.consent_id}
                                 onChange={(e) =>
                                     form.setData('consent_id', e.target.value)
                                 }
                                 placeholder="e.g. 42"
+                                aria-invalid={Boolean(form.errors.consent_id)}
+                                aria-describedby={`${consentHelpId}${form.errors.consent_id ? ` ${consentErrorId}` : ''}`}
                             />
-                            <p className="text-xs text-muted-foreground">
-                                Location data is consent-gated. Without a valid
-                                consent record, the device will connect but
-                                lat/lng will not be stored.
+                            <p
+                                id={consentHelpId}
+                                className="text-xs text-muted-foreground"
+                            >
+                                A current location-tracking consent is required
+                                before you can claim this device. Leave this
+                                blank to use the client's current consent, or
+                                enter another current consent record ID. If
+                                there is no current consent, record it in the
+                                client's profile first.
                             </p>
+                            {form.errors.consent_id && (
+                                <p
+                                    id={consentErrorId}
+                                    className="text-sm text-destructive"
+                                >
+                                    {form.errors.consent_id}
+                                </p>
+                            )}
                         </div>
                     )}
 
@@ -1136,15 +1481,19 @@ function DevicesTab({
 
     if (paired.length === 0) {
         return (
-            <Card>
-                <CardContent className="flex flex-col items-center gap-2 p-12 text-center">
-                    <Satellite className="h-10 w-10 text-muted-foreground" />
-                    <p className="text-sm font-medium">No devices paired yet</p>
-                    <p className="text-xs text-muted-foreground">
-                        Pair a device from the Pending tab to see it here.
-                    </p>
-                </CardContent>
-            </Card>
+            <>
+                <Card>
+                    <CardContent className="flex flex-col items-center gap-2 p-12 text-center">
+                        <Satellite className="h-10 w-10 text-muted-foreground" />
+                        <p className="text-sm font-medium">
+                            No devices paired yet
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            Pair a device from the Pending tab to see it here.
+                        </p>
+                    </CardContent>
+                </Card>
+            </>
         );
     }
 
@@ -1209,7 +1558,7 @@ function DevicesTab({
                                 <TableRow key={d.id}>
                                     <TableCell>
                                         <input
-                                            aria-label={`Select ${d.imei}`}
+                                            aria-label={`Select ${d.reference}`}
                                             type="checkbox"
                                             checked={selectedIds.includes(d.id)}
                                             onChange={(event) =>
@@ -1225,7 +1574,7 @@ function DevicesTab({
                                         />
                                     </TableCell>
                                     <TableCell className="font-mono text-xs">
-                                        {d.imei}
+                                        {d.reference}
                                     </TableCell>
                                     <TableCell className="text-xs capitalize">
                                         {d.assignment?.type ?? '—'}
@@ -1258,7 +1607,7 @@ function DevicesTab({
                                             onClick={() => {
                                                 if (
                                                     confirm(
-                                                        `Release ${d.imei}? It will return to the pending tray and stop receiving commands.`,
+                                                        `Release ${d.reference}? It will return to the pending tray and stop receiving commands.`,
                                                     )
                                                 ) {
                                                     router.post(
@@ -1318,8 +1667,9 @@ function BulkActionDialog({
                 <DialogHeader>
                     <DialogTitle>Bulk apply</DialogTitle>
                     <DialogDescription>
-                        Queue commands for every selected paired device. Commands
-                        still send through the normal pending-command queue.
+                        Queue commands for every selected paired device.
+                        Commands still send through the normal pending-command
+                        queue.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -1335,7 +1685,7 @@ function BulkActionDialog({
                                     variant="outline"
                                     className="font-mono"
                                 >
-                                    {device.imei}
+                                    {device.reference}
                                 </Badge>
                             ))}
                         </div>
@@ -1522,8 +1872,11 @@ function PresetsCard({
                             <CardTitle>Configuration presets</CardTitle>
                             <CardDescription>
                                 Apply a saved bundle of settings to{' '}
-                                {target ? target.imei : 'the selected device'} in
-                                one click. Each section queues its own command.
+                                {target
+                                    ? target.reference
+                                    : 'the selected device'}{' '}
+                                in one click. Each section queues its own
+                                command.
                             </CardDescription>
                         </div>
                     </div>
@@ -1542,8 +1895,8 @@ function PresetsCard({
             <CardContent>
                 {presets.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                        No presets yet. Set up the Server and Global cards below,
-                        then save them as a reusable preset.
+                        No presets yet. Set up the Server and Global cards
+                        below, then save them as a reusable preset.
                     </p>
                 ) : (
                     <div className="grid gap-3 md:grid-cols-2">
@@ -1626,43 +1979,21 @@ function PresetsCard({
                             <DialogTitle>Apply “{confirm.name}”?</DialogTitle>
                             <DialogDescription>
                                 Queues {confirm.sections.length} command
-                                {confirm.sections.length === 1 ? '' : 's'} to{' '}
+                                {confirm.sections.length === 1
+                                    ? ''
+                                    : 's'} to{' '}
                                 <span className="font-mono">
-                                    {target?.imei}
+                                    {target?.reference}
                                 </span>
                                 . The tracker applies them on its next check-in.
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="max-h-72 space-y-3 overflow-y-auto">
-                            {Object.entries(confirm.payload).map(
-                                ([sectionName, fields]) => (
-                                    <div
-                                        key={sectionName}
-                                        className="rounded-md border bg-muted/20 p-3"
-                                    >
-                                        <p className="text-xs font-semibold uppercase text-muted-foreground">
-                                            {sectionName}
-                                        </p>
-                                        <div className="mt-1 grid gap-0.5">
-                                            {Object.entries(fields).map(
-                                                ([field, value]) => (
-                                                    <div
-                                                        key={field}
-                                                        className="flex justify-between gap-4 text-xs"
-                                                    >
-                                                        <span className="text-muted-foreground">
-                                                            {field}
-                                                        </span>
-                                                        <span className="font-mono">
-                                                            {String(value)}
-                                                        </span>
-                                                    </div>
-                                                ),
-                                            )}
-                                        </div>
-                                    </div>
-                                ),
-                            )}
+                        <div className="flex flex-wrap gap-2">
+                            {confirm.sections.map((sectionName) => (
+                                <Badge key={sectionName} variant="outline">
+                                    {sectionName}
+                                </Badge>
+                            ))}
                         </div>
                         <DialogFooter>
                             <Button
@@ -1768,7 +2099,8 @@ function SavePresetDialog({
                                     setIncludeTracking(event.target.checked)
                                 }
                             />
-                            Global tracking (cadence, GNSS, panic button, battery)
+                            Global tracking (cadence, GNSS, panic button,
+                            battery)
                         </label>
                         <label className="flex items-center gap-2 text-sm">
                             <input
@@ -1850,11 +2182,8 @@ function serverDefaults(
     device: Device | null,
     listener: Props['listener'],
 ): ServerSettingsForm {
-    const current = device?.configuration?.summary.server ?? {};
-    const host = str(
-        current.main_host,
-        listener.public_hostname || 'oblivionfindings.com',
-    );
+    const current: Record<string, string> = {};
+    const host = str(current.main_host, '');
     const port = str(current.main_port, String(listener.port || 8090));
 
     return {
@@ -1881,7 +2210,7 @@ function serverDefaults(
 }
 
 function globalDefaults(device: Device | null): GlobalSettingsForm {
-    const current = device?.configuration?.summary.global ?? {};
+    const current: Record<string, string> = {};
 
     return {
         device_name: str(current.device_name, device?.model_hint || 'GL30MEU'),
@@ -2567,7 +2896,7 @@ export function DeviceSettingsTab({
                                             key={device.id}
                                             value={String(device.id)}
                                         >
-                                            {device.imei}
+                                            {device.reference}
                                             {device.assignment?.label
                                                 ? ` — ${device.assignment.label}`
                                                 : ''}
@@ -2602,8 +2931,8 @@ export function DeviceSettingsTab({
                                 icon={<Database className="h-4 w-4" />}
                                 label="Config read"
                                 value={
-                                    config?.available
-                                        ? fmtRel(config.received_at)
+                                    config?.state === 'observed'
+                                        ? fmtRel(config.observed_at)
                                         : 'not read yet'
                                 }
                             />
@@ -3132,15 +3461,11 @@ export function DeviceSettingsTab({
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <Textarea
-                                readOnly
-                                value={
-                                    config?.available
-                                        ? config.raw
-                                        : 'No configuration readback has been received yet.'
-                                }
-                                className="min-h-40 font-mono text-xs"
-                            />
+                            <p className="text-sm text-muted-foreground">
+                                {config?.state === 'observed'
+                                    ? `Configuration observed. Sections: ${config.sections.join(', ') || 'none reported'}. Values are protected.`
+                                    : 'No configuration readback has been received yet.'}
+                            </p>
                         </CardContent>
                     </Card>
                 </div>
@@ -3168,7 +3493,8 @@ export function DeviceSettingsTab({
                         ) : (
                             <div className="max-h-[680px] space-y-3 overflow-y-auto pr-1">
                                 {recentCommands.map((command) => (
-                                    <Card unstyled
+                                    <Card
+                                        unstyled
                                         key={command.id}
                                         className="rounded-lg border bg-background p-3 shadow-xs"
                                     >
@@ -3178,8 +3504,8 @@ export function DeviceSettingsTab({
                                             </span>
                                             {commandStatusBadge(command.status)}
                                         </div>
-                                        <p className="mt-1 font-mono text-xs break-all text-muted-foreground">
-                                            {command.raw_command}
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Command content protected
                                         </p>
                                         <dl className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                                             <div>
@@ -3198,11 +3524,12 @@ export function DeviceSettingsTab({
                                                         : 'waiting'}
                                                 </dd>
                                             </div>
-                                            {command.failed_reason && (
+                                            {command.failure_category && (
                                                 <div className="col-span-2">
                                                     <dt>Failure</dt>
                                                     <dd>
-                                                        {command.failed_reason}
+                                                        Provider operation
+                                                        failed
                                                     </dd>
                                                 </div>
                                             )}
@@ -3289,50 +3616,17 @@ export function DeviceSettingsTab({
             >
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>Command payload</DialogTitle>
+                        <DialogTitle>Command status</DialogTitle>
                         <DialogDescription>
-                            Raw queued command and the latest ACK payload, if
-                            the device has responded.
+                            Bounded delivery state. Command and ACK content are
+                            protected.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs">Raw AT command</Label>
-                            <Textarea
-                                readOnly
-                                value={selectedCommand?.raw_command ?? ''}
-                                className="min-h-24 font-mono text-xs"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs">ACK response</Label>
-                            <Textarea
-                                readOnly
-                                value={
-                                    selectedCommand?.ack_response ||
-                                    selectedCommand?.failed_reason ||
-                                    'No ACK or failure reason recorded yet.'
-                                }
-                                className="min-h-20 font-mono text-xs"
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            disabled={!selectedCommand}
-                            onClick={() => {
-                                if (!selectedCommand) return;
-                                void navigator.clipboard?.writeText(
-                                    selectedCommand.raw_command,
-                                );
-                            }}
-                        >
-                            <Copy className="mr-2 h-3 w-3" />
-                            Copy raw
-                        </Button>
-                    </DialogFooter>
+                    <p className="text-sm text-muted-foreground">
+                        {selectedCommand?.failure_category
+                            ? 'Provider operation failed.'
+                            : 'No failure category is recorded.'}
+                    </p>
                 </DialogContent>
             </Dialog>
         </div>
@@ -3351,7 +3645,10 @@ function SettingsMetric({
     tone?: 'default' | 'success' | 'muted';
 }) {
     return (
-        <Card unstyled className="rounded-lg border bg-background p-3 shadow-xs">
+        <Card
+            unstyled
+            className="rounded-lg border bg-background p-3 shadow-xs"
+        >
             <div
                 className={
                     tone === 'success'
@@ -3443,8 +3740,7 @@ function AdvancedQueclinkSectionForm({
         setValues(commandDefaults(definition));
     }, [definition]);
 
-    const snapshot =
-        target?.configuration?.summary[definition.summaryKey] ?? null;
+    const snapshot = null;
 
     return (
         <Card className="shadow-sm">
@@ -3637,11 +3933,9 @@ export function DebugConsoleTab({
 }) {
     const [frames, setFrames] = useState<Frame[]>([]);
     const [filters, setFilters] = useState<FrameFilters>({
-        imei: '',
         direction: 'all',
         commandWord: '',
         parseStatus: 'all',
-        search: '',
     });
     const [streaming, setStreaming] = useState(true);
     const esRef = useRef<EventSource | null>(null);
@@ -3737,29 +4031,6 @@ export function DebugConsoleTab({
                             </CardDescription>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Select
-                                value={filters.imei || 'all'}
-                                onValueChange={(v) =>
-                                    updateFilter('imei', v === 'all' ? '' : v)
-                                }
-                            >
-                                <SelectTrigger className="w-48">
-                                    <SelectValue placeholder="All devices" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All devices
-                                    </SelectItem>
-                                    {devices.map((d) => (
-                                        <SelectItem key={d.id} value={d.imei}>
-                                            {d.imei}
-                                            {d.assignment?.label
-                                                ? ` — ${d.assignment.label}`
-                                                : ''}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
                             <Button
                                 size="sm"
                                 variant={streaming ? 'default' : 'outline'}
@@ -3785,7 +4056,7 @@ export function DebugConsoleTab({
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         <div className="space-y-2">
                             <Label className="text-xs">Direction</Label>
                             <Select
@@ -3849,18 +4120,9 @@ export function DebugConsoleTab({
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs">Search raw frame</Label>
-                            <Input
-                                value={filters.search}
-                                placeholder="IMEI, serial, error text"
-                                onChange={(event) =>
-                                    updateFilter('search', event.target.value)
-                                }
-                            />
-                        </div>
                     </div>
-                    <Card unstyled
+                    <Card
+                        unstyled
                         ref={containerRef}
                         className="h-[480px] overflow-y-auto rounded-md border bg-background font-mono text-xs"
                         onScroll={(e) => {
@@ -3913,16 +4175,13 @@ function FrameLine({ frame }: { frame: Frame }) {
             <div className="w-16 shrink-0 text-[10px] text-muted-foreground">
                 {frame.command_word ?? frame.frame_type}
             </div>
-            <div className="w-28 shrink-0 truncate text-[10px] text-muted-foreground">
-                {frame.imei ?? '—'}
-            </div>
             <div className="flex-1 break-all">
                 <code className={frame.parse_ok ? '' : 'text-status-critical'}>
-                    {frame.raw_frame}
+                    {frame.frame_type} frame received
                 </code>
-                {frame.parse_error && (
+                {frame.failure_category && (
                     <p className="mt-0.5 text-[10px] text-status-critical">
-                        {frame.parse_error}
+                        Frame parsing failed
                     </p>
                 )}
             </div>
@@ -3983,7 +4242,7 @@ function CommandRepl({
                         <SelectContent>
                             {devices.map((d) => (
                                 <SelectItem key={d.id} value={String(d.id)}>
-                                    {d.imei}
+                                    {d.reference}
                                     {d.assignment?.label
                                         ? ` — ${d.assignment.label}`
                                         : ''}

@@ -33,6 +33,10 @@ import {
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
+import {
+    SiteCredentialsCard,
+    type SiteCredentialRow,
+} from './site-credentials';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -43,8 +47,7 @@ type TenantSecret = {
     secret_last4?: string;
     last_tested_at?: string;
     last_synced_at?: string;
-    last_error?: string | null;
-    base_url?: string | null;
+    endpoint_configured: boolean;
 } | null;
 
 type SyncLog = {
@@ -55,7 +58,7 @@ type SyncLog = {
     items_created: number;
     items_updated: number;
     items_errored: number;
-    error_message?: string | null;
+    failure_category?: string | null;
     started_at: string;
     completed_at?: string | null;
 };
@@ -63,6 +66,7 @@ type SyncLog = {
 type Props = {
     tenantSecret: TenantSecret;
     syncLogs: SyncLog[];
+    siteCredentials: SiteCredentialRow[];
     can: {
         manage: boolean;
     };
@@ -111,6 +115,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 export default function MilesightIntegration({
     tenantSecret,
     syncLogs,
+    siteCredentials,
     can,
 }: Props) {
     const [showRotateForm, setShowRotateForm] = useState(false);
@@ -118,15 +123,15 @@ export default function MilesightIntegration({
 
     const saveKeyForm = useForm<{ api_key: string; base_url: string }>({
         api_key: '',
-        base_url: tenantSecret?.base_url ?? '',
+        base_url: '',
     });
 
     const rotateKeyForm = useForm<{ api_key: string }>({ api_key: '' });
 
     const hasKey = !!tenantSecret;
     const connStatus = tenantSecret
-        ? connectionStatusConfig[tenantSecret.status] ??
-          connectionStatusConfig.disconnected
+        ? (connectionStatusConfig[tenantSecret.status] ??
+          connectionStatusConfig.disconnected)
         : null;
 
     return (
@@ -152,11 +157,11 @@ export default function MilesightIntegration({
                                 Scaffold stage — credential management only.
                             </p>
                             <p className="text-muted-foreground">
-                                Save your API key and verify the connection
-                                here today. Gateway / application mapping,
-                                LoRaWAN device import, and payload decoding for
-                                bed, fall, door, temp, leak and air-quality
-                                sensors ship in a follow-up release.
+                                Save your API key and verify the connection here
+                                today. Gateway / application mapping, LoRaWAN
+                                device import, and payload decoding for bed,
+                                fall, door, temp, leak and air-quality sensors
+                                ship in a follow-up release.
                             </p>
                         </div>
                     </CardContent>
@@ -254,13 +259,10 @@ export default function MilesightIntegration({
                                         </Badge>
                                     )}
                                 </div>
-                                {tenantSecret?.base_url && (
+                                {tenantSecret?.endpoint_configured && (
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <MapPin className="h-3.5 w-3.5" />
-                                        Server:{' '}
-                                        <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                                            {tenantSecret.base_url}
-                                        </code>
+                                        Provider endpoint configured
                                     </div>
                                 )}
                                 <div className="space-y-1 text-sm text-muted-foreground">
@@ -277,10 +279,14 @@ export default function MilesightIntegration({
                                         </span>
                                     </p>
                                 </div>
-                                {tenantSecret?.last_error && (
+                                {tenantSecret?.status === 'error' && (
                                     <div className="flex items-start gap-2 rounded-md border border-status-critical/30 bg-status-critical-bg p-3 text-xs text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                                        <span>{tenantSecret.last_error}</span>
+                                        <span>
+                                            The provider connection needs
+                                            attention. Test the connection or
+                                            retry.
+                                        </span>
                                     </div>
                                 )}
                                 <div className="flex flex-wrap gap-2">
@@ -413,6 +419,8 @@ export default function MilesightIntegration({
                     </CardContent>
                 </Card>
 
+                <SiteCredentialsCard rows={siteCredentials} />
+
                 {/* ── Recent activity ──────────────────────────────────── */}
                 {syncLogs.length > 0 && (
                     <Card>
@@ -444,9 +452,12 @@ export default function MilesightIntegration({
                                                     <Badge variant="outline">
                                                         {log.status}
                                                     </Badge>
-                                                    {log.error_message && (
+                                                    {log.failure_category && (
                                                         <p className="mt-1 text-xs text-status-critical">
-                                                            {log.error_message}
+                                                            Provider operation
+                                                            failed. Retry or
+                                                            review the bounded
+                                                            diagnostics.
                                                         </p>
                                                     )}
                                                 </TableCell>

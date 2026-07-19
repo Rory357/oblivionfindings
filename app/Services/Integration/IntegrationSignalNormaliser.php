@@ -6,6 +6,7 @@ use App\Enums\AlertSeverity;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SignalType;
 use App\Models\Integration\IntegrationEvent;
+use App\Support\SafeOperationalData;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -196,26 +197,29 @@ class IntegrationSignalNormaliser
                 return $code;
             }
 
-            Log::warning('IntegrationSignalNormaliser: mapped signal type not found in DB', [
+            Log::warning('IntegrationSignalNormaliser: mapped signal type not found in DB', SafeOperationalData::logContext([
+                'tenant_id' => $event->tenant_id,
                 'event_type' => $eventType,
                 'mapped_code' => $code,
-            ]);
+                'provider' => $event->provider,
+            ]));
         }
 
         // 2. Try generated code
-        $generatedCode = 'integration_' . $eventType;
+        $generatedCode = 'integration_'.$eventType;
         if (SignalType::where('code', $generatedCode)->where('is_active', true)->exists()) {
             return $generatedCode;
         }
 
         // 3. Fallback to catch-all
-        Log::info('IntegrationSignalNormaliser: using fallback signal type', [
+        Log::info('IntegrationSignalNormaliser: using fallback signal type', SafeOperationalData::logContext([
+            'tenant_id' => $event->tenant_id,
             'event_type' => $eventType,
             'tried_codes' => [self::SIGNAL_TYPE_MAP[$eventType] ?? null, $generatedCode],
             'fallback' => self::FALLBACK_SIGNAL_TYPE,
             'integration_event_id' => $event->id,
             'provider' => $event->provider,
-        ]);
+        ]));
 
         return self::FALLBACK_SIGNAL_TYPE;
     }
@@ -248,11 +252,13 @@ class IntegrationSignalNormaliser
         }
 
         // 3. Unrecognised provider severity — log and default
-        Log::warning('IntegrationSignalNormaliser: unrecognised provider severity', [
+        Log::warning('IntegrationSignalNormaliser: unrecognised provider severity', SafeOperationalData::logContext([
+            'tenant_id' => $event->tenant_id,
             'severity' => $event->severity,
             'event_type' => $eventType,
             'integration_event_id' => $event->id,
-        ]);
+            'provider' => $event->provider,
+        ]));
 
         return AlertSeverity::MEDIUM;
     }
@@ -265,13 +271,13 @@ class IntegrationSignalNormaliser
      */
     public function resolveSignalSource(string $provider): ?SignalSource
     {
-        $slug = 'integration_' . strtolower(trim($provider));
+        $slug = 'integration_'.strtolower(trim($provider));
 
         try {
             return SignalSource::firstOrCreate(
                 ['slug' => $slug],
                 [
-                    'name' => ucfirst($provider) . ' Integration',
+                    'name' => ucfirst($provider).' Integration',
                     'vendor' => $provider,
                     'status' => 'active',
                     'config' => [],
@@ -279,11 +285,10 @@ class IntegrationSignalNormaliser
                 ]
             );
         } catch (\Throwable $e) {
-            Log::error('IntegrationSignalNormaliser: failed to resolve signal source', [
+            Log::error('IntegrationSignalNormaliser: failed to resolve signal source', SafeOperationalData::logContext([
                 'provider' => $provider,
-                'slug' => $slug,
-                'error' => $e->getMessage(),
-            ]);
+                'error_category' => SafeOperationalData::failureCategory($e),
+            ]));
 
             return null;
         }
@@ -298,7 +303,7 @@ class IntegrationSignalNormaliser
      */
     public function buildIdempotencyKey(IntegrationEvent $event): string
     {
-        if (!empty($event->source_event_id)) {
+        if (! empty($event->source_event_id)) {
             // Strong idempotency: provider + source event ID is globally unique
             return hash('sha256', implode('|', [
                 'integration',
@@ -395,5 +400,4 @@ class IntegrationSignalNormaliser
 
         return implode(' ', $words);
     }
-
 }

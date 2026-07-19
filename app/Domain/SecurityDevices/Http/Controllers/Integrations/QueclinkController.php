@@ -51,7 +51,7 @@ class QueclinkController extends Controller
                 'items_created' => $log->items_created,
                 'items_updated' => $log->items_updated,
                 'items_errored' => $log->items_errored,
-                'error_message' => $log->error_message,
+                'failure_category' => $log->status === IntegrationSyncLog::STATUS_FAILED ? 'provider_failure' : null,
                 'started_at' => $log->started_at?->toDateTimeString(),
                 'completed_at' => $log->completed_at?->toDateTimeString(),
             ])
@@ -64,8 +64,7 @@ class QueclinkController extends Controller
                 'secret_last4' => $tenantSecret->secret_last4,
                 'last_tested_at' => $tenantSecret->last_tested_at?->toDateTimeString(),
                 'last_synced_at' => $tenantSecret->last_synced_at?->toDateTimeString(),
-                'last_error' => $tenantSecret->last_error,
-                'base_url' => $config['base_url'] ?? null,
+                'endpoint_configured' => filled($config['base_url'] ?? null),
             ] : null,
             'syncLogs' => $syncLogs,
             'can' => [

@@ -11,8 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class IntegrationSiteSecret extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
 
     protected $table = 'integration_site_secrets';
 
@@ -35,6 +35,12 @@ class IntegrationSiteSecret extends Model
 
     protected $hidden = [
         'secret_encrypted',
+    ];
+
+    protected array $auditExcludedAttributes = [
+        'secret_encrypted',
+        'base_url',
+        'last_error',
     ];
 
     /* ---------------------------------------------------------------

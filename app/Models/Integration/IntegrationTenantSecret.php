@@ -11,11 +11,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class IntegrationTenantSecret extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
 
     public const STATUS_CONNECTED = 'connected';
+
     public const STATUS_DISCONNECTED = 'disconnected';
+
     public const STATUS_ERROR = 'error';
 
     protected $table = 'integration_tenant_secrets';
@@ -43,6 +45,12 @@ class IntegrationTenantSecret extends Model
 
     protected $hidden = [
         'secret_encrypted',
+    ];
+
+    protected array $auditExcludedAttributes = [
+        'secret_encrypted',
+        'config',
+        'last_error',
     ];
 
     /* ---------------------------------------------------------------

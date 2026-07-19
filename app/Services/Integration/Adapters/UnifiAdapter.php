@@ -7,8 +7,11 @@ use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\LocationHardware;
 use App\Services\Integration\IntegrationAdapterInterface;
+use App\Services\Integration\IntegrationDiscoveryException;
 use App\Services\Integration\SyncResult;
 use App\Services\Integration\UnifiOperationalBridgeService;
+use App\Support\SafeOperationalData;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -16,6 +19,18 @@ use Illuminate\Support\Facades\Log;
 class UnifiAdapter implements IntegrationAdapterInterface
 {
     private const BASE_URL = 'https://api.ui.com/v1';
+
+    private const SITE_IDENTIFIER_MAX_LENGTH = 255;
+
+    private const SITE_LABEL_MAX_LENGTH = 255;
+
+    private const SITE_STATUS_MAX_LENGTH = 100;
+
+    private const SITE_DEVICE_COUNT_MAX = 1000000;
+
+    private const HOST_COUNT_MAX = 10000;
+
+    private const HOST_CONTROLLER_COUNT_MAX = 100;
 
     public function __construct(
         private readonly UnifiOperationalBridgeService $runtime,
@@ -29,11 +44,11 @@ class UnifiAdapter implements IntegrationAdapterInterface
         'uxg' => LocationHardware::CATEGORY_GATEWAY,
         'usw' => LocationHardware::CATEGORY_SWITCH,
         'uap' => LocationHardware::CATEGORY_AP,
-        'u6'  => LocationHardware::CATEGORY_AP,
-        'u7'  => LocationHardware::CATEGORY_AP,
+        'u6' => LocationHardware::CATEGORY_AP,
+        'u7' => LocationHardware::CATEGORY_AP,
         'uvc' => LocationHardware::CATEGORY_CAMERA,
         'ucg' => LocationHardware::CATEGORY_GATEWAY,
-        'ua'  => LocationHardware::CATEGORY_DOOR,
+        'ua' => LocationHardware::CATEGORY_DOOR,
         'unvr' => LocationHardware::CATEGORY_NVR,
         'uai' => LocationHardware::CATEGORY_AI,
     ];
@@ -56,14 +71,14 @@ class UnifiAdapter implements IntegrationAdapterInterface
             $response = Http::withHeaders([
                 'Accept' => 'application/json',
                 'X-API-Key' => $apiKey,
-            ])->get(self::BASE_URL . '/sites');
+            ])->get(self::BASE_URL.'/sites');
 
             return $response->successful();
         } catch (\Throwable $e) {
-            Log::warning('UniFi testConnection failed', [
+            Log::warning('UniFi testConnection failed', SafeOperationalData::logContext([
                 'tenant_id' => $secret->tenant_id,
-                'error' => $e->getMessage(),
-            ]);
+                'error_category' => SafeOperationalData::failureCategory($e),
+            ]));
 
             return false;
         }
@@ -79,23 +94,22 @@ class UnifiAdapter implements IntegrationAdapterInterface
                 'X-API-Key' => $apiKey,
             ];
 
-            $response = Http::withHeaders($headers)->get(self::BASE_URL . '/sites');
+            $response = Http::withHeaders($headers)->get(self::BASE_URL.'/sites');
 
-            if (!$response->successful()) {
-                Log::warning('UniFi discoverSites request failed', [
-                    'tenant_id' => $secret->tenant_id,
-                    'status' => $response->status(),
-                ]);
-
-                return [];
+            if (! $response->successful()) {
+                throw IntegrationDiscoveryException::forHttpStatus($response->status());
             }
 
-            $sites = $response->json('data', []);
+            $sites = $response->json('data');
+            if (! is_array($sites) || collect($sites)->contains(fn ($site): bool => ! is_array($site))) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $sites = array_map(fn (array $site): array => $this->normalizeDiscoveredSite($site), $sites);
             $mainDeviceByHost = [];
             $hostsById = [];
 
             try {
-                $hostsResponse = Http::withHeaders($headers)->get(self::BASE_URL . '/hosts');
+                $hostsResponse = Http::withHeaders($headers)->get(self::BASE_URL.'/hosts');
                 if ($hostsResponse->successful()) {
                     $hosts = $hostsResponse->json('data', []);
                     $hostsById = $this->indexHosts($hosts);
@@ -106,19 +120,19 @@ class UnifiAdapter implements IntegrationAdapterInterface
                     ]);
                 }
             } catch (\Throwable $e) {
-                Log::warning('UniFi discoverSites hosts enrichment failed', [
+                Log::warning('UniFi discoverSites hosts enrichment failed', SafeOperationalData::logContext([
                     'tenant_id' => $secret->tenant_id,
-                    'error' => $e->getMessage(),
-                ]);
+                    'error_category' => SafeOperationalData::failureCategory($e),
+                ]));
             }
 
             try {
-                $devicesResponse = Http::withHeaders($headers)->get(self::BASE_URL . '/devices');
+                $devicesResponse = Http::withHeaders($headers)->get(self::BASE_URL.'/devices');
                 if ($devicesResponse->successful()) {
                     $deviceGroups = $devicesResponse->json('data', []);
                     foreach ($deviceGroups as $group) {
                         $hostId = $group['hostId'] ?? null;
-                        if (!$hostId) {
+                        if (! $hostId) {
                             continue;
                         }
 
@@ -130,32 +144,38 @@ class UnifiAdapter implements IntegrationAdapterInterface
                     }
                 }
             } catch (\Throwable $e) {
-                Log::warning('UniFi discoverSites device enrichment failed', [
+                Log::warning('UniFi discoverSites device enrichment failed', SafeOperationalData::logContext([
                     'tenant_id' => $secret->tenant_id,
-                    'error' => $e->getMessage(),
-                ]);
+                    'error_category' => SafeOperationalData::failureCategory($e),
+                ]));
             }
 
             return array_map(function (array $site) use ($mainDeviceByHost, $hostsById) {
-                $meta = is_array($site['meta'] ?? null) ? $site['meta'] : [];
-                $stats = is_array($site['statistics'] ?? null) ? $site['statistics'] : [];
-                $counts = is_array($stats['counts'] ?? null) ? $stats['counts'] : [];
-                $hostId = $site['hostId'] ?? null;
+                $hostId = $site['_host_id'];
                 $main = $hostId && isset($mainDeviceByHost[$hostId]) ? $mainDeviceByHost[$hostId] : null;
                 $host = $hostId && isset($hostsById[$hostId]) ? $hostsById[$hostId] : null;
                 $hostMain = $this->resolveHostPrimary($host);
 
                 $useHost = $hostMain && in_array($hostMain['role'], ['protect', 'nvr', 'nas', 'console', 'access'], true);
-                $mainName = $useHost ? $hostMain['name'] : ($main ? $this->resolveDeviceName($main) : null);
-                $mainModel = $useHost ? $hostMain['model'] : ($main['model'] ?? $main['shortname'] ?? null);
-                $mainRole = $useHost ? $hostMain['role'] : ($main ? $this->resolveMainDeviceRole($main) : null);
+                $mainName = $this->normalizeOptionalProjectedText(
+                    $useHost ? $hostMain['name'] : ($main ? $this->resolveDeviceName($main) : null),
+                    self::SITE_LABEL_MAX_LENGTH,
+                );
+                $mainModel = $this->normalizeOptionalProjectedText(
+                    $useHost ? $hostMain['model'] : ($main['model'] ?? $main['shortname'] ?? null),
+                    self::SITE_LABEL_MAX_LENGTH,
+                );
+                $mainRole = $this->normalizeOptionalProjectedText(
+                    $useHost ? $hostMain['role'] : ($main ? $this->resolveMainDeviceRole($main) : null),
+                    self::SITE_STATUS_MAX_LENGTH,
+                );
 
                 return [
-                    'external_id' => $site['siteId'] ?? $site['id'] ?? $site['_id'] ?? '',
-                    'name' => $site['name'] ?? $site['desc'] ?? $meta['name'] ?? $meta['desc'] ?? 'Unknown',
+                    'external_id' => $site['external_id'],
+                    'name' => $site['name'],
                     'meta' => [
-                        'device_count' => $counts['totalDevice'] ?? $site['device_count'] ?? null,
-                        'health_status' => $site['health'] ?? null,
+                        'device_count' => $site['device_count'],
+                        'health_status' => $site['health_status'],
                         'main_device_name' => $mainName,
                         'main_device_model' => $mainModel,
                         'main_device_role' => $mainRole,
@@ -163,13 +183,119 @@ class UnifiAdapter implements IntegrationAdapterInterface
                 ];
             }, $sites);
         } catch (\Throwable $e) {
-            Log::error('UniFi discoverSites failed', [
+            $failure = IntegrationDiscoveryException::fromThrowable($e);
+            Log::error('UniFi discoverSites failed', SafeOperationalData::logContext([
                 'tenant_id' => $secret->tenant_id,
-                'error' => $e->getMessage(),
-            ]);
+                'error_category' => $failure->failureCategory(),
+            ]));
 
-            return [];
+            throw $failure;
         }
+    }
+
+    /** @param array<string, mixed> $site @return array<string, mixed> */
+    private function normalizeDiscoveredSite(array $site): array
+    {
+        $externalId = null;
+        foreach (['siteId', 'id', '_id'] as $field) {
+            if (! array_key_exists($field, $site)) {
+                continue;
+            }
+
+            $externalId = $this->normalizeRequiredSiteIdentifier($site[$field]);
+            break;
+        }
+
+        if ($externalId === null) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        $meta = $site['meta'] ?? [];
+        $statistics = $site['statistics'] ?? [];
+        if (! is_array($meta) || ! is_array($statistics)) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        $counts = $statistics['counts'] ?? [];
+        if (! is_array($counts)) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        $name = null;
+        foreach ([$site['name'] ?? null, $site['desc'] ?? null, $meta['name'] ?? null, $meta['desc'] ?? null] as $candidate) {
+            $name = $this->normalizeOptionalProjectedText($candidate, self::SITE_LABEL_MAX_LENGTH);
+            if ($name !== null) {
+                break;
+            }
+        }
+
+        return [
+            '_host_id' => $this->normalizeOptionalProjectedText(
+                $site['hostId'] ?? null,
+                self::SITE_IDENTIFIER_MAX_LENGTH,
+            ),
+            'external_id' => $externalId,
+            'name' => $name ?? 'Unknown',
+            'device_count' => $this->normalizeOptionalDeviceCount(
+                $counts['totalDevice'] ?? $site['device_count'] ?? null,
+            ),
+            'health_status' => $this->normalizeOptionalProjectedText(
+                $site['health'] ?? null,
+                self::SITE_STATUS_MAX_LENGTH,
+            ),
+        ];
+    }
+
+    private function normalizeRequiredSiteIdentifier(mixed $value): string
+    {
+        if (! is_string($value) && ! is_int($value)) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        $normalized = trim((string) $value);
+        if ($normalized === '' || mb_strlen($normalized) > self::SITE_IDENTIFIER_MAX_LENGTH) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeOptionalProjectedText(mixed $value, int $maxLength): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (! is_string($value) && ! is_int($value) && ! is_float($value)) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        $normalized = trim((string) $value);
+        if ($normalized === '') {
+            return null;
+        }
+
+        if (mb_strlen($normalized) > $maxLength) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeOptionalDeviceCount(mixed $value): ?int
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if ((is_int($value) || is_string($value)) && preg_match('/^\d+$/', (string) $value) === 1) {
+            $normalized = (int) $value;
+            if ($normalized <= self::SITE_DEVICE_COUNT_MAX) {
+                return $normalized;
+            }
+        }
+
+        throw IntegrationDiscoveryException::invalidResponse();
     }
 
     public function discoverHosts(IntegrationTenantSecret $secret): array
@@ -180,50 +306,60 @@ class UnifiAdapter implements IntegrationAdapterInterface
             $response = Http::withHeaders([
                 'Accept' => 'application/json',
                 'X-API-Key' => $apiKey,
-            ])->get(self::BASE_URL . '/hosts');
+            ])->get(self::BASE_URL.'/hosts');
 
-            if (!$response->successful()) {
-                Log::warning('UniFi discoverHosts request failed', [
-                    'tenant_id' => $secret->tenant_id,
-                    'status' => $response->status(),
-                ]);
-
-                return [];
+            if (! $response->successful()) {
+                throw IntegrationDiscoveryException::forHttpStatus($response->status());
             }
 
-            $hosts = $response->json('data', []);
+            $hosts = $response->json('data');
+            if (! is_array($hosts)
+                || count($hosts) > self::HOST_COUNT_MAX
+                || collect($hosts)->contains(fn ($host): bool => ! is_array($host))) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
 
-            return array_values(array_filter(array_map(function ($host) {
-                if (!is_array($host)) {
-                    return null;
-                }
-
-                $hostId = $host['id'] ?? $host['_id'] ?? $host['hostId'] ?? null;
-                if (!$hostId) {
-                    return null;
-                }
-
-                $name = $this->resolveHostName($host) ?? 'Unknown';
-                $model = $this->resolveHostModel($host);
-                $controllers = $this->resolveHostControllers($host);
-                $role = $this->resolveHostRole($host, $model, $controllers);
-
-                return [
-                    'host_id' => (string) $hostId,
-                    'name' => $name,
-                    'model' => $model,
-                    'role' => $role,
-                    'controllers' => $controllers,
-                ];
-            }, $hosts)));
+            return array_values(array_map(
+                fn (array $host): array => $this->normalizeDiscoveredHost($host),
+                $hosts,
+            ));
         } catch (\Throwable $e) {
-            Log::warning('UniFi discoverHosts failed', [
+            $failure = IntegrationDiscoveryException::fromThrowable($e);
+            Log::error('UniFi discoverHosts failed', SafeOperationalData::logContext([
                 'tenant_id' => $secret->tenant_id,
-                'error' => $e->getMessage(),
-            ]);
+                'error_category' => $failure->failureCategory(),
+            ]));
 
-            return [];
+            throw $failure;
         }
+    }
+
+    /** @param array<string, mixed> $host @return array<string, mixed> */
+    private function normalizeDiscoveredHost(array $host): array
+    {
+        $hostId = null;
+        foreach (['id', '_id', 'hostId'] as $field) {
+            if (! array_key_exists($field, $host)) {
+                continue;
+            }
+            $hostId = $this->normalizeRequiredSiteIdentifier($host[$field]);
+            break;
+        }
+        if ($hostId === null) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        $name = $this->resolveHostName($host) ?? 'Unknown';
+        $model = $this->resolveHostModel($host);
+        $controllers = $this->resolveHostControllers($host);
+
+        return [
+            'host_id' => $hostId,
+            'name' => $name,
+            'model' => $model,
+            'role' => $this->resolveHostRole($host, $model, $controllers),
+            'controllers' => $controllers,
+        ];
     }
 
     public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): SyncResult
@@ -235,31 +371,31 @@ class UnifiAdapter implements IntegrationAdapterInterface
             $sitesResponse = Http::withHeaders([
                 'Accept' => 'application/json',
                 'X-API-Key' => $apiKey,
-            ])->get(self::BASE_URL . '/sites');
+            ])->get(self::BASE_URL.'/sites');
 
-            if (!$sitesResponse->successful()) {
+            if (! $sitesResponse->successful()) {
                 return new SyncResult(
-                    error: "UniFi API returned HTTP {$sitesResponse->status()} when fetching sites.",
+                    error: SafeOperationalData::failureSummary(),
                 );
             }
 
             $sites = $sitesResponse->json('data', []);
             $hostId = $this->resolveHostId($sites, $externalSiteId);
 
-            if (!$hostId) {
+            if (! $hostId) {
                 return new SyncResult(
-                    error: "UniFi API did not return a hostId for site {$externalSiteId}.",
+                    error: SafeOperationalData::failureSummary(),
                 );
             }
 
             $devicesResponse = Http::withHeaders([
                 'Accept' => 'application/json',
                 'X-API-Key' => $apiKey,
-            ])->get(self::BASE_URL . '/devices');
+            ])->get(self::BASE_URL.'/devices');
 
-            if (!$devicesResponse->successful()) {
+            if (! $devicesResponse->successful()) {
                 return new SyncResult(
-                    error: "UniFi API returned HTTP {$devicesResponse->status()} when fetching devices for host {$hostId}.",
+                    error: SafeOperationalData::failureSummary(),
                 );
             }
 
@@ -286,8 +422,9 @@ class UnifiAdapter implements IntegrationAdapterInterface
                     try {
                         $providerEntityId = $device['id'] ?? $device['_id'] ?? $device['mac'] ?? null;
 
-                        if (!$providerEntityId) {
+                        if (! $providerEntityId) {
                             $errored++;
+
                             continue;
                         }
 
@@ -300,10 +437,11 @@ class UnifiAdapter implements IntegrationAdapterInterface
                             $updated++;
                         }
                     } catch (\Throwable $e) {
-                        Log::warning('UniFi syncDevices: error processing device', [
-                            'device_id' => $device['id'] ?? $device['_id'] ?? 'unknown',
-                            'error' => $e->getMessage(),
-                        ]);
+                        Log::warning('UniFi syncDevices: error processing device', SafeOperationalData::logContext([
+                            'tenant_id' => $siteConfig->tenant_id,
+                            'site_id' => $siteConfig->site_id,
+                            'error_category' => SafeOperationalData::failureCategory($e),
+                        ]));
                         $errored++;
                     }
                 }
@@ -316,13 +454,13 @@ class UnifiAdapter implements IntegrationAdapterInterface
                 errored: $errored,
             );
         } catch (\Throwable $e) {
-            Log::error('UniFi syncDevices failed', [
+            Log::error('UniFi syncDevices failed', SafeOperationalData::logContext([
                 'tenant_id' => $siteConfig->tenant_id,
                 'site_id' => $siteConfig->site_id,
-                'error' => $e->getMessage(),
-            ]);
+                'error_category' => SafeOperationalData::failureCategory($e),
+            ]));
 
-            return new SyncResult(error: $e->getMessage());
+            return new SyncResult(error: SafeOperationalData::failureSummary());
         }
     }
 
@@ -343,7 +481,7 @@ class UnifiAdapter implements IntegrationAdapterInterface
                 ->where('is_enabled', true)
                 ->first();
 
-            if (!$accessSecret || empty($accessSecret->base_url)) {
+            if (! $accessSecret || empty($accessSecret->base_url)) {
                 return [];
             }
 
@@ -355,13 +493,13 @@ class UnifiAdapter implements IntegrationAdapterInterface
                 'Authorization' => "Bearer {$apiKey}",
             ])
                 ->withOptions(['verify' => false])
-                ->get($baseUrl . '/api/v1/developer/system/logs', [
+                ->get($baseUrl.'/api/v1/developer/system/logs', [
                     'limit' => 200,
                     'offset' => 0,
                     'topics' => 'door_openings',
                 ]);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 $status = $response->status();
                 Log::warning('UniFi Access pullEvents failed', [
                     'tenant_id' => $siteConfig->tenant_id,
@@ -372,17 +510,17 @@ class UnifiAdapter implements IntegrationAdapterInterface
                 throw new \RuntimeException("UniFi Access API returned HTTP {$status}.");
             }
 
-            $sinceAt = $since ? \Carbon\Carbon::instance($since) : null;
+            $sinceAt = $since ? Carbon::instance($since) : null;
             $entries = $response->json('data', []);
             $events = [];
 
             foreach ($entries as $entry) {
-                if (!is_array($entry)) {
+                if (! is_array($entry)) {
                     continue;
                 }
 
                 $normalized = $this->normalizeAccessLogEntry($entry);
-                if (!$normalized) {
+                if (! $normalized) {
                     continue;
                 }
 
@@ -395,11 +533,11 @@ class UnifiAdapter implements IntegrationAdapterInterface
 
             return $events;
         } catch (\Throwable $e) {
-            Log::warning('UniFi Access pullEvents error', [
+            Log::warning('UniFi Access pullEvents error', SafeOperationalData::logContext([
                 'tenant_id' => $siteConfig->tenant_id,
                 'site_id' => $siteConfig->site_id,
-                'error' => $e->getMessage(),
-            ]);
+                'error_category' => SafeOperationalData::failureCategory($e),
+            ]));
 
             throw $e;
         }
@@ -467,7 +605,7 @@ class UnifiAdapter implements IntegrationAdapterInterface
 
     private function resolveHostId(array $sites, ?string $externalSiteId): ?string
     {
-        if (!$externalSiteId) {
+        if (! $externalSiteId) {
             return null;
         }
 
@@ -496,7 +634,7 @@ class UnifiAdapter implements IntegrationAdapterInterface
     {
         $indexed = [];
         foreach ($hosts as $host) {
-            if (!is_array($host)) {
+            if (! is_array($host)) {
                 continue;
             }
             $id = $host['id'] ?? $host['_id'] ?? $host['hostId'] ?? null;
@@ -510,7 +648,7 @@ class UnifiAdapter implements IntegrationAdapterInterface
 
     private function resolveHostPrimary(?array $host): ?array
     {
-        if (!$host) {
+        if (! $host) {
             return null;
         }
 
@@ -519,11 +657,11 @@ class UnifiAdapter implements IntegrationAdapterInterface
         $controllers = $this->resolveHostControllers($host);
         $role = $this->resolveHostRole($host, $model, $controllers);
 
-        if (!$name && !$model) {
+        if (! $name && ! $model) {
             return null;
         }
 
-        if (!$name && $model) {
+        if (! $name && $model) {
             $name = $model;
         }
 
@@ -549,8 +687,9 @@ class UnifiAdapter implements IntegrationAdapterInterface
         ];
 
         foreach ($candidates as $value) {
-            if (is_string($value) && trim($value) !== '') {
-                return trim($value);
+            $normalized = $this->normalizeOptionalProjectedText($value, self::SITE_LABEL_MAX_LENGTH);
+            if ($normalized !== null) {
+                return $normalized;
             }
         }
 
@@ -569,8 +708,9 @@ class UnifiAdapter implements IntegrationAdapterInterface
         ];
 
         foreach ($candidates as $value) {
-            if (is_string($value) && trim($value) !== '') {
-                return trim($value);
+            $normalized = $this->normalizeOptionalProjectedText($value, self::SITE_LABEL_MAX_LENGTH);
+            if ($normalized !== null) {
+                return $normalized;
             }
         }
 
@@ -582,43 +722,71 @@ class UnifiAdapter implements IntegrationAdapterInterface
         $controllers = [];
 
         $raw = data_get($host, 'userData.controllers');
+        if ($raw !== null && ! is_array($raw)) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
         if (is_array($raw)) {
             foreach ($raw as $entry) {
-                if (is_string($entry)) {
-                    $controllers[] = strtolower($entry);
-                } elseif (is_array($entry) && isset($entry['name'])) {
-                    $controllers[] = strtolower((string) $entry['name']);
-                }
+                $controllers[] = $this->normalizeHostController($entry);
             }
         }
 
         $fallback = $host['controllers'] ?? $host['apps'] ?? null;
+        if ($fallback !== null && ! is_array($fallback)) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
         if (is_array($fallback)) {
             foreach ($fallback as $entry) {
-                if (is_string($entry)) {
-                    $controllers[] = strtolower($entry);
-                } elseif (is_array($entry) && isset($entry['name'])) {
-                    $controllers[] = strtolower((string) $entry['name']);
-                }
+                $controllers[] = $this->normalizeHostController($entry);
             }
         }
 
         $groupMembers = data_get($host, 'userData.consoleGroupMembers');
+        if ($groupMembers !== null && ! is_array($groupMembers)) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
         if (is_array($groupMembers)) {
             foreach ($groupMembers as $member) {
+                if (! is_array($member)) {
+                    throw IntegrationDiscoveryException::invalidResponse();
+                }
                 $apps = data_get($member, 'roleAttributes.applications');
-                if (!is_array($apps)) {
+                if ($apps !== null && ! is_array($apps)) {
+                    throw IntegrationDiscoveryException::invalidResponse();
+                }
+                if (! is_array($apps)) {
                     continue;
                 }
                 foreach ($apps as $app => $meta) {
-                    if (is_array($meta) && ($meta['supported'] ?? false)) {
-                        $controllers[] = strtolower((string) $app);
+                    if (! is_array($meta)) {
+                        throw IntegrationDiscoveryException::invalidResponse();
+                    }
+                    if ($meta['supported'] ?? false) {
+                        $controllers[] = $this->normalizeHostController($app);
                     }
                 }
             }
         }
 
-        return array_values(array_unique(array_filter($controllers)));
+        $controllers = array_values(array_unique(array_filter($controllers)));
+        if (count($controllers) > self::HOST_CONTROLLER_COUNT_MAX) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        return $controllers;
+    }
+
+    private function normalizeHostController(mixed $entry): string
+    {
+        $value = is_array($entry) && array_key_exists('name', $entry)
+            ? $entry['name']
+            : $entry;
+        $normalized = $this->normalizeOptionalProjectedText($value, self::SITE_STATUS_MAX_LENGTH);
+        if ($normalized === null) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        return strtolower($normalized);
     }
 
     private function resolveHostRole(array $host, ?string $model, array $controllers): string
@@ -648,9 +816,9 @@ class UnifiAdapter implements IntegrationAdapterInterface
             return 'access';
         }
 
-        $type = strtolower((string) ($host['type'] ?? ''));
-        if ($type !== '') {
-            return $type;
+        $type = $this->normalizeOptionalProjectedText($host['type'] ?? null, self::SITE_STATUS_MAX_LENGTH);
+        if ($type !== null) {
+            return strtolower($type);
         }
 
         return 'console';
@@ -658,7 +826,7 @@ class UnifiAdapter implements IntegrationAdapterInterface
 
     private function isProtectDevice(mixed $device): bool
     {
-        if (!is_array($device)) {
+        if (! is_array($device)) {
             return false;
         }
 
@@ -681,7 +849,7 @@ class UnifiAdapter implements IntegrationAdapterInterface
         }
 
         $occurredAt = $this->parseAccessTimestamp($entry['time'] ?? null);
-        if (!$occurredAt) {
+        if (! $occurredAt) {
             return null;
         }
 
@@ -713,7 +881,7 @@ class UnifiAdapter implements IntegrationAdapterInterface
         return "{$dir}: {$who}{$where}";
     }
 
-    private function parseAccessTimestamp(mixed $value): ?\Carbon\Carbon
+    private function parseAccessTimestamp(mixed $value): ?Carbon
     {
         if ($value === null || $value === '') {
             return null;
@@ -722,14 +890,14 @@ class UnifiAdapter implements IntegrationAdapterInterface
         if (is_numeric($value)) {
             $numeric = (int) $value;
             if ($numeric > 1000000000000) {
-                return \Carbon\Carbon::createFromTimestamp($numeric / 1000);
+                return Carbon::createFromTimestamp($numeric / 1000);
             }
 
-            return \Carbon\Carbon::createFromTimestamp($numeric);
+            return Carbon::createFromTimestamp($numeric);
         }
 
         try {
-            return \Carbon\Carbon::parse($value);
+            return Carbon::parse($value);
         } catch (\Throwable) {
             return null;
         }
@@ -745,7 +913,7 @@ class UnifiAdapter implements IntegrationAdapterInterface
         $bestScore = -1;
 
         foreach ($devices as $device) {
-            if (!is_array($device)) {
+            if (! is_array($device)) {
                 continue;
             }
 
@@ -794,11 +962,11 @@ class UnifiAdapter implements IntegrationAdapterInterface
 
     private function resolveMainDeviceRole(array $device): string
     {
-        if (!is_array($device)) {
+        if (! is_array($device)) {
             return 'device';
         }
 
-        if (!empty($device['isConsole'])) {
+        if (! empty($device['isConsole'])) {
             return 'console';
         }
 
@@ -819,7 +987,7 @@ class UnifiAdapter implements IntegrationAdapterInterface
         }
 
         $productLine = strtolower((string) ($device['productLine'] ?? ''));
+
         return $productLine !== '' ? $productLine : 'device';
     }
-
 }

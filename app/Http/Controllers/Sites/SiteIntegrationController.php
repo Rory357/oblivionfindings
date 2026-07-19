@@ -2,48 +2,78 @@
 
 namespace App\Http\Controllers\Sites;
 
+use App\Domain\SecurityDevices\Presenters\IntegrationSiteCredentialsPresenter;
 use App\Http\Controllers\Controller;
-use App\Models\Site;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Integration\IntegrationTenantSecret;
+use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Services\Integration\IntegrationAdapterRegistry;
+use App\Support\SafeOperationalData;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 
 class SiteIntegrationController extends Controller
 {
-    public function index(Request $request, Site $site)
+    public function index(Request $request, Site $site, IntegrationSiteCredentialsPresenter $siteCredentialsPresenter)
     {
         $this->authorize('view', $site);
         $tenantId = $this->resolveTenantId($request->user(), $site);
 
-        $configs = IntegrationSiteConfig::where('site_id', $site->id)->get();
+        $configs = IntegrationSiteConfig::query()
+            ->forTenant($tenantId)
+            ->where('site_id', $site->id)
+            ->get()
+            ->map(fn (IntegrationSiteConfig $config): array => [
+                'id' => $config->id,
+                'site_id' => (int) $config->site_id,
+                'provider' => $config->provider,
+                'status' => in_array($config->status, [
+                    IntegrationSiteConfig::STATUS_TENANT_ONLY,
+                    IntegrationSiteConfig::STATUS_HYBRID,
+                    IntegrationSiteConfig::STATUS_DISCONNECTED,
+                ], true) ? $config->status : 'unknown',
+                'enabled' => (bool) $config->is_active,
+                'mapping_state' => filled($config->mapped_external_site_id) ? 'mapped' : 'not_mapped',
+                'overrides_configured' => is_array($config->overrides) && $config->overrides !== [],
+            ])
+            ->values();
 
-        $siteSecrets = IntegrationSiteSecret::where('site_id', $site->id)
-            ->select(['id', 'tenant_id', 'site_id', 'provider', 'capability', 'base_url', 'is_enabled', 'last_tested_at', 'last_error'])
-            ->get();
+        $siteSecrets = IntegrationSiteSecret::query()
+            ->forTenant($tenantId)
+            ->where('site_id', $site->id)
+            ->with('site:id,name,tenant_id')
+            ->get()
+            ->map(fn (IntegrationSiteSecret $secret): array => $siteCredentialsPresenter->project($secret))
+            ->values();
 
         $tenantSecrets = IntegrationTenantSecret::where('tenant_id', $tenantId)
             ->get()
-            ->map(function (IntegrationTenantSecret $secret) {
+            ->map(function (IntegrationTenantSecret $secret): array {
                 $config = is_array($secret->config) ? $secret->config : [];
 
                 return [
                     'id' => $secret->id,
-                    'tenant_id' => $secret->tenant_id,
                     'provider' => $secret->provider,
-                    'secret_last4' => $secret->secret_last4,
-                    'status' => $secret->status,
-                    'last_tested_at' => $secret->last_tested_at,
-                    'last_synced_at' => $secret->last_synced_at,
-                    'last_error' => $secret->last_error,
-                    'config' => [
-                        'discovered_sites' => $config['discovered_sites'] ?? [],
-                        'discovered_hosts' => $config['discovered_hosts'] ?? [],
-                        'sites_synced_at' => $config['sites_synced_at'] ?? null,
+                    'configured' => true,
+                    'tested' => $secret->last_tested_at !== null,
+                    'status' => in_array($secret->status, [
+                        IntegrationTenantSecret::STATUS_CONNECTED,
+                        IntegrationTenantSecret::STATUS_DISCONNECTED,
+                        IntegrationTenantSecret::STATUS_ERROR,
+                    ], true) ? $secret->status : 'unknown',
+                    'failure_category' => filled($secret->last_error) ? 'provider_failure' : null,
+                    'last_tested_at' => $secret->last_tested_at?->toISOString(),
+                    'last_synced_at' => $secret->last_synced_at?->toISOString(),
+                    'discovery' => [
+                        'site_count' => count(is_array($config['discovered_sites'] ?? null) ? $config['discovered_sites'] : []),
+                        'host_count' => is_numeric($config['discovered_host_count'] ?? null)
+                            ? max(0, (int) $config['discovered_host_count'])
+                            : count(is_array($config['discovered_hosts'] ?? null) ? $config['discovered_hosts'] : []),
                     ],
                 ];
             })
@@ -72,7 +102,7 @@ class SiteIntegrationController extends Controller
         ]);
 
         $mappedId = $validated['mapped_external_site_id'] ?? null;
-        $isActive = $validated['is_active'] ?? !empty($mappedId);
+        $isActive = $validated['is_active'] ?? ! empty($mappedId);
         $status = $mappedId ? IntegrationSiteConfig::STATUS_HYBRID : IntegrationSiteConfig::STATUS_TENANT_ONLY;
 
         $existingConfig = IntegrationSiteConfig::where('site_id', $site->id)
@@ -118,11 +148,11 @@ class SiteIntegrationController extends Controller
             ->where('provider', $provider)
             ->first();
 
-        if (!$tenantSecret) {
+        if (! $tenantSecret) {
             return redirect()->back()->with('error', 'No tenant credentials found for this integration.');
         }
 
-        if (!$registry->has($provider)) {
+        if (! $registry->has($provider)) {
             return redirect()->back()->with('error', 'No adapter registered for this integration provider.');
         }
 
@@ -142,8 +172,10 @@ class SiteIntegrationController extends Controller
             if (method_exists($adapter, 'discoverHosts')) {
                 try {
                     $hosts = $adapter->discoverHosts($tenantSecret);
-                } catch (\Throwable $e) {
-                    $hosts = [];
+                } catch (\Throwable) {
+                    $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, SafeOperationalData::failureSummary());
+
+                    return redirect()->back()->with('error', 'Failed to sync integration hosts. Existing discovery state was preserved; review the bounded diagnostic state and retry.');
                 }
             }
 
@@ -151,7 +183,7 @@ class SiteIntegrationController extends Controller
                 $tenantSecret->config,
                 [
                     'discovered_sites' => array_values($sites),
-                    'discovered_hosts' => array_values($hosts),
+                    'discovered_host_count' => count($hosts),
                     'sites_synced_at' => now()->toISOString(),
                 ]
             );
@@ -169,20 +201,23 @@ class SiteIntegrationController extends Controller
 
             if (count($sites) > 0) {
                 $syncLog->markCompleted(IntegrationSyncLog::STATUS_SUCCESS);
+
                 return redirect()->back()->with('success', 'Integration sites synced successfully.');
             }
 
             $syncLog->markCompleted(IntegrationSyncLog::STATUS_PARTIAL, 'No sites returned by provider API.');
+
             return redirect()->back()->with('warning', 'No sites returned by provider API.');
         } catch (\Throwable $e) {
-            $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, $e->getMessage());
+            $failure = $this->providerFailure($tenantId, $site->id, $provider, $e);
+            $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, $failure);
 
             $tenantSecret->update([
                 'status' => IntegrationTenantSecret::STATUS_ERROR,
-                'last_error' => $e->getMessage(),
+                'last_error' => $failure,
             ]);
 
-            return redirect()->back()->with('error', 'Failed to sync sites: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to sync integration sites. Review the bounded diagnostic state and retry.');
         }
     }
 
@@ -195,11 +230,11 @@ class SiteIntegrationController extends Controller
             ->where('provider', $provider)
             ->first();
 
-        if (!$tenantSecret) {
+        if (! $tenantSecret) {
             return redirect()->back()->with('error', 'No tenant credentials found for this integration.');
         }
 
-        if (!$registry->has($provider)) {
+        if (! $registry->has($provider)) {
             return redirect()->back()->with('error', 'No adapter registered for this integration provider.');
         }
 
@@ -224,7 +259,7 @@ class SiteIntegrationController extends Controller
     {
         $this->authorize('update', $site);
 
-        if (!$registry->has($provider)) {
+        if (! $registry->has($provider)) {
             return redirect()->back()->with('error', 'No adapter registered for this integration provider.');
         }
 
@@ -237,7 +272,7 @@ class SiteIntegrationController extends Controller
             ->active()
             ->first();
 
-        if (!$siteConfig || empty($siteConfig->mapped_external_site_id)) {
+        if (! $siteConfig || empty($siteConfig->mapped_external_site_id)) {
             return redirect()->back()->with('error', 'Integration mapping is missing for this location.');
         }
 
@@ -247,7 +282,7 @@ class SiteIntegrationController extends Controller
             ->connected()
             ->first();
 
-        if (!$tenantSecret) {
+        if (! $tenantSecret) {
             return redirect()->back()->with('error', 'Tenant credentials are not connected for this integration.');
         }
 
@@ -275,16 +310,21 @@ class SiteIntegrationController extends Controller
             } elseif ($result->isPartial()) {
                 $syncLog->markCompleted(IntegrationSyncLog::STATUS_PARTIAL);
             } else {
-                $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, $result->error);
+                $syncLog->markCompleted(
+                    IntegrationSyncLog::STATUS_FAILED,
+                    $this->providerFailure($tenantId, $site->id, $provider),
+                );
             }
 
             $tenantSecret->update([
                 'last_synced_at' => now(),
-                'last_error' => $result->error,
+                'last_error' => $result->isSuccess() || $result->isPartial()
+                    ? null
+                    : SafeOperationalData::failureSummary(),
             ]);
 
-            if (!$result->isSuccess() && !$result->isPartial()) {
-                return redirect()->back()->with('error', $result->error ?? 'Device sync failed.');
+            if (! $result->isSuccess() && ! $result->isPartial()) {
+                return redirect()->back()->with('error', 'Device sync failed. Review the bounded diagnostic state and retry.');
             }
 
             return redirect()->back()->with(
@@ -292,8 +332,14 @@ class SiteIntegrationController extends Controller
                 "Device sync complete. Processed {$result->processed}, created {$result->created}, updated {$result->updated}, errored {$result->errored}."
             );
         } catch (\Throwable $e) {
-            $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, $e->getMessage());
-            return redirect()->back()->with('error', 'Device sync failed: ' . $e->getMessage());
+            $failure = $this->providerFailure($tenantId, $site->id, $provider, $e);
+            $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, $failure);
+            $tenantSecret->update([
+                'status' => IntegrationTenantSecret::STATUS_ERROR,
+                'last_error' => $failure,
+            ]);
+
+            return redirect()->back()->with('error', 'Device sync failed. Review the bounded diagnostic state and retry.');
         }
     }
 
@@ -302,7 +348,7 @@ class SiteIntegrationController extends Controller
         $this->authorize('update', $site);
         $tenantId = $this->resolveTenantId($request->user(), $site);
 
-        if (!$registry->has($provider)) {
+        if (! $registry->has($provider)) {
             return redirect()->back()->with('error', 'No adapter registered for this integration provider.');
         }
 
@@ -324,7 +370,7 @@ class SiteIntegrationController extends Controller
             ->connected()
             ->first();
 
-        if (!$tenantSecret) {
+        if (! $tenantSecret) {
             return redirect()->back()->with('error', 'Tenant credentials are not connected for this integration.');
         }
 
@@ -335,14 +381,14 @@ class SiteIntegrationController extends Controller
             ->where('capability', 'access_api')
             ->first();
 
-        if (!$accessSecret || !$accessSecret->is_enabled || empty($accessSecret->base_url)) {
+        if (! $accessSecret || ! $accessSecret->is_enabled || empty($accessSecret->base_url)) {
             return redirect()->back()->with('error', 'Access API credentials are missing for this location.');
         }
 
         $since = null;
         if ($request->filled('since')) {
             try {
-                $since = \Carbon\Carbon::parse($request->input('since'));
+                $since = Carbon::parse($request->input('since'));
             } catch (\Throwable) {
                 $since = null;
             }
@@ -359,7 +405,7 @@ class SiteIntegrationController extends Controller
 
             foreach ($events as $event) {
                 $sourceId = $event['source_event_id'] ?? null;
-                if (!$sourceId) {
+                if (! $sourceId) {
                     continue;
                 }
 
@@ -401,12 +447,13 @@ class SiteIntegrationController extends Controller
 
             return redirect()->back()->with('success', "Access events synced. Added {$created}, updated {$updated}.");
         } catch (\Throwable $e) {
+            $failure = $this->providerFailure($tenantId, $site->id, $provider, $e);
             $accessSecret->update([
                 'last_tested_at' => now(),
-                'last_error' => $e->getMessage(),
+                'last_error' => $failure,
             ]);
 
-            return redirect()->back()->with('error', 'Access event sync failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Access event sync failed. Review the bounded diagnostic state and retry.');
         }
     }
 
@@ -470,10 +517,27 @@ class SiteIntegrationController extends Controller
 
         $preserved = [
             'discovered_sites' => $existing['discovered_sites'] ?? [],
-            'discovered_hosts' => $existing['discovered_hosts'] ?? [],
+            'discovered_host_count' => is_numeric($existing['discovered_host_count'] ?? null)
+                ? max(0, (int) $existing['discovered_host_count'])
+                : count(is_array($existing['discovered_hosts'] ?? null) ? $existing['discovered_hosts'] : []),
             'sites_synced_at' => $existing['sites_synced_at'] ?? null,
         ];
 
-        return array_merge($preserved, $existing, $newConfig);
+        $merged = array_merge($preserved, $existing, $newConfig);
+        unset($merged['discovered_hosts']);
+
+        return $merged;
+    }
+
+    private function providerFailure(int $tenantId, int $siteId, string $provider, ?\Throwable $exception = null): string
+    {
+        Log::warning('Site integration provider operation failed', SafeOperationalData::logContext([
+            'tenant_id' => $tenantId,
+            'site_id' => $siteId,
+            'provider' => $provider,
+            'failure_category' => SafeOperationalData::failureCategory($exception),
+        ]));
+
+        return SafeOperationalData::failureSummary();
     }
 }

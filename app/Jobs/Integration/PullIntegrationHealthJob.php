@@ -10,6 +10,7 @@ use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Integration\IntegrationTenantSecret;
 use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Services\Integration\UnifiOperationalBridgeService;
+use App\Support\SafeOperationalData;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -42,10 +43,10 @@ class PullIntegrationHealthJob implements ShouldQueue
         try {
             $adapter = $registry->resolve($this->provider);
         } catch (\RuntimeException $e) {
-            Log::error('PullIntegrationHealthJob: adapter not found', [
+            Log::error('PullIntegrationHealthJob: adapter not found', SafeOperationalData::logContext([
                 'provider' => $this->provider,
-                'error' => $e->getMessage(),
-            ]);
+                'error_category' => SafeOperationalData::failureCategory($e),
+            ]));
 
             return;
         }
@@ -56,10 +57,10 @@ class PullIntegrationHealthJob implements ShouldQueue
             ->first();
 
         if (! $tenantSecret) {
-            Log::warning('PullIntegrationHealthJob: no connected secret found', [
+            Log::warning('PullIntegrationHealthJob: no connected secret found', SafeOperationalData::logContext([
                 'tenant_id' => $this->tenantId,
                 'provider' => $this->provider,
-            ]);
+            ]));
 
             return;
         }
@@ -71,11 +72,11 @@ class PullIntegrationHealthJob implements ShouldQueue
             ->get();
 
         if ($siteConfigs->isEmpty()) {
-            Log::info('PullIntegrationHealthJob: no active site configs found', [
+            Log::info('PullIntegrationHealthJob: no active site configs found', SafeOperationalData::logContext([
                 'tenant_id' => $this->tenantId,
                 'provider' => $this->provider,
                 'site_id' => $this->siteId,
-            ]);
+            ]));
 
             return;
         }
@@ -128,13 +129,11 @@ class PullIntegrationHealthJob implements ShouldQueue
 
                         $updated++;
                     } catch (\Throwable $e) {
-                        Log::warning('PullIntegrationHealthJob: error updating device', [
+                        Log::warning('PullIntegrationHealthJob: error updating device', SafeOperationalData::logContext([
                             'provider' => $this->provider,
-                            'hardware_id' => $entry['hardware_id'] ?? null,
-                            'provider_entity_id' => $entry['provider_entity_id'] ?? null,
                             'device_id' => $entry['device_id'] ?? null,
-                            'error' => $e->getMessage(),
-                        ]);
+                            'error_category' => SafeOperationalData::failureCategory($e),
+                        ]));
                         $errored++;
                     }
                 }
@@ -153,14 +152,14 @@ class PullIntegrationHealthJob implements ShouldQueue
                     $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, 'All health updates failed');
                 }
             } catch (\Throwable $e) {
-                Log::error('PullIntegrationHealthJob: pull failed for site', [
+                Log::error('PullIntegrationHealthJob: pull failed for site', SafeOperationalData::logContext([
                     'tenant_id' => $this->tenantId,
                     'provider' => $this->provider,
                     'site_id' => $siteConfig->site_id,
-                    'error' => $e->getMessage(),
-                ]);
+                    'error_category' => SafeOperationalData::failureCategory($e),
+                ]));
 
-                $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, $e->getMessage());
+                $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, SafeOperationalData::failureSummary());
             }
         }
     }

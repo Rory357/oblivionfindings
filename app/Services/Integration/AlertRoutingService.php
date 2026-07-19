@@ -6,6 +6,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\Integration\IntegrationTenantSecret;
 use App\Services\ControlRoom\SignalProcessingService;
+use App\Support\SafeOperationalData;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -37,13 +38,13 @@ class AlertRoutingService
 
         if (! $decision['alert']) {
             // Check quiet hours: even warn-level events may be suppressed
-            Log::debug('AlertRoutingService: integration event suppressed', [
+            Log::debug('AlertRoutingService: integration event suppressed', SafeOperationalData::logContext([
                 'integration_event_id' => $event->id,
                 'event_type' => $event->event_type,
                 'severity' => $event->severity,
                 'reason' => $decision['reason'],
                 'provider' => $event->provider,
-            ]);
+            ]));
 
             return null;
         }
@@ -51,12 +52,12 @@ class AlertRoutingService
         // Step 2: Apply quiet hours suppression for non-critical events
         if ($event->severity !== IntegrationEvent::SEVERITY_CRITICAL) {
             if ($this->isQuietHours($event->tenant_id, $event->provider)) {
-                Log::info('AlertRoutingService: event suppressed during quiet hours', [
+                Log::info('AlertRoutingService: event suppressed during quiet hours', SafeOperationalData::logContext([
                     'integration_event_id' => $event->id,
                     'event_type' => $event->event_type,
                     'severity' => $event->severity,
                     'provider' => $event->provider,
-                ]);
+                ]));
 
                 return null;
             }
@@ -73,7 +74,7 @@ class AlertRoutingService
             $alert = $this->signalProcessor->process($signal);
 
             if ($alert) {
-                Log::info('AlertRoutingService: integration event → alert created', [
+                Log::info('AlertRoutingService: integration event → alert created', SafeOperationalData::logContext([
                     'integration_event_id' => $event->id,
                     'signal_id' => $signal->id,
                     'alert_id' => $alert->id,
@@ -81,26 +82,24 @@ class AlertRoutingService
                     'severity' => $alert->severity,
                     'provider' => $event->provider,
                     'signal_type' => $signalData['signal_type_code'],
-                ]);
+                ]));
             } else {
-                Log::info('AlertRoutingService: signal processed but no alert created', [
+                Log::info('AlertRoutingService: signal processed but no alert created', SafeOperationalData::logContext([
                     'integration_event_id' => $event->id,
                     'signal_id' => $signal->id,
                     'signal_status' => $signal->status,
                     'reason' => $signal->processing_notes ?? 'maintenance_window_or_suppression',
                     'provider' => $event->provider,
-                ]);
+                ]));
             }
 
             return $alert;
         } catch (\Throwable $e) {
-            Log::error('AlertRoutingService: signal processing failed', [
-                'integration_event_id' => $event->id,
-                'event_type' => $event->event_type,
+            Log::error('AlertRoutingService: signal processing failed', SafeOperationalData::logContext([
+                'tenant_id' => $event->tenant_id,
                 'provider' => $event->provider,
-                'error' => $e->getMessage(),
-                'signal_data' => array_diff_key($signalData, ['payload' => true]), // exclude raw payload from log
-            ]);
+                'error_category' => SafeOperationalData::failureCategory($e),
+            ]));
 
             // Do NOT rethrow — the IntegrationEvent is already persisted.
             // The failure is logged for operational visibility.
