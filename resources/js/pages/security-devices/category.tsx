@@ -1,6 +1,10 @@
 import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import {
+    type FacilitiesWorkspaceData,
+    FacilitiesWorkspacePanels,
+} from '@/components/security-devices/facilities-workspace';
+import {
     type HealthcareWorkspaceData,
     HealthcareWorkspacePanels,
 } from '@/components/security-devices/healthcare-workspace';
@@ -83,6 +87,7 @@ type Props = {
     };
     pageConfig: PageConfig;
     workspace: SecurityDevicesWorkspace;
+    facilitiesWorkspace?: FacilitiesWorkspaceData | null;
     networkItWorkspace?: NetworkItWorkspaceData | null;
     securityWorkspace?: SecurityWorkspaceData | null;
     healthcareWorkspace?: HealthcareWorkspaceData | null;
@@ -127,6 +132,7 @@ export default function CategoryPage({
     filterOptions,
     pageConfig,
     workspace,
+    facilitiesWorkspace,
     networkItWorkspace,
     securityWorkspace,
     healthcareWorkspace,
@@ -201,6 +207,9 @@ export default function CategoryPage({
                     workspace={workspace}
                     filters={filters}
                 >
+                    {facilitiesWorkspace ? (
+                        <FacilitiesWorkspacePanels data={facilitiesWorkspace} />
+                    ) : null}
                     {networkItWorkspace ? (
                         <NetworkItWorkspacePanels data={networkItWorkspace} />
                     ) : null}

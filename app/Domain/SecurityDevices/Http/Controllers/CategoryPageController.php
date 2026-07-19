@@ -10,6 +10,7 @@ use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Presenters\FacilitiesWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\HealthcareWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\NetworkItWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\SecurityWorkspacePresenter;
@@ -31,6 +32,7 @@ class CategoryPageController extends Controller
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
         private readonly WorkspacePresenter $workspacePresenter,
+        private readonly FacilitiesWorkspacePresenter $facilitiesWorkspacePresenter,
         private readonly NetworkItWorkspacePresenter $networkItWorkspacePresenter,
         private readonly SecurityWorkspacePresenter $securityWorkspacePresenter,
         private readonly HealthcareWorkspacePresenter $healthcareWorkspacePresenter,
@@ -208,7 +210,7 @@ class CategoryPageController extends Controller
                 ],
             ],
             'stats' => $stats,
-            'filters' => $request->only(['tab', 'device_id', 'subcategory', 'category', 'status', 'health', 'provider', 'assigned', 'search', 'sort', 'direction']),
+            'filters' => $request->only(['tab', 'device_id', 'subcategory', 'category', 'status', 'health', 'provider', 'assigned', 'search', 'sort', 'direction', 'history_kind', 'severity', 'event_type', 'source']),
             'filterOptions' => [
                 'subcategories' => $subcategories,
                 'categories' => $categoryOptions,
@@ -232,6 +234,14 @@ class CategoryPageController extends Controller
                 $activeTab,
                 $user,
             ),
+            'facilitiesWorkspace' => $slug === 'facilities-iot'
+                ? $this->facilitiesWorkspacePresenter->present(
+                    $user,
+                    clone $baseScope,
+                    $activeTab,
+                    $request->only(['history_kind', 'device_id', 'severity', 'event_type', 'source']),
+                )
+                : null,
             'securityWorkspace' => $slug === 'security'
                 ? $this->securityWorkspacePresenter->present($user, clone $baseScope, $activeTab)
                 : null,

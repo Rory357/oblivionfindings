@@ -137,11 +137,11 @@ class WorkspaceConfig
                 'domain' => 'facilities',
                 'tabs' => [
                     self::tab('overview', 'Overview', 'Facilities and IoT technical posture across authorised sites.'),
-                    self::tab('environment', 'Environment', 'Environmental sensors, freshness, and threshold-event evidence.', 'not_configured'),
-                    self::tab('building-systems', 'Building systems', 'Connected building and safety systems.', 'not_configured'),
-                    self::tab('utilities', 'Utilities', 'Observed utility services and metering integrations.', 'not_configured'),
-                    self::tab('automations', 'Automations', 'Supported facility automations and last execution state.', 'not_configured'),
-                    self::tab('history', 'History', 'Canonical event and observation history.', 'not_configured'),
+                    self::tab('environment', 'Environment', 'Environmental sensors, freshness, and threshold-event evidence.'),
+                    self::tab('building-systems', 'Building systems', 'Connected building and safety systems.'),
+                    self::tab('utilities', 'Utilities', 'Observed utility services and metering integrations.'),
+                    self::tab('automations', 'Automations', 'Supported facility automations and last execution state.'),
+                    self::tab('history', 'History', 'Canonical event and observation history.'),
                 ],
             ],
         ];
