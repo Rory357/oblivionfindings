@@ -18,14 +18,14 @@ Security & Devices already provides the canonical `Device`, assignments, topolog
 
 ## Delivery streams
 
-| Stream | State | Acceptance evidence |
-| --- | --- | --- |
-| 1. Platform foundations | In progress | Native monitor persistence and idempotent observation ingestion: `496dbce8f`, `334c98ffa` |
-| 2. Connected monitoring-to-ticket lifecycle | In progress | L01-L04 vertical slice: `94a5f5830`, `21d5e0b93` |
-| 3. Complete IT & Support | In progress | Typed monitoring links, governed service-management lifecycles, grouped navigation, catalogue, teams, queues, routing, service ownership, and secure service API identities with scoped idempotent intake: `2bb1f5fd2`, `0c0a51410`, Tasks 2-9 in the implementation plan |
-| 4. Complete Security & Devices workspaces | Planned | None recorded |
-| 5. Cross-module projections and privacy | Planned | None recorded |
-| 6. Production hardening and closure | Planned | None recorded |
+| Stream                                      | State       | Acceptance evidence                                                                                                                                                                                                                                                       |
+| ------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Platform foundations                     | In progress | Native monitor persistence and idempotent observation ingestion: `496dbce8f`, `334c98ffa`                                                                                                                                                                                 |
+| 2. Connected monitoring-to-ticket lifecycle | In progress | L01-L04 vertical slice: `94a5f5830`, `21d5e0b93`                                                                                                                                                                                                                          |
+| 3. Complete IT & Support                    | In progress | Typed monitoring links, governed service-management lifecycles, grouped navigation, catalogue, teams, queues, routing, service ownership, and secure service API identities with scoped idempotent intake: `2bb1f5fd2`, `0c0a51410`, Tasks 2-9 in the implementation plan |
+| 4. Complete Security & Devices workspaces   | In progress | Approved four-group navigation, canonical estate/site/workspace/operations/setup routes, and tenant-isolated production-backed entry surfaces: `b20817d43`                                                                                                                |
+| 5. Cross-module projections and privacy     | Planned     | None recorded                                                                                                                                                                                                                                                             |
+| 6. Production hardening and closure         | Planned     | None recorded                                                                                                                                                                                                                                                             |
 
 Allowed states are `Planned`, `In progress`, `Implemented`, `Acceptance verified`, and `Blocked with evidence`.
 
@@ -73,7 +73,7 @@ Progress notes:
 
 ### Security & Devices experience
 
-- [ ] S01 One global Security & Devices entry opens the approved grouped module side navigation.
+- [x] S01 One global Security & Devices entry opens the approved grouped module side navigation.
 - [ ] S02 Estate overview, Sites, and All devices answer health, change, coverage, site impact, and required action.
 - [ ] S03 Network & IT workspace includes map, devices, interfaces, services, traffic/capacity, configuration, and firmware.
 - [ ] S04 Security workspace includes CCTV, Alarms, Access Control, and Security events.
@@ -154,3 +154,4 @@ Progress notes:
 - 2026-07-19: Complete IT & Support verification passed 272 backend tests / 2,583 assertions across IT, native monitoring, and the DeviceEvent signal pipeline; the focused secure API rerun passed 6 tests / 101 assertions. Frontend proof passed 94 files / 371 tests, TypeScript, repository-wide ESLint, client build at 4,979 modules, SSR build at 1,631 modules, targeted Prettier, targeted Pint, PHP syntax, and diff checks.
 - 2026-07-19: Production-backed browser acceptance passed 7 journeys across desktop and Pixel 7 with 1 deliberate duplicate mobile accessibility scan skipped. Requester catalogue/knowledge/My requests/email isolation, technician incident/problem/change/major-incident/JML/API/delivery workspaces, denial behavior, responsive navigation, and a 10-route axe matrix with no serious or critical violations are proven. I01-I10 and E01-E03 are complete. X06 remains open until frozen incident-time evidence is implemented and accepted; E09 remains open for the whole-platform sensitive-domain and command-denial matrix.
 - 2026-07-19: Repository-wide `npm run format:check` still reports 1,328 pre-existing files across unrelated modules. No bulk rewrite was performed; the new IT acceptance files pass targeted Prettier. V01 and V06-V08 remain open because their definitions cover the unfinished master Security & Devices/monitoring goal, and V08 additionally requires the repository format baseline to be resolved.
+- 2026-07-19: Security & Devices navigation milestone committed as `b20817d43`. S01 is proven by 20 route/navigation tests with 247 assertions, five affected controller suites with 95 tests and 741 assertions, and six tenant-isolation regressions with 77 assertions. Three frontend files passed 9 tests; TypeScript, targeted ESLint/Prettier/Pint, PHP syntax, client build at 4,985 modules, SSR build at 1,637 modules, route inspection, and diff checks passed. All 13 canonical destinations passed production-backed desktop and Pixel 7 navigation, heading, console, and horizontal-overflow checks. S02-S10 and the master verification gates remain open.
