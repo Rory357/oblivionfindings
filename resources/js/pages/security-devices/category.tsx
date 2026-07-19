@@ -1,19 +1,22 @@
 import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import {
+    type SecurityDevicesWorkspace,
+    SecurityDevicesWorkspaceShell,
+    WorkspaceDeviceList,
+    WorkspaceFilterBar,
+} from '@/components/security-devices/security-devices-workspace-shell';
 import { Button } from '@/components/ui/button';
 import { EmptySearch, EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    Activity,
-    AlertTriangle,
     Building2,
     Cctv,
     HeartPulse,
     Key,
     type LucideIcon,
-    MonitorOff,
     Plus,
     Search,
     Server,
@@ -28,7 +31,6 @@ import {
     type FilterOption,
     FilterSelect,
     type Paginated,
-    StatCard,
 } from './devices/shared';
 
 // ── Types ─────────────────────────────────────────────────────────
@@ -64,6 +66,7 @@ type Props = {
         providers: string[];
     };
     pageConfig: PageConfig;
+    workspace: SecurityDevicesWorkspace;
 };
 
 // ── Icon map ──────────────────────────────────────────────────────
@@ -103,10 +106,11 @@ export default function CategoryPage({
     filters,
     filterOptions,
     pageConfig,
+    workspace,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const PageIcon = iconMap[pageConfig.icon] ?? Server;
-    const pageUrl = `/security-devices/${pageConfig.slug}`;
+    const pageUrl = workspace.canonicalHref;
     const registerLabel =
         pageConfig.slug.includes('-') ||
         ['security', 'healthcare', 'tracking'].includes(pageConfig.slug)
@@ -122,12 +126,20 @@ export default function CategoryPage({
     };
 
     const clearFilters = () => {
-        router.get(pageUrl, {}, { preserveState: true });
+        router.get(
+            pageUrl,
+            {
+                tab: workspace.activeTab,
+                ...(filters.device_id ? { device_id: filters.device_id } : {}),
+            },
+            { preserveState: true },
+        );
         setSearch('');
     };
 
-    const hasActiveFilters = Object.values(filters).some(
-        (v) => v && v !== 'all',
+    const hasActiveFilters = Object.entries(filters).some(
+        ([key, value]) =>
+            !['tab', 'device_id'].includes(key) && value && value !== 'all',
     );
 
     return (
@@ -161,232 +173,234 @@ export default function CategoryPage({
                     }
                 />
 
-                {/* Stats cards */}
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <StatCard
-                        label={`Total ${pageConfig.title}`}
-                        value={stats.total}
-                        icon={PageIcon}
-                    />
-                    <StatCard
-                        label="Active"
-                        value={stats.active}
-                        icon={Activity}
-                    />
-                    <StatCard
-                        label="Offline"
-                        value={stats.offline}
-                        icon={MonitorOff}
-                    />
-                    <StatCard
-                        label="Needing Attention"
-                        value={stats.attention}
-                        icon={AlertTriangle}
-                        variant={stats.attention > 0 ? 'warning' : 'default'}
-                    />
-                </div>
-
-                {/* Subcategory chips */}
-                {filterOptions.subcategories.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="xs"
-                            onClick={() => applyFilters({ subcategory: 'all' })}
-                            className={`h-auto rounded-full px-3 py-1 ${
-                                !filters.subcategory ||
-                                filters.subcategory === 'all'
-                                    ? 'border-primary bg-primary/10 text-primary'
-                                    : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                            }`}
-                        >
-                            All
-                            <span className="ml-1 text-muted-foreground">
-                                ({stats.total})
-                            </span>
-                        </Button>
-                        {filterOptions.subcategories.map((sub) => {
-                            const count = stats.bySubcategory[sub.value] ?? 0;
-                            const isActive = filters.subcategory === sub.value;
-                            return (
-                                <Button
-                                    key={sub.value}
-                                    type="button"
-                                    variant="outline"
-                                    size="xs"
-                                    onClick={() =>
-                                        applyFilters({ subcategory: sub.value })
-                                    }
-                                    className={`h-auto rounded-full px-3 py-1 ${
-                                        isActive
-                                            ? 'border-primary bg-primary/10 text-primary'
-                                            : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                                    }`}
-                                >
-                                    {sub.label}
-                                    {count > 0 && (
-                                        <span className="ml-1 text-muted-foreground/70">
-                                            ({count})
-                                        </span>
-                                    )}
-                                </Button>
-                            );
-                        })}
-                    </div>
-                )}
-
-                {/* Category filter (for multi-category or whole-domain pages) */}
-                {filterOptions.categories &&
-                    filterOptions.categories.length > 1 && (
+                <SecurityDevicesWorkspaceShell
+                    workspace={workspace}
+                    filters={filters}
+                >
+                    {/* Subcategory chips */}
+                    {filterOptions.subcategories.length > 0 && (
                         <div className="flex flex-wrap gap-2">
                             <Button
                                 type="button"
                                 variant="outline"
                                 size="xs"
                                 onClick={() =>
-                                    applyFilters({ category: 'all' })
+                                    applyFilters({ subcategory: 'all' })
                                 }
                                 className={`h-auto rounded-full px-3 py-1 ${
-                                    !filters.category ||
-                                    filters.category === 'all'
+                                    !filters.subcategory ||
+                                    filters.subcategory === 'all'
                                         ? 'border-primary bg-primary/10 text-primary'
                                         : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
                                 }`}
                             >
-                                All categories
+                                All
+                                <span className="ml-1 text-muted-foreground">
+                                    ({stats.total})
+                                </span>
                             </Button>
-                            {filterOptions.categories.map((cat) => (
+                            {filterOptions.subcategories.map((sub) => {
+                                const count =
+                                    stats.bySubcategory[sub.value] ?? 0;
+                                const isActive =
+                                    filters.subcategory === sub.value;
+                                return (
+                                    <Button
+                                        key={sub.value}
+                                        type="button"
+                                        variant="outline"
+                                        size="xs"
+                                        onClick={() =>
+                                            applyFilters({
+                                                subcategory: sub.value,
+                                            })
+                                        }
+                                        className={`h-auto rounded-full px-3 py-1 ${
+                                            isActive
+                                                ? 'border-primary bg-primary/10 text-primary'
+                                                : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                                        }`}
+                                    >
+                                        {sub.label}
+                                        {count > 0 && (
+                                            <span className="ml-1 text-muted-foreground/70">
+                                                ({count})
+                                            </span>
+                                        )}
+                                    </Button>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Category filter (for multi-category or whole-domain pages) */}
+                    {filterOptions.categories &&
+                        filterOptions.categories.length > 1 && (
+                            <div className="flex flex-wrap gap-2">
                                 <Button
-                                    key={cat.value}
                                     type="button"
                                     variant="outline"
                                     size="xs"
                                     onClick={() =>
-                                        applyFilters({ category: cat.value })
+                                        applyFilters({ category: 'all' })
                                     }
                                     className={`h-auto rounded-full px-3 py-1 ${
-                                        filters.category === cat.value
+                                        !filters.category ||
+                                        filters.category === 'all'
                                             ? 'border-primary bg-primary/10 text-primary'
                                             : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
                                     }`}
                                 >
-                                    {cat.label}
+                                    All categories
                                 </Button>
-                            ))}
-                        </div>
-                    )}
+                                {filterOptions.categories.map((cat) => (
+                                    <Button
+                                        key={cat.value}
+                                        type="button"
+                                        variant="outline"
+                                        size="xs"
+                                        onClick={() =>
+                                            applyFilters({
+                                                category: cat.value,
+                                            })
+                                        }
+                                        className={`h-auto rounded-full px-3 py-1 ${
+                                            filters.category === cat.value
+                                                ? 'border-primary bg-primary/10 text-primary'
+                                                : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                                        }`}
+                                    >
+                                        {cat.label}
+                                    </Button>
+                                ))}
+                            </div>
+                        )}
 
-                {/* Filter bar */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-                    <div className="relative flex-1 sm:max-w-xs">
-                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                            placeholder={`Search ${pageConfig.title.toLowerCase()}...`}
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            onKeyDown={(e) =>
-                                e.key === 'Enter' && applyFilters({ search })
-                            }
-                            className="pl-9"
-                        />
-                    </div>
+                    {/* Filter bar */}
+                    <WorkspaceFilterBar>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                            <div className="relative flex-1 sm:max-w-xs">
+                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    placeholder={`Search ${pageConfig.title.toLowerCase()}...`}
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    onKeyDown={(e) =>
+                                        e.key === 'Enter' &&
+                                        applyFilters({ search })
+                                    }
+                                    className="pl-9"
+                                />
+                            </div>
 
-                    <FilterSelect
-                        value={filters.status}
-                        onChange={(v) => applyFilters({ status: v })}
-                        placeholder="Status"
-                        options={filterOptions.statuses}
-                    />
-                    <FilterSelect
-                        value={filters.health}
-                        onChange={(v) => applyFilters({ health: v })}
-                        placeholder="Health"
-                        options={filterOptions.healthStatuses}
-                    />
-                    {filterOptions.providers.length > 0 && (
-                        <FilterSelect
-                            value={filters.provider}
-                            onChange={(v) => applyFilters({ provider: v })}
-                            placeholder="Provider"
-                            options={filterOptions.providers.map(
-                                (p: string) => ({ value: p, label: p }),
-                            )}
-                        />
-                    )}
-                    <FilterSelect
-                        value={filters.assigned}
-                        onChange={(v) => applyFilters({ assigned: v })}
-                        placeholder="Assignment"
-                        options={[
-                            { value: 'yes', label: 'Assigned' },
-                            { value: 'no', label: 'Unassigned' },
-                        ]}
-                    />
-
-                    {hasActiveFilters && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={clearFilters}
-                        >
-                            Clear filters
-                        </Button>
-                    )}
-                </div>
-
-                {/* Results */}
-                {devices.data.length > 0 ? (
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                        {devices.data.map((device) => (
-                            <DeviceCard key={device.id} device={device} />
-                        ))}
-                    </div>
-                ) : hasActiveFilters ? (
-                    <EmptySearch
-                        onClear={clearFilters}
-                        searchTerm={filters.search}
-                        title={`No matching ${pageConfig.title.toLowerCase()} found`}
-                    />
-                ) : (
-                    <EmptyState
-                        icon={PageIcon}
-                        title={pageConfig.emptyTitle}
-                        description={pageConfig.emptyDescription}
-                        action={
-                            <Button asChild size="sm">
-                                <Link
-                                    href={`/security-devices/devices/create?domain=${pageConfig.domain}`}
-                                >
-                                    {registerLabel}
-                                </Link>
-                            </Button>
-                        }
-                    />
-                )}
-
-                {/* Pagination */}
-                {(devices.meta.last_page ?? 1) > 1 && (
-                    <div className="flex items-center justify-center gap-1">
-                        {devices.links.map((link, i) => (
-                            <Button
-                                key={i}
-                                variant={link.active ? 'default' : 'outline'}
-                                size="sm"
-                                disabled={!link.url}
-                                onClick={() =>
-                                    link.url &&
-                                    router.get(
-                                        link.url,
-                                        {},
-                                        { preserveState: true },
-                                    )
-                                }
-                                dangerouslySetInnerHTML={{ __html: link.label }}
+                            <FilterSelect
+                                value={filters.status}
+                                onChange={(v) => applyFilters({ status: v })}
+                                placeholder="Status"
+                                options={filterOptions.statuses}
                             />
-                        ))}
-                    </div>
-                )}
+                            <FilterSelect
+                                value={filters.health}
+                                onChange={(v) => applyFilters({ health: v })}
+                                placeholder="Health"
+                                options={filterOptions.healthStatuses}
+                            />
+                            {filterOptions.providers.length > 0 && (
+                                <FilterSelect
+                                    value={filters.provider}
+                                    onChange={(v) =>
+                                        applyFilters({ provider: v })
+                                    }
+                                    placeholder="Provider"
+                                    options={filterOptions.providers.map(
+                                        (p: string) => ({ value: p, label: p }),
+                                    )}
+                                />
+                            )}
+                            <FilterSelect
+                                value={filters.assigned}
+                                onChange={(v) => applyFilters({ assigned: v })}
+                                placeholder="Assignment"
+                                options={[
+                                    { value: 'yes', label: 'Assigned' },
+                                    { value: 'no', label: 'Unassigned' },
+                                ]}
+                            />
+
+                            {hasActiveFilters && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={clearFilters}
+                                >
+                                    Clear filters
+                                </Button>
+                            )}
+                        </div>
+                    </WorkspaceFilterBar>
+
+                    {/* Results */}
+                    <WorkspaceDeviceList>
+                        {devices.data.length > 0 ? (
+                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                {devices.data.map((device) => (
+                                    <DeviceCard
+                                        key={device.id}
+                                        device={device}
+                                    />
+                                ))}
+                            </div>
+                        ) : hasActiveFilters ? (
+                            <EmptySearch
+                                onClear={clearFilters}
+                                searchTerm={filters.search}
+                                title={`No matching ${pageConfig.title.toLowerCase()} found`}
+                            />
+                        ) : (
+                            <EmptyState
+                                icon={PageIcon}
+                                title={pageConfig.emptyTitle}
+                                description={pageConfig.emptyDescription}
+                                action={
+                                    <Button asChild size="sm">
+                                        <Link
+                                            href={`/security-devices/devices/create?domain=${pageConfig.domain}`}
+                                        >
+                                            {registerLabel}
+                                        </Link>
+                                    </Button>
+                                }
+                            />
+                        )}
+
+                        {/* Pagination */}
+                        {(devices.meta.last_page ?? 1) > 1 && (
+                            <div className="flex items-center justify-center gap-1">
+                                {devices.links.map((link, i) => (
+                                    <Button
+                                        key={i}
+                                        variant={
+                                            link.active ? 'default' : 'outline'
+                                        }
+                                        size="sm"
+                                        disabled={!link.url}
+                                        onClick={() =>
+                                            link.url &&
+                                            router.get(
+                                                link.url,
+                                                {},
+                                                { preserveState: true },
+                                            )
+                                        }
+                                        dangerouslySetInnerHTML={{
+                                            __html: link.label,
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </WorkspaceDeviceList>
+                </SecurityDevicesWorkspaceShell>
             </PageShell>
         </AppLayout>
     );

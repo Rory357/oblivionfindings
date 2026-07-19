@@ -2,23 +2,32 @@
 
 namespace App\Domain\SecurityDevices\Http\Controllers;
 
+use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\SecurityDevices\Config\CategoryPageConfig;
 use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
+use App\Domain\SecurityDevices\Config\WorkspaceConfig;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
-use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Presenters\WorkspacePresenter;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Arr;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class CategoryPageController extends Controller
 {
     use MapsDevicesForList;
-    use ResolvesDeviceTenant;
+
+    public function __construct(
+        private readonly SecurityDevicesAccessService $access,
+        private readonly WorkspacePresenter $workspacePresenter,
+    ) {}
 
     public function networkIt(Request $request)
     {
@@ -45,39 +54,39 @@ class CategoryPageController extends Controller
         return $this->buildCategoryPage($request, 'facilities-iot');
     }
 
-    public function alarms(Request $request)
+    public function alarms(Request $request): RedirectResponse
     {
-        return $this->buildCategoryPage($request, 'alarms');
+        return $this->redirectLegacyWorkspace($request, '/security-devices/security', 'alarms');
     }
 
-    public function cctv(Request $request)
+    public function cctv(Request $request): RedirectResponse
     {
-        return $this->buildCategoryPage($request, 'cctv');
+        return $this->redirectLegacyWorkspace($request, '/security-devices/security', 'cctv');
     }
 
-    public function accessControl(Request $request)
+    public function accessControl(Request $request): RedirectResponse
     {
-        return $this->buildCategoryPage($request, 'access-control');
+        return $this->redirectLegacyWorkspace($request, '/security-devices/security', 'access-control');
     }
 
-    public function trackingDevices(Request $request)
+    public function trackingDevices(Request $request): RedirectResponse
     {
-        return $this->buildCategoryPage($request, 'tracking-devices');
+        return $this->redirectLegacyWorkspace($request, '/security-devices/tracking', 'overview');
     }
 
-    public function smartIotHealthcare(Request $request)
+    public function smartIotHealthcare(Request $request): RedirectResponse
     {
-        return $this->buildCategoryPage($request, 'smart-iot-healthcare');
+        return $this->redirectLegacyWorkspace($request, '/security-devices/healthcare', 'overview');
     }
 
-    public function itInfrastructure(Request $request)
+    public function itInfrastructure(Request $request): RedirectResponse
     {
-        return $this->buildCategoryPage($request, 'it-infrastructure');
+        return $this->redirectLegacyWorkspace($request, '/security-devices/network-it', 'devices');
     }
 
-    public function facilities(Request $request)
+    public function facilities(Request $request): RedirectResponse
     {
-        return $this->buildCategoryPage($request, 'facilities');
+        return $this->redirectLegacyWorkspace($request, '/security-devices/facilities-iot', 'overview');
     }
 
     private function buildCategoryPage(Request $request, string $slug): Response
@@ -85,20 +94,35 @@ class CategoryPageController extends Controller
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.view'), 403);
 
+        $workspaceConfig = WorkspaceConfig::get($slug);
         $config = CategoryPageConfig::get($slug);
-        abort_unless($config !== null, 404);
-        $tenantId = $this->resolveDeviceTenantId($user);
+        abort_unless($workspaceConfig !== null && $config !== null, 404);
+        $activeTab = WorkspaceConfig::activeTab($workspaceConfig, $request->string('tab')->toString());
 
         // ── Base scope ────────────────────────────────────────────
 
-        $query = Device::query()
-            ->forTenant($tenantId)
-            ->with(['assignments' => fn ($q) => $q->active()])
+        $baseScope = $this->access->visibleDevices($user)
             ->byDomain($config['domain']);
 
-        if ($config['categories'] !== null) {
-            $query->whereIn('category', $config['categories']);
+        $inventoryConfig = $config;
+        $inventoryScope = clone $baseScope;
+
+        if (isset($activeTab['categories'])) {
+            $inventoryConfig['categories'] = $activeTab['categories'];
+            $inventoryScope->whereIn('category', $activeTab['categories']);
         }
+
+        $query = (clone $inventoryScope)
+            ->with(['assignments' => fn ($q) => $q->active()])
+            ->withCount([
+                'monitors as enabled_monitors_count' => fn ($monitor) => $monitor->where('is_enabled', true),
+                'monitors as failing_monitors_count' => fn ($monitor) => $monitor
+                    ->where('is_enabled', true)
+                    ->whereIn('current_state', [MonitorState::Failed->value, MonitorState::Degraded->value]),
+                'monitors as uncertain_monitors_count' => fn ($monitor) => $monitor
+                    ->where('is_enabled', true)
+                    ->whereIn('current_state', [MonitorState::Unknown->value, MonitorState::Stale->value, MonitorState::Pending->value]),
+            ]);
 
         // ── Subcategory filter (category-page-specific) ───────────
 
@@ -121,7 +145,7 @@ class CategoryPageController extends Controller
 
         // ── Scoped stats ──────────────────────────────────────────
 
-        $statsBase = fn (): Builder => $this->scopedBaseQuery($config, $tenantId);
+        $statsBase = fn (): Builder => clone $inventoryScope;
 
         $stats = [
             'total' => $statsBase()->count(),
@@ -138,7 +162,7 @@ class CategoryPageController extends Controller
 
         // ── Build subcategory options from taxonomy ───────────────
 
-        $subcategories = $this->buildSubcategoryOptions($config);
+        $subcategories = $this->buildSubcategoryOptions($inventoryConfig);
 
         // ── Scoped provider list ──────────────────────────────────
 
@@ -152,12 +176,12 @@ class CategoryPageController extends Controller
         // ── Category options (for multi-category pages) ───────────
 
         $categoryOptions = null;
-        if ($config['categories'] !== null && count($config['categories']) > 1) {
-            $categoryOptions = collect($config['categories'])->map(fn ($cat) => [
+        if ($inventoryConfig['categories'] !== null && count($inventoryConfig['categories']) > 1) {
+            $categoryOptions = collect($inventoryConfig['categories'])->map(fn ($cat) => [
                 'value' => $cat,
                 'label' => str_replace('_', ' ', ucfirst($cat)),
             ]);
-        } elseif ($config['categories'] === null) {
+        } elseif ($inventoryConfig['categories'] === null) {
             // Whole domain — show categories as a filter.
             $categoryOptions = collect(DeviceTaxonomy::categoriesFor($config['domain']))->map(fn ($label, $slug) => [
                 'value' => $slug,
@@ -176,7 +200,7 @@ class CategoryPageController extends Controller
                 ],
             ],
             'stats' => $stats,
-            'filters' => $request->only(['subcategory', 'category', 'status', 'health', 'provider', 'assigned', 'search', 'sort', 'direction']),
+            'filters' => $request->only(['tab', 'device_id', 'subcategory', 'category', 'status', 'health', 'provider', 'assigned', 'search', 'sort', 'direction']),
             'filterOptions' => [
                 'subcategories' => $subcategories,
                 'categories' => $categoryOptions,
@@ -185,33 +209,21 @@ class CategoryPageController extends Controller
                 'providers' => $providers,
             ],
             'pageConfig' => [
-                'slug' => $config['slug'],
-                'title' => $config['title'],
-                'description' => $config['description'],
+                'slug' => $workspaceConfig['slug'],
+                'title' => $workspaceConfig['title'],
+                'description' => $workspaceConfig['description'],
                 'emptyTitle' => $config['emptyTitle'],
                 'emptyDescription' => $config['emptyDescription'],
                 'icon' => $config['icon'],
                 'domain' => $config['domain'],
-                'categories' => $config['categories'],
+                'categories' => $inventoryConfig['categories'],
             ],
+            'workspace' => $this->workspacePresenter->present(
+                clone $baseScope,
+                $workspaceConfig,
+                $activeTab,
+            ),
         ]);
-    }
-
-    /**
-     * Build an unfiltered base query scoped to the page's domain + categories.
-     * Used for stats so they always reflect the full scope, regardless of user filters.
-     */
-    private function scopedBaseQuery(array $config, int $tenantId): Builder
-    {
-        $query = Device::query()
-            ->forTenant($tenantId)
-            ->byDomain($config['domain']);
-
-        if ($config['categories'] !== null) {
-            $query->whereIn('category', $config['categories']);
-        }
-
-        return $query;
     }
 
     /**
@@ -238,5 +250,18 @@ class CategoryPageController extends Controller
         }
 
         return $options;
+    }
+
+    private function redirectLegacyWorkspace(
+        Request $request,
+        string $canonicalPath,
+        string $tab,
+    ): RedirectResponse {
+        abort_unless($request->user()->canDo('securityDevices.devices.view'), 403);
+
+        $query = $request->query();
+        $query['tab'] = $tab;
+
+        return redirect()->to($canonicalPath.'?'.Arr::query($query));
     }
 }

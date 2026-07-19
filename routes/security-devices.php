@@ -144,7 +144,9 @@ Route::middleware([
         ->middleware('permission:securityDevices.devices.view')
         ->name('security-devices.facilities-iot');
 
-    // ── Category pages ────────────────────────────────────────────
+    // ── Legacy category compatibility redirects ──────────────────
+    // Route names remain stable, while the controller preserves filters and
+    // device context when moving users into the matching canonical local tab.
 
     Route::get('/alarms', [CategoryPageController::class, 'alarms'])
         ->name('security-devices.alarms');

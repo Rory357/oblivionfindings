@@ -49,11 +49,11 @@ class CategoryPageControllerTest extends TestCase
     }
 
     #[DataProvider('categoryRouteProvider')]
-    public function test_category_page_accessible_with_permission(string $route): void
+    public function test_legacy_category_page_redirects_with_permission(string $route): void
     {
         $this->actingAs($this->admin)
             ->get($route)
-            ->assertOk();
+            ->assertRedirect();
     }
 
     public static function categoryRouteProvider(): array
@@ -72,19 +72,11 @@ class CategoryPageControllerTest extends TestCase
     // ── Correct Inertia component ─────────────────────────────────
 
     #[DataProvider('categoryRouteProvider')]
-    public function test_category_page_renders_correct_component(string $route): void
+    public function test_legacy_category_page_redirects_to_a_canonical_workspace(string $route): void
     {
         $this->actingAs($this->admin)
             ->get($route)
-            ->assertInertia(fn ($page) => $page
-                ->component('security-devices/category')
-                ->has('devices.data')
-                ->has('devices.meta')
-                ->has('stats')
-                ->has('filters')
-                ->has('filterOptions')
-                ->has('pageConfig')
-            );
+            ->assertRedirect();
     }
 
     // ── Domain scoping ────────────────────────────────────────────
@@ -96,11 +88,12 @@ class CategoryPageControllerTest extends TestCase
         Device::factory()->create(['domain' => 'security', 'category' => 'cctv', 'name' => 'Camera 1']);
         Device::factory()->create(['domain' => 'it_infrastructure', 'category' => 'network', 'name' => 'Switch 1']);
 
-        $response = $this->actingAs($this->admin)->get('/security-devices/alarms');
+        $response = $this->actingAs($this->admin)->get('/security-devices/security?tab=alarms');
 
         $response->assertInertia(fn ($page) => $page
             ->has('devices.data', 2)  // alarm + perimeter, not cctv or IT
-            ->where('pageConfig.slug', 'alarms')
+            ->where('stats.total', 2)
+            ->where('workspace.activeTab', 'alarms')
             ->where('pageConfig.domain', 'security')
         );
     }
@@ -110,11 +103,12 @@ class CategoryPageControllerTest extends TestCase
         Device::factory()->create(['domain' => 'security', 'category' => 'cctv', 'name' => 'Camera 1']);
         Device::factory()->create(['domain' => 'security', 'category' => 'alarm', 'name' => 'Panel 1']);
 
-        $response = $this->actingAs($this->admin)->get('/security-devices/cctv');
+        $response = $this->actingAs($this->admin)->get('/security-devices/security?tab=cctv');
 
         $response->assertInertia(fn ($page) => $page
             ->has('devices.data', 1)
-            ->where('pageConfig.slug', 'cctv')
+            ->where('stats.total', 1)
+            ->where('workspace.activeTab', 'cctv')
         );
     }
 
@@ -125,7 +119,7 @@ class CategoryPageControllerTest extends TestCase
         Device::factory()->create(['domain' => 'it_infrastructure', 'category' => 'power', 'name' => 'UPS']);
         Device::factory()->create(['domain' => 'security', 'category' => 'cctv', 'name' => 'Camera']);
 
-        $response = $this->actingAs($this->admin)->get('/security-devices/it-infrastructure');
+        $response = $this->actingAs($this->admin)->get('/security-devices/network-it?tab=devices');
 
         $response->assertInertia(fn ($page) => $page
             ->has('devices.data', 3)  // 3 IT devices, not the camera
@@ -139,7 +133,7 @@ class CategoryPageControllerTest extends TestCase
         Device::factory()->create(['domain' => 'tracking', 'category' => 'personal_tracker']);
         Device::factory()->create(['domain' => 'facilities', 'category' => 'cold_chain']);
 
-        $response = $this->actingAs($this->admin)->get('/security-devices/tracking-devices');
+        $response = $this->actingAs($this->admin)->get('/security-devices/tracking');
 
         $response->assertInertia(fn ($page) => $page
             ->has('devices.data', 2)
@@ -154,7 +148,7 @@ class CategoryPageControllerTest extends TestCase
         Device::factory()->create(['domain' => 'security', 'category' => 'cctv', 'status' => 'offline']);
         Device::factory()->create(['domain' => 'it_infrastructure', 'category' => 'network', 'status' => 'active']);
 
-        $response = $this->actingAs($this->admin)->get('/security-devices/cctv');
+        $response = $this->actingAs($this->admin)->get('/security-devices/security?tab=cctv');
 
         $response->assertInertia(fn ($page) => $page
             ->where('stats.total', 2)
@@ -196,7 +190,7 @@ class CategoryPageControllerTest extends TestCase
         Device::factory()->create(['domain' => 'security', 'category' => 'cctv', 'subcategory' => 'nvr']);
 
         $response = $this->actingAs($this->admin)
-            ->get('/security-devices/cctv?subcategory=dome_camera');
+            ->get('/security-devices/security?tab=cctv&subcategory=dome_camera');
 
         $response->assertInertia(fn ($page) => $page
             ->has('devices.data', 1)
@@ -212,7 +206,7 @@ class CategoryPageControllerTest extends TestCase
         Device::factory()->create(['domain' => 'it_infrastructure', 'category' => 'network', 'name' => 'Fire Rack Switch']);
 
         $response = $this->actingAs($this->admin)
-            ->get('/security-devices/alarms?search=Fire');
+            ->get('/security-devices/security?tab=alarms&search=Fire');
 
         $response->assertInertia(fn ($page) => $page
             ->has('devices.data', 1)  // Only the alarm device, not the IT switch
@@ -223,11 +217,11 @@ class CategoryPageControllerTest extends TestCase
 
     public function test_facilities_page_has_correct_config(): void
     {
-        $response = $this->actingAs($this->admin)->get('/security-devices/facilities');
+        $response = $this->actingAs($this->admin)->get('/security-devices/facilities-iot');
 
         $response->assertInertia(fn ($page) => $page
-            ->where('pageConfig.slug', 'facilities')
-            ->where('pageConfig.title', 'Facilities')
+            ->where('pageConfig.slug', 'facilities-iot')
+            ->where('pageConfig.title', 'Facilities & IoT')
             ->where('pageConfig.domain', 'facilities')
             ->has('pageConfig.emptyTitle')
             ->has('pageConfig.emptyDescription')
@@ -236,13 +230,13 @@ class CategoryPageControllerTest extends TestCase
 
     public function test_access_control_page_has_correct_config(): void
     {
-        $response = $this->actingAs($this->admin)->get('/security-devices/access-control');
+        $response = $this->actingAs($this->admin)->get('/security-devices/security?tab=access-control');
 
         $response->assertInertia(fn ($page) => $page
-            ->where('pageConfig.slug', 'access-control')
-            ->where('pageConfig.title', 'Access Control')
+            ->where('pageConfig.slug', 'security')
+            ->where('pageConfig.title', 'Security')
             ->where('pageConfig.domain', 'security')
-            ->where('pageConfig.categories', ['access_control'])
+            ->where('workspace.activeTab', 'access-control')
         );
     }
 }
