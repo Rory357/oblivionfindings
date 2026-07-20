@@ -11,26 +11,30 @@ it('keeps the new monitoring delivery boundary single tenant', function () {
         $root.'/app/Domain/Monitoring/Models/MonitoringProfile.php',
         $root.'/app/Domain/Monitoring/Models/MonitorObservation.php',
         $root.'/app/Domain/Monitoring/Services/MonitoringObservationIngestor.php',
+        $root.'/database/migrations/2026_07_18_100001_create_monitoring_foundation_tables.php',
+        $root.'/tests/Feature/Monitoring/MonitoringSchemaTest.php',
+        $root.'/app/Listeners/It/CreateOrUpdateMonitoringTicket.php',
+        $root.'/app/Domain/SecurityDevices/Presenters/MonitoringOperationsPresenter.php',
+        $root.'/tests/Feature/It/ItMonitoringTicketIntegrationTest.php',
     ];
-    $legacyMigration = $root.'/database/migrations/2026_07_18_100001_create_monitoring_foundation_tables.php';
-    $legacySchemaTest = $root.'/tests/Feature/Monitoring/MonitoringSchemaTest.php';
+    $enforcementTest = $root.'/tests/Architecture/MonitoringSingleTenantBoundaryTest.php';
 
     $runtimeFiles = collect([
-        ...monitoringPhpFiles($root.'/app/Domain/Monitoring'),
+        ...monitoringPhpFiles($root.'/app'),
+        ...monitoringPhpFiles($root.'/config'),
+        ...monitoringPhpFiles($root.'/tests'),
         ...monitoringPhpFiles($root.'/database/migrations'),
-        ...monitoringPhpFiles($root.'/tests/Feature/Monitoring'),
-        ...monitoringPhpFiles($root.'/tests/Unit/Monitoring'),
-        $root.'/config/features.php',
-    ])->filter(function (string $file) use ($legacyRuntimeFiles, $legacyMigration, $legacySchemaTest): bool {
-        if (in_array($file, [...$legacyRuntimeFiles, $legacyMigration, $legacySchemaTest], true)) {
-            return false;
-        }
-
-        return ! str_contains($file, '/database/migrations/')
-            || str_contains(basename($file), 'monitoring');
-    })->unique()->values();
+    ])->filter(fn (string $file): bool => str_contains(strtolower(substr($file, strlen($root) + 1)), 'monitoring'))
+        ->reject(fn (string $file): bool => in_array($file, $legacyRuntimeFiles, true) || $file === $enforcementTest)
+        ->push($root.'/config/features.php')
+        ->unique()
+        ->values();
 
     expect($runtimeEnvelope->hasProperty('tenantId'))->toBeFalse();
+    expect($runtimeFiles)
+        ->toContain($root.'/app/Domain/SecurityDevices/Http/Controllers/MonitoringOperationsController.php')
+        ->toContain($root.'/config/monitoring.php')
+        ->toContain($root.'/tests/Feature/Safeguarding/SafeguardingMonitoringTest.php');
 
     foreach ($runtimeFiles as $file) {
         $contents = file_get_contents($file);

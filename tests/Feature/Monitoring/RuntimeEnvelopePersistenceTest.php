@@ -200,7 +200,7 @@ it('keeps dead letter site context trusted and outside untrusted envelope payloa
         ->not->toBe($scoped->fresh()->site_id);
 });
 
-it('rejects mismatched inbox payload integrity while preserving first-or-create delivery semantics', function () {
+it('requires inbox payload integrity to match the exact envelope bytes at creation', function () {
     $attributes = [
         'message_id' => '018f0000-0000-7000-8000-000000000041',
         'consumer' => 'integrity-projector',
@@ -214,15 +214,85 @@ it('rejects mismatched inbox payload integrity while preserving first-or-create 
     expect(fn () => MonitoringInbox::create($attributes))
         ->toThrow(UnexpectedValueException::class, 'Monitoring inbox payload hash does not match envelope bytes.');
 
-    $attributes['payload_hash'] = hash('sha256', $attributes['envelope_bytes']);
-    $inbox = MonitoringInbox::create($attributes);
-
-    $inbox->envelope_bytes = '{"schema_version":1,"sequence":42}';
-    expect(fn () => $inbox->save())
+    $quietInbox = new MonitoringInbox($attributes);
+    expect(fn () => $quietInbox->saveQuietly())
         ->toThrow(UnexpectedValueException::class, 'Monitoring inbox payload hash does not match envelope bytes.');
+});
 
-    $inbox->payload_hash = hash('sha256', $inbox->envelope_bytes);
+it('makes inbox delivery identity and evidence immutable after creation', function () {
+    $bytes = '{"schema_version":1}';
+    $attributes = [
+        'message_id' => '018f0000-0000-7000-8000-000000000041',
+        'consumer' => 'integrity-projector',
+        'source' => 'central:checks',
+        'sequence' => 41,
+        'idempotency_key' => 'integrity:41',
+        'payload_hash' => hash('sha256', $bytes),
+        'envelope_bytes' => $bytes,
+    ];
+    $changes = [
+        'message_id' => '018f0000-0000-7000-8000-000000000042',
+        'consumer' => 'replacement-projector',
+        'source' => 'collector:replacement',
+        'sequence' => 42,
+        'idempotency_key' => 'integrity:42',
+        'envelope_bytes' => '{"schema_version":1,"sequence":42}',
+        'payload_hash' => str_repeat('f', 64),
+    ];
+
+    foreach ($changes as $attribute => $replacement) {
+        $inbox = MonitoringInbox::create($attributes);
+
+        expect(function () use ($inbox, $attribute, $replacement): void {
+            $inbox->{$attribute} = $replacement;
+            $inbox->save();
+        })
+            ->toThrow(UnexpectedValueException::class, 'Monitoring inbox delivery identity and evidence are immutable.');
+
+        $inbox->delete();
+    }
+
+    $inbox = MonitoringInbox::create($attributes);
+    expect(function () use ($inbox, $changes): void {
+        $inbox->envelope_bytes = $changes['envelope_bytes'];
+        $inbox->payload_hash = hash('sha256', $changes['envelope_bytes']);
+        $inbox->save();
+    })
+        ->toThrow(UnexpectedValueException::class, 'Monitoring inbox delivery identity and evidence are immutable.');
+    $inbox->delete();
+
+    $inbox = MonitoringInbox::create($attributes);
+    expect(fn () => $inbox->updateQuietly(['source' => 'collector:quiet-rewrite']))
+        ->toThrow(UnexpectedValueException::class, 'Monitoring inbox delivery identity and evidence are immutable.');
+    $inbox->delete();
+
+    $inbox = MonitoringInbox::create($attributes);
+    expect(fn () => MonitoringInbox::query()->whereKey($inbox->id)->update([
+        'envelope_bytes' => $changes['envelope_bytes'],
+        'payload_hash' => hash('sha256', $changes['envelope_bytes']),
+    ]))->toThrow(UnexpectedValueException::class, 'Monitoring inbox delivery identity and evidence are immutable.');
+});
+
+it('allows inbox lifecycle updates and preserves first-or-create existing-row semantics', function () {
+    $bytes = '{"schema_version":1}';
+    $inbox = MonitoringInbox::create([
+        'message_id' => '018f0000-0000-7000-8000-000000000041',
+        'consumer' => 'integrity-projector',
+        'source' => 'central:checks',
+        'sequence' => 41,
+        'idempotency_key' => 'integrity:41',
+        'payload_hash' => hash('sha256', $bytes),
+        'envelope_bytes' => $bytes,
+    ]);
+    $processedAt = now()->startOfSecond();
+    $inbox->processed_at = $processedAt;
     $inbox->save();
+
+    $quietProcessedAt = $processedAt->copy()->addMinute();
+    $inbox->updateQuietly(['processed_at' => $quietProcessedAt]);
+
+    $bulkProcessedAt = $processedAt->copy()->addMinutes(2);
+    MonitoringInbox::query()->whereKey($inbox->id)->update(['processed_at' => $bulkProcessedAt]);
 
     $duplicate = MonitoringInbox::firstOrCreate([
         'consumer' => $inbox->consumer,
@@ -235,9 +305,66 @@ it('rejects mismatched inbox payload integrity while preserving first-or-create 
         'envelope_bytes' => '{"different":true}',
     ]);
 
-    expect($inbox->fresh()->payload_hash)->toBe(hash('sha256', $inbox->fresh()->envelope_bytes))
+    expect($inbox->fresh()->processed_at->equalTo($bulkProcessedAt))->toBeTrue()
+        ->and($inbox->fresh()->payload_hash)->toBe(hash('sha256', $inbox->fresh()->envelope_bytes))
         ->and($duplicate->is($inbox))->toBeTrue()
         ->and($duplicate->envelope_bytes)->toBe($inbox->fresh()->envelope_bytes);
+});
+
+it('guards normal Eloquent bulk writes against inbox evidence bypasses', function () {
+    $bytes = '{"schema_version":1}';
+    $attributes = [
+        'message_id' => '018f0000-0000-7000-8000-000000000051',
+        'consumer' => 'bulk-guard-projector',
+        'source' => 'central:checks',
+        'sequence' => 51,
+        'idempotency_key' => 'bulk-guard:51',
+        'payload_hash' => hash('sha256', $bytes),
+        'envelope_bytes' => $bytes,
+    ];
+    $inbox = MonitoringInbox::create($attributes);
+    $invalid = [
+        ...$attributes,
+        'message_id' => '018f0000-0000-7000-8000-000000000052',
+        'sequence' => 52,
+        'idempotency_key' => 'bulk-guard:52',
+        'payload_hash' => str_repeat('0', 64),
+    ];
+
+    expect(fn () => $inbox->increment('sequence'))
+        ->toThrow(UnexpectedValueException::class, 'Monitoring inbox delivery identity and evidence are immutable.');
+    expect(fn () => MonitoringInbox::query()->whereKey($inbox->id)->update(['SEQUENCE' => 52]))
+        ->toThrow(UnexpectedValueException::class, 'Monitoring inbox delivery identity and evidence are immutable.');
+    expect(fn () => MonitoringInbox::query()->whereKey($inbox->id)->touch('SOURCE'))
+        ->toThrow(UnexpectedValueException::class, 'Monitoring inbox delivery identity and evidence are immutable.');
+    expect(MonitoringInbox::query()->whereKey($inbox->id)->touch())->toBe(1);
+
+    foreach (['insert', 'insertOrIgnore', 'insertGetId'] as $method) {
+        expect(fn () => MonitoringInbox::query()->{$method}($invalid))
+            ->toThrow(UnexpectedValueException::class, 'Monitoring inbox payload hash does not match envelope bytes.');
+    }
+
+    expect(fn () => MonitoringInbox::query()->upsert([
+        ...$attributes,
+        'envelope_bytes' => '{"schema_version":1,"replacement":true}',
+        'payload_hash' => hash('sha256', '{"schema_version":1,"replacement":true}'),
+    ], ['consumer', 'message_id'], ['envelope_bytes', 'payload_hash']))
+        ->toThrow(UnexpectedValueException::class, 'Monitoring inbox delivery identity and evidence are immutable.')
+        ->and(fn () => MonitoringInbox::query()->upsert(
+            $attributes,
+            ['consumer', 'message_id'],
+            ['SEQUENCE' => DB::raw('sequence + 1')],
+        ))->toThrow(UnexpectedValueException::class, 'Monitoring inbox delivery identity and evidence are immutable.')
+        ->and(fn () => MonitoringInbox::query()->upsert($attributes, ['consumer', 'message_id']))
+        ->toThrow(UnexpectedValueException::class, 'Monitoring inbox delivery identity and evidence are immutable.')
+        ->and(fn () => MonitoringInbox::query()->updateOrInsert(
+            ['consumer' => $inbox->consumer, 'message_id' => $inbox->message_id],
+            ['envelope_bytes' => $bytes, 'payload_hash' => hash('sha256', $bytes)],
+        ))->toThrow(UnexpectedValueException::class, 'Monitoring inbox delivery identity and evidence are immutable.');
+
+    $sourceQuery = MonitoringOutbox::query()->select('message_id');
+    expect(fn () => MonitoringInbox::query()->insertUsing(['message_id'], $sourceQuery))
+        ->toThrow(UnexpectedValueException::class, 'Monitoring inbox insert-from-query is not permitted.');
 });
 
 it('canonicalises nested payload keys before signing', function () {
