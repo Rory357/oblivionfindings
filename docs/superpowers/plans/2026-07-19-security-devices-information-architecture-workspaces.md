@@ -279,10 +279,12 @@ Legacy category paths (`/alarms`, `/cctv`, `/access-control`, `/tracking-devices
 
 ## Task 12: Verify the Security & Devices experience and update the master ledger
 
+**Acceptance scope (2026-07-21):** Security & Devices is a desktop web application. Task 12 browser acceptance covers standard and compact desktop web viewports only; mobile/device-emulation journeys are out of scope. Earlier Pixel 7 results remain historical evidence for the commits on which they were run, not a continuing product requirement.
+
 - [ ] Run all `tests/Feature/SecurityDevices`, `tests/Feature/Monitoring`, and connected IT/Control Room tests.
 - [ ] Run tenant, site, role, sensitive-domain, direct-link, count, search, export, and mutation denial suites.
 - [ ] Run all frontend tests, types, repository-wide ESLint, client build, and SSR build; record the repository-wide format baseline separately without bulk rewriting unrelated files.
-- [ ] Run production-backed desktop/mobile browser journeys for Estate, Sites, device inventory/profile, each specialist workspace, Monitoring, Maintenance, Discovery, Integrations, and Settings.
+- [ ] Run production-backed desktop web browser journeys for Estate, Sites, device inventory/profile, each specialist workspace, Monitoring, Maintenance, Discovery, Integrations, and Settings at standard and compact desktop widths.
 - [ ] Run accessibility and overflow checks across grouped navigation and local tabs.
 - [ ] Verify every legacy Security & Devices deep link and current UniFi/Milesight/Queclink route remains valid.
 - [ ] Update only exact proven S01-S10, relevant X01-X06/E04-E09, and verification-gate evidence in `docs/it-support-security-devices-completion-goal.md`.
