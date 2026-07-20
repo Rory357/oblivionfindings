@@ -4,6 +4,7 @@ namespace App\Domain\Monitoring\Database;
 
 use App\Domain\Monitoring\Models\MonitoringInbox;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use UnexpectedValueException;
 
 /** @extends Builder<MonitoringInbox> */
@@ -47,6 +48,16 @@ final class MonitoringInboxBuilder extends Builder
         $this->assertPayloadIntegrity($values);
 
         return $this->toBase()->insertOrIgnore($values);
+    }
+
+    public function insertOrIgnoreReturning(
+        array $values,
+        array $returning = ['*'],
+        array|string|null $uniqueBy = null,
+    ): Collection {
+        $this->assertPayloadIntegrity($values);
+
+        return $this->toBase()->insertOrIgnoreReturning($values, $returning, $uniqueBy);
     }
 
     public function insertGetId(array $values, $sequence = null): int

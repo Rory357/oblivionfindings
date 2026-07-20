@@ -339,7 +339,7 @@ it('guards normal Eloquent bulk writes against inbox evidence bypasses', functio
         ->toThrow(UnexpectedValueException::class, 'Monitoring inbox delivery identity and evidence are immutable.');
     expect(MonitoringInbox::query()->whereKey($inbox->id)->touch())->toBe(1);
 
-    foreach (['insert', 'insertOrIgnore', 'insertGetId'] as $method) {
+    foreach (['insert', 'insertOrIgnore', 'insertOrIgnoreReturning', 'insertGetId'] as $method) {
         expect(fn () => MonitoringInbox::query()->{$method}($invalid))
             ->toThrow(UnexpectedValueException::class, 'Monitoring inbox payload hash does not match envelope bytes.');
     }
