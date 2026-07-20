@@ -6,6 +6,8 @@
 
 **Status:** Implementation in progress
 
+> **Mandatory architecture boundary:** Oblivion Findings is single tenant: one operating organisation across all configured sites. New work must not add tenant selectors, partitions, contracts, or acceptance fixtures. Use roles and permissions, approved sites and networks, canonical ownership, direct-object denial, and privacy rules. See [`docs/architecture/single-tenant-application.md`](architecture/single-tenant-application.md).
+
 ## Completion rule
 
 This ledger is the master acceptance record. The goal is complete only when every stream is `Acceptance verified`, its evidence links are recorded, the full regression/build gates pass, and the user has not left a material gap unaccepted. A merged or pushed branch is not the same as acceptance verification. Production deployment is separately authorised.

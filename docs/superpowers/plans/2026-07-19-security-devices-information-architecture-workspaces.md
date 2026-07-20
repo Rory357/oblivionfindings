@@ -1,5 +1,7 @@
 # Security & Devices Information Architecture and Workspaces Implementation Plan
 
+> **Single-tenant correction (2026-07-21):** This is a historical implementation/evidence plan. Its tenant terminology describes legacy schema fields and evidence captured before the architecture clarification; it is not product guidance. Do not propagate tenant-based contracts or acceptance scenarios. All future work follows [`docs/architecture/single-tenant-application.md`](../../architecture/single-tenant-application.md) and proves site, role, canonical ownership, direct-object, and privacy boundaries.
+
 **Goal:** Replace the current flat, partially duplicated Security & Devices experience with the approved three-layer navigation and production-backed estate, site, workspace, operations, setup, and capability-driven device views while preserving canonical records and existing provider workflows.
 
 **Source of truth:**

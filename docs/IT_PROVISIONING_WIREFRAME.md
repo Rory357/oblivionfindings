@@ -1,5 +1,10 @@
 # IT & Provisioning — wireframe build-out spec
 
+> **Architecture correction (2026-07-21):** Oblivion Findings is single tenant.
+> The historical schema sketch below used `tenant_id`; that field is not part
+> of the product model or authorization boundary. See
+> `docs/architecture/single-tenant-application.md`.
+
 > **Status: BUILT (2026-07-02).** The wireframe has been replaced by the real
 > feature: `it_provisioning_requests` + `it_tickets` tables,
 > `App\Http\Controllers\It\ItProvisioningController`, the
@@ -28,7 +33,7 @@ already automatable on the onboarding side:
 ### 1. Schema (two tables)
 ```
 it_provisioning_requests
-  id, tenant_id
+  id
   employee_profile_id            FK hr_employee_profiles (the new hire)
   onboarding_task_id             FK hr_onboarding_tasks NULLABLE (source task)
   type                           enum: account | access | equipment | other
@@ -40,7 +45,7 @@ it_provisioning_requests
   notes, created_by, timestamps
 
 it_tickets                       (general helpdesk — not onboarding-driven)
-  id, tenant_id, title, description
+  id, title, description
   requester_user_id              FK users
   assigned_to_user_id            FK users NULLABLE
   category                       string (hardware | account | network | other)

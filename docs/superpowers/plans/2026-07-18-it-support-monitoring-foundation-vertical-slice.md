@@ -1,5 +1,7 @@
 # IT Support Monitoring Foundation Vertical Slice Implementation Plan
 
+> **Single-tenant correction (2026-07-21):** This is a historical implementation/evidence plan. Its tenant terminology describes legacy schema fields and previously executed test fixtures, not the product architecture. Do not copy those fields or cross-tenant scenarios into new work. All future monitoring design and implementation follows [`docs/architecture/single-tenant-application.md`](../../architecture/single-tenant-application.md) and uses site, network, role, canonical ownership, direct-object, and privacy boundaries.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the first production-shaped native monitoring path from idempotent observations through confirmed device state, canonical Control Room correlation, one linked IT incident, confirmed recovery, and visible ticket context.

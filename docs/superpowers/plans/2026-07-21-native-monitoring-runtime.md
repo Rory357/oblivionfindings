@@ -14,6 +14,8 @@
 
 **Completion ledger:** `docs/it-support-security-devices-completion-goal.md`
 
+> **Mandatory single-tenant boundary:** Oblivion Findings serves one operating organisation across all configured sites. Do not add organisation-partition identifiers to new runtime envelopes, delivery tables, collector contracts, correlation keys, fixtures, or acceptance criteria. Scope and authorise through approved sites and networks, canonical devices and ownership, roles and permissions, direct-object denial, and privacy rules. Legacy organisation-context columns in mature models are compatibility details only. See [`docs/architecture/single-tenant-application.md`](../../architecture/single-tenant-application.md).
+
 ---
 
 ## Delivery boundaries and decisions
@@ -207,24 +209,23 @@ use Illuminate\Support\Facades\Schema;
 uses(RefreshDatabase::class);
 
 it('stores every durable delivery control and verifies a v1 envelope', function () {
-    expect(Schema::hasColumns('monitoring_outbox', ['message_id', 'tenant_id', 'stream', 'source', 'sequence', 'envelope', 'published_at']))->toBeTrue()
+    expect(Schema::hasColumns('monitoring_outbox', ['message_id', 'stream', 'source', 'sequence', 'envelope', 'published_at']))->toBeTrue()
         ->and(Schema::hasColumns('monitoring_inbox', ['message_id', 'consumer', 'payload_hash', 'processed_at']))->toBeTrue()
         ->and(Schema::hasColumns('monitoring_consumer_checkpoints', ['consumer', 'source', 'last_sequence', 'gap_from', 'gap_to']))->toBeTrue()
         ->and(Schema::hasColumns('monitoring_dead_letters', ['message_id', 'consumer', 'reason_code', 'envelope', 'replay_count', 'resolved_at']))->toBeTrue();
 
     $envelope = RuntimeEnvelope::new(
         type: RuntimeMessageType::Observation,
-        tenantId: 42,
         source: 'central:checks',
         sequence: 7,
         idempotencyKey: 'monitor:9:sample:7',
-        payload: ['monitor_id' => 9, 'state' => 'healthy'],
+        payload: ['site_id' => 9, 'device_id' => 81, 'monitor_id' => 9, 'state' => 'healthy'],
     );
     $decoded = app(RuntimeEnvelopeCodec::class)->decode(app(RuntimeEnvelopeCodec::class)->encode($envelope));
 
     expect($decoded->schemaVersion)->toBe(1)
-        ->and($decoded->tenantId)->toBe(42)
         ->and($decoded->sequence)->toBe(7)
+        ->and($decoded->payload['site_id'])->toBe(9)
         ->and($decoded->traceId)->not->toBeEmpty();
 });
 ```
@@ -243,7 +244,6 @@ Create four tables with these indexes:
 Schema::create('monitoring_outbox', function (Blueprint $table): void {
     $table->id();
     $table->uuid('message_id')->unique();
-    $table->unsignedBigInteger('tenant_id');
     $table->string('stream');
     $table->string('source');
     $table->unsignedBigInteger('sequence');
@@ -254,13 +254,13 @@ Schema::create('monitoring_outbox', function (Blueprint $table): void {
     $table->unsignedSmallInteger('attempts')->default(0);
     $table->text('last_error')->nullable();
     $table->timestamps();
-    $table->unique(['tenant_id', 'source', 'sequence']);
-    $table->unique(['tenant_id', 'source', 'idempotency_key']);
+    $table->unique(['source', 'sequence']);
+    $table->unique(['source', 'idempotency_key']);
     $table->index(['stream', 'published_at', 'available_at']);
 });
 ```
 
-Create `monitoring_inbox` with unique `['consumer', 'message_id']` and `['consumer', 'tenant_id', 'source', 'idempotency_key']`, `monitoring_consumer_checkpoints` with unique `['consumer', 'tenant_id', 'source']`, and `monitoring_dead_letters` with indexes on `['consumer', 'resolved_at']` and `['tenant_id', 'created_at']`. Every lookup and lock must include tenant ID even when a UUID is globally unique. Store the original envelope JSON, a bounded reason code/message, replay count, replay timestamps, and resolving user ID; never store signing keys.
+Create `monitoring_inbox` with unique `['consumer', 'message_id']` and `['consumer', 'source', 'idempotency_key']`, `monitoring_consumer_checkpoints` with unique `['consumer', 'source']`, and `monitoring_dead_letters` with indexes on `['consumer', 'resolved_at']` and `['created_at']`. Every lookup and lock must include the consumer and source boundaries even when a UUID is globally unique. Store the original envelope JSON, a bounded reason code/message, replay count, replay timestamps, and resolving user ID; never store signing keys. Site, device, collector, and network references belong in the signed payload only where the message type requires them, and the handler must validate those references against canonical records before mutation.
 
 - [ ] **Step 4: Implement the immutable envelope and signature codec**
 
@@ -271,7 +271,6 @@ final readonly class RuntimeEnvelope
         public int $schemaVersion,
         public string $messageId,
         public RuntimeMessageType $type,
-        public int $tenantId,
         public string $source,
         public int $sequence,
         public CarbonImmutable $occurredAt,
@@ -283,15 +282,15 @@ final readonly class RuntimeEnvelope
         public string $signature = '',
     ) {}
 
-    public static function new(RuntimeMessageType $type, int $tenantId, string $source, int $sequence, string $idempotencyKey, array $payload): self
+    public static function new(RuntimeMessageType $type, string $source, int $sequence, string $idempotencyKey, array $payload): self
     {
         $now = CarbonImmutable::now('UTC');
-        return new self(1, (string) Str::orderedUuid(), $type, $tenantId, $source, $sequence, $now, $now, $idempotencyKey, (string) Str::orderedUuid(), $payload);
+        return new self(1, (string) Str::orderedUuid(), $type, $source, $sequence, $now, $now, $idempotencyKey, (string) Str::orderedUuid(), $payload);
     }
 }
 ```
 
-`RuntimeEnvelopeCodec::encode()` must canonicalise keys recursively, JSON-encode with `JSON_THROW_ON_ERROR`, sign every field except `signature` with `sodium_crypto_auth`, then attach `key_id` and base64 signature. `decode()` must reject unknown versions, missing required fields, unknown key IDs, invalid signatures, invalid timestamps, and tenant IDs below 1 before returning `RuntimeEnvelope`.
+`RuntimeEnvelopeCodec::encode()` must canonicalise keys recursively, JSON-encode with `JSON_THROW_ON_ERROR`, sign every field except `signature` with `sodium_crypto_auth`, then attach `key_id` and base64 signature. `decode()` must reject unknown versions, missing required fields, unknown key IDs, invalid signatures, invalid timestamps, and malformed canonical scope identifiers before returning `RuntimeEnvelope`. Message handlers, not the codec, validate any payload `site_id`, `device_id`, `monitor_id`, or `collector_uuid` against canonical ownership and the actor or collector's approved scope.
 
 - [ ] **Step 5: Run focused and migration tests**
 
@@ -343,7 +342,7 @@ it('processes once and parks sequence gaps without advancing the checkpoint', fu
 });
 ```
 
-Add cases for duplicate message ID, duplicate idempotency key, unsupported version, invalid signature, handler exception retry exhaustion, replay after the missing sequence arrives, and permission denial when replaying another tenant's letter.
+Add cases for duplicate message ID, duplicate idempotency key, unsupported version, invalid signature, handler exception retry exhaustion, replay after the missing sequence arrives, and permission denial when replaying a letter for an unapproved site or restricted device.
 
 - [ ] **Step 2: Run the test and verify RED**
 
@@ -361,7 +360,7 @@ Expected: FAIL because publisher, consumer, jobs, and replay service do not exis
 $envelope = $codec->decode($encoded);
 $inbox = MonitoringInbox::firstOrCreate(
     ['consumer' => $consumer, 'message_id' => $envelope->messageId],
-    ['tenant_id' => $envelope->tenantId, 'payload_hash' => hash('sha256', $encoded)],
+    ['source' => $envelope->source, 'payload_hash' => hash('sha256', $encoded)],
 );
 if ($inbox->processed_at) {
     return;
@@ -373,7 +372,7 @@ if (! hash_equals($inbox->payload_hash, hash('sha256', $encoded))) {
 $checkpoint = MonitoringConsumerCheckpoint::query()
     ->lockForUpdate()
     ->firstOrCreate(
-        ['consumer' => $consumer, 'tenant_id' => $envelope->tenantId, 'source' => $envelope->source],
+        ['consumer' => $consumer, 'source' => $envelope->source],
         ['last_sequence' => 0],
     );
 if ($envelope->sequence !== $checkpoint->last_sequence + 1) {
@@ -385,11 +384,11 @@ $inbox->forceFill(['processed_at' => now()])->save();
 $checkpoint->forceFill(['last_sequence' => $envelope->sequence, 'gap_from' => null, 'gap_to' => null])->save();
 ```
 
-Use stable reason codes `invalid_signature`, `unsupported_version`, `sequence_gap`, `tenant_scope_violation`, `handler_failed`, and `payload_invalid`. Redact payloads before logging; the permission-scoped DLQ record retains the signed envelope.
+Use stable reason codes `invalid_signature`, `unsupported_version`, `sequence_gap`, `scope_violation`, `site_scope_violation`, `handler_failed`, and `payload_invalid`. Redact payloads before logging; the permission-scoped DLQ record retains the signed envelope.
 
 - [ ] **Step 4: Add audited replay and discard commands**
 
-`MonitoringReplayService::replay(User $actor, MonitoringDeadLetter $letter)` must verify tenant/site permission through `SecurityDevicesAccessService`, increment `replay_count`, preserve original `message_id`, `occurred_at`, and sequence, and enqueue the original signed envelope. `discard()` records actor, reason, and resolution time but never deletes the letter.
+`MonitoringReplayService::replay(User $actor, MonitoringDeadLetter $letter)` must verify runtime-operate permission plus access to every referenced site and protected canonical target through `SecurityDevicesAccessService`, increment `replay_count`, preserve original `message_id`, `occurred_at`, and sequence, and enqueue the original signed envelope. `discard()` records actor, reason, and resolution time but never deletes the letter.
 
 Run: `php artisan monitoring:replay-dead-letter 15 --reason="missing sequence restored"`
 
@@ -408,7 +407,7 @@ git add app/Domain/Monitoring/Contracts/RuntimeEnvelopeHandler.php app/Domain/Mo
 git commit -m "feat(monitoring): make runtime delivery replayable"
 ```
 
-## Task 4: Enforce tenant, site, target, DNS, and SSRF egress boundaries
+## Task 4: Enforce site, network, target, DNS, and SSRF egress boundaries
 
 **Files:**
 
@@ -421,8 +420,8 @@ git commit -m "feat(monitoring): make runtime delivery replayable"
 - [ ] **Step 1: Write failing allow/deny and DNS-rebinding tests**
 
 ```php
-it('allows only every resolved address inside the tenant and site scope', function () {
-    $scope = probeScope(tenantId: 42, siteId: 9, cidrs: ['10.44.0.0/16']);
+it('allows only every resolved address inside the approved site network scope', function () {
+    $scope = probeScope(siteId: 9, cidrs: ['10.44.0.0/16']);
     $resolver = fakeResolver([
         'switch.site.example' => ['10.44.8.10'],
         'rebind.site.example' => ['10.44.8.11', '169.254.169.254'],
@@ -437,7 +436,7 @@ it('allows only every resolved address inside the tenant and site scope', functi
 });
 ```
 
-Add tests for tenant mismatch, site mismatch, loopback, link-local metadata, multicast, IPv4-in-IPv6, an empty DNS answer, CIDR boundary addresses, ports outside the scope allowlist, redirect to a denied host, response-size cap, and timeout cap.
+Add tests for site mismatch, device ownership mismatch, an unapproved network, loopback, link-local metadata, multicast, IPv4-in-IPv6, an empty DNS answer, CIDR boundary addresses, ports outside the scope allowlist, redirect to a denied host, response-size cap, and timeout cap.
 
 - [ ] **Step 2: Run the test and verify RED**
 
@@ -580,7 +579,7 @@ it('runs on monitoring-checks and publishes one idempotent observation', functio
 
 - [ ] **Step 5: Implement the runner and check job**
 
-`MonitorCheckRunner` must load the monitor with tenant, device, profile, collector, and active discovery scope; reject disabled/inactive/cross-tenant records; authorise egress; select exactly one adapter by `MonitorKind`; convert `ProtocolObservation` to the existing `ObservationInput`; and call `MonitoringObservationIngestor`. `RunMonitorCheck` uses `$connection = 'redis'`, `$queue = 'monitoring-checks'`, `tries = 3`, timeout 30 seconds, and uniqueness by monitor plus schedule key.
+`MonitorCheckRunner` must load the monitor with its canonical device, site, profile, collector, and active discovery scope; reject disabled, inactive, site-mismatched, ownership-mismatched, or out-of-scope records; authorise egress; select exactly one adapter by `MonitorKind`; convert `ProtocolObservation` to the existing `ObservationInput`; and call `MonitoringObservationIngestor`. `RunMonitorCheck` uses `$connection = 'redis'`, `$queue = 'monitoring-checks'`, `tries = 3`, timeout 30 seconds, and uniqueness by monitor plus schedule key.
 
 - [ ] **Step 6: Run direct-probe and existing lifecycle suites**
 
@@ -619,7 +618,7 @@ it('dispatches each due monitor once to the checks queue', function () {
 });
 ```
 
-Add collector-assignment, inactive-profile, not-yet-due, tenant partition, scheduler lock, and 10,000-monitor chunking cases.
+Add collector-assignment, inactive-profile, not-yet-due, site partition, restricted-site omission, scheduler lock, and 10,000-monitor chunking cases.
 
 - [ ] **Step 2: Run the test and verify RED**
 
@@ -659,7 +658,7 @@ git add app/Domain/Monitoring/Services/MonitorScheduler.php app/Domain/Monitorin
 git commit -m "feat(monitoring): schedule isolated check workloads"
 ```
 
-## Task 7: Add tenant-scoped discovery scopes, runs, candidates, and identity evidence
+## Task 7: Add site- and network-scoped discovery runs, candidates, and identity evidence
 
 **Files:**
 
@@ -682,8 +681,15 @@ git commit -m "feat(monitoring): schedule isolated check workloads"
 
 ```php
 it('auto-matches only immutable high-confidence evidence and queues ambiguity', function () {
-    $scope = DiscoveryScope::factory()->create(['tenant_id' => 42, 'site_id' => 9]);
-    $device = Device::factory()->create(['tenant_id' => 42, 'serial_number' => 'SER-100']);
+    $scope = DiscoveryScope::factory()->create(['site_id' => 9, 'cidrs' => ['10.44.0.0/16']]);
+    $device = Device::factory()->create(['serial_number' => 'SER-100']);
+    DeviceAssignment::query()->create([
+        'device_id' => $device->id,
+        'assignable_type' => DeviceAssignment::TARGET_SITE,
+        'assignable_id' => $scope->site_id,
+        'assignment_type' => AssignmentType::Permanent,
+        'assigned_at' => now(),
+    ]);
 
     $matched = app(DeviceIdentityMatcher::class)->match($scope, new DiscoveredIdentity(
         provider: 'snmp', providerId: null, serialNumber: 'SER-100', macAddresses: ['00:11:22:33:44:55'],
@@ -696,7 +702,7 @@ it('auto-matches only immutable high-confidence evidence and queues ambiguity', 
 });
 ```
 
-Add tests proving tenant/site mismatch rejection, exclusions taking precedence, provider ID and certificate identity confidence, MAC normalisation, address-history-only review, no-match proposal, and immutable run summaries.
+Add tests proving site mismatch, unapproved-network, and canonical-ownership rejection; exclusions taking precedence; provider ID and certificate identity confidence; MAC normalisation; address-history-only review; no-match proposal; and immutable run summaries.
 
 - [ ] **Step 2: Run the test and verify RED**
 
@@ -706,7 +712,7 @@ Expected: FAIL because discovery persistence and services do not exist.
 
 - [ ] **Step 3: Create the discovery schema**
 
-`monitoring_discovery_scopes` stores tenant, site, optional collector, CIDRs, seed hosts, enabled protocols, exclusions, port bounds, rate limits, schedule, and lifecycle state. `monitoring_discovery_runs` stores immutable counts for found/matched/proposed/changed/excluded/failed/unresolved plus start/end and failure summary. `monitoring_discovery_candidates` stores proposed or matched canonical device ID, decision, confidence, reasons, evidence snapshot, review actor/time, and supersession link. `monitoring_device_identity_evidence` stores canonical device ID, evidence type, SHA-256 normalised value, source, first/last seen, confidence, and active/superseded state; unique keys include tenant and source.
+`monitoring_discovery_scopes` stores site, optional collector, approved CIDRs, seed hosts, enabled protocols, exclusions, port bounds, rate limits, schedule, and lifecycle state. `monitoring_discovery_runs` stores immutable counts for found/matched/proposed/changed/excluded/failed/unresolved plus start/end and failure summary. `monitoring_discovery_candidates` stores proposed or matched canonical device ID, decision, confidence, reasons, evidence snapshot, review actor/time, and supersession link. `monitoring_device_identity_evidence` stores canonical device ID, evidence type, SHA-256 normalised value, source, first/last seen, confidence, and active/superseded state; unique keys include the canonical device, evidence source, and normalised value where required.
 
 Do not store raw credentials or create a discovery-owned device identity.
 
@@ -731,7 +737,7 @@ One unique immutable match at 90 or above is `matched`. Conflicting immutable ev
 
 - [ ] **Step 5: Implement reviewed adopt, merge, and split against canonical Device**
 
-`DiscoveryCandidateService::adopt()` must call existing `DeviceRegistryService`, attach active identity evidence, and mark the candidate accepted. `merge($winner, $loser)` must validate same tenant, move evidence/monitors/assignments/history in a transaction, record old-to-new IDs, and soft-delete only the losing canonical `Device`. `split()` must create a canonical Device through `DeviceRegistryService`, move only selected evidence and dependent observations, and record the repair audit. Every operation is idempotent by candidate plus review action.
+`DiscoveryCandidateService::adopt()` must call existing `DeviceRegistryService`, attach active identity evidence, and mark the candidate accepted. `merge($winner, $loser)` must validate compatible canonical ownership and site visibility, move evidence/monitors/assignments/history in a transaction, record old-to-new IDs, and soft-delete only the losing canonical `Device`. `split()` must create a canonical Device through `DeviceRegistryService`, move only selected evidence and dependent observations, and record the repair audit. Every operation is idempotent by candidate plus review action.
 
 - [ ] **Step 6: Run identity and device-registry regressions**
 
@@ -777,7 +783,7 @@ it('records an immutable reconciled run and never probes exclusions', function (
 });
 ```
 
-Add overlapping-run, disabled scope, collector scope, tenant/site mismatch, maximum CIDR expansion, partial adapter failure, cancellation, immutable completed counts, and idempotent rerun tests.
+Add overlapping-run, disabled scope, collector scope, site/network mismatch, maximum CIDR expansion, partial adapter failure, cancellation, immutable completed counts, and idempotent rerun tests.
 
 - [ ] **Step 2: Run the test and verify RED**
 
@@ -851,7 +857,7 @@ Expected: FAIL because the lease seam, transport, adapter, decoder, and listener
 ```php
 interface CredentialLeaseProvider
 {
-    public function acquire(int $tenantId, int $siteId, string $reference, array $capabilities): CredentialLease;
+    public function acquire(int $siteId, string $reference, array $capabilities): CredentialLease;
 }
 
 final readonly class CredentialLease
@@ -867,11 +873,11 @@ final readonly class CredentialLease
 }
 ```
 
-Bind `CredentialLeaseProvider` to `UnavailableCredentialLeaseProvider`, which throws `Credential lease provider is not configured.` Production activation is owned by the later secrets/command plan. Tests inject one-use leases. `NativeSnmpTransport` requires ext-snmp, accepts SNMPv3 auth/privacy only, uses numeric authorised addresses, applies OID and varbind caps, and clears material references after each call. A v1/v2c call requires a tenant/site-scoped compatibility-exception record with owner, reason, expiry, and migration status.
+Bind `CredentialLeaseProvider` to `UnavailableCredentialLeaseProvider`, which throws `Credential lease provider is not configured.` Production activation is owned by the later secrets/command plan. Tests inject one-use leases. `NativeSnmpTransport` requires ext-snmp, accepts SNMPv3 auth/privacy only, uses numeric authorised addresses, applies OID and varbind caps, and clears material references after each call. A v1/v2c call requires a site- and device-scoped compatibility-exception record with owner, reason, expiry, and migration status.
 
 - [ ] **Step 4: Implement trap intake as a supervised event workload**
 
-`MonitoringListenSnmpTraps` binds only the configured interface/port, caps datagrams at 65,507 bytes, resolves sender IP to one active tenant/site scope, decodes allowlisted v1/v2/v3 trap fields, rejects unauthenticated v3 traps, and publishes a signed `event` envelope to `monitoring-events`. It must not call `DeviceEvent::create()` inside the socket loop. The event consumer maps source identity to canonical `Device`, stores bounded evidence, and then creates one `DeviceEvent` so the existing observer remains the sole Control Room bridge.
+`MonitoringListenSnmpTraps` binds only the configured interface/port, caps datagrams at 65,507 bytes, resolves sender IP to one active approved site/network scope, decodes allowlisted v1/v2/v3 trap fields, rejects unauthenticated v3 traps, and publishes a signed `event` envelope to `monitoring-events`. It must not call `DeviceEvent::create()` inside the socket loop. The event consumer maps source identity to a canonical `Device`, validates canonical ownership, stores bounded evidence, and then creates one `DeviceEvent` so the existing observer remains the sole Control Room bridge.
 
 - [ ] **Step 5: Run SNMP, envelope, and signal regressions**
 
@@ -946,7 +952,7 @@ Expected: FAIL because protocol decoders do not exist.
 
 - [ ] **Step 4: Implement decoders, aggregation, and listeners**
 
-Syslog emits only allowlisted fields plus a sanitised 4 KiB message and SHA-256 raw hash. Flow decoders use network byte order, reject incomplete structures, cap 1,000 records/datagram, and return the common `FlowDatagram` value. `FlowAggregator` groups tenant/site/exporter/interface/direction/protocol/application buckets per minute, publishes signed metric envelopes for the Task 17 storage consumer, and emits a gap health event when exporter sequence is discontinuous.
+Syslog emits only allowlisted fields plus a sanitised 4 KiB message and SHA-256 raw hash. Flow decoders use network byte order, reject incomplete structures, cap 1,000 records/datagram, and return the common `FlowDatagram` value. `FlowAggregator` groups site/exporter/interface/direction/protocol/application buckets per minute, publishes signed metric envelopes for the Task 17 storage consumer, and emits a gap health event when exporter sequence is discontinuous.
 
 Both listener commands must resolve the sender through an approved discovery scope, publish signed envelopes to `monitoring-events`, expose heartbeat counters, and avoid inline Eloquent writes. Use distinct supervisor processes and ports; no listener may bind `0.0.0.0` unless the deployment allowlist explicitly includes the receiving network.
 
@@ -1136,8 +1142,17 @@ git commit -m "refactor(integrations): add typed monitoring capabilities"
 
 ```php
 it('keeps inferred topology temporal and does not overwrite canonical relationships', function () {
-    $site = Site::factory()->create(['tenant_id' => 42]);
-    [$switch, $accessPoint] = Device::factory()->count(2)->create(['tenant_id' => 42]);
+    $site = Site::factory()->create();
+    [$switch, $accessPoint] = Device::factory()->count(2)->create();
+    foreach ([$switch, $accessPoint] as $device) {
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assignment_type' => AssignmentType::Permanent,
+            'assigned_at' => now(),
+        ]);
+    }
     $snapshot = app(TopologySnapshotBuilder::class)->build($site, [
         new TopologyEvidence('lldp', $switch->id, $accessPoint->id, 'ethernet', 'Gi1/0/8', 'eth0', 0.95, ['chassis_hash' => 'abc']),
         new TopologyEvidence('arp', $switch->id, $accessPoint->id, 'observed_path', null, null, 0.45, ['table_age_seconds' => 12]),
@@ -1149,7 +1164,7 @@ it('keeps inferred topology temporal and does not overwrite canonical relationsh
 });
 ```
 
-Add LLDP, CDP, ARP, forwarding table, routes, provider evidence, conflicting edges, unresolved nodes, removed/added/changed edge diff, cross-tenant rejection, immutable completed snapshot, and deduplication tests.
+Add LLDP, CDP, ARP, forwarding table, routes, provider evidence, conflicting edges, unresolved nodes, removed/added/changed edge diff, cross-site and canonical-ownership rejection, immutable completed snapshot, and deduplication tests.
 
 - [ ] **Step 2: Run topology tests and verify RED**
 
@@ -1159,7 +1174,7 @@ Expected: FAIL because topology persistence and builders do not exist.
 
 - [ ] **Step 3: Create temporal topology persistence**
 
-`monitoring_topology_snapshots` stores tenant/site, source run/envelope, captured/completed times, status, node/edge counts, and summary. Nodes reference canonical `device_id` when matched and otherwise a discovery candidate plus hashed observed identity. Edges store source, kind, endpoint node IDs, local/remote port, confidence decimal, bounded evidence, first/last seen, and stable edge hash. Changes link previous/current snapshots and store `added`, `removed`, or `changed` plus evidence.
+`monitoring_topology_snapshots` stores site, source run/envelope, captured/completed times, status, node/edge counts, and summary. Nodes reference canonical `device_id` when matched and otherwise a discovery candidate plus hashed observed identity. Edges store source, kind, endpoint node IDs, local/remote port, confidence decimal, bounded evidence, first/last seen, and stable edge hash. Changes link previous/current snapshots and store `added`, `removed`, or `changed` plus evidence.
 
 Completed snapshots and edges are immutable. Existing `device_relationships` remain the reviewed operational relationships; inferred edges never overwrite them silently.
 
@@ -1208,10 +1223,21 @@ git commit -m "feat(monitoring): add temporal topology snapshots"
 
 ```php
 it('shows downstream symptoms as suppressed while emitting one root cause', function () {
-    $wan = Monitor::factory()->failed()->create(['affects_availability' => true]);
-    $camera = Monitor::factory()->failed()->create(['affects_availability' => true]);
+    $site = Site::factory()->create();
+    [$wanDevice, $cameraDevice] = Device::factory()->count(2)->create();
+    foreach ([$wanDevice, $cameraDevice] as $device) {
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assignment_type' => AssignmentType::Permanent,
+            'assigned_at' => now(),
+        ]);
+    }
+    $wan = Monitor::factory()->failed()->create(['device_id' => $wanDevice->id, 'affects_availability' => true]);
+    $camera = Monitor::factory()->failed()->create(['device_id' => $cameraDevice->id, 'affects_availability' => true]);
     MonitorDependency::create([
-        'tenant_id' => $wan->tenant_id,
+        'site_id' => $site->id,
         'upstream_monitor_id' => $wan->id,
         'downstream_monitor_id' => $camera->id,
         'policy' => 'suppress_notifications_and_ticketing',
@@ -1234,11 +1260,11 @@ Expected: FAIL because policy records and evaluators do not exist.
 
 - [ ] **Step 3: Add explicit policy fields and evaluators**
 
-Extend monitoring profiles with failure/recovery duration, rising/falling thresholds, baseline window/minimum samples/deviation multiplier, maintenance policy, roll-up policy, and retention policy ID. Add tenant-safe dependencies, recurring/one-off maintenance windows, and device-class capability expectations.
+Extend monitoring profiles with failure/recovery duration, rising/falling thresholds, baseline window/minimum samples/deviation multiplier, maintenance policy, roll-up policy, and retention policy ID. Add site- and ownership-safe dependencies, recurring/one-off maintenance windows, and device-class capability expectations.
 
 Refactor the current confirmation logic out of `MonitoringObservationIngestor` into `MonitorStateMachine`. The ingestor persists every observation, asks the state machine for the reported transition, asks maintenance/dependency evaluators for the effective transition, and creates a `DeviceEvent` only for a confirmed unsuppressed root-cause transition. Suppressed symptoms persist their own history and root-cause reference.
 
-Every failure and recovery event must carry the same immutable `monitor_correlation_key` derived from tenant, canonical device, root-cause monitor, and condition. `DeviceEventObserver` projects that key into normalised signal data. `SignalProcessingService::processDeviceRecovery()` matches unresolved alerts by that key in addition to canonical device identity. `CreateOrUpdateMonitoringTicket::handleRecovery()` follows the matching source alert/correlation link and must not select every open system incident linked to the device. Legacy device-only recovery is retained only for explicitly identified legacy events and has its own regression.
+Every failure and recovery event must carry the same immutable `monitor_correlation_key` derived from canonical device, root-cause monitor, condition, and site context. `DeviceEventObserver` projects that key into normalised signal data. `SignalProcessingService::processDeviceRecovery()` matches unresolved alerts by that key in addition to canonical device identity. `CreateOrUpdateMonitoringTicket::handleRecovery()` follows the matching source alert/correlation link and must not select every open system incident linked to the device. Legacy device-only recovery is retained only for explicitly identified legacy events and has its own regression.
 
 - [ ] **Step 4: Implement deterministic roll-up and coverage rules**
 
@@ -1310,7 +1336,7 @@ it('contains no database client and executes only signed scoped checks', functio
 });
 ```
 
-Add wrong collector ID, wrong tenant/site, expired config, rollback sequence, out-of-scope target, forbidden protocol, expired credential lease, encrypted-at-rest assertion, spool maximum, restart checkpoint, duplicate item, ordered flush, acknowledgement, corrupted frame quarantine, and revoked collector tests.
+Add wrong collector ID, wrong site/network/device scope, expired config, rollback sequence, out-of-scope target, forbidden protocol, expired credential lease, encrypted-at-rest assertion, spool maximum, restart checkpoint, duplicate item, ordered flush, acknowledgement, corrupted frame quarantine, and revoked collector tests.
 
 - [ ] **Step 2: Run collector tests and verify RED**
 
@@ -1331,7 +1357,7 @@ The executable supports `enrol`, `run`, `doctor`, and `version`. It accepts cent
 
 - [ ] **Step 4: Implement signed configuration, scope guard, and encrypted spool**
 
-Verify Ed25519 configuration signatures with the pinned central public key, require monotonically increasing config sequence and expiry, and reject entries outside tenant/site/collector scope. `EncryptedSpool` uses length-prefixed frames encrypted with `sodium_crypto_secretstream_xchacha20poly1305`, fsyncs before acknowledging local receipt, caps bytes/items/age, preserves source sequence, and deletes acknowledged frames only after an atomic checkpoint-file replacement. When the cap is reached, stop new scheduled checks, continue heartbeat/control traffic, and report `buffer_full`; never discard old items silently.
+Verify Ed25519 configuration signatures with the pinned central public key, require monotonically increasing config sequence and expiry, and reject entries outside the collector's approved site/network/device scope. `EncryptedSpool` uses length-prefixed frames encrypted with `sodium_crypto_secretstream_xchacha20poly1305`, fsyncs before acknowledging local receipt, caps bytes/items/age, preserves source sequence, and deletes acknowledged frames only after an atomic checkpoint-file replacement. When the cap is reached, stop new scheduled checks, continue heartbeat/control traffic, and report `buffer_full`; never discard old items silently.
 
 - [ ] **Step 5: Implement collector probe execution without commands**
 
@@ -1384,7 +1410,7 @@ git commit -m "feat(monitoring): add database-free remote collector"
 
 ```php
 it('enrols once and returns only the collector site scope', function () {
-    $enrollment = app(CollectorEnrollmentService::class)->issue(tenantId: 42, siteId: 9, actorId: 7);
+    $enrollment = app(CollectorEnrollmentService::class)->issue(siteId: 9, actorId: 7);
     $response = $this->postJson('/api/monitoring/collectors/enrol', [
         'token' => $enrollment->plainToken,
         'collector_uuid' => '018f0000-0000-7000-8000-000000000009',
@@ -1392,13 +1418,13 @@ it('enrols once and returns only the collector site scope', function () {
     ])->assertCreated();
 
     expect($response->json('site_id'))->toBe(9)
-        ->and($response->json('config.monitors.*.tenant_id'))->each->toBe(42)
-        ->and($response->json('config.monitors.*.site_id'))->each->toBe(9);
+        ->and($response->json('config.monitors.*.site_id'))->each->toBe(9)
+        ->and($response->json('config.database'))->toBeNull();
     $this->postJson('/api/monitoring/collectors/enrol', ['token' => $enrollment->plainToken])->assertUnprocessable();
 });
 ```
 
-Add token hashing/expiry, certificate/public-key binding, wrong tenant/site, foreign monitor omission, scoped capability omission, signed config version, monotonic sequence, heartbeat, backlog/gap, duplicate upload, out-of-order upload, clock drift, revocation, post-revocation denial, re-enrolment, and stale-data tests. Include reverse-proxy header spoofing, an untrusted proxy, certificate-fingerprint mismatch, request-signature replay, and a valid trusted-proxy/mTLS/request-signature path.
+Add token hashing/expiry, certificate/public-key binding, wrong site/network/device scope, unassigned monitor omission, scoped capability omission, signed config version, monotonic sequence, heartbeat, backlog/gap, duplicate upload, out-of-order upload, clock drift, revocation, post-revocation denial, re-enrolment, and stale-data tests. Include reverse-proxy header spoofing, an untrusted proxy, certificate-fingerprint mismatch, request-signature replay, and a valid trusted-proxy/mTLS/request-signature path.
 
 - [ ] **Step 2: Run lifecycle tests and verify RED**
 
@@ -1408,13 +1434,13 @@ Expected: FAIL because collector control-plane services and routes do not exist.
 
 - [ ] **Step 3: Implement one-time enrolment and least-privilege configuration**
 
-Store only an enrolment-token hash, expiry, tenant/site, issuing actor, and consumed time. The collector extension migration adds a tenant-consistent `collector_device_id` reference plus public-key fingerprint, client-certificate fingerprint, configuration sequence, contiguous acknowledgement, backlog/gap, revoked-at, and last-clock-drift fields. Bind the collector UUID and public key on first use, rotate the central-issued client certificate, link the collector to one tenant-scoped canonical collector projection `Device`, and audit issuance/consumption/revocation. `CollectorConfigurationService` includes only monitors, targets, protocol settings, egress CIDRs, rate limits, and expiring lease references assigned to that collector/site. Sign with Ed25519 and increment `config_sequence`; never include another tenant/site, application database credential, reusable session cookie, or command capability.
+Store only an enrolment-token hash, expiry, approved site, issuing actor, and consumed time. The collector extension migration adds an ownership-consistent `collector_device_id` reference plus public-key fingerprint, client-certificate fingerprint, configuration sequence, contiguous acknowledgement, backlog/gap, revoked-at, and last-clock-drift fields. Bind the collector UUID and public key on first use, rotate the central-issued client certificate, link the collector to one canonical collector projection `Device`, and audit issuance/consumption/revocation. `CollectorConfigurationService` includes only monitors, targets, protocol settings, approved egress CIDRs, rate limits, and expiring lease references assigned to that collector/site. Sign with Ed25519 and increment `config_sequence`; never include another site's networks or devices, an application database credential, reusable session cookie, or command capability.
 
 `CollectorTransportAuthenticator` requires both a request signature from the enrolled collector public key (method, path, body hash, timestamp, nonce) and an mTLS certificate fingerprint verified by the terminating reverse proxy. `AuthenticateMonitoringCollector` trusts the verified-certificate header only from configured proxy addresses, rejects stale/replayed nonces, and resolves exactly one active collector identity before controller code runs. Direct public requests, spoofed headers, certificate/public-key disagreement, and revoked identities all receive the same denial shape. The deployment runbook must include the proxy mTLS verification contract; Laravel must never accept an arbitrary client-supplied fingerprint header.
 
 - [ ] **Step 4: Implement ordered collector ingestion and checkpoints**
 
-`CollectorIngestService` verifies mTLS identity plus envelope signature, tenant/site/collector scope, and occurrence-time drift. It accepts the next contiguous sequence, handles duplicates idempotently, returns the highest contiguous acknowledgement, parks gaps visibly, and routes observations/events through the same central envelope handlers used by direct monitoring. A collector cannot send a canonical device ID unless that device is in its signed scope; otherwise the item enters DLQ with `collector_scope_violation`.
+`CollectorIngestService` verifies mTLS identity plus envelope signature, approved site/network/device/collector scope, and occurrence-time drift. It accepts the next contiguous sequence, handles duplicates idempotently, returns the highest contiguous acknowledgement, parks gaps visibly, and routes observations/events through the same central envelope handlers used by direct monitoring. A collector cannot send a canonical device ID unless that device is in its signed scope and remains canonically owned by the approved site; otherwise the item enters DLQ with `site_scope_violation` or `collector_scope_violation` as appropriate.
 
 - [ ] **Step 5: Implement collector outage semantics through the canonical path**
 
@@ -1422,7 +1448,7 @@ Store only an enrolment-token hash, expiry, tenant/site, issuing actor, and cons
 
 1. changes collector/path state to `unavailable`;
 2. changes affected monitors' effective freshness to `stale` without changing their last reported state to failed or healthy;
-3. creates one `DeviceEvent` against the collector's tenant-scoped canonical projection device with payload containing affected device/monitor counts, `root_cause = collector_path`, and its immutable collector correlation key;
+3. creates one `DeviceEvent` against the collector's canonical projection device with payload containing affected site, device and monitor counts, `root_cause = collector_path`, and its immutable collector correlation key;
 4. suppresses downstream availability event/ticket automation while preserving symptom evidence;
 5. on contiguous recovery, records backlog age, gap count, clock drift, and recovery evidence before emitting one recovery event.
 
@@ -1482,7 +1508,7 @@ it('stores samples outside MySQL and retains only series pointers and current su
 });
 ```
 
-Add tenant/dimension identity, unit conflict, duplicate timestamp/idempotency, raw→hourly→daily downsample, legal hold, privacy override, deletion tombstone without sensitive payload, restore pointer validation, capacity percentile/forecast explanation, and missing-store failure tests.
+Add site/device/dimension identity, unit conflict, duplicate timestamp/idempotency, raw→hourly→daily downsample, legal hold, privacy override, deletion tombstone without sensitive payload, restore pointer validation, capacity percentile/forecast explanation, and missing-store failure tests.
 
 - [ ] **Step 2: Run storage tests and verify RED**
 
@@ -1492,13 +1518,13 @@ Expected: FAIL because storage contracts, catalog, and services do not exist.
 
 - [ ] **Step 3: Implement the storage catalog and InfluxDB adapter**
 
-MySQL stores metric identity (`tenant_id`, monitor, metric, normalised dimensions hash, unit, source, retention tier, external key), current safe summary, retention policy, snapshot metadata, and tombstones. `InfluxDbTimeSeriesStore` uses Laravel HTTP with token redaction, write idempotency tags, bounded batch size, explicit organisation/bucket, query time range, and health check. It throws a typed unavailable exception; the runtime records collection-health impact and never treats a failed write as healthy evidence.
+MySQL stores metric identity (site, canonical device, monitor, metric, normalised dimensions hash, unit, source, retention tier, external key), current safe summary, retention policy, snapshot metadata, and tombstones. `InfluxDbTimeSeriesStore` uses Laravel HTTP with token redaction, write idempotency tags, bounded batch size, the single configured organisation/bucket, query time range, and health check. It throws a typed unavailable exception; the runtime records collection-health impact and never treats a failed write as healthy evidence.
 
 Bind the production contracts from `config/monitoring.php`; tests use fakes.
 
 - [ ] **Step 4: Implement tiered retention and capacity history**
 
-`DownsampleMetrics` creates hourly p50/p95/min/max/count from raw and daily p50/p95/min/max/count from hourly. `RetentionEnforcer` applies the most restrictive applicable tenant/data-class policy unless legal hold requires preservation, deletes payloads from the external store/object store, then writes a tombstone containing IDs, class, period, policy, actor/job, and deletion time but no deleted values. `CapacityProjectionService` returns measured period, p95, slope, confidence/sample count, forecast threshold date, and an `insufficient_data` state below the configured minimum.
+`DownsampleMetrics` creates hourly p50/p95/min/max/count from raw and daily p50/p95/min/max/count from hourly. `RetentionEnforcer` applies the most restrictive applicable organisation/site/device/data-class/privacy policy unless legal hold requires preservation, deletes payloads from the external store/object store, then writes a tombstone containing IDs, class, period, policy, actor/job, and deletion time but no deleted values. `CapacityProjectionService` returns measured period, p95, slope, confidence/sample count, forecast threshold date, and an `insufficient_data` state below the configured minimum.
 
 - [ ] **Step 5: Implement governed configuration/inventory snapshots**
 
@@ -1546,9 +1572,9 @@ git commit -m "feat(monitoring): add governed telemetry retention"
 
 ```php
 it('reconciles runtime, discovery, topology, storage, and collector work without exposing secrets', function () {
-    $viewer = securityDevicesViewer(tenantId: 42, siteIds: [9]);
-    seedRuntimeOperations(tenantId: 42, siteId: 9);
-    seedRuntimeOperations(tenantId: 77, siteId: 10);
+    $viewer = securityDevicesViewer(siteIds: [9], permissions: ['security-devices.view']);
+    seedRuntimeOperations(siteId: 9);
+    seedRuntimeOperations(siteId: 10);
 
     $props = app(MonitoringOperationsPresenter::class)->present($viewer);
     expect($props['runtime']['queues'])->toHaveKeys(['events', 'checks', 'discovery', 'provider', 'topology', 'maintenance'])
@@ -1571,7 +1597,7 @@ Expected: FAIL because presenters still report unsupported runtime foundations.
 
 Discovery shows scopes, immutable run counts, candidates/reasons, exclusions, collector assignment, enrol/revoke state, backlog/gaps, and exact capacity numbers. Monitoring shows effective/reported state, suppression/root cause, maintenance, coverage classification, queue lag/DLQ, time-series health, capacity evidence, and data gaps. Network & IT shows the latest topology snapshot/diff, interfaces/services/traffic, safe configuration snapshot metadata, firmware evidence, and canonical links. Integrations lists typed capabilities, version, bounds, cursor/backfill/rate-limit/partial state, credential-test state without values, and disconnect/revoke readiness. Settings & audit includes profiles, retention, compatibility exceptions, collector/replay/merge/split audit, and no raw secret fields.
 
-Add an authenticated, permission-scoped runtime-health endpoint that reports only bounded worker heartbeat age, queue lag/dead-letter counts, listener heartbeat, time-series/object-store health, and collector aggregate state. It must not expose Redis/Influx/object-store endpoints, credentials, raw exception messages, cross-tenant counts, or payloads. Supervisor/readiness tooling uses a separate internal token/mTLS path with the same bounded response rather than bypassing application authorization.
+Add an authenticated, permission-scoped runtime-health endpoint that reports only bounded worker heartbeat age, queue lag/dead-letter counts, listener heartbeat, time-series/object-store health, and collector aggregate state. It must not expose Redis/Influx/object-store endpoints, credentials, raw exception messages, restricted-site counts, canonical identifiers outside the viewer's scope, or payloads. Supervisor/readiness tooling uses a separate internal token/mTLS path with the same bounded response rather than bypassing application authorization.
 
 - [ ] **Step 4: Write failing frontend behavior tests**
 
@@ -1672,7 +1698,7 @@ Create corresponding programs for checks (8 processes/45-second timeout), discov
 
 - [ ] **Step 4: Implement reproducible load and outage proof**
 
-`MonitoringLoadTest.php` seeds 10 tenants, 100 sites, 10,000 devices, 50,000 monitors, 500 collectors, and synthetic signed envelopes without performing network I/O. It measures dispatch, ingest, correlation, projection, queue-lag, topology, and downsample phases; asserts no cross-tenant records or duplicate correlations; and writes JSON results to `output/monitoring/load/` only when `MONITORING_WRITE_EVIDENCE=1`.
+`MonitoringLoadTest.php` seeds one organisation with 100 sites, 10,000 canonically owned devices, 50,000 monitors, 500 collectors, restricted-role site grants, and synthetic signed envelopes without performing network I/O. It measures dispatch, ingest, correlation, projection, queue-lag, topology, and downsample phases; asserts no site-scope or ownership leakage and no duplicate correlations; and writes JSON results to `output/monitoring/load/` only when `MONITORING_WRITE_EVIDENCE=1`.
 
 Run:
 
@@ -1698,11 +1724,11 @@ Expected: exit 0 with `outbox_gap=0`, `orphan_series=0`, `snapshot_hash_mismatch
 
 - [ ] **Step 6: Write executable runbooks**
 
-Each runbook must contain: trigger/alert names, customer-visible symptoms, distinction between device/collector/site-path/runtime/storage failures, safe read-only diagnosis commands, containment that preserves evidence, replay/recovery sequence, validation queries, escalation owner, rollback or forward-repair rule, and closure evidence. The false-alert-storm runbook may pause notification/ticket automation under audited maintenance policy but must not delete observations. The compromised/revoked collector path revokes identity, rejects future envelopes, preserves DLQ/audit, rotates central trust, and verifies another tenant/site is unaffected. Failed device commands are explicitly linked to the separate command runbook and are not exercised here.
+Each runbook must contain: trigger/alert names, customer-visible symptoms, distinction between device/collector/site-path/runtime/storage failures, safe read-only diagnosis commands, containment that preserves evidence, replay/recovery sequence, validation queries, escalation owner, rollback or forward-repair rule, and closure evidence. The false-alert-storm runbook may pause notification/ticket automation under audited maintenance policy but must not delete observations. The compromised/revoked collector path revokes identity, rejects future envelopes, preserves DLQ/audit, rotates central trust, and verifies unrelated approved sites and collectors are unaffected. Failed device commands are explicitly linked to the separate command runbook and are not exercised here.
 
 - [ ] **Step 7: Write and run desktop-web-only browser acceptance**
 
-The fixture creates two tenants and these exact states: direct ICMP failure with three dependent suppressed symptoms and one Control Room/IT link; remote collector outage with stale devices, backlog and sequence gap; completed discovery run with matched/proposed/ambiguous candidates; topology add/remove change; provider partial page/rate limit; expiring TLS; capacity projection; configuration snapshot metadata; DLQ replayable item; and a denied site.
+The fixture creates one organisation with an allowed site, a denied site, restricted and privileged roles, unrelated canonically owned devices, and these exact states: direct ICMP failure with three dependent suppressed symptoms and one Control Room/IT link; remote collector outage with stale devices, backlog and sequence gap; completed discovery run with matched/proposed/ambiguous candidates; topology add/remove change; provider partial page/rate limit; expiring TLS; capacity projection; configuration snapshot metadata; and a DLQ replayable item.
 
 The Playwright spec must run at 1440×900 and 1280×800 and assert:
 
@@ -1712,7 +1738,7 @@ The Playwright spec must run at 1440×900 and 1280×800 and assert:
 - topology has visual and keyboard-readable evidence/confidence/change views;
 - Integrations and Settings & audit show typed capability, rate/backfill, retention, queue/DLQ, and audit state;
 - no secret, raw datagram, credential material, command button, console error, failed request, or horizontal overflow appears;
-- denied tenant/site records cannot be inferred by direct URL, count, filter, export, or response body.
+- denied-site, unowned, and privacy-restricted records cannot be inferred by direct URL, forged identifier, count, filter, export, or response body.
 
 Run:
 
@@ -1762,7 +1788,7 @@ git commit -m "docs(monitoring): record runtime acceptance evidence"
 | --- | --- | --- |
 | Same-repository PHP 8.4 runtime and isolated workers | 1, 6, 19 | runtime configuration, scheduler, supervisor contract |
 | Versioned signed envelope, inbox/outbox/checkpoint/DLQ/replay/order | 2–3 | delivery feature suite |
-| SSRF/egress and tenant/site invariants | 4, 7–9, 16, 18 | egress, discovery, collector, workspace denial suites |
+| SSRF/egress and site/network/device ownership invariants | 4, 7–9, 16, 18 | egress, discovery, collector, workspace denial suites |
 | ICMP/TCP/DNS/HTTP/TLS | 5–6 | direct adapter and job suites |
 | Discovery scopes/runs/candidates/identity/merge/split | 7–8 | discovery identity and run suites |
 | SNMPv3/traps/syslog/flow and approved SSH/WinRM | 9–11 | protocol fixture and listener-boundary suites |

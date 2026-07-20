@@ -6,6 +6,8 @@
 
 **Goal:** Transform the current IT/provisioning and Security & Devices surfaces into one complete, production-ready platform: an end-to-end service desk comparable in operational depth to ConnectWise or Zendesk, plus a fully independent Oblivion Findings monitoring and management system with PRTG/Auvik-class capabilities and UniFi-like clarity.
 
+> **Single-tenant architecture decision:** Oblivion Findings serves one operating organisation across all of its sites. This design must not introduce organisation selection, organisation switching, partitioned-SaaS transports, or fictional organisation-isolation scenarios. Authorisation is enforced through roles and permissions, approved sites and networks, canonical record ownership, direct-object denial, and privacy rules. Legacy organisation-context columns in mature models are compatibility details only; new monitoring contracts and storage do not propagate them. See [`docs/architecture/single-tenant-application.md`](../../architecture/single-tenant-application.md).
+
 ## 1. Outcome
 
 Oblivion Findings becomes the operational hub for every connected site. The main application observes all sites reachable through the organisation's SD-WAN and can use a hardened collector at remote, isolated, or unreliable sites. Security & Devices provides native discovery, monitoring, topology, alerting, history, and authorised device management. IT & Support converts requests, failures, changes, provisioning work, and monitoring findings into accountable work with queues, service levels, approvals, communications, knowledge, and auditable resolution.
@@ -50,7 +52,7 @@ The implementation extends the current application instead of replacing working 
 - Existing ticket and provisioning identifiers remain resolvable.
 - Existing device identifiers remain stable.
 - Existing integrations continue to sync while their adapter contracts are expanded.
-- No migration reports success if links, history, or tenant ownership are incomplete.
+- No migration reports success if links, history, canonical ownership, or site relationships are incomplete.
 - Every destructive migration has a tested rollback or a documented forward-repair path when rollback would lose valid operational data.
 
 ## 3. Approaches considered
@@ -61,7 +63,7 @@ This keeps deployment simple, but long-running polling, topology computation, hi
 
 ### B. Modular control plane with dedicated monitoring runtimes — selected
 
-Laravel/Inertia remains the control plane for identity, tenancy, permissions, configuration, ticketing, approvals, audit, and UI. Dedicated Oblivion runtimes perform discovery, polling, topology processing, event intake, command execution, and collector synchronisation. Durable contracts join the runtimes without creating duplicate domain ownership.
+Laravel/Inertia remains the control plane for identity, the single-organisation context, roles, site access, permissions, configuration, ticketing, approvals, audit, and UI. Dedicated Oblivion runtimes perform discovery, polling, topology processing, event intake, command execution, and collector synchronisation. Durable contracts join the runtimes without creating duplicate domain ownership.
 
 This gives the product native monitoring depth while preserving the application's existing business and care context.
 
@@ -75,7 +77,7 @@ This offers maximum isolation but creates operational sprawl, repeated security 
 
 The Laravel/Inertia application owns:
 
-- organisation and tenant boundaries;
+- the single operating organisation, roles, permissions, and approved site boundaries;
 - users, roles, site access, consent, and step-up authentication;
 - canonical device identity and contextual assignments;
 - discovery scopes, monitoring profiles, policy, and maintenance-window configuration;
@@ -108,7 +110,7 @@ Runtime workers are divided by workload class so a slow SNMP estate, a video pro
 - A collector receives only its scoped configuration and expiring credentials or tokens.
 - A collector buffers observations, events, and command results while disconnected and sends them in order when connectivity returns.
 - The central application distinguishes `device unavailable`, `collector unavailable`, `site path unavailable`, and `data stale`; it never converts missing data into healthy status.
-- Collectors cannot query the application database, enumerate other tenants, or perform commands outside their signed scope.
+- Collectors cannot query the application database, enumerate unassigned sites, networks, or devices, or perform commands outside their signed scope.
 
 ### 4.4 Data stores and message flow
 
@@ -136,7 +138,7 @@ flowchart LR
 
 ### 4.5 Contract rules
 
-Every message includes a schema version, tenant, source, occurrence time, ingestion time, idempotency key, trace ID, and payload integrity metadata. Consumers are idempotent. Contract evolution is backward compatible for at least one deployed runtime version. Unsupported versions fail visibly and enter an actionable dead-letter queue.
+Every message includes a schema version, source, site or approved scope reference where applicable, occurrence time, ingestion time, idempotency key, trace ID, and payload integrity metadata. Consumers are idempotent. Contract evolution is backward compatible for at least one deployed runtime version. Unsupported versions fail visibly and enter an actionable dead-letter queue.
 
 ## 5. Canonical domain ownership
 
@@ -161,7 +163,7 @@ Typed links replace unstructured JSON identifiers for new relationships. Events 
 
 - **Device:** stable canonical identity for hardware, software appliance, service endpoint, camera, alarm panel, access component, healthcare device, tracker, sensor, or managed virtual component.
 - **Device capability:** declared or discovered functions such as network polling, camera stream, door control, location, clinical data transport, configuration backup, or remote command.
-- **Discovery scope:** tenant/site-scoped CIDRs, seeds, provider accounts, protocols, exclusions, schedules, rate limits, and collector assignment.
+- **Discovery scope:** site- and network-scoped CIDRs, seeds, provider accounts, protocols, exclusions, schedules, rate limits, and collector assignment.
 - **Discovery run:** immutable execution summary with found, matched, proposed, changed, excluded, failed, and unresolved results.
 - **Discovery candidate:** reviewed identity proposal before a new canonical device is created or merged.
 - **Monitoring profile:** reusable policy for checks, thresholds, dependencies, schedules, retention, escalation, and device-class defaults.
@@ -218,7 +220,7 @@ Retention is tiered by data class and policy:
 - long-term aggregates for reporting and forecasting;
 - durable state transitions, alerts, ticket links, command results, and audit evidence for their governed retention period.
 
-Tenant policy, legal holds, privacy obligations, and clinical separation override default retention. Deletion produces an auditable tombstone without retaining the deleted sensitive payload.
+Organisation policy, legal holds, privacy obligations, data ownership, and clinical separation override default retention. Deletion produces an auditable tombstone without retaining the deleted sensitive payload.
 
 ## 7. Security & Devices information architecture
 
@@ -371,7 +373,7 @@ These types share a work foundation but retain type-specific lifecycle rules. Th
 
 Every work item supports, as applicable:
 
-- tenant, requester, affected user/client, source channel, source record, and official reference;
+- requester, affected user/client, source channel, source record, canonical ownership, and official reference;
 - site, service, device, asset, vehicle, room, and integration links;
 - impact, urgency, calculated priority, severity, and restricted/sensitive marker;
 - queue, team, assignee, owner, watchers, followers, and escalation owner;
@@ -433,7 +435,7 @@ Fulfilment updates the existing onboarding bridge. Leaver workflows revoke acces
 
 - Problems relate incidents, known errors, workarounds, root cause, corrective actions, and permanent-fix changes.
 - Changes include risk, impact, affected services/devices/sites, implementation plan, validation plan, backout plan, approvals, maintenance window, command links, actual outcome, and post-implementation review.
-- Knowledge has draft/review/publish/retire lifecycle, audience and site/tenant scope, ownership, review date, feedback, related services, and ticket deflection evidence.
+- Knowledge has draft/review/publish/retire lifecycle, audience and site scope, ownership, review date, feedback, related services, and ticket deflection evidence.
 - Reports cover demand, backlog age, response/resolution SLA, reopen rate, first-contact resolution, channel, customer satisfaction, major incidents, change success, recurring problems, provisioning lead time, automation outcome, device/service reliability, and data-quality gaps.
 
 Reports expose definitions and filters so a dashboard count can be reconciled with its underlying records.
@@ -464,7 +466,7 @@ sequenceDiagram
 
 - A monitor must pass configured debounce and confirmation rules before a failure or recovery state change is emitted.
 - Maintenance and dependencies are evaluated before notification and ticket automation.
-- Signal processing uses tenant, site, service, device, topology, time, source, and known dependency context to identify one correlation.
+- Signal processing uses site, service, canonical device, topology, condition, time, source, and known dependency context to identify one correlation.
 - One root-cause IT incident is created when policy requires accountable technical work. Downstream symptoms relate to that incident and remain visible as suppressed or correlated evidence.
 - Repeated observations update impact, timeline, and evidence. They do not create one ticket per poll.
 - Materially distinct failures can create separate work even within the same time window; idempotency cannot erase legitimate incidents.
@@ -517,7 +519,7 @@ Tickets show live permission-aware device/site/service context and frozen incide
 
 ### 11.1 Permission model
 
-Access is evaluated across tenant, organisation role, site, workspace, device class, data sensitivity, relationship, and capability. UI capabilities are server-provided; route and service policies enforce the same decision.
+Access is evaluated across organisation role, permission, approved site, workspace, device class, canonical ownership, data sensitivity, relationship, and capability. UI capabilities are server-provided; route and service policies enforce the same decision.
 
 Operational capability levels are:
 
@@ -555,7 +557,7 @@ Security & Devices is a management platform as well as a monitoring platform. Ma
 
 ### 12.1 Command flow
 
-1. Validate tenant, site, device, capability, current state, user permission, and requested parameters.
+1. Validate approved site and network scope, canonical device ownership, capability, current state, user permission, and requested parameters.
 2. Classify risk and require a reason, step-up authentication, approval, maintenance/change link, or break-glass declaration as policy dictates.
 3. Create an expiring, signed, idempotent command request with expected state and reconciliation rules.
 4. Dispatch to the central runtime or correct collector.
@@ -634,7 +636,7 @@ The master goal is delivered through bounded implementation plans and workstream
 - schema and domain contracts;
 - work-item and typed-link foundation;
 - runtime/event contracts and time-series boundary;
-- tenant/site/capability permission framework;
+- site/role/ownership/capability permission framework;
 - audit, secrets, idempotency, and feature-flag foundations;
 - migration and reconciliation harness.
 
@@ -679,7 +681,7 @@ This stream proves the architecture but does not complete the master goal.
 ### Stream 6 — Production hardening and closure
 
 - scale, fault isolation, backpressure, replay, dead-letter, collector loss, runtime health, and disaster recovery;
-- security review, secret rotation, break-glass review, penetration and tenant-isolation tests;
+- security review, secret rotation, break-glass review, penetration tests, and site/role/direct-object/privacy isolation tests;
 - migration rehearsal, runbooks, observability, capacity targets, accessibility, and supported-browser proof;
 - completion-ledger audit against every acceptance scenario and evidence gate.
 
@@ -719,9 +721,9 @@ An authorised user requests door action, supplies reason and step-up authenticat
 
 A remote collector loses connection. The site becomes collector/path unavailable and device data becomes stale, not failed or healthy. One correlated finding is created, per-device ticket noise is suppressed, buffered data returns in order, and gaps/backlog are visible.
 
-### 16.9 Tenant, role, and site denial
+### 16.9 Role, site, ownership, and privacy denial
 
-Users without tenant, site, sensitive-domain, or command capability cannot view, search, export, infer counts, open direct links, mutate, or call APIs for restricted records. Both source and destination permissions are enforced on cross-module projections.
+Users without the required role, approved site, canonical ownership relationship, sensitive-domain permission, or command capability cannot view, search, export, infer counts, open direct links, mutate, or call APIs for restricted records. Both source and destination permissions are enforced on cross-module projections.
 
 ## 17. Verification and evidence gates
 
@@ -731,7 +733,7 @@ Users without tenant, site, sensitive-domain, or command capability cannot view,
 - Integration tests for each protocol/adapter capability, pagination, rate limit, retry, partial response, and identity match.
 - Versioned contract tests across control plane, central runtime, collectors, and secure API clients.
 - Queue tests for retry, replay, ordering, dead-letter, consumer lag, duplicate delivery, and poison messages.
-- Security tests for tenant/site isolation, field-level redaction, direct-object access, sensitive projections, commands, step-up, approval, break glass, and secret leakage.
+- Security tests for site and role isolation, canonical ownership, field-level redaction, forged direct-object access, sensitive projections, commands, step-up, approval, break glass, and secret leakage.
 - Migration tests against representative legacy records, rollback or forward repair, reference preservation, and reconciliation.
 - Browser tests for every acceptance journey at supported desktop widths plus the module's required responsive behaviour.
 - Accessibility checks for keyboard navigation, focus, labels, status meaning, colour independence, dialogs, tables/cards, and live updates.
