@@ -209,10 +209,10 @@ use Illuminate\Support\Facades\Schema;
 uses(RefreshDatabase::class);
 
 it('stores every durable delivery control and verifies a v1 envelope', function () {
-    expect(Schema::hasColumns('monitoring_outbox', ['message_id', 'stream', 'source', 'sequence', 'envelope', 'published_at']))->toBeTrue()
-        ->and(Schema::hasColumns('monitoring_inbox', ['message_id', 'consumer', 'payload_hash', 'processed_at']))->toBeTrue()
+    expect(Schema::hasColumns('monitoring_outbox', ['message_id', 'stream', 'source', 'sequence', 'envelope_bytes', 'published_at']))->toBeTrue()
+        ->and(Schema::hasColumns('monitoring_inbox', ['message_id', 'consumer', 'payload_hash', 'envelope_bytes', 'processed_at']))->toBeTrue()
         ->and(Schema::hasColumns('monitoring_consumer_checkpoints', ['consumer', 'source', 'last_sequence', 'gap_from', 'gap_to']))->toBeTrue()
-        ->and(Schema::hasColumns('monitoring_dead_letters', ['message_id', 'consumer', 'reason_code', 'envelope', 'replay_count', 'resolved_at']))->toBeTrue();
+        ->and(Schema::hasColumns('monitoring_dead_letters', ['message_id', 'site_id', 'consumer', 'reason_code', 'envelope_bytes', 'replay_count', 'resolved_at']))->toBeTrue();
 
     $envelope = RuntimeEnvelope::new(
         type: RuntimeMessageType::Observation,
@@ -248,7 +248,7 @@ Schema::create('monitoring_outbox', function (Blueprint $table): void {
     $table->string('source');
     $table->unsignedBigInteger('sequence');
     $table->string('idempotency_key', 128);
-    $table->json('envelope');
+    $table->mediumText('envelope_bytes');
     $table->timestamp('available_at');
     $table->timestamp('published_at')->nullable();
     $table->unsignedSmallInteger('attempts')->default(0);
@@ -260,7 +260,11 @@ Schema::create('monitoring_outbox', function (Blueprint $table): void {
 });
 ```
 
-Create `monitoring_inbox` with unique `['consumer', 'message_id']` and `['consumer', 'source', 'idempotency_key']`, `monitoring_consumer_checkpoints` with unique `['consumer', 'source']`, and `monitoring_dead_letters` with indexes on `['consumer', 'resolved_at']` and `['created_at']`. Every lookup and lock must include the consumer and source boundaries even when a UUID is globally unique. Store the original envelope JSON, a bounded reason code/message, replay count, replay timestamps, and resolving user ID; never store signing keys. Site, device, collector, and network references belong in the signed payload only where the message type requires them, and the handler must validate those references against canonical records before mutation.
+Create `monitoring_inbox` with unique `['consumer', 'message_id']` and `['consumer', 'source', 'idempotency_key']`, `monitoring_consumer_checkpoints` with unique `['consumer', 'source']`, and `monitoring_dead_letters` with indexes on `['consumer', 'resolved_at']`, nullable `site_id`, and `['site_id', 'resolved_at']` or equivalent site-worklist lookup. Every lookup and lock must include the consumer and source boundaries even when a UUID is globally unique. Outbox, inbox, and dead letters store the exact canonical signed transport string in `envelope_bytes`; JSON columns or Eloquent array casts are not authoritative because database normalisation would break byte-exact replay, signature verification, and payload hashes. Store a bounded reason code/message, replay count, replay timestamps, and resolving user ID; never store signing keys.
+
+The DLQ `site_id` is trusted routing context supplied by authenticated intake, collector identity, or a canonical route lookup before parking; it is never inferred from an invalid or unauthenticated payload. A genuinely unscoped malformed message keeps `site_id = null` and is visible only through an explicit privileged operational path. Device, collector, and network references remain in the signed payload where required, and handlers validate them against canonical records before mutation.
+
+`MonitoringInbox` enforces `payload_hash = sha256(envelope_bytes)` at creation. Its delivery identity, exact envelope bytes, and payload hash are immutable afterwards; only lifecycle fields such as `processed_at` may change. The model and its Eloquent builder enforce this across ordinary, quiet, bulk, counter, touch, insert, returning-insert, insert-from-query, and upsert paths; direct database writes are reserved for schema/migration operations. An existing row returned by `firstOrCreate` is compared with the incoming hash before the processed shortcut and before any handler runs.
 
 - [ ] **Step 4: Implement the immutable envelope and signature codec**
 
@@ -358,15 +362,22 @@ Expected: FAIL because publisher, consumer, jobs, and replay service do not exis
 
 ```php
 $envelope = $codec->decode($encoded);
+$incomingHash = hash('sha256', $encoded);
 $inbox = MonitoringInbox::firstOrCreate(
     ['consumer' => $consumer, 'message_id' => $envelope->messageId],
-    ['source' => $envelope->source, 'payload_hash' => hash('sha256', $encoded)],
+    [
+        'source' => $envelope->source,
+        'sequence' => $envelope->sequence,
+        'idempotency_key' => $envelope->idempotencyKey,
+        'payload_hash' => $incomingHash,
+        'envelope_bytes' => $encoded,
+    ],
 );
-if ($inbox->processed_at) {
+if (! hash_equals($inbox->payload_hash, $incomingHash)) {
+    $this->park($envelope, $encoded, 'payload_invalid', 'message id reused with different payload');
     return;
 }
-if (! hash_equals($inbox->payload_hash, hash('sha256', $encoded))) {
-    $this->park($envelope, $encoded, 'payload_invalid', 'message id reused with different payload');
+if ($inbox->processed_at) {
     return;
 }
 $checkpoint = MonitoringConsumerCheckpoint::query()

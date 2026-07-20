@@ -138,7 +138,7 @@ flowchart LR
 
 ### 4.5 Contract rules
 
-Every message includes a schema version, source, site or approved scope reference where applicable, occurrence time, ingestion time, idempotency key, trace ID, and payload integrity metadata. Consumers are idempotent. Contract evolution is backward compatible for at least one deployed runtime version. Unsupported versions fail visibly and enter an actionable dead-letter queue.
+Every message includes a schema version, source, site or approved scope reference where applicable, occurrence time, ingestion time, idempotency key, trace ID, and payload integrity metadata. The durable outbox, inbox, and dead-letter store preserves the exact canonical signed transport bytes so signature verification, payload hashes, and replay never depend on database-normalised JSON. Inbox delivery identity, signed bytes, and payload hash are immutable after creation, and duplicate bytes are compared before any already-processed shortcut. Dead letters carry nullable trusted canonical site routing context from authenticated intake; malformed or unauthenticated payload content is never trusted for authorisation, and genuinely unscoped failures require privileged operational access. Consumers are idempotent. Contract evolution is backward compatible for at least one deployed runtime version. Unsupported versions fail visibly and enter an actionable dead-letter queue.
 
 ## 5. Canonical domain ownership
 
