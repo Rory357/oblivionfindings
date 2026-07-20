@@ -123,6 +123,33 @@ function singularizeTitle(title: string): string {
     return title;
 }
 
+type CategorySearchInputProps = {
+    title: string;
+    value: string;
+    onChange: (value: string) => void;
+    onSubmit: () => void;
+};
+
+export function CategorySearchInput({
+    title,
+    value,
+    onChange,
+    onSubmit,
+}: CategorySearchInputProps) {
+    const accessibleName = `Search ${title.toLowerCase()}`;
+
+    return (
+        <Input
+            aria-label={accessibleName}
+            placeholder={`${accessibleName}...`}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            onKeyDown={(event) => event.key === 'Enter' && onSubmit()}
+            className="pl-9"
+        />
+    );
+}
+
 // ── Component ─────────────────────────────────────────────────────
 
 export default function CategoryPage({
@@ -327,15 +354,11 @@ export default function CategoryPage({
                         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                             <div className="relative flex-1 sm:max-w-xs">
                                 <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    placeholder={`Search ${pageConfig.title.toLowerCase()}...`}
+                                <CategorySearchInput
+                                    title={pageConfig.title}
                                     value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    onKeyDown={(e) =>
-                                        e.key === 'Enter' &&
-                                        applyFilters({ search })
-                                    }
-                                    className="pl-9"
+                                    onChange={setSearch}
+                                    onSubmit={() => applyFilters({ search })}
                                 />
                             </div>
 
