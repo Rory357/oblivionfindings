@@ -43,10 +43,12 @@ beforeEach(function () {
     ]);
 });
 
-it('provides tenant scoped durable delivery controls', function () {
+it('provides single-tenant durable delivery controls', function () {
+    $legacyScopeColumn = 'tenant'.'_id';
+    $deadLetterIndexes = collect(Schema::getIndexes('monitoring_dead_letters'))->keyBy('name');
+
     expect(Schema::hasColumns('monitoring_outbox', [
         'message_id',
-        'tenant_id',
         'stream',
         'source',
         'sequence',
@@ -59,7 +61,6 @@ it('provides tenant scoped durable delivery controls', function () {
     ]))->toBeTrue()
         ->and(Schema::hasColumns('monitoring_inbox', [
             'message_id',
-            'tenant_id',
             'consumer',
             'source',
             'sequence',
@@ -69,7 +70,6 @@ it('provides tenant scoped durable delivery controls', function () {
             'processed_at',
         ]))->toBeTrue()
         ->and(Schema::hasColumns('monitoring_consumer_checkpoints', [
-            'tenant_id',
             'consumer',
             'source',
             'last_sequence',
@@ -78,7 +78,6 @@ it('provides tenant scoped durable delivery controls', function () {
         ]))->toBeTrue()
         ->and(Schema::hasColumns('monitoring_dead_letters', [
             'message_id',
-            'tenant_id',
             'consumer',
             'source',
             'sequence',
@@ -91,13 +90,18 @@ it('provides tenant scoped durable delivery controls', function () {
             'resolved_at',
             'resolved_by_user_id',
             'resolution_reason',
-        ]))->toBeTrue();
+        ]))->toBeTrue()
+        ->and(Schema::hasColumn('monitoring_outbox', $legacyScopeColumn))->toBeFalse()
+        ->and(Schema::hasColumn('monitoring_inbox', $legacyScopeColumn))->toBeFalse()
+        ->and(Schema::hasColumn('monitoring_consumer_checkpoints', $legacyScopeColumn))->toBeFalse()
+        ->and(Schema::hasColumn('monitoring_dead_letters', $legacyScopeColumn))->toBeFalse()
+        ->and($deadLetterIndexes->get('monitoring_dead_letters_consumer_resolved_idx')['columns'])->toBe(['consumer', 'resolved_at'])
+        ->and($deadLetterIndexes->get('monitoring_dead_letters_created_idx')['columns'])->toBe(['created_at']);
 });
 
 it('round trips and persists a signed v1 envelope without signing material', function () {
     $envelope = RuntimeEnvelope::new(
         type: RuntimeMessageType::Observation,
-        tenantId: 42,
         source: 'central:checks',
         sequence: 7,
         idempotencyKey: 'monitor:9:sample:7',
@@ -110,7 +114,6 @@ it('round trips and persists a signed v1 envelope without signing material', fun
 
     $outbox = MonitoringOutbox::create([
         'message_id' => $decoded->messageId,
-        'tenant_id' => $decoded->tenantId,
         'stream' => 'checks',
         'source' => $decoded->source,
         'sequence' => $decoded->sequence,
@@ -120,7 +123,6 @@ it('round trips and persists a signed v1 envelope without signing material', fun
     ]);
     $inbox = MonitoringInbox::create([
         'message_id' => $decoded->messageId,
-        'tenant_id' => $decoded->tenantId,
         'consumer' => 'observation-projector',
         'source' => $decoded->source,
         'sequence' => $decoded->sequence,
@@ -129,7 +131,6 @@ it('round trips and persists a signed v1 envelope without signing material', fun
         'envelope' => $originalEnvelope,
     ]);
     $checkpoint = MonitoringConsumerCheckpoint::create([
-        'tenant_id' => $decoded->tenantId,
         'consumer' => 'observation-projector',
         'source' => $decoded->source,
         'last_sequence' => 6,
@@ -138,7 +139,6 @@ it('round trips and persists a signed v1 envelope without signing material', fun
     ]);
     $deadLetter = MonitoringDeadLetter::create([
         'message_id' => $decoded->messageId,
-        'tenant_id' => $decoded->tenantId,
         'consumer' => 'observation-projector',
         'source' => $decoded->source,
         'sequence' => $decoded->sequence,
@@ -149,7 +149,6 @@ it('round trips and persists a signed v1 envelope without signing material', fun
     ]);
 
     expect($decoded->schemaVersion)->toBe(1)
-        ->and($decoded->tenantId)->toBe(42)
         ->and($decoded->sequence)->toBe(7)
         ->and($decoded->traceId)->not->toBeEmpty()
         ->and($decoded->keyId)->toBe('runtime-test-key')
@@ -171,7 +170,6 @@ it('canonicalises nested payload keys before signing', function () {
         schemaVersion: 1,
         messageId: '018f0000-0000-7000-8000-000000000001',
         type: RuntimeMessageType::Observation,
-        tenantId: 42,
         source: 'central:checks',
         sequence: 7,
         occurredAt: $occurredAt,
@@ -184,7 +182,6 @@ it('canonicalises nested payload keys before signing', function () {
         schemaVersion: 1,
         messageId: $first->messageId,
         type: $first->type,
-        tenantId: $first->tenantId,
         source: $first->source,
         sequence: $first->sequence,
         occurredAt: $first->occurredAt,
@@ -202,7 +199,6 @@ it('accepts only the exact canonical transport bytes', function () {
     $codec = app(RuntimeEnvelopeCodec::class);
     $encoded = $codec->encode(RuntimeEnvelope::new(
         RuntimeMessageType::Observation,
-        42,
         'central:checks',
         7,
         'monitor:9:sample:7',
@@ -231,7 +227,6 @@ it('supports exact dotted key ids during signing key rotation', function () {
     $codec = app(RuntimeEnvelopeCodec::class);
     $decoded = $codec->decode($codec->encode(RuntimeEnvelope::new(
         RuntimeMessageType::Event,
-        42,
         'central:events',
         8,
         'event:8',
@@ -254,7 +249,6 @@ it('canonically round trips nested zero and representative finite floats without
     ];
     $envelope = RuntimeEnvelope::new(
         RuntimeMessageType::Observation,
-        42,
         'central:checks',
         9,
         'monitor:9:sample:9',
@@ -282,7 +276,6 @@ it('rejects an encoded envelope before parsing when its byte cap is exceeded', f
 it('rejects an envelope that crosses the byte cap while encoding', function () {
     expect(fn () => app(RuntimeEnvelopeCodec::class)->encode(RuntimeEnvelope::new(
         RuntimeMessageType::Observation,
-        42,
         'central:checks',
         9,
         'monitor:9:sample:9',
@@ -301,7 +294,6 @@ it('rejects JSON that exceeds the decode depth before structural traversal', fun
 it('bounds payload depth breadth node count and string or key bytes', function (Closure $payload, string $message) {
     expect(fn () => app(RuntimeEnvelopeCodec::class)->encode(RuntimeEnvelope::new(
         RuntimeMessageType::Observation,
-        42,
         'central:checks',
         9,
         'monitor:9:sample:9',
@@ -352,7 +344,6 @@ it('applies payload bounds before canonicalising or authenticating decoded data'
         'sequence' => 9,
         'signature' => base64_encode(str_repeat("\x00", SODIUM_CRYPTO_AUTH_BYTES)),
         'source' => 'central:checks',
-        'tenant_id' => 42,
         'trace_id' => '018f0000-0000-7000-8000-000000000002',
         'type' => 'observation',
     ];
@@ -377,7 +368,6 @@ it('rejects nested objects resources and closures instead of coercing them', fun
         foreach ($values as $value) {
             expect(fn () => app(RuntimeEnvelopeCodec::class)->encode(RuntimeEnvelope::new(
                 RuntimeMessageType::Observation,
-                42,
                 'central:checks',
                 10,
                 'monitor:9:sample:10',
@@ -398,7 +388,6 @@ it('rejects non-finite floating point payload values', function () {
     foreach ([INF, -INF, NAN] as $value) {
         expect(fn () => app(RuntimeEnvelopeCodec::class)->encode(RuntimeEnvelope::new(
             RuntimeMessageType::Observation,
-            42,
             'central:checks',
             10,
             'monitor:9:sample:10',
@@ -414,7 +403,6 @@ it('rejects malformed unsupported or unauthenticated envelopes with specific rea
     $codec = app(RuntimeEnvelopeCodec::class);
     $encoded = $codec->encode(RuntimeEnvelope::new(
         RuntimeMessageType::Event,
-        42,
         'central:events',
         3,
         'event:3',
@@ -436,10 +424,9 @@ it('rejects malformed unsupported or unauthenticated envelopes with specific rea
     'tampered payload' => [fn (array &$document) => $document['payload']['severity'] = 'critical', 'Monitoring envelope signature is invalid.'],
     'invalid signature encoding' => [fn (array &$document) => $document['signature'] = '***', 'Monitoring envelope signature is invalid.'],
     'invalid timestamp' => [fn (array &$document) => $document['occurred_at'] = 'yesterday', 'Monitoring envelope timestamp is invalid.'],
-    'invalid tenant' => [fn (array &$document) => $document['tenant_id'] = 0, 'Monitoring envelope tenant is invalid.'],
 ]);
 
-it('enforces delivery identities within each tenant', function () {
+it('enforces single-application delivery identities by source and consumer', function () {
     $attributes = [
         'message_id' => '018f0000-0000-7000-8000-000000000011',
         'stream' => 'checks',
@@ -450,13 +437,67 @@ it('enforces delivery identities within each tenant', function () {
         'available_at' => now(),
     ];
 
-    MonitoringOutbox::create(['tenant_id' => 42, ...$attributes]);
-    MonitoringOutbox::create(['tenant_id' => 77, ...$attributes]);
+    MonitoringOutbox::create($attributes);
 
     expect(fn () => MonitoringOutbox::create([
-        'tenant_id' => 42,
+        ...$attributes,
+        'source' => 'collector:message-collision',
+        'sequence' => 99,
+        'idempotency_key' => 'monitor:other:sample:99',
+    ]))->toThrow(QueryException::class);
+
+    expect(fn () => MonitoringOutbox::create([
         ...$attributes,
         'message_id' => '018f0000-0000-7000-8000-000000000012',
+        'idempotency_key' => 'monitor:9:sample:12',
+    ]))->toThrow(QueryException::class);
+
+    expect(fn () => MonitoringOutbox::create([
+        ...$attributes,
+        'message_id' => '018f0000-0000-7000-8000-000000000013',
+        'sequence' => 12,
+    ]))->toThrow(QueryException::class);
+
+    MonitoringOutbox::create([
+        ...$attributes,
+        'message_id' => '018f0000-0000-7000-8000-000000000014',
+        'source' => 'collector:remote-a',
+    ]);
+
+    $inbox = [
+        'message_id' => '018f0000-0000-7000-8000-000000000021',
+        'consumer' => 'observation-projector',
+        'source' => 'central:checks',
+        'sequence' => 11,
+        'idempotency_key' => 'monitor:9:sample:11',
+        'payload_hash' => str_repeat('a', 64),
+        'envelope' => ['schema_version' => 1],
+    ];
+    MonitoringInbox::create($inbox);
+
+    expect(fn () => MonitoringInbox::create([
+        ...$inbox,
+        'source' => 'collector:remote-a',
+        'sequence' => 12,
+        'idempotency_key' => 'monitor:9:sample:12',
+    ]))->toThrow(QueryException::class);
+
+    expect(fn () => MonitoringInbox::create([
+        ...$inbox,
+        'message_id' => '018f0000-0000-7000-8000-000000000022',
+        'sequence' => 12,
+    ]))->toThrow(QueryException::class);
+
+    MonitoringConsumerCheckpoint::create([
+        'consumer' => 'observation-projector',
+        'source' => 'central:checks',
+        'last_sequence' => 1,
+    ]);
+
+    expect(fn () => MonitoringConsumerCheckpoint::create([
+        'consumer' => 'observation-projector',
+        'source' => 'central:checks',
+        'last_sequence' => 2,
     ]))->toThrow(QueryException::class)
         ->and(DB::table('monitoring_outbox')->count())->toBe(2);
 });

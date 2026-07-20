@@ -10,8 +10,7 @@ return new class extends Migration
     {
         Schema::create('monitoring_outbox', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('message_id');
-            $table->unsignedBigInteger('tenant_id');
+            $table->uuid('message_id')->unique();
             $table->string('stream', 64);
             $table->string('source', 128);
             $table->unsignedBigInteger('sequence');
@@ -23,16 +22,14 @@ return new class extends Migration
             $table->string('last_error', 500)->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'message_id'], 'monitoring_outbox_tenant_message_uq');
-            $table->unique(['tenant_id', 'source', 'sequence'], 'monitoring_outbox_tenant_source_sequence_uq');
-            $table->unique(['tenant_id', 'source', 'idempotency_key'], 'monitoring_outbox_tenant_source_idempotency_uq');
-            $table->index(['tenant_id', 'stream', 'published_at', 'available_at'], 'monitoring_outbox_tenant_pending_idx');
+            $table->unique(['source', 'sequence'], 'monitoring_outbox_source_sequence_uq');
+            $table->unique(['source', 'idempotency_key'], 'monitoring_outbox_source_idempotency_uq');
+            $table->index(['stream', 'published_at', 'available_at'], 'monitoring_outbox_pending_idx');
         });
 
         Schema::create('monitoring_inbox', function (Blueprint $table): void {
             $table->id();
             $table->uuid('message_id');
-            $table->unsignedBigInteger('tenant_id');
             $table->string('consumer', 128);
             $table->string('source', 128);
             $table->unsignedBigInteger('sequence');
@@ -42,17 +39,16 @@ return new class extends Migration
             $table->timestamp('processed_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'consumer', 'message_id'], 'monitoring_inbox_tenant_consumer_message_uq');
+            $table->unique(['consumer', 'message_id'], 'monitoring_inbox_consumer_message_uq');
             $table->unique(
-                ['tenant_id', 'consumer', 'source', 'idempotency_key'],
-                'monitoring_inbox_tenant_consumer_source_idempotency_uq',
+                ['consumer', 'source', 'idempotency_key'],
+                'monitoring_inbox_consumer_source_idempotency_uq',
             );
-            $table->index(['tenant_id', 'consumer', 'processed_at'], 'monitoring_inbox_tenant_consumer_processed_idx');
+            $table->index(['consumer', 'processed_at'], 'monitoring_inbox_consumer_processed_idx');
         });
 
         Schema::create('monitoring_consumer_checkpoints', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('tenant_id');
             $table->string('consumer', 128);
             $table->string('source', 128);
             $table->unsignedBigInteger('last_sequence')->default(0);
@@ -61,15 +57,14 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(
-                ['tenant_id', 'consumer', 'source'],
-                'monitoring_checkpoints_tenant_consumer_source_uq',
+                ['consumer', 'source'],
+                'monitoring_checkpoints_consumer_source_uq',
             );
         });
 
         Schema::create('monitoring_dead_letters', function (Blueprint $table): void {
             $table->id();
             $table->uuid('message_id');
-            $table->unsignedBigInteger('tenant_id');
             $table->string('consumer', 128);
             $table->string('source', 128);
             $table->unsignedBigInteger('sequence');
@@ -84,9 +79,8 @@ return new class extends Migration
             $table->string('resolution_reason', 500)->nullable();
             $table->timestamps();
 
-            $table->index(['tenant_id', 'consumer', 'resolved_at'], 'monitoring_dead_letters_tenant_consumer_resolved_idx');
-            $table->index(['tenant_id', 'created_at'], 'monitoring_dead_letters_tenant_created_idx');
-            $table->index(['tenant_id', 'message_id'], 'monitoring_dead_letters_tenant_message_idx');
+            $table->index(['consumer', 'resolved_at'], 'monitoring_dead_letters_consumer_resolved_idx');
+            $table->index('created_at', 'monitoring_dead_letters_created_idx');
         });
     }
 

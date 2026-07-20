@@ -2,7 +2,6 @@
 
 namespace App\Domain\Monitoring\Models;
 
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class MonitoringOutbox extends Model
@@ -11,7 +10,6 @@ class MonitoringOutbox extends Model
 
     protected $fillable = [
         'message_id',
-        'tenant_id',
         'stream',
         'source',
         'sequence',
@@ -24,16 +22,10 @@ class MonitoringOutbox extends Model
     ];
 
     protected $casts = [
-        'tenant_id' => 'integer',
         'sequence' => 'integer',
         'envelope' => 'array',
         'available_at' => 'immutable_datetime',
         'published_at' => 'immutable_datetime',
         'attempts' => 'integer',
     ];
-
-    public function scopeForTenant(Builder $query, int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 }

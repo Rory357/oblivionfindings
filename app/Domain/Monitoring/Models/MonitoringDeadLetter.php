@@ -3,7 +3,6 @@
 namespace App\Domain\Monitoring\Models;
 
 use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -11,7 +10,6 @@ class MonitoringDeadLetter extends Model
 {
     protected $fillable = [
         'message_id',
-        'tenant_id',
         'consumer',
         'source',
         'sequence',
@@ -27,7 +25,6 @@ class MonitoringDeadLetter extends Model
     ];
 
     protected $casts = [
-        'tenant_id' => 'integer',
         'sequence' => 'integer',
         'envelope' => 'array',
         'replay_count' => 'integer',
@@ -38,10 +35,5 @@ class MonitoringDeadLetter extends Model
     public function resolvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'resolved_by_user_id');
-    }
-
-    public function scopeForTenant(Builder $query, int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 }

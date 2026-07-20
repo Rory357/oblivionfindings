@@ -15,7 +15,6 @@ final readonly class RuntimeEnvelope
         public int $schemaVersion,
         public string $messageId,
         public RuntimeMessageType $type,
-        public int $tenantId,
         public string $source,
         public int $sequence,
         public CarbonImmutable $occurredAt,
@@ -32,7 +31,6 @@ final readonly class RuntimeEnvelope
      */
     public static function new(
         RuntimeMessageType $type,
-        int $tenantId,
         string $source,
         int $sequence,
         string $idempotencyKey,
@@ -44,7 +42,6 @@ final readonly class RuntimeEnvelope
             schemaVersion: 1,
             messageId: (string) Str::orderedUuid(),
             type: $type,
-            tenantId: $tenantId,
             source: $source,
             sequence: $sequence,
             occurredAt: $now,

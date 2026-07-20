@@ -34,7 +34,6 @@ final class RuntimeEnvelopeCodec
         'schema_version',
         'message_id',
         'type',
-        'tenant_id',
         'source',
         'sequence',
         'occurred_at',
@@ -115,7 +114,6 @@ final class RuntimeEnvelopeCodec
             schemaVersion: $document['schema_version'],
             messageId: $document['message_id'],
             type: RuntimeMessageType::from($document['type']),
-            tenantId: $document['tenant_id'],
             source: $document['source'],
             sequence: $document['sequence'],
             occurredAt: $this->timestamp($document['occurred_at']),
@@ -137,7 +135,6 @@ final class RuntimeEnvelopeCodec
             'schema_version' => $envelope->schemaVersion,
             'message_id' => $envelope->messageId,
             'type' => $envelope->type->value,
-            'tenant_id' => $envelope->tenantId,
             'source' => $envelope->source,
             'sequence' => $envelope->sequence,
             'occurred_at' => $this->formatTimestamp($envelope->occurredAt),
@@ -171,10 +168,6 @@ final class RuntimeEnvelopeCodec
     {
         if (($document['schema_version'] ?? null) !== 1) {
             throw new UnexpectedValueException('Monitoring envelope version is unsupported.');
-        }
-
-        if (! is_int($document['tenant_id'] ?? null) || $document['tenant_id'] < 1) {
-            throw new UnexpectedValueException('Monitoring envelope tenant is invalid.');
         }
 
         if (! $this->validUuid($document['message_id'] ?? null)
