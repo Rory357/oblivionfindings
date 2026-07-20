@@ -7,7 +7,9 @@ use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Monitoring\Contracts\CommandDispatchPort;
+use App\Domain\Monitoring\Contracts\EnvelopeSigner;
 use App\Domain\Monitoring\Services\RejectingCommandDispatchPort;
+use App\Domain\Monitoring\Services\SodiumEnvelopeSigner;
 use App\Domain\Roadmap\Events\InitiativeScored;
 use App\Domain\Roadmap\Events\QuarterlyPlanPublished;
 use App\Domain\SecurityDevices\Models\Device;
@@ -131,6 +133,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(CommandDispatchPort::class, RejectingCommandDispatchPort::class);
+        $this->app->bind(EnvelopeSigner::class, SodiumEnvelopeSigner::class);
 
         // On Windows + Herd, the `mysql` client binary isn't on PATH by
         // default, but Laravel's MigrateCommand shells out to it when
