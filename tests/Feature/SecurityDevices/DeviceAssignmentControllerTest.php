@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Client;
@@ -30,27 +31,36 @@ class DeviceAssignmentControllerTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->seed(SecurityDevicesPermissionsSeeder::class);
 
-        $this->admin = User::factory()->create();
+        $this->admin = User::factory()->create([
+            'organization_id' => 1,
+            'approved_at' => now(),
+        ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
 
-        $this->viewer = User::factory()->create();
+        $this->viewer = User::factory()->create([
+            'organization_id' => 1,
+            'approved_at' => now(),
+        ]);
         $this->viewer->roles()->attach(Role::where('name', 'support_worker')->first());
 
-        $this->noPerms = User::factory()->create();
+        $this->noPerms = User::factory()->create([
+            'organization_id' => 1,
+            'approved_at' => now(),
+        ]);
     }
 
     // ── Assign ────────────────────────────────────────────────────
 
     public function test_assign_requires_authentication(): void
     {
-        $device = Device::factory()->create();
+        $device = Device::factory()->create(['tenant_id' => 1]);
         $this->post("/security-devices/devices/{$device->id}/assign")->assertRedirect('/login');
     }
 
     public function test_assign_requires_assign_permission(): void
     {
-        $device = Device::factory()->create();
-        $site = Site::factory()->create();
+        $device = Device::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create(['tenant_id' => 1]);
 
         $this->actingAs($this->viewer)
             ->post("/security-devices/devices/{$device->id}/assign", [
@@ -62,8 +72,8 @@ class DeviceAssignmentControllerTest extends TestCase
 
     public function test_assign_to_site(): void
     {
-        $device = Device::factory()->create();
-        $site = Site::factory()->create();
+        $device = Device::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create(['tenant_id' => 1]);
 
         $this->actingAs($this->admin)
             ->post("/security-devices/devices/{$device->id}/assign", [
@@ -83,8 +93,18 @@ class DeviceAssignmentControllerTest extends TestCase
 
     public function test_assign_to_staff(): void
     {
-        $device = Device::factory()->create();
-        $staff = User::factory()->create();
+        $device = Device::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create(['tenant_id' => 1]);
+        $staff = User::factory()->create([
+            'organization_id' => 1,
+            'approved_at' => now(),
+        ]);
+        HrEmployeeProfile::factory()->create([
+            'tenant_id' => 1,
+            'user_id' => $staff->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+        ]);
 
         $this->actingAs($this->admin)
             ->post("/security-devices/devices/{$device->id}/assign", [
@@ -102,8 +122,8 @@ class DeviceAssignmentControllerTest extends TestCase
 
     public function test_assign_as_loan_with_return_date(): void
     {
-        $device = Device::factory()->create();
-        $site = Site::factory()->create();
+        $device = Device::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create(['tenant_id' => 1]);
         $returnDate = now()->addDays(14)->format('Y-m-d');
 
         $this->actingAs($this->admin)
@@ -122,7 +142,7 @@ class DeviceAssignmentControllerTest extends TestCase
 
     public function test_assign_validates_required_fields(): void
     {
-        $device = Device::factory()->create();
+        $device = Device::factory()->create(['tenant_id' => 1]);
 
         $this->actingAs($this->admin)
             ->post("/security-devices/devices/{$device->id}/assign", [])
@@ -131,7 +151,7 @@ class DeviceAssignmentControllerTest extends TestCase
 
     public function test_assign_validates_target_type(): void
     {
-        $device = Device::factory()->create();
+        $device = Device::factory()->create(['tenant_id' => 1]);
 
         $this->actingAs($this->admin)
             ->post("/security-devices/devices/{$device->id}/assign", [
@@ -143,7 +163,7 @@ class DeviceAssignmentControllerTest extends TestCase
 
     public function test_client_assign_requires_consent(): void
     {
-        $device = Device::factory()->tracking()->create();
+        $device = Device::factory()->tracking()->create(['tenant_id' => 1]);
         $site = Site::factory()->create(['tenant_id' => 1]);
         $client = Client::factory()->create([
             'organization_id' => 1,
@@ -161,9 +181,9 @@ class DeviceAssignmentControllerTest extends TestCase
 
     public function test_transfer_releases_previous_assignment(): void
     {
-        $device = Device::factory()->create();
-        $siteA = Site::factory()->create();
-        $siteB = Site::factory()->create();
+        $device = Device::factory()->create(['tenant_id' => 1]);
+        $siteA = Site::factory()->create(['tenant_id' => 1]);
+        $siteB = Site::factory()->create(['tenant_id' => 1]);
 
         // First assignment
         $this->actingAs($this->admin)
@@ -198,13 +218,13 @@ class DeviceAssignmentControllerTest extends TestCase
 
     public function test_release_requires_authentication(): void
     {
-        $device = Device::factory()->create();
+        $device = Device::factory()->create(['tenant_id' => 1]);
         $this->post("/security-devices/devices/{$device->id}/release")->assertRedirect('/login');
     }
 
     public function test_release_requires_assign_permission(): void
     {
-        $device = Device::factory()->create();
+        $device = Device::factory()->create(['tenant_id' => 1]);
 
         $this->actingAs($this->viewer)
             ->post("/security-devices/devices/{$device->id}/release")
@@ -213,8 +233,8 @@ class DeviceAssignmentControllerTest extends TestCase
 
     public function test_release_sets_released_at(): void
     {
-        $device = Device::factory()->create();
-        $site = Site::factory()->create();
+        $device = Device::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create(['tenant_id' => 1]);
 
         DeviceAssignment::create([
             'device_id' => $device->id,
@@ -232,7 +252,7 @@ class DeviceAssignmentControllerTest extends TestCase
 
     public function test_release_with_no_active_assignment(): void
     {
-        $device = Device::factory()->create();
+        $device = Device::factory()->create(['tenant_id' => 1]);
 
         $this->actingAs($this->admin)
             ->post("/security-devices/devices/{$device->id}/release")
@@ -244,15 +264,15 @@ class DeviceAssignmentControllerTest extends TestCase
 
     public function test_history_requires_authentication(): void
     {
-        $device = Device::factory()->create();
+        $device = Device::factory()->create(['tenant_id' => 1]);
         $this->getJson("/security-devices/devices/{$device->id}/assignments")->assertUnauthorized();
     }
 
     public function test_history_returns_assignment_records(): void
     {
-        $device = Device::factory()->create();
-        $siteA = Site::factory()->create();
-        $siteB = Site::factory()->create();
+        $device = Device::factory()->create(['tenant_id' => 1]);
+        $siteA = Site::factory()->create(['tenant_id' => 1]);
+        $siteB = Site::factory()->create(['tenant_id' => 1]);
 
         DeviceAssignment::create([
             'device_id' => $device->id,
@@ -289,8 +309,8 @@ class DeviceAssignmentControllerTest extends TestCase
 
     public function test_show_page_includes_assignment_history_and_targets(): void
     {
-        $device = Device::factory()->create();
-        $site = Site::factory()->create();
+        $device = Device::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create(['tenant_id' => 1]);
 
         DeviceAssignment::create([
             'device_id' => $device->id,

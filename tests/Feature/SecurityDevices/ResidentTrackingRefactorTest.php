@@ -12,6 +12,7 @@ use App\Models\ConsentType;
 use App\Models\ConsentTypeVersion;
 use App\Models\FleetTelemetryEvent;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
@@ -23,8 +24,16 @@ class ResidentTrackingRefactorTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private Client $clientA;
+
     private Client $clientB;
+
+    private Site $site;
+
+    private int $clientAConsentId;
+
+    private int $clientBConsentId;
 
     protected function setUp(): void
     {
@@ -33,23 +42,41 @@ class ResidentTrackingRefactorTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->seed(SecurityDevicesPermissionsSeeder::class);
 
-        $this->admin = User::factory()->create(['role' => 'admin']);
+        $this->admin = User::factory()->create([
+            'role' => 'admin',
+            'organization_id' => 1,
+        ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
 
-        $this->clientA = Client::factory()->create(['status' => 'active']);
-        $this->clientB = Client::factory()->create(['status' => 'active']);
+        $this->site = Site::factory()->create(['tenant_id' => 1]);
+        $this->clientA = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $this->site->id,
+            'status' => 'active',
+        ]);
+        $this->clientB = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $this->site->id,
+            'status' => 'active',
+        ]);
+        $this->clientAConsentId = $this->createFleetTrackingConsent($this->clientA)->id;
+        $this->clientBConsentId = $this->createFleetTrackingConsent($this->clientB)->id;
     }
 
     // ── Index: reads from canonical devices ────────────────────────
 
     public function test_index_shows_client_assigned_tracking_devices(): void
     {
-        $device = Device::factory()->tracking()->create(['name' => 'Resident Tracker 1']);
+        $device = Device::factory()->tracking()->create([
+            'tenant_id' => 1,
+            'name' => 'Resident Tracker 1',
+        ]);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => 'client',
             'assignable_id' => $this->clientA->id,
             'assigned_at' => now(),
+            'consent_id' => $this->clientAConsentId,
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -67,13 +94,14 @@ class ResidentTrackingRefactorTest extends TestCase
 
     public function test_index_excludes_released_assignments(): void
     {
-        $device = Device::factory()->tracking()->create();
+        $device = Device::factory()->tracking()->create(['tenant_id' => 1]);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => 'client',
             'assignable_id' => $this->clientA->id,
             'assigned_at' => now()->subDays(30),
             'released_at' => now()->subDays(5),
+            'consent_id' => $this->clientAConsentId,
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -86,12 +114,13 @@ class ResidentTrackingRefactorTest extends TestCase
 
     public function test_index_excludes_other_clients_devices(): void
     {
-        $device = Device::factory()->tracking()->create();
+        $device = Device::factory()->tracking()->create(['tenant_id' => 1]);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => 'client',
             'assignable_id' => $this->clientB->id,
             'assigned_at' => now(),
+            'consent_id' => $this->clientBConsentId,
         ]);
 
         // Should appear because admin can see all clients.
@@ -109,42 +138,48 @@ class ResidentTrackingRefactorTest extends TestCase
 
     public function test_assign_page_shows_unassigned_trackers(): void
     {
-        $available = Device::factory()->tracking()->create(['name' => 'Free Tracker']);
-        $assigned = Device::factory()->tracking()->create(['name' => 'Busy Tracker']);
+        $available = Device::factory()->tracking()->create([
+            'tenant_id' => 1,
+            'name' => 'Free Tracker',
+        ]);
+        $assigned = Device::factory()->tracking()->create([
+            'tenant_id' => 1,
+            'name' => 'Busy Tracker',
+        ]);
 
         DeviceAssignment::create([
             'device_id' => $assigned->id,
             'assignable_type' => 'client',
             'assignable_id' => $this->clientA->id,
             'assigned_at' => now(),
+            'consent_id' => $this->clientAConsentId,
         ]);
 
         $response = $this->actingAs($this->admin)
             ->get('/fleet-assets/resident-tracking/assign');
 
-        $response->assertOk();
-        $response->assertInertia(function ($page) {
-            $available = collect($page->toArray()['props']['available_trackers']);
-            $assigned = collect($page->toArray()['props']['assigned_trackers']);
+        $response->assertRedirect('/fleet-assets/resident-tracking?new=1');
 
-            $this->assertCount(1, $available);
-            $this->assertEquals('Free Tracker', $available->first()['name']);
-            $this->assertCount(1, $assigned);
-            $this->assertEquals('Busy Tracker', $assigned->first()['name']);
-        });
+        $this->actingAs($this->admin)
+            ->get('/fleet-assets/resident-tracking?new=1')
+            ->assertOk()
+            ->assertInertia(function ($page) {
+                $assign = $page->toArray()['props']['assign'];
+                $available = collect($assign['available_trackers']);
+                $assigned = collect($assign['assigned_trackers']);
+
+                $this->assertCount(1, $available);
+                $this->assertEquals('Free Tracker', $available->first()['name']);
+                $this->assertCount(1, $assigned);
+                $this->assertEquals('Busy Tracker', $assigned->first()['name']);
+            });
     }
 
     // ── Assign: creates canonical device assignment ────────────────
 
     public function test_assign_creates_device_assignment(): void
     {
-        $device = Device::factory()->tracking()->create();
-
-        // The DeviceAssignmentService rejects client + tracking assignments
-        // that have no consent record (NZ privacy). The controller resolves
-        // any active Fleet Tracking consent for the client when one isn't
-        // passed explicitly — seed one to exercise that resolution path.
-        $consent = $this->createFleetTrackingConsent($this->clientA);
+        $device = Device::factory()->tracking()->create(['tenant_id' => 1]);
 
         $response = $this->actingAs($this->admin)
             ->post('/fleet-assets/resident-tracking/assign', [
@@ -158,7 +193,7 @@ class ResidentTrackingRefactorTest extends TestCase
             'device_id' => $device->id,
             'assignable_type' => 'client',
             'assignable_id' => $this->clientA->id,
-            'consent_id' => $consent->id,
+            'consent_id' => $this->clientAConsentId,
         ]);
     }
 
@@ -206,12 +241,13 @@ class ResidentTrackingRefactorTest extends TestCase
 
     public function test_unassign_releases_device_assignment(): void
     {
-        $device = Device::factory()->tracking()->create();
+        $device = Device::factory()->tracking()->create(['tenant_id' => 1]);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => 'client',
             'assignable_id' => $this->clientA->id,
             'assigned_at' => now(),
+            'consent_id' => $this->clientAConsentId,
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -227,6 +263,7 @@ class ResidentTrackingRefactorTest extends TestCase
     public function test_history_returns_tracker_info_from_canonical_device(): void
     {
         $device = Device::factory()->tracking()->create([
+            'tenant_id' => 1,
             'name' => 'History Tracker',
             'serial_number' => 'HIS-001',
         ]);
@@ -235,6 +272,7 @@ class ResidentTrackingRefactorTest extends TestCase
             'assignable_type' => 'client',
             'assignable_id' => $this->clientA->id,
             'assigned_at' => now(),
+            'consent_id' => $this->clientAConsentId,
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -266,6 +304,7 @@ class ResidentTrackingRefactorTest extends TestCase
     {
         $asset = Asset::create([
             'client_id' => $this->clientA->id,
+            'site_id' => $this->site->id,
             'name' => 'Amelia pendant',
             'status' => 'active',
             'risk_level' => 'medium',
@@ -280,6 +319,7 @@ class ResidentTrackingRefactorTest extends TestCase
             'paired_at' => now(),
         ]);
         $device = Device::factory()->tracking()->create([
+            'tenant_id' => 1,
             'name' => 'Amelia tracker',
             'provider' => 'queclink',
             'imei' => 'QUE-AMELIA',
@@ -291,6 +331,7 @@ class ResidentTrackingRefactorTest extends TestCase
             'assignable_type' => 'client',
             'assignable_id' => $this->clientA->id,
             'assigned_at' => now(),
+            'consent_id' => $this->clientAConsentId,
         ]);
         FleetTelemetryEvent::create([
             'asset_id' => $asset->id,
@@ -329,6 +370,7 @@ class ResidentTrackingRefactorTest extends TestCase
     public function test_resident_data_includes_canonical_fields(): void
     {
         $device = Device::factory()->tracking()->create([
+            'tenant_id' => 1,
             'battery_level' => 65,
             'provider' => 'queclink',
         ]);
@@ -337,6 +379,7 @@ class ResidentTrackingRefactorTest extends TestCase
             'assignable_type' => 'client',
             'assignable_id' => $this->clientA->id,
             'assigned_at' => now(),
+            'consent_id' => $this->clientAConsentId,
         ]);
 
         $response = $this->actingAs($this->admin)

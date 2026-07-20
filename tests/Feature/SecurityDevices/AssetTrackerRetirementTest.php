@@ -8,8 +8,12 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
+use App\Models\AssetTracker;
 use App\Models\Client;
+use App\Models\ClientConsent;
+use App\Models\ConsentType;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
@@ -26,6 +30,8 @@ class AssetTrackerRetirementTest extends TestCase
 
     private User $admin;
 
+    private Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -33,8 +39,13 @@ class AssetTrackerRetirementTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->seed(SecurityDevicesPermissionsSeeder::class);
 
-        $this->admin = User::factory()->create(['role' => 'admin']);
+        $this->admin = User::factory()->create([
+            'role' => 'admin',
+            'organization_id' => 1,
+        ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+
+        $this->site = Site::factory()->create(['tenant_id' => 1]);
     }
 
     // ── Fleet devices reads from canonical devices ────────────────
@@ -85,14 +96,23 @@ class AssetTrackerRetirementTest extends TestCase
 
     public function test_resident_tracking_reads_from_canonical_devices(): void
     {
-        $client = Client::factory()->create(['status' => 'active']);
-        $device = Device::factory()->tracking()->create(['name' => 'Resident Pendant']);
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $this->site->id,
+            'status' => 'active',
+        ]);
+        $consent = $this->createFleetTrackingConsent($client);
+        $device = Device::factory()->tracking()->create([
+            'tenant_id' => 1,
+            'name' => 'Resident Pendant',
+        ]);
 
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => 'client',
             'assignable_id' => $client->id,
             'assigned_at' => now(),
+            'consent_id' => $consent->id,
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -153,7 +173,7 @@ class AssetTrackerRetirementTest extends TestCase
 
     public function test_asset_tracker_model_has_deprecation_annotation(): void
     {
-        $reflection = new \ReflectionClass(\App\Models\AssetTracker::class);
+        $reflection = new \ReflectionClass(AssetTracker::class);
         $docComment = $reflection->getDocComment();
 
         $this->assertNotFalse($docComment);
@@ -164,10 +184,36 @@ class AssetTrackerRetirementTest extends TestCase
 
     public function test_asset_trackers_relationship_has_deprecation(): void
     {
-        $reflection = new \ReflectionMethod(\App\Models\Asset::class, 'trackers');
+        $reflection = new \ReflectionMethod(Asset::class, 'trackers');
         $docComment = $reflection->getDocComment();
 
         $this->assertNotFalse($docComment);
         $this->assertStringContainsString('@deprecated', $docComment);
+    }
+
+    private function createFleetTrackingConsent(Client $client): ClientConsent
+    {
+        $type = ConsentType::firstOrCreate(
+            ['name' => 'Fleet Tracking'],
+            [
+                'category' => 'operational',
+                'description' => 'Vehicle / tracker GPS consent',
+                'purpose' => 'Tracker location collection',
+                'legal_basis' => 'consent',
+                'active' => true,
+            ],
+        );
+
+        return ClientConsent::create([
+            'client_id' => $client->id,
+            'consent_type_id' => $type->id,
+            'status' => 'given',
+            'given_at' => now(),
+            'expires_at' => now()->addMonth(),
+            'given_by_user_id' => $this->admin->id,
+            'given_method' => 'electronic',
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
     }
 }

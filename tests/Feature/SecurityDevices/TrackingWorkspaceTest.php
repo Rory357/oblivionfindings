@@ -168,7 +168,7 @@ class TrackingWorkspaceTest extends TestCase
                 $detail = $page->toArray()['props']['device'];
 
                 foreach (['external_ref', 'config', 'meta', 'latitude', 'longitude', 'location_description'] as $field) {
-                    $this->assertNull($detail[$field]);
+                    $this->assertArrayNotHasKey($field, $detail);
                 }
                 $this->assertStringNotContainsString(
                     'RAW-PERSON-LOCATION-SENTINEL',

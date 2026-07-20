@@ -5,8 +5,8 @@ namespace Tests\Feature\SecurityDevices;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Models\Device;
-use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
 use App\Models\AssetTelemetrySnapshot;
 use App\Models\AssetTracker;
@@ -26,6 +26,7 @@ class FleetDeviceRefactorTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $noPerms;
 
     protected function setUp(): void
@@ -119,14 +120,19 @@ class FleetDeviceRefactorTest extends TestCase
         $response = $this->actingAs($this->admin)
             ->get("/fleet-assets/devices/{$device->id}");
 
-        $response->assertOk();
-        $response->assertInertia(function ($page) {
-            $tracker = $page->toArray()['props']['tracker'];
-            $this->assertEquals('Vehicle Tracker X', $tracker['name']);
-            $this->assertEquals('123456789', $tracker['imei']);
-            $this->assertArrayHasKey('detail_url', $tracker);
-            $this->assertArrayHasKey('health_status', $tracker);
-        });
+        $response->assertRedirect("/fleet-assets/devices?device={$device->id}");
+
+        $this->actingAs($this->admin)
+            ->get("/fleet-assets/devices?device={$device->id}")
+            ->assertOk()
+            ->assertInertia(function ($page) {
+                $tracker = $page->toArray()['props']['device_detail'];
+                $this->assertEquals('Vehicle Tracker X', $tracker['name']);
+                $this->assertEquals('123456789', $tracker['imei']);
+                $this->assertArrayHasKey('detail_url', $tracker);
+                $this->assertArrayHasKey('health_status', $tracker);
+                $this->assertArrayHasKey('telemetry_snapshots', $tracker);
+            });
     }
 
     public function test_show_prefers_canonical_snapshot_lineage_without_legacy_bridge(): void
@@ -155,11 +161,15 @@ class FleetDeviceRefactorTest extends TestCase
         $response = $this->actingAs($this->admin)
             ->get("/fleet-assets/devices/{$device->id}");
 
-        $response->assertOk();
-        $response->assertInertia(function ($page) {
-            $tracker = $page->toArray()['props']['tracker'];
-            $this->assertCount(1, $tracker['telemetry_snapshots']);
-        });
+        $response->assertRedirect("/fleet-assets/devices?device={$device->id}");
+
+        $this->actingAs($this->admin)
+            ->get("/fleet-assets/devices?device={$device->id}")
+            ->assertOk()
+            ->assertInertia(function ($page) {
+                $tracker = $page->toArray()['props']['device_detail'];
+                $this->assertCount(1, $tracker['telemetry_snapshots']);
+            });
     }
 
     // ── Pair: creates device_asset_link ────────────────────────────
@@ -363,15 +373,20 @@ class FleetDeviceRefactorTest extends TestCase
 
         $response = $this->actingAs($this->admin)->get('/fleet-assets/devices/consent');
 
-        $response->assertOk();
-        $response->assertInertia(function ($page) use ($device) {
-            $rows = collect($page->toArray()['props']['devices']);
-            $row = $rows->firstWhere('id', $device->id);
+        $response->assertRedirect('/fleet-assets/devices?tab=consent');
 
-            $this->assertNotNull($row);
-            $this->assertEquals($device->id, $row['id']);
-            $this->assertEquals('consented', $row['consent_status']);
-        });
+        $this->actingAs($this->admin)
+            ->get('/fleet-assets/devices?tab=consent')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($device) {
+                $props = $page->toArray()['props'];
+                $this->assertSame('consent', $props['tab']);
+                $row = collect($props['consent_devices'])->firstWhere('id', $device->id);
+
+                $this->assertNotNull($row);
+                $this->assertEquals($device->id, $row['id']);
+                $this->assertEquals('consented', $row['consent_status']);
+            });
     }
 
     public function test_grant_consent_uses_canonical_device_route_and_syncs_assignment_and_tracker(): void

@@ -69,6 +69,7 @@ class AssetAlertArchiveTest extends TestCase
             'alert_type' => 'speed_violation',
             'severity' => 'critical',
             'status' => 'open',
+            'site_id' => $asset->site_id,
             'asset_id' => $asset->id,
             'triggered_at' => now()->subMinute(),
             'context' => ['source' => 'control_room'],
