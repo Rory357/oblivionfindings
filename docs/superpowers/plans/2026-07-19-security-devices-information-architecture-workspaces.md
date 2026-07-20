@@ -281,16 +281,18 @@ Legacy category paths (`/alarms`, `/cctv`, `/access-control`, `/tracking-devices
 
 **Acceptance scope (2026-07-21):** Security & Devices is a desktop web application. Task 12 browser acceptance covers standard and compact desktop web viewports only; mobile/device-emulation journeys are out of scope. Earlier Pixel 7 results remain historical evidence for the commits on which they were run, not a continuing product requirement.
 
-- [ ] Run all `tests/Feature/SecurityDevices`, `tests/Feature/Monitoring`, and connected IT/Control Room tests.
-- [ ] Run tenant, site, role, sensitive-domain, direct-link, count, search, export, and mutation denial suites.
-- [ ] Run all frontend tests, types, repository-wide ESLint, client build, and SSR build; record the repository-wide format baseline separately without bulk rewriting unrelated files.
-- [ ] Run production-backed desktop web browser journeys for Estate, Sites, device inventory/profile, each specialist workspace, Monitoring, Maintenance, Discovery, Integrations, and Settings at standard and compact desktop widths.
-- [ ] Run accessibility and overflow checks across grouped navigation and local tabs.
-- [ ] Verify every legacy Security & Devices deep link and current UniFi/Milesight/Queclink route remains valid.
-- [ ] Update only exact proven S01-S10, relevant X01-X06/E04-E09, and verification-gate evidence in `docs/it-support-security-devices-completion-goal.md`.
-- [ ] Record explicit handoff gaps for the native runtime, management-command, and cross-module/privacy plans.
-- [ ] Commit as `docs(security-devices): record workspace evidence`.
+- [x] Run all `tests/Feature/SecurityDevices`, `tests/Feature/Monitoring`, and connected IT/Control Room tests.
+- [x] Run tenant, site, role, sensitive-domain, direct-link, count, search, export, and mutation denial suites.
+- [x] Run all frontend tests, types, repository-wide ESLint, client build, and SSR build; record the repository-wide format baseline separately without bulk rewriting unrelated files.
+- [x] Run production-backed desktop web browser journeys for Estate, Sites, device inventory/profile, each specialist workspace, Monitoring, Maintenance, Discovery, Integrations, and Settings at standard and compact desktop widths.
+- [x] Run accessibility and overflow checks across grouped navigation and local tabs.
+- [x] Verify every legacy Security & Devices deep link and current UniFi/Milesight/Queclink route remains valid.
+- [x] Update only exact proven S01-S10, relevant X01-X06/E04-E09, and verification-gate evidence in `docs/it-support-security-devices-completion-goal.md`.
+- [x] Record explicit handoff gaps for the native runtime, management-command, and cross-module/privacy plans.
+- [x] Commit as `docs(security-devices): record workspace evidence`.
+
+**Task 12 evidence (2026-07-21):** The authoritative connected backend matrix passed 774 tests / 8,056 assertions. The post-accessibility-fix frontend matrix passed 108 files / 428 tests; TypeScript, repository-wide ESLint, targeted Prettier, client build (4,993 modules), SSR build (1,645 modules), and diff checks passed. Repository-wide `npm run format:check` remains an unrelated 1,313-file baseline and was not rewritten. Exact-worktree Dusk setup passed the UniFi integration browser test (1 test / 1 assertion), and Chrome then passed all 16 canonical destinations at 1440×1000 and 1024×768 with grouped navigation, headings, main landmarks, active state, provider routes, and no horizontal overflow. Twelve legacy/global aliases reached their intended canonical or retained compatibility pages. A real isolated-Dusk device exercised all ten available capability-driven profile sections without unsafe command controls or overflow. Keyboard order exposed the skip link first, visible controls had names, and the one discovered unlabeled category search was fixed in `e204149db` with a focused test and current-asset browser recheck. S09 is complete. S08 remains open because its collector/discovery/runtime operations are still presentation-only; S10 remains open because Milesight and cloud Queclink adapters are honest scaffolds. Runtime, command/secrets, and cross-module/privacy work remain in plans 4–6.
 
 ## Execution rule
 
-Execute in order with test-driven development and a commit after each task. A route or tab is not complete merely because it renders: its payload, authorization, canonical links, action semantics, empty/stale/error states, responsive behavior, and focused evidence must pass. Do not mark the master goal complete after this plan; native discovery/protocol/topology/collector breadth, PRTG/Auvik-class monitoring, management commands/secrets, cross-module projections, privacy withdrawal, operational hardening, and final release verification remain separate streams.
+Execute in order with test-driven development and a commit after each task. A route or tab is not complete merely because it renders: its payload, authorization, canonical links, action semantics, empty/stale/error states, compact-desktop behavior, and focused evidence must pass. Do not mark the master goal complete after this plan; native discovery/protocol/topology/collector breadth, PRTG/Auvik-class monitoring, management commands/secrets, cross-module projections, privacy withdrawal, operational hardening, and final release verification remain separate streams.
