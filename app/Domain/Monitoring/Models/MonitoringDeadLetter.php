@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MonitoringDeadLetter extends Model
 {
+    /**
+     * site_id is trusted intake/routing context. Callers must never derive it
+     * from envelope_bytes, which remains untrusted evidence for review.
+     */
     protected $fillable = [
         'message_id',
         'consumer',
@@ -16,7 +20,8 @@ class MonitoringDeadLetter extends Model
         'idempotency_key',
         'reason_code',
         'reason_message',
-        'envelope',
+        'envelope_bytes',
+        'site_id',
         'replay_count',
         'last_replayed_at',
         'resolved_at',
@@ -26,7 +31,7 @@ class MonitoringDeadLetter extends Model
 
     protected $casts = [
         'sequence' => 'integer',
-        'envelope' => 'array',
+        'site_id' => 'integer',
         'replay_count' => 'integer',
         'last_replayed_at' => 'immutable_datetime',
         'resolved_at' => 'immutable_datetime',

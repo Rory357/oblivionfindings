@@ -14,7 +14,7 @@ class MonitoringOutbox extends Model
         'source',
         'sequence',
         'idempotency_key',
-        'envelope',
+        'envelope_bytes',
         'available_at',
         'published_at',
         'attempts',
@@ -23,7 +23,6 @@ class MonitoringOutbox extends Model
 
     protected $casts = [
         'sequence' => 'integer',
-        'envelope' => 'array',
         'available_at' => 'immutable_datetime',
         'published_at' => 'immutable_datetime',
         'attempts' => 'integer',

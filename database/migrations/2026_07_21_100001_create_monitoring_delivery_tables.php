@@ -15,7 +15,7 @@ return new class extends Migration
             $table->string('source', 128);
             $table->unsignedBigInteger('sequence');
             $table->string('idempotency_key', 128);
-            $table->json('envelope');
+            $table->mediumText('envelope_bytes');
             $table->timestamp('available_at');
             $table->timestamp('published_at')->nullable();
             $table->unsignedSmallInteger('attempts')->default(0);
@@ -35,7 +35,7 @@ return new class extends Migration
             $table->unsignedBigInteger('sequence');
             $table->string('idempotency_key', 128);
             $table->char('payload_hash', 64);
-            $table->json('envelope');
+            $table->mediumText('envelope_bytes');
             $table->timestamp('processed_at')->nullable();
             $table->timestamps();
 
@@ -71,7 +71,10 @@ return new class extends Migration
             $table->string('idempotency_key', 128);
             $table->string('reason_code', 64);
             $table->string('reason_message', 500);
-            $table->json('envelope');
+            $table->mediumText('envelope_bytes');
+            // Canonical site context comes from trusted intake/routing metadata,
+            // never from the untrusted envelope payload. Null remains reviewable.
+            $table->foreignId('site_id')->nullable()->index()->constrained('sites')->nullOnDelete();
             $table->unsignedSmallInteger('replay_count')->default(0);
             $table->timestamp('last_replayed_at')->nullable();
             $table->timestamp('resolved_at')->nullable();

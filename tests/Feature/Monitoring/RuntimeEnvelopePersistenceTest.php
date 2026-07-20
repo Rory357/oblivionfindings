@@ -7,6 +7,7 @@ use App\Domain\Monitoring\Models\MonitoringDeadLetter;
 use App\Domain\Monitoring\Models\MonitoringInbox;
 use App\Domain\Monitoring\Models\MonitoringOutbox;
 use App\Domain\Monitoring\Services\RuntimeEnvelopeCodec;
+use App\Models\Site;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
@@ -44,7 +45,6 @@ beforeEach(function () {
 });
 
 it('provides single-tenant durable delivery controls', function () {
-    $legacyScopeColumn = 'tenant'.'_id';
     $deadLetterIndexes = collect(Schema::getIndexes('monitoring_dead_letters'))->keyBy('name');
 
     expect(Schema::hasColumns('monitoring_outbox', [
@@ -53,7 +53,7 @@ it('provides single-tenant durable delivery controls', function () {
         'source',
         'sequence',
         'idempotency_key',
-        'envelope',
+        'envelope_bytes',
         'available_at',
         'published_at',
         'attempts',
@@ -66,7 +66,7 @@ it('provides single-tenant durable delivery controls', function () {
             'sequence',
             'idempotency_key',
             'payload_hash',
-            'envelope',
+            'envelope_bytes',
             'processed_at',
         ]))->toBeTrue()
         ->and(Schema::hasColumns('monitoring_consumer_checkpoints', [
@@ -84,19 +84,24 @@ it('provides single-tenant durable delivery controls', function () {
             'idempotency_key',
             'reason_code',
             'reason_message',
-            'envelope',
+            'envelope_bytes',
+            'site_id',
             'replay_count',
             'last_replayed_at',
             'resolved_at',
             'resolved_by_user_id',
             'resolution_reason',
         ]))->toBeTrue()
-        ->and(Schema::hasColumn('monitoring_outbox', $legacyScopeColumn))->toBeFalse()
-        ->and(Schema::hasColumn('monitoring_inbox', $legacyScopeColumn))->toBeFalse()
-        ->and(Schema::hasColumn('monitoring_consumer_checkpoints', $legacyScopeColumn))->toBeFalse()
-        ->and(Schema::hasColumn('monitoring_dead_letters', $legacyScopeColumn))->toBeFalse()
+        ->and(Schema::hasColumn('monitoring_outbox', 'envelope'))->toBeFalse()
+        ->and(Schema::hasColumn('monitoring_inbox', 'envelope'))->toBeFalse()
+        ->and(Schema::hasColumn('monitoring_dead_letters', 'envelope'))->toBeFalse()
+        ->and(Schema::hasColumn('monitoring_outbox', 'tenant_id'))->toBeFalse()
+        ->and(Schema::hasColumn('monitoring_inbox', 'tenant_id'))->toBeFalse()
+        ->and(Schema::hasColumn('monitoring_consumer_checkpoints', 'tenant_id'))->toBeFalse()
+        ->and(Schema::hasColumn('monitoring_dead_letters', 'tenant_id'))->toBeFalse()
         ->and($deadLetterIndexes->get('monitoring_dead_letters_consumer_resolved_idx')['columns'])->toBe(['consumer', 'resolved_at'])
-        ->and($deadLetterIndexes->get('monitoring_dead_letters_created_idx')['columns'])->toBe(['created_at']);
+        ->and($deadLetterIndexes->get('monitoring_dead_letters_created_idx')['columns'])->toBe(['created_at'])
+        ->and($deadLetterIndexes->get('monitoring_dead_letters_site_id_index')['columns'])->toBe(['site_id']);
 });
 
 it('round trips and persists a signed v1 envelope without signing material', function () {
@@ -110,7 +115,6 @@ it('round trips and persists a signed v1 envelope without signing material', fun
     $codec = app(RuntimeEnvelopeCodec::class);
     $encoded = $codec->encode($envelope);
     $decoded = $codec->decode($encoded);
-    $originalEnvelope = json_decode($encoded, true, flags: JSON_THROW_ON_ERROR);
 
     $outbox = MonitoringOutbox::create([
         'message_id' => $decoded->messageId,
@@ -118,7 +122,7 @@ it('round trips and persists a signed v1 envelope without signing material', fun
         'source' => $decoded->source,
         'sequence' => $decoded->sequence,
         'idempotency_key' => $decoded->idempotencyKey,
-        'envelope' => $originalEnvelope,
+        'envelope_bytes' => $encoded,
         'available_at' => now(),
     ]);
     $inbox = MonitoringInbox::create([
@@ -128,7 +132,7 @@ it('round trips and persists a signed v1 envelope without signing material', fun
         'sequence' => $decoded->sequence,
         'idempotency_key' => $decoded->idempotencyKey,
         'payload_hash' => hash('sha256', $encoded),
-        'envelope' => $originalEnvelope,
+        'envelope_bytes' => $encoded,
     ]);
     $checkpoint = MonitoringConsumerCheckpoint::create([
         'consumer' => 'observation-projector',
@@ -145,7 +149,7 @@ it('round trips and persists a signed v1 envelope without signing material', fun
         'idempotency_key' => $decoded->idempotencyKey,
         'reason_code' => 'sequence_gap',
         'reason_message' => 'Expected sequence 7.',
-        'envelope' => $originalEnvelope,
+        'envelope_bytes' => $encoded,
     ]);
 
     expect($decoded->schemaVersion)->toBe(1)
@@ -153,15 +157,87 @@ it('round trips and persists a signed v1 envelope without signing material', fun
         ->and($decoded->traceId)->not->toBeEmpty()
         ->and($decoded->keyId)->toBe('runtime-test-key')
         ->and($decoded->signature)->not->toBeEmpty()
-        ->and($outbox->fresh()->envelope)->toBe($originalEnvelope)
-        ->and($inbox->fresh()->envelope)->toBe($originalEnvelope)
+        ->and($outbox->fresh()->envelope_bytes)->toBe($encoded)
+        ->and($inbox->fresh()->envelope_bytes)->toBe($encoded)
+        ->and($inbox->fresh()->payload_hash)->toBe(hash('sha256', $inbox->fresh()->envelope_bytes))
         ->and($checkpoint->fresh()->gap_from)->toBe(7)
         ->and($deadLetter->fresh()->replay_count)->toBe(0)
-        ->and(json_encode([
-            $outbox->fresh()->envelope,
-            $inbox->fresh()->envelope,
-            $deadLetter->fresh()->envelope,
-        ], JSON_THROW_ON_ERROR))->not->toContain(config('monitoring.signing.keys.runtime-test-key'));
+        ->and($deadLetter->fresh()->envelope_bytes)->toBe($encoded)
+        ->and(implode('', [
+            $outbox->fresh()->envelope_bytes,
+            $inbox->fresh()->envelope_bytes,
+            $deadLetter->fresh()->envelope_bytes,
+        ]))->not->toContain(config('monitoring.signing.keys.runtime-test-key'));
+});
+
+it('keeps dead letter site context trusted and outside untrusted envelope payload', function () {
+    $trustedSite = Site::factory()->create();
+    $untrustedBytes = '{"payload":{"site_id":999999}}';
+    $attributes = [
+        'message_id' => '018f0000-0000-7000-8000-000000000031',
+        'consumer' => 'privileged-dead-letter-review',
+        'source' => 'collector:remote-a',
+        'sequence' => 31,
+        'idempotency_key' => 'invalid:31',
+        'reason_code' => 'invalid_envelope',
+        'reason_message' => 'Envelope failed validation before site routing.',
+        'envelope_bytes' => $untrustedBytes,
+    ];
+
+    $unscoped = MonitoringDeadLetter::create($attributes);
+    $scoped = MonitoringDeadLetter::create([
+        ...$attributes,
+        'message_id' => '018f0000-0000-7000-8000-000000000032',
+        'sequence' => 32,
+        'idempotency_key' => 'invalid:32',
+        'site_id' => $trustedSite->id,
+    ]);
+
+    expect($unscoped->fresh()->site_id)->toBeNull()
+        ->and($unscoped->fresh()->envelope_bytes)->toBe($untrustedBytes)
+        ->and($scoped->fresh()->site_id)->toBe($trustedSite->id)
+        ->and(data_get(json_decode($scoped->fresh()->envelope_bytes, true), 'payload.site_id'))
+        ->not->toBe($scoped->fresh()->site_id);
+});
+
+it('rejects mismatched inbox payload integrity while preserving first-or-create delivery semantics', function () {
+    $attributes = [
+        'message_id' => '018f0000-0000-7000-8000-000000000041',
+        'consumer' => 'integrity-projector',
+        'source' => 'central:checks',
+        'sequence' => 41,
+        'idempotency_key' => 'integrity:41',
+        'payload_hash' => str_repeat('0', 64),
+        'envelope_bytes' => '{"schema_version":1}',
+    ];
+
+    expect(fn () => MonitoringInbox::create($attributes))
+        ->toThrow(UnexpectedValueException::class, 'Monitoring inbox payload hash does not match envelope bytes.');
+
+    $attributes['payload_hash'] = hash('sha256', $attributes['envelope_bytes']);
+    $inbox = MonitoringInbox::create($attributes);
+
+    $inbox->envelope_bytes = '{"schema_version":1,"sequence":42}';
+    expect(fn () => $inbox->save())
+        ->toThrow(UnexpectedValueException::class, 'Monitoring inbox payload hash does not match envelope bytes.');
+
+    $inbox->payload_hash = hash('sha256', $inbox->envelope_bytes);
+    $inbox->save();
+
+    $duplicate = MonitoringInbox::firstOrCreate([
+        'consumer' => $inbox->consumer,
+        'message_id' => $inbox->message_id,
+    ], [
+        'source' => 'unreachable:create-values',
+        'sequence' => 999,
+        'idempotency_key' => 'unreachable:create-values',
+        'payload_hash' => hash('sha256', '{"different":true}'),
+        'envelope_bytes' => '{"different":true}',
+    ]);
+
+    expect($inbox->fresh()->payload_hash)->toBe(hash('sha256', $inbox->fresh()->envelope_bytes))
+        ->and($duplicate->is($inbox))->toBeTrue()
+        ->and($duplicate->envelope_bytes)->toBe($inbox->fresh()->envelope_bytes);
 });
 
 it('canonicalises nested payload keys before signing', function () {
@@ -433,7 +509,7 @@ it('enforces single-application delivery identities by source and consumer', fun
         'source' => 'central:checks',
         'sequence' => 11,
         'idempotency_key' => 'monitor:9:sample:11',
-        'envelope' => ['schema_version' => 1],
+        'envelope_bytes' => '{"schema_version":1}',
         'available_at' => now(),
     ];
 
@@ -470,8 +546,8 @@ it('enforces single-application delivery identities by source and consumer', fun
         'source' => 'central:checks',
         'sequence' => 11,
         'idempotency_key' => 'monitor:9:sample:11',
-        'payload_hash' => str_repeat('a', 64),
-        'envelope' => ['schema_version' => 1],
+        'payload_hash' => hash('sha256', '{"schema_version":1}'),
+        'envelope_bytes' => '{"schema_version":1}',
     ];
     MonitoringInbox::create($inbox);
 
