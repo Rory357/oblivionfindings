@@ -43,6 +43,27 @@ return [
     ],
     'contracts' => ['current' => 1, 'accepted' => [1]],
     'signing' => ['active_key_id' => env('MONITORING_SIGNING_KEY_ID'), 'keys' => $signingKeys],
+    'delivery' => [
+        'queue_connection' => env('MONITORING_QUEUE_CONNECTION', 'redis'),
+        'sequence_lock_store' => env('MONITORING_SEQUENCE_LOCK_STORE', 'redis'),
+        'sequence_lock_seconds' => 15,
+        'sequence_lock_wait_seconds' => 5,
+        'allow_local_sequence_lock_for_tests' => env('MONITORING_ALLOW_LOCAL_SEQUENCE_LOCK_FOR_TESTS', false),
+        'recovery_batch_size' => 100,
+        'dispatch_lease_seconds' => 120,
+        'consumers' => [
+            'observation' => 'observation-projector',
+            'event' => 'event-projector',
+            'configuration' => 'configuration-projector',
+            'projection' => 'projection-projector',
+        ],
+        'type_queues' => [
+            'observation' => 'monitoring-checks',
+            'event' => 'monitoring-events',
+            'configuration' => 'monitoring-maintenance',
+            'projection' => 'monitoring-topology',
+        ],
+    ],
     'egress' => [
         'connect_timeout_seconds' => 5,
         'response_timeout_seconds' => 15,

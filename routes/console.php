@@ -71,6 +71,13 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+// Durable monitoring outbox and replay intents recover after queue outages or
+// a process crash between database commit and queue acceptance.
+app(Schedule::class)
+    ->command('monitoring:recover-delivery')
+    ->everyMinute()
+    ->withoutOverlapping();
+
 // Recover Control Room alert notification outbox rows that were committed
 // before a transient queue/worker failure could deliver them.
 app(Schedule::class)

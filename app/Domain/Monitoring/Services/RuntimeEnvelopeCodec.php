@@ -126,6 +126,14 @@ final class RuntimeEnvelopeCodec
         );
     }
 
+    /** @param array<string|int, mixed> $payload */
+    public function canonicalPayloadBytes(array $payload): string
+    {
+        $this->validatePayload($payload);
+
+        return $this->json($this->canonicalise($payload));
+    }
+
     /**
      * @return array<string, mixed>
      */
