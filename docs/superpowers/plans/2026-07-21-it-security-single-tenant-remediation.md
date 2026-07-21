@@ -222,7 +222,7 @@ Only after a repository-wide dependency audit, data backup/restore rehearsal, an
 
 | Task | Status | Evidence |
 | --- | --- | --- |
-| 1. Boundary gate and collision report | Pending | Awaiting final independent approval and parent commit of the 476 path-rule no-regression baseline and redacted local development audit report |
+| 1. Boundary gate and collision report | Completed | Commit `4eaa0771b`; independently approved 476 path-rule / 3,083-occurrence no-regression baseline; 206-line redacted local development audit; 12 focused tests / 149 assertions |
 | 2. IT access kernel | Pending | Site/team/sensitivity/organisation-wide policy matrix |
 | 3. High-risk IT ingress and context | Pending | Email/API/context/monitoring/link direct-object tests |
 | 4. Remaining IT refactor | Pending | IT controller/service/regression matrix |
