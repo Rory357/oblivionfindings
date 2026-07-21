@@ -148,7 +148,7 @@ class WorkspaceCompatibilityTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_shared_workspace_query_is_tenant_scoped_and_preserves_filters(): void
+    public function test_shared_workspace_query_uses_the_single_application_registry_and_preserves_filters(): void
     {
         Device::factory()->itInfrastructure()->create([
             'tenant_id' => 42,
@@ -168,13 +168,16 @@ class WorkspaceCompatibilityTest extends TestCase
 
         $this->actingAs($this->admin)
             ->get('/security-devices/network-it?tab=devices&status=offline')
-            ->assertInertia(fn ($page) => $page
-                ->where('workspace.activeTab', 'devices')
-                ->where('workspace.summary.devices', 2)
-                ->has('devices.data', 1)
-                ->where('devices.data.0.name', 'Tenant edge')
-                ->where('filters.status', 'offline')
-            );
+            ->assertInertia(function ($page): void {
+                $props = $page->toArray()['props'];
+                $this->assertSame('devices', $props['workspace']['activeTab']);
+                $this->assertSame(3, $props['workspace']['summary']['devices']);
+                $this->assertEqualsCanonicalizing(
+                    ['Tenant edge', 'Foreign edge'],
+                    collect($props['devices']['data'])->pluck('name')->all(),
+                );
+                $this->assertSame('offline', $props['filters']['status']);
+            });
     }
 
     #[DataProvider('legacyRouteProvider')]

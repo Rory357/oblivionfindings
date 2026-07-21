@@ -18,7 +18,6 @@ use App\Models\ItTicketLink;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
-use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -29,14 +28,12 @@ use Throwable;
 class DeviceProfilePresenter
 {
     public function __construct(
-        private readonly UserSiteAccessService $siteAccess,
         private readonly SecurityDevicesAccessService $deviceAccess,
     ) {}
 
     /** @return array<string, mixed> */
     public function present(User $viewer, Device $device, ?DeviceAssignment $activeAssignment): array
     {
-        $tenantId = (int) $device->tenant_id;
         $canViewMonitoring = $viewer->canDo('securityDevices.events.view');
         $canViewMaintenance = $viewer->canDo('securityDevices.maintenance.view');
         $canViewIt = $viewer->canDo('it.view');
@@ -46,10 +43,10 @@ class DeviceProfilePresenter
             ? $device->monitors
             : collect();
         $observations = $canViewMonitoring
-            ? $this->latestObservations($tenantId, $monitors->pluck('id'))
+            ? $this->latestObservations($monitors->pluck('id'))
             : collect();
         $tickets = $canViewIt ? $this->tickets($viewer, $device) : collect();
-        $audit = $canViewAudit ? $this->audit($tenantId, $device) : collect();
+        $audit = $canViewAudit ? $this->audit($device) : collect();
         $controlRoomAlerts = $canViewControlRoom
             ? $this->controlRoomAlerts($viewer, $device)
             : collect();
@@ -192,7 +189,6 @@ class DeviceProfilePresenter
     private function siteLocation(Device $device, DeviceAssignment $assignment): ?array
     {
         $site = Site::query()
-            ->where('tenant_id', $device->tenant_id)
             ->find($assignment->assignable_id, ['id', 'name']);
 
         return $site ? [
@@ -207,7 +203,6 @@ class DeviceProfilePresenter
     private function clientLocation(Device $device, DeviceAssignment $assignment): ?array
     {
         $client = Client::query()
-            ->where('organization_id', $device->tenant_id)
             ->find($assignment->assignable_id, ['id', 'first_name', 'last_name']);
 
         return $client ? [
@@ -222,7 +217,6 @@ class DeviceProfilePresenter
     private function roomLocation(Device $device, DeviceAssignment $assignment): ?array
     {
         $room = SiteRoom::query()
-            ->whereHas('site', fn (Builder $site): Builder => $site->where('tenant_id', $device->tenant_id))
             ->with('site:id,name')
             ->find($assignment->assignable_id);
 
@@ -255,7 +249,6 @@ class DeviceProfilePresenter
     private function staffLocation(Device $device, DeviceAssignment $assignment): ?array
     {
         $staff = User::query()
-            ->where('organization_id', $device->tenant_id)
             ->find($assignment->assignable_id, ['id', 'name']);
 
         return $staff ? [
@@ -441,14 +434,13 @@ class DeviceProfilePresenter
     }
 
     /** @param Collection<int, int> $monitorIds @return Collection<int, MonitorObservation> */
-    private function latestObservations(int $tenantId, Collection $monitorIds): Collection
+    private function latestObservations(Collection $monitorIds): Collection
     {
         if ($monitorIds->isEmpty()) {
             return collect();
         }
 
         $ids = MonitorObservation::query()
-            ->forTenant($tenantId)
             ->whereIn('monitor_id', $monitorIds)
             ->selectRaw('MAX(id)')
             ->groupBy('monitor_id');
@@ -535,14 +527,11 @@ class DeviceProfilePresenter
                 'notes' => $device->notes,
                 'groups' => $device->relationLoaded('groups')
                     ? $device->groups
-                        ->where('tenant_id', $device->tenant_id)
                         ->map(fn ($group): array => ['id' => $group->id, 'name' => $group->name])
                         ->values()
                     : [],
                 'createdBy' => $device->relationLoaded('createdBy')
                     && $device->createdBy
-                    && ((int) $device->createdBy->organization_id === (int) $device->tenant_id
-                        || $device->createdBy->organization_id === null)
                         ? ['id' => $device->createdBy->id, 'name' => $device->createdBy->name]
                         : null,
                 'createdAt' => $device->created_at?->toISOString(),
@@ -614,11 +603,9 @@ class DeviceProfilePresenter
     private function tickets(User $viewer, Device $device): Collection
     {
         return ItTicketLink::query()
-            ->forTenant((int) $device->tenant_id)
             ->where('relationship', 'affected_device')
             ->where('linkable_type', Device::class)
             ->where('linkable_id', $device->id)
-            ->whereHas('ticket', fn (Builder $ticket): Builder => $ticket->where('tenant_id', $device->tenant_id))
             ->with('ticket')
             ->latest('id')
             ->limit(50)
@@ -650,7 +637,38 @@ class DeviceProfilePresenter
             ->latest('triggered_at')
             ->limit(50);
 
-        $this->siteAccess->applyAlertScope($query, $viewer, ['reports.viewAny']);
+        $siteIds = $this->deviceAccess->accessibleSiteIds($viewer);
+        $clientIds = $this->deviceAccess->authorizedClientIds($viewer);
+        if ($siteIds === []) {
+            $query->whereRaw('1 = 0');
+        } else {
+            // Control Room remains the owner of alert visibility. Within the
+            // device profile, preserve its direct Site/client precedence using
+            // the same canonical records as the device access boundary.
+            $query->where(function (Builder $privacy) use ($clientIds): void {
+                $privacy->whereNull('client_id');
+                if ($clientIds !== []) {
+                    $privacy->orWhereIn('client_id', $clientIds);
+                }
+            })->where(function (Builder $scope) use ($siteIds, $clientIds): void {
+                $scope->whereIn('site_id', $siteIds)
+                    ->orWhere(function (Builder $fallback) use ($siteIds, $clientIds): void {
+                        $fallback->whereNull('site_id')
+                            ->where(function (Builder $context) use ($siteIds, $clientIds): void {
+                                if ($clientIds !== []) {
+                                    $context->whereIn('client_id', $clientIds);
+                                } else {
+                                    $context->whereRaw('1 = 0');
+                                }
+                                $context->orWhere(function (Builder $projection) use ($siteIds): void {
+                                    $projection->whereNull('client_id')
+                                        ->whereHas('device', fn (Builder $device): Builder => $device
+                                            ->whereIn('site_id', $siteIds));
+                                });
+                            });
+                    });
+            });
+        }
 
         return $query->get()->map(fn (ControlRoomAlert $alert): array => [
             'id' => $alert->id,
@@ -664,10 +682,9 @@ class DeviceProfilePresenter
     }
 
     /** @return Collection<int, array<string, mixed>> */
-    private function audit(int $tenantId, Device $device): Collection
+    private function audit(Device $device): Collection
     {
         return AuditLog::query()
-            ->forOrganization($tenantId)
             ->where('auditable_type', Device::class)
             ->where('auditable_id', $device->id)
             ->with('user:id,name')

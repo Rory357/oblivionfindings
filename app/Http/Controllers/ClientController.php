@@ -15,6 +15,7 @@ namespace App\Http\Controllers;
 use App\Domain\Clinical\Services\ClinicalHealthSummaryService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Enums\NextOfKinRelationship;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
@@ -261,26 +262,28 @@ class ClientController extends Controller
             $defaultServiceContextId = null;
         }
 
-        return [
-            'sites' => Site::query()
-                ->forTenant($organizationId)
+        $sites = Site::query()
+            ->forTenant($organizationId)
+            ->where('is_active', true)
+            ->with(['houseRooms' => fn ($query) => $query
                 ->where('is_active', true)
-                ->with(['houseRooms' => fn ($query) => $query
-                    ->where('is_active', true)
-                    ->where('is_assignable', true)
-                    ->orderBy('sort_order')
-                    ->orderBy('name')])
-                ->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn (Site $site) => [
-                    'id' => $site->id,
-                    'name' => $site->name,
-                    'rooms' => $site->houseRooms->map(fn (SiteHouseRoom $room) => [
-                        'id' => $room->id,
-                        'name' => $room->name,
-                        'notes' => $room->notes,
-                    ])->values(),
-                ]),
+                ->where('is_assignable', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')])
+            ->orderBy('name')
+            ->get(['id', 'name']);
+        $availableSiteIds = $sites->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+
+        return [
+            'sites' => $sites->map(fn (Site $site) => [
+                'id' => $site->id,
+                'name' => $site->name,
+                'rooms' => $site->houseRooms->map(fn (SiteHouseRoom $room) => [
+                    'id' => $room->id,
+                    'name' => $room->name,
+                    'notes' => $room->notes,
+                ])->values(),
+            ]),
             'serviceContexts' => ServiceContext::query()
                 ->forOrganization($organizationId)
                 ->where('is_active', true)
@@ -291,10 +294,11 @@ class ClientController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'geofences' => AssetGeofence::query()
-                ->forOrganization($organizationId)
                 ->where('is_active', true)
+                ->whereIn('site_id', $availableSiteIds)
+                ->whereIn('scope', ['house', 'resident'])
                 ->orderBy('name')
-                ->get(['id', 'name']),
+                ->get(['id', 'site_id', 'name']),
             'defaultServiceContextId' => $defaultServiceContextId,
         ];
     }
@@ -1567,10 +1571,10 @@ class ClientController extends Controller
                 )
                 : null,
             ...($sectionAccess['personal_assets'] && $canEditClientAssets ? [
-                'asset_locations' => $this->buildAssetLocations($clientTenantId),
+                'asset_locations' => $this->buildAssetLocations($client),
             ] : []),
             ...($sectionAccess['tracking'] && $canEditClientAssets && $canManageClientTrackers ? [
-                'available_trackers' => $this->buildAvailableTrackers($client, $clientTenantId),
+                'available_trackers' => $this->buildAvailableTrackers($client, $request->user()),
             ] : []),
             'emar_summary' => $sectionAccess['medical'] ? [
                 'active_medications_count' => ClientMedication::where('client_id', $client->id)
@@ -2214,10 +2218,14 @@ class ClientController extends Controller
             ->values();
     }
 
-    private function buildAssetLocations(int $tenantId)
+    private function buildAssetLocations(Client $client)
     {
+        if (! is_numeric($client->site_id)) {
+            return collect();
+        }
+
         return Site::query()
-            ->where('tenant_id', $tenantId)
+            ->whereKey((int) $client->site_id)
             ->where('is_active', true)
             ->with(['houseRooms' => fn ($query) => $query
                 ->where('is_active', true)
@@ -2236,28 +2244,19 @@ class ClientController extends Controller
             ]);
     }
 
-    private function buildAvailableTrackers(Client $client, int $tenantId)
+    private function buildAvailableTrackers(Client $client, User $viewer)
     {
         if (! Schema::hasTable('devices') || ! Schema::hasTable('location_hardware')) {
             return collect();
         }
 
         try {
-            $trackers = Device::query()
-                ->forTenant($tenantId)
-                ->where('domain', 'tracking')
-                ->whereNotIn('status', ['decommissioned', 'lost'])
-                ->whereNotNull('legacy_location_hardware_id')
-                ->whereDoesntHave('assignments', fn ($query) => $query->active())
-                ->whereExists(function ($query) use ($tenantId): void {
-                    $query->selectRaw('1')
-                        ->from('location_hardware')
-                        ->whereColumn('location_hardware.id', 'devices.legacy_location_hardware_id')
-                        ->where('location_hardware.tenant_id', $tenantId)
-                        ->where('location_hardware.category', LocationHardware::CATEGORY_TRACKER)
-                        ->where('location_hardware.status', '!=', LocationHardware::STATUS_RETIRED)
-                        ->whereNull('location_hardware.deleted_at');
-                })
+            $access = app(SecurityDevicesAccessService::class);
+            if (! $access->canViewUnassigned($viewer) || ! is_numeric($client->site_id)) {
+                return collect();
+            }
+
+            $trackers = $access->unassignedTrackingDevicesForClient($viewer, $client)
                 ->whereNotExists(function ($query) use ($client): void {
                     $query->selectRaw('1')
                         ->from('client_personal_assets')
@@ -2278,8 +2277,8 @@ class ClientController extends Controller
                 ]);
 
             $hardwareById = LocationHardware::query()
-                ->forTenant($tenantId)
                 ->whereIn('id', $trackers->pluck('legacy_location_hardware_id'))
+                ->where('site_id', $client->site_id)
                 ->get(['id', 'site_id'])
                 ->keyBy('id');
 
@@ -2641,15 +2640,9 @@ class ClientController extends Controller
         $serviceContexts = $serviceContextsQuery->get(['id', 'type', 'name', 'is_active']);
 
         $geofences = AssetGeofence::query()
-            ->forOrganization($organizationId)
-            ->where(function ($query) use ($client) {
-                $query->where('is_active', true);
-                if ($client->house_geofence_id) {
-                    $query->orWhere('id', $client->house_geofence_id);
-                }
-            })
+            ->eligibleForClientSite(is_numeric($client->site_id) ? (int) $client->site_id : null)
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get(['id', 'site_id', 'name']);
 
         $keyWorkers = app(ClientWorkerEligibility::class)
             ->query($client)
@@ -2665,7 +2658,10 @@ class ClientController extends Controller
                 'phone', 'email', 'address_line_1', 'address_line_2', 'suburb', 'city', 'postcode',
                 'profile_photo_path', 'funding_type', 'funding_notes',
             ]),
-            'initialValues' => $this->clientWizardInitialValues($client),
+            'initialValues' => $this->clientWizardInitialValues(
+                $client,
+                $geofences->pluck('id')->map(fn (mixed $id): int => (int) $id)->all(),
+            ),
             'sites' => $sites,
             'serviceContexts' => $serviceContexts,
             'keyWorkers' => $keyWorkers,
@@ -2687,7 +2683,8 @@ class ClientController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function clientWizardInitialValues(Client $client): array
+    /** @param list<int>|null $eligibleGeofenceIds */
+    private function clientWizardInitialValues(Client $client, ?array $eligibleGeofenceIds = null): array
     {
         $stringId = fn (mixed $value): string => filled($value)
             ? (string) $value
@@ -2757,7 +2754,10 @@ class ClientController extends Controller
             'key_worker_id' => $stringId($client->key_worker_id),
             'risk_level' => $client->risk_level ?? 'low',
             'safeguarding_flag' => (bool) $client->safeguarding_flag,
-            'house_geofence_id' => $stringId($client->house_geofence_id),
+            'house_geofence_id' => $client->house_geofence_id !== null
+                && ($eligibleGeofenceIds === null || in_array((int) $client->house_geofence_id, $eligibleGeofenceIds, true))
+                    ? $stringId($client->house_geofence_id)
+                    : '',
             'funding_type' => $client->funding_type ?? '',
             'funding_notes' => $client->funding_notes ?? '',
             'emergency_contacts' => $client->emergencyContacts->map(fn ($contact) => [
@@ -3284,7 +3284,6 @@ class ClientController extends Controller
 
     private function buildLocationData(Client $client, bool $canManageTrackers): array
     {
-        $tenantId = $this->clientTenantId($client);
         $trackingConsent = app(PortalClientSectionAccess::class)
             ->activeLocationTrackingConsent($client);
 
@@ -3314,7 +3313,7 @@ class ClientController extends Controller
         // Find the active tracking device assigned to this client.
         try {
             $device = app(DeviceRegistryService::class)
-                ->forClient($tenantId, $client->id)
+                ->forClient($client->id)
                 ->where('domain', 'tracking')
                 ->first();
         } catch (QueryException $exception) {
@@ -3421,11 +3420,11 @@ class ClientController extends Controller
         $geofences = [];
         $houseGeofence = null;
         try {
-            if (Schema::hasTable('asset_geofences')) {
+            if (Schema::hasTable('asset_geofences') && is_numeric($client->site_id)) {
                 if ($client->house_geofence_id) {
                     $houseGeofence = AssetGeofence::query()
-                        ->forOrganization($tenantId)
                         ->whereKey($client->house_geofence_id)
+                        ->where('site_id', (int) $client->site_id)
                         ->where('is_active', true)
                         ->where(function ($q) {
                             $q->where('scope', 'house')->orWhere('scope', 'resident');
@@ -3435,7 +3434,6 @@ class ClientController extends Controller
 
                 if (! $houseGeofence && $client->site_id) {
                     $houseGeofence = AssetGeofence::query()
-                        ->forOrganization($tenantId)
                         ->where('site_id', $client->site_id)
                         ->where('is_active', true)
                         ->where(function ($q) {
@@ -3524,11 +3522,9 @@ class ClientController extends Controller
             403,
         );
 
-        $tenantId = $this->clientTenantId($client);
-
         // Canonical device lookup.
         $device = app(DeviceRegistryService::class)
-            ->forClient($tenantId, $client->id)
+            ->forClient($client->id)
             ->where('domain', 'tracking')
             ->first();
 
@@ -3548,9 +3544,8 @@ class ClientController extends Controller
             403,
         );
 
-        $tenantId = $this->clientTenantId($client);
         $device = app(DeviceRegistryService::class)
-            ->forClient($tenantId, $client->id)
+            ->forClient($client->id)
             ->where('domain', 'tracking')
             ->first();
 
@@ -3580,9 +3575,8 @@ class ClientController extends Controller
             403,
         );
 
-        $tenantId = $this->clientTenantId($client);
         $device = app(DeviceRegistryService::class)
-            ->forClient($tenantId, $client->id)
+            ->forClient($client->id)
             ->where('domain', 'tracking')
             ->first();
 

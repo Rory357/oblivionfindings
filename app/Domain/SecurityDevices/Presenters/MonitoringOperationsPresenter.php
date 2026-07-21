@@ -24,7 +24,6 @@ class MonitoringOperationsPresenter
     /** @param array<string, mixed> $filters @return array<string, mixed> */
     public function present(User $viewer, array $filters = []): array
     {
-        $tenantId = $this->access->tenantId($viewer);
         $visibleDevices = $this->access->visibleDevices($viewer)
             ->with(['assignments' => fn ($query) => $query->active()])
             ->orderBy('name')
@@ -38,7 +37,6 @@ class MonitoringOperationsPresenter
         $allMonitors = $deviceIds->isEmpty()
             ? collect()
             : Monitor::query()
-                ->forTenant($tenantId)
                 ->whereIn('device_id', $deviceIds)
                 ->with([
                     'device:id,name,device_uid,domain,category',
@@ -48,7 +46,7 @@ class MonitoringOperationsPresenter
                 ])
                 ->orderBy('name')
                 ->get();
-        $observations = $this->recentObservations($tenantId, $allMonitors->pluck('id'));
+        $observations = $this->recentObservations($allMonitors->pluck('id'));
         $mapped = $allMonitors->map(fn (Monitor $monitor): array => $this->mapMonitor(
             $monitor,
             $sitesByDevice->get($monitor->device_id),
@@ -173,14 +171,13 @@ class MonitoringOperationsPresenter
     }
 
     /** @param Collection<int, int> $monitorIds @return Collection<int, Collection<int, MonitorObservation>> */
-    private function recentObservations(int $tenantId, Collection $monitorIds): Collection
+    private function recentObservations(Collection $monitorIds): Collection
     {
         if ($monitorIds->isEmpty()) {
             return collect();
         }
 
         return MonitorObservation::query()
-            ->forTenant($tenantId)
             ->whereIn('monitor_id', $monitorIds)
             ->orderByDesc('observed_at')
             ->limit(max(1000, $monitorIds->count() * 10))

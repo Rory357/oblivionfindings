@@ -450,7 +450,7 @@ describe('QueclinkHub page chrome', () => {
                     },
                 }}
                 statistics={{ frames_last_hour: 0, last_frame_at: null }}
-                imsCloud={null}
+                providerConnection={null}
                 siteCredentials={[]}
                 targets={{ vehicles: [], staff: [], clients: [] }}
                 presets={[]}
@@ -515,7 +515,7 @@ describe('QueclinkHub page chrome', () => {
                     frames_last_hour: 12,
                     last_frame_at: '2026-05-18T02:07:01Z',
                 }}
-                imsCloud={null}
+                providerConnection={null}
                 siteCredentials={[]}
                 targets={{
                     vehicles: [],

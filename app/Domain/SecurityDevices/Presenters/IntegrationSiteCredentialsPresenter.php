@@ -2,7 +2,9 @@
 
 namespace App\Domain\SecurityDevices\Presenters;
 
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Integration\IntegrationSiteSecret;
+use App\Models\User;
 
 class IntegrationSiteCredentialsPresenter
 {
@@ -14,13 +16,17 @@ class IntegrationSiteCredentialsPresenter
 
     public const STATE_ERROR = 'error';
 
+    public function __construct(private readonly SecurityDevicesAccessService $access) {}
+
     /** @return array<int, array<string, mixed>> */
-    public function present(int $tenantId, string $provider): array
+    public function present(User $viewer, string $provider): array
     {
+        $siteIds = $this->access->accessibleSiteIds($viewer);
+
         return IntegrationSiteSecret::query()
-            ->forTenant($tenantId)
             ->where('provider', $provider)
-            ->whereHas('site', fn ($site) => $site->where('tenant_id', $tenantId))
+            ->whereIn('site_id', $siteIds)
+            ->whereHas('site')
             ->with('site:id,name,tenant_id')
             ->orderBy('site_id')
             ->orderBy('capability')

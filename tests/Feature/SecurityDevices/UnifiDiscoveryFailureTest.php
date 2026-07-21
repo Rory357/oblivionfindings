@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSyncLog;
-use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -27,7 +27,7 @@ class UnifiDiscoveryFailureTest extends TestCase
 
     private Site $site;
 
-    private IntegrationTenantSecret $secret;
+    private IntegrationProviderConnection $secret;
 
     protected function setUp(): void
     {
@@ -38,11 +38,11 @@ class UnifiDiscoveryFailureTest extends TestCase
         $this->admin = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
         $this->site = Site::factory()->create(['tenant_id' => 1]);
-        $this->secret = IntegrationTenantSecret::create([
+        $this->secret = IntegrationProviderConnection::create([
             'tenant_id' => 1,
             'provider' => 'unifi',
             'secret_encrypted' => Crypt::encryptString('RAW-UNIFI-API-TOKEN'),
-            'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
             'last_synced_at' => now()->subDay(),
             'last_error' => null,
             'config' => ['discovered_sites' => [['external_id' => 'previous-site']]],
@@ -60,7 +60,7 @@ class UnifiDiscoveryFailureTest extends TestCase
 
         foreach ($this->entryPoints() as $url) {
             $this->secret->refresh()->update([
-                'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+                'status' => IntegrationProviderConnection::STATUS_CONNECTED,
                 'last_error' => null,
                 'last_synced_at' => $previousSyncedAt,
             ]);
@@ -74,7 +74,7 @@ class UnifiDiscoveryFailureTest extends TestCase
 
             $secret = $this->secret->fresh();
             $log = IntegrationSyncLog::query()->sole();
-            $this->assertSame(IntegrationTenantSecret::STATUS_ERROR, $secret->status);
+            $this->assertSame(IntegrationProviderConnection::STATUS_ERROR, $secret->status);
             $this->assertSame($previousSyncedAt, $secret->last_synced_at?->toDateTimeString());
             $this->assertSame(SafeOperationalData::failureSummary(), $secret->last_error);
             $this->assertSame(IntegrationSyncLog::STATUS_FAILED, $log->status);
@@ -122,7 +122,7 @@ class UnifiDiscoveryFailureTest extends TestCase
 
         foreach ($this->entryPoints() as $url) {
             $this->secret->refresh()->update([
-                'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+                'status' => IntegrationProviderConnection::STATUS_CONNECTED,
                 'last_error' => null,
                 'last_synced_at' => $previousSyncedAt,
                 'config' => ['discovered_sites' => [['external_id' => 'previous-site']]],
@@ -137,7 +137,7 @@ class UnifiDiscoveryFailureTest extends TestCase
 
             $secret = $this->secret->fresh();
             $log = IntegrationSyncLog::query()->sole();
-            $this->assertSame(IntegrationTenantSecret::STATUS_ERROR, $secret->status);
+            $this->assertSame(IntegrationProviderConnection::STATUS_ERROR, $secret->status);
             $this->assertSame($previousSyncedAt, $secret->last_synced_at?->toDateTimeString());
             $this->assertSame(SafeOperationalData::failureSummary(), $secret->last_error);
             $this->assertSame(IntegrationSyncLog::STATUS_FAILED, $log->status);
@@ -228,7 +228,7 @@ class UnifiDiscoveryFailureTest extends TestCase
 
         foreach ($this->entryPoints() as $url) {
             $this->secret->refresh()->update([
-                'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+                'status' => IntegrationProviderConnection::STATUS_CONNECTED,
                 'last_error' => null,
                 'last_synced_at' => $previousSyncedAt,
                 'config' => $previousConfig,
@@ -243,7 +243,7 @@ class UnifiDiscoveryFailureTest extends TestCase
 
             $secret = $this->secret->fresh();
             $log = IntegrationSyncLog::query()->sole();
-            $this->assertSame(IntegrationTenantSecret::STATUS_CONNECTED, $secret->status);
+            $this->assertSame(IntegrationProviderConnection::STATUS_CONNECTED, $secret->status);
             $this->assertNull($secret->last_error);
             $this->assertSame($previousSyncedAt, $secret->last_synced_at?->toDateTimeString());
             $this->assertEquals($previousConfig, $secret->config);
@@ -294,7 +294,7 @@ class UnifiDiscoveryFailureTest extends TestCase
 
         foreach ($this->entryPoints() as $url) {
             $this->secret->refresh()->update([
-                'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+                'status' => IntegrationProviderConnection::STATUS_CONNECTED,
                 'last_error' => null,
                 'config' => $previousConfig,
             ]);
@@ -343,7 +343,7 @@ class UnifiDiscoveryFailureTest extends TestCase
 
         foreach ($this->entryPoints() as $url) {
             $this->secret->refresh()->update([
-                'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+                'status' => IntegrationProviderConnection::STATUS_CONNECTED,
                 'config' => [
                     'discovered_sites' => [['external_id' => 'old-site']],
                     'discovered_hosts' => [['id' => 'RAW-LEGACY-HOST']],
@@ -384,7 +384,7 @@ class UnifiDiscoveryFailureTest extends TestCase
 
         foreach ($this->entryPoints() as $url) {
             $this->secret->refresh()->update([
-                'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+                'status' => IntegrationProviderConnection::STATUS_CONNECTED,
                 'last_error' => SafeOperationalData::failureSummary(),
                 'last_synced_at' => $previousSyncedAt,
                 'config' => ['discovered_sites' => [['external_id' => 'previous-site']]],
@@ -398,7 +398,7 @@ class UnifiDiscoveryFailureTest extends TestCase
 
             $secret = $this->secret->fresh();
             $log = IntegrationSyncLog::query()->sole();
-            $this->assertSame(IntegrationTenantSecret::STATUS_CONNECTED, $secret->status);
+            $this->assertSame(IntegrationProviderConnection::STATUS_CONNECTED, $secret->status);
             $this->assertNull($secret->last_error);
             $this->assertNotSame($previousSyncedAt, $secret->last_synced_at?->toDateTimeString());
             $this->assertSame(IntegrationSyncLog::STATUS_SUCCESS, $log->status);
@@ -425,7 +425,7 @@ class UnifiDiscoveryFailureTest extends TestCase
 
         foreach ($this->entryPoints() as $url) {
             $this->secret->refresh()->update([
-                'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+                'status' => IntegrationProviderConnection::STATUS_CONNECTED,
                 'last_error' => SafeOperationalData::failureSummary(),
                 'last_synced_at' => $previousSyncedAt,
             ]);

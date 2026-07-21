@@ -18,20 +18,17 @@ class DiscoveryOperationsPresenter
     /** @return array<string, mixed> */
     public function present(User $viewer, mixed $requestedTab = null): array
     {
-        $tenantId = $this->access->tenantId($viewer);
         $visibleDeviceIds = $this->access->visibleDevices($viewer)->pluck('devices.id');
         $monitors = $visibleDeviceIds->isEmpty()
             ? collect()
             : Monitor::query()
-                ->forTenant($tenantId)
                 ->whereIn('device_id', $visibleDeviceIds)
                 ->with(['device:id,name', 'collector:id,name,site_id,status,last_seen_at', 'collector.site:id,name'])
                 ->get();
         $collectorIds = $monitors->pluck('collector_id')->filter()->unique();
         $collectors = MonitoringCollector::query()
-            ->forTenant($tenantId)
             ->with('site:id,name')
-            ->when(! $this->access->canViewAllTenantSites($viewer), function (Builder $query) use ($viewer, $collectorIds): void {
+            ->when(! $this->access->canViewAllSites($viewer), function (Builder $query) use ($viewer, $collectorIds): void {
                 $siteIds = $this->access->accessibleSiteIds($viewer);
                 $query->where(function (Builder $visibility) use ($siteIds, $collectorIds): void {
                     if ($siteIds !== []) {

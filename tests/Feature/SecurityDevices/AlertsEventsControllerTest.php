@@ -329,7 +329,7 @@ class AlertsEventsControllerTest extends TestCase
         });
     }
 
-    public function test_events_stats_and_filter_options_are_scoped_to_the_users_tenant(): void
+    public function test_events_stats_and_filter_options_cover_the_single_application_registry_for_all_sites_users(): void
     {
         $this->admin->forceFill(['organization_id' => 42])->save();
 
@@ -356,11 +356,14 @@ class AlertsEventsControllerTest extends TestCase
         $response->assertInertia(function ($page) {
             $props = $page->toArray()['props'];
 
-            $this->assertSame(1, $props['stats']['total24h']);
-            $this->assertSame(1, $props['stats']['critical24h']);
-            $this->assertSame(['Tenant sensor'], collect($props['events']['data'])->pluck('device_name')->all());
-            $this->assertSame(['tenant_event'], $props['filterOptions']['eventTypes']);
-            $this->assertSame(['tenant-source'], $props['filterOptions']['sources']);
+            $this->assertSame(2, $props['stats']['total24h']);
+            $this->assertSame(2, $props['stats']['critical24h']);
+            $this->assertEqualsCanonicalizing(
+                ['Tenant sensor', 'Foreign sensor'],
+                collect($props['events']['data'])->pluck('device_name')->all(),
+            );
+            $this->assertSame(['foreign_event', 'tenant_event'], $props['filterOptions']['eventTypes']);
+            $this->assertSame(['foreign-source', 'tenant-source'], $props['filterOptions']['sources']);
         });
     }
 

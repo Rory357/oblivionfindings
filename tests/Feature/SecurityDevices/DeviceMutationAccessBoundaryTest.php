@@ -229,17 +229,11 @@ class DeviceMutationAccessBoundaryTest extends TestCase
 
         $this->actingAs($this->manager)
             ->get("/security-devices/devices/{$device->id}")
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('activeAssignment', null)
-                ->has('assignmentHistory', 0));
+            ->assertNotFound();
 
         $this->actingAs($this->manager)
             ->getJson("/security-devices/devices/{$device->id}/assignments")
-            ->assertOk()
-            ->assertJsonCount(0, 'data')
-            ->assertJsonPath('meta.total', 0)
-            ->assertJsonMissing(['notes' => 'HIDDEN-ASSIGNMENT-NOTE']);
+            ->assertNotFound();
 
         $this->actingAs($this->manager)
             ->post("/security-devices/devices/{$device->id}/release")
@@ -310,7 +304,7 @@ class DeviceMutationAccessBoundaryTest extends TestCase
         }
     }
 
-    public function test_vehicle_assignment_rejects_a_client_whose_site_belongs_to_another_tenant(): void
+    public function test_legacy_partition_mismatches_do_not_hide_a_vehicle_with_valid_site_access(): void
     {
         $foreignSite = Site::factory()->create(['tenant_id' => 77]);
         $mismatchedClient = Client::factory()->create([
@@ -331,29 +325,30 @@ class DeviceMutationAccessBoundaryTest extends TestCase
             ->get("/security-devices/devices/{$this->allowedDevice->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('assignmentTargets.vehicles', fn ($targets): bool => collect($targets)->doesntContain('id', $vehicle->id)));
-        $this->assertFalse($access->canAccessAssignmentTarget(
+                ->where('assignmentTargets.vehicles', fn ($targets): bool => collect($targets)->contains('id', $vehicle->id)));
+        $this->assertTrue($access->canAccessAssignmentTarget(
             $platformAdmin,
             $this->allowedDevice,
             DeviceAssignment::TARGET_VEHICLE,
             $vehicle->id,
         ));
-        $this->assertFalse($access->assignableVehicles($this->admin)->contains('id', $vehicle->id));
+        $this->assertTrue($access->assignableVehicles($this->admin)->contains('id', $vehicle->id));
 
         $this->actingAs($this->admin)
             ->post("/security-devices/devices/{$this->allowedDevice->id}/assign", [
                 'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
                 'assignable_id' => $vehicle->id,
             ])
-            ->assertNotFound();
-        $this->assertDatabaseMissing('device_assignments', [
+            ->assertRedirect();
+        $this->assertDatabaseHas('device_assignments', [
             'device_id' => $this->allowedDevice->id,
             'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
             'assignable_id' => $vehicle->id,
+            'released_at' => null,
         ]);
     }
 
-    public function test_vehicle_assignment_accepts_consistent_client_site_and_home_site_tenant_evidence(): void
+    public function test_vehicle_assignment_requires_canonical_site_or_client_site_evidence(): void
     {
         $siteLessClient = Client::factory()->create(['organization_id' => 42, 'site_id' => null]);
         $siteClient = Client::factory()->create(['organization_id' => 42, 'site_id' => $this->allowedSite->id]);
@@ -377,30 +372,37 @@ class DeviceMutationAccessBoundaryTest extends TestCase
         $assignableIds = $access->assignableVehicles($this->admin)->pluck('id')->map(fn ($id): int => (int) $id)->all();
 
         foreach ($vehicles as $index => $vehicle) {
-            $this->assertTrue($access->canAccessAssignmentTarget(
-                $platformAdmin,
-                $this->allowedDevice,
-                DeviceAssignment::TARGET_VEHICLE,
-                $vehicle->id,
-            ));
-            $this->assertContains($vehicle->id, $assignableIds);
             if ($index === 0) {
+                $this->assertFalse($access->canAccessAssignmentTarget(
+                    $platformAdmin,
+                    $this->allowedDevice,
+                    DeviceAssignment::TARGET_VEHICLE,
+                    $vehicle->id,
+                ));
                 $this->assertFalse($access->canAccessAssignmentTarget(
                     $this->admin,
                     $this->allowedDevice,
                     DeviceAssignment::TARGET_VEHICLE,
                     $vehicle->id,
                 ));
+                $this->assertNotContains($vehicle->id, $assignableIds);
 
                 continue;
             }
 
+            $this->assertTrue($access->canAccessAssignmentTarget(
+                $platformAdmin,
+                $this->allowedDevice,
+                DeviceAssignment::TARGET_VEHICLE,
+                $vehicle->id,
+            ));
             $this->assertTrue($access->canAccessAssignmentTarget(
                 $this->admin,
                 $this->allowedDevice,
                 DeviceAssignment::TARGET_VEHICLE,
                 $vehicle->id,
             ));
+            $this->assertContains($vehicle->id, $assignableIds);
 
             $this->actingAs($this->admin)
                 ->post("/security-devices/devices/{$this->allowedDevice->id}/assign", [
@@ -471,19 +473,19 @@ class DeviceMutationAccessBoundaryTest extends TestCase
         $this->assertDatabaseHas('device_relationships', ['id' => $relationship->id]);
     }
 
-    public function test_cross_tenant_admin_cannot_update_or_decommission_device(): void
+    public function test_admin_can_manage_unassigned_stock_regardless_of_legacy_partition_value(): void
     {
         $foreign = Device::factory()->create(['tenant_id' => 77, 'name' => 'Foreign device']);
 
         $this->actingAs($this->admin)
             ->patch("/security-devices/devices/{$foreign->id}/fields", ['asset_tag' => 'FORBIDDEN'])
-            ->assertNotFound();
+            ->assertRedirect();
         $this->actingAs($this->admin)
             ->delete("/security-devices/devices/{$foreign->id}")
-            ->assertNotFound();
+            ->assertRedirect();
 
-        $this->assertNull($foreign->fresh()->asset_tag);
-        $this->assertNull($foreign->fresh()->deleted_at);
+        $this->assertSame('FORBIDDEN', $foreign->fresh()->asset_tag);
+        $this->assertNotNull($foreign->fresh()->deleted_at);
     }
 
     public function test_allowed_inline_service_date_update_round_trips(): void

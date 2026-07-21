@@ -25,7 +25,6 @@ class SiteHardwareController extends Controller
         $this->authorize('view', $site);
 
         $user = $request->user();
-        $tenantId = $user?->tenant_id ?? $user?->organization_id ?? $site->tenant_id ?? 1;
         $typePlan = $this->typePlans->summaryFor($site);
         $currentPlan = $this->typePlans->currentEditable($site);
         $devicePins = $currentPlan
@@ -38,7 +37,7 @@ class SiteHardwareController extends Controller
         // Canonical device list (from Security & Devices).
         // This page is a read-only context view; provider config + device CRUD
         // live in the Security & Devices module.
-        $devices = $this->registry->forSite($tenantId, $site->id)
+        $devices = $this->registry->visibleForSite($user, $site->id)
             ->with(['assignments' => fn ($q) => $q->active()])
             ->orderBy('category')
             ->orderBy('name')
@@ -128,13 +127,11 @@ class SiteHardwareController extends Controller
     ) {
         $this->authorize('update', $site);
 
-        $device = Device::query()
-            ->forTenant($site->tenant_id ?? 1)
+        $device = $this->registry->visibleForSite($request->user(), $site->id)
             ->byProvider('unifi')
             ->findOrFail($hardware);
 
-        $tenantId = (int) ($site->tenant_id ?? 1);
-        $currentSiteId = $runtime->resolveSiteId($device, $tenantId);
+        $currentSiteId = $runtime->resolveSiteId($device);
         abort_unless($currentSiteId === null || $currentSiteId === $site->id, 404);
 
         $validated = $request->validate([
@@ -145,14 +142,13 @@ class SiteHardwareController extends Controller
         $roomId = $validated['room_id'] ?? null;
         if ($roomId !== null) {
             $room = SiteRoom::query()
-                ->where('tenant_id', $tenantId)
                 ->where('site_id', $site->id)
-                ->whereHas('site', fn ($siteQuery) => $siteQuery->where('tenant_id', $tenantId))
+                ->whereHas('site')
                 ->find($roomId);
             abort_unless($room, 404);
         }
 
-        $runtime->syncRoomAssignment($device, $room, $request->user()?->id, $tenantId, $site->id);
+        $runtime->syncRoomAssignment($device, $room, $request->user()?->id, $site->id);
 
         return redirect()->back()->with('success', 'Hardware room assignment updated.');
     }
@@ -240,10 +236,9 @@ class SiteHardwareController extends Controller
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        $tenantId = $request->user()?->tenant_id ?? $request->user()?->organization_id ?? $site->tenant_id ?? 1;
-        $deviceModel = Device::query()->forTenant($tenantId)->findOrFail($device);
+        $deviceModel = Device::query()->findOrFail($device);
 
-        $belongsToSite = $this->registry->forSite($tenantId, $site->id)
+        $belongsToSite = $this->registry->visibleForSite($request->user(), $site->id)
             ->whereKey($deviceModel->id)
             ->exists();
         abort_unless($belongsToSite, 404);
@@ -282,6 +277,7 @@ class SiteHardwareController extends Controller
 
         $plan = $this->typePlans->currentEditable($site);
         abort_unless($plan, 404);
+        abort_unless($this->registry->visibleForSite($request->user(), $site->id)->whereKey($device)->exists(), 404);
 
         $plan->pins()
             ->where('kind', SiteTypePlanPin::KIND_DEVICE)

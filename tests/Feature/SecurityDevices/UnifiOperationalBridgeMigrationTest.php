@@ -8,8 +8,9 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Jobs\Integration\PullIntegrationHealthJob;
 use App\Models\AuditLog;
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
-use App\Models\Integration\IntegrationTenantSecret;
+use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\LocationHardware;
 use App\Models\Site;
 use App\Models\SiteRoom;
@@ -35,7 +36,7 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
         // integration_events.canonical_device_id.
         $site = Site::factory()->create(['tenant_id' => 1, 'name' => 'North Hub']);
         $siteConfig = $this->makeSiteConfig($site);
-        $tenantSecret = $this->makeTenantSecret();
+        $providerConnection = $this->makeProviderConnection();
 
         $this->fakeUnifiInventory([
             [
@@ -53,7 +54,7 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
             ],
         ]);
 
-        $result = app(UnifiAdapter::class)->syncDevices($siteConfig, $tenantSecret);
+        $result = app(UnifiAdapter::class)->syncDevices($siteConfig, $providerConnection);
 
         $this->assertTrue($result->isSuccess());
         $this->assertSame(1, $result->processed);
@@ -81,6 +82,42 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
         $this->assertSame(0, LocationHardware::query()->count());
     }
 
+    public function test_unifi_access_events_use_exact_site_credentials_despite_legacy_partition_mismatch(): void
+    {
+        $site = Site::factory()->create(['tenant_id' => 501]);
+        $siteConfig = $this->makeSiteConfig($site);
+        $siteConfig->update(['tenant_id' => 601]);
+        $providerConnection = $this->makeProviderConnection();
+        IntegrationSiteSecret::query()->create([
+            'tenant_id' => 701,
+            'site_id' => $site->id,
+            'provider' => 'unifi',
+            'capability' => 'access_api',
+            'base_url' => 'https://access.example.test',
+            'secret_encrypted' => Crypt::encryptString('site-access-key'),
+            'is_enabled' => true,
+        ]);
+        Http::fake([
+            'https://access.example.test/api/v1/developer/system/logs*' => Http::response([
+                'data' => [[
+                    'id' => 'door-event-1',
+                    'time' => now()->toIso8601String(),
+                    'topic' => 'door_openings',
+                    'door' => ['name' => 'Front door'],
+                    'user' => ['name' => 'Aroha'],
+                    'details' => ['direction' => 'entry'],
+                ]],
+            ]),
+        ]);
+
+        $events = app(UnifiAdapter::class)->pullEvents($siteConfig, $providerConnection);
+
+        $this->assertCount(1, $events);
+        $this->assertSame('door-event-1', $events[0]['source_event_id']);
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://access.example.test/api/v1/developer/system/logs?limit=200&offset=0&topics=door_openings'
+            && $request->hasHeader('Authorization', 'Bearer site-access-key'));
+    }
+
     public function test_unifi_sync_preserves_existing_room_assignment_within_same_site(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1, 'name' => 'South Hub']);
@@ -91,7 +128,7 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
         ]);
 
         $siteConfig = $this->makeSiteConfig($site);
-        $tenantSecret = $this->makeTenantSecret();
+        $providerConnection = $this->makeProviderConnection();
 
         // Pre-existing legacy shadow from before PR P Phase 1. After Phase 1 the
         // sync must NOT write to this row; it is read-only historical data.
@@ -138,7 +175,7 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
             ],
         ]);
 
-        $result = app(UnifiAdapter::class)->syncDevices($siteConfig, $tenantSecret);
+        $result = app(UnifiAdapter::class)->syncDevices($siteConfig, $providerConnection);
 
         $this->assertTrue($result->isSuccess());
         $this->assertSame(0, $result->created);
@@ -162,12 +199,61 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
         $this->assertSame(LocationHardware::STATUS_ONLINE, $shadow->status);
     }
 
+    public function test_unifi_sync_never_relocates_a_matching_device_from_another_site(): void
+    {
+        $sourceSite = Site::factory()->create(['tenant_id' => 1, 'name' => 'Source Site']);
+        $mappedSite = Site::factory()->create(['tenant_id' => 1, 'name' => 'Mapped Site']);
+        $siteConfig = $this->makeSiteConfig($mappedSite);
+        $providerConnection = $this->makeProviderConnection();
+        $device = Device::factory()->itInfrastructure()->create([
+            'tenant_id' => 1,
+            'provider' => 'unifi',
+            'name' => 'Protected source switch',
+            'status' => DeviceStatus::Active,
+            'external_ref' => ['provider_entity_id' => 'cross-site-switch'],
+        ]);
+        $assignment = DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $sourceSite->id,
+            'assigned_at' => now(),
+        ]);
+        $before = [
+            'device' => $device->fresh()->getAttributes(),
+            'assignments' => $device->assignments()->orderBy('id')->get()->map->getAttributes()->all(),
+        ];
+
+        $this->fakeUnifiInventory([[
+            'id' => 'cross-site-switch',
+            'productLine' => 'network',
+            'shortname' => 'usw',
+            'model' => 'USW-Pro-24',
+            'serial' => 'CROSS-SITE-001',
+            'mac' => 'AA:BB:CC:DD:EE:91',
+            'status' => 'offline',
+            'name' => 'Attempted relocation',
+        ]]);
+
+        $result = app(UnifiAdapter::class)->syncDevices($siteConfig, $providerConnection);
+
+        $this->assertSame(1, $result->processed);
+        $this->assertSame(1, $result->errored);
+        $this->assertSame(0, $result->created);
+        $this->assertSame(0, $result->updated);
+        $this->assertSame($before, [
+            'device' => $device->fresh()->getAttributes(),
+            'assignments' => $device->assignments()->orderBy('id')->get()->map->getAttributes()->all(),
+        ]);
+        $this->assertNull($assignment->fresh()->released_at);
+        $this->assertSame(1, Device::query()->where('external_ref->provider_entity_id', 'cross-site-switch')->count());
+    }
+
     public function test_pull_health_job_updates_canonical_device_first_for_unifi(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1, 'name' => 'Health Site']);
         $siteConfig = $this->makeSiteConfig($site);
-        $tenantSecret = $this->makeTenantSecret();
-        $tenantSecret->update(['status' => IntegrationTenantSecret::STATUS_CONNECTED]);
+        $providerConnection = $this->makeProviderConnection();
+        $providerConnection->update(['status' => IntegrationProviderConnection::STATUS_CONNECTED]);
 
         $shadow = LocationHardware::create([
             'tenant_id' => 1,
@@ -212,7 +298,7 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
             ->with('unifi')
             ->andReturn($adapter);
 
-        $job = new PullIntegrationHealthJob(1, 'unifi', $site->id);
+        $job = new PullIntegrationHealthJob('unifi', $site->id);
         $job->handle($registry, app(UnifiOperationalBridgeService::class));
 
         $device->refresh();
@@ -227,6 +313,37 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
         // values.
         $this->assertSame(LocationHardware::STATUS_ONLINE, $shadow->status);
         $this->assertEquals($originalShadowUpdatedAt, $shadow->updated_at);
+    }
+
+    public function test_unifi_health_from_one_site_cannot_update_a_device_at_another_site(): void
+    {
+        $mappedSite = Site::factory()->create(['tenant_id' => 1]);
+        $otherSite = Site::factory()->create(['tenant_id' => 1]);
+        $siteConfig = $this->makeSiteConfig($mappedSite);
+        $device = Device::factory()->itInfrastructure()->create([
+            'tenant_id' => 1,
+            'provider' => 'unifi',
+            'status' => DeviceStatus::Active,
+            'health_status' => HealthStatus::Healthy,
+            'external_ref' => ['provider_entity_id' => 'other-site-ap'],
+        ]);
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $otherSite->id,
+            'assigned_at' => now(),
+        ]);
+
+        $updated = app(UnifiOperationalBridgeService::class)->applyHealthUpdate($siteConfig, [
+            'device_id' => $device->id,
+            'provider_entity_id' => 'other-site-ap',
+            'status' => 'offline',
+            'last_seen_at' => now()->toIso8601String(),
+        ]);
+
+        $this->assertFalse($updated);
+        $this->assertSame(DeviceStatus::Active, $device->fresh()->status);
+        $this->assertSame(HealthStatus::Healthy, $device->fresh()->health_status);
     }
 
     public function test_room_assignment_revalidates_fresh_current_provenance_before_non_null_replacement(): void
@@ -286,7 +403,6 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
                 $staleDevice,
                 $targetRoom,
                 null,
-                1,
                 $localSite->id,
             );
         } catch (NotFoundHttpException $exception) {
@@ -320,14 +436,14 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
         ]);
     }
 
-    private function makeTenantSecret(): IntegrationTenantSecret
+    private function makeProviderConnection(): IntegrationProviderConnection
     {
-        return IntegrationTenantSecret::create([
+        return IntegrationProviderConnection::create([
             'tenant_id' => 1,
             'provider' => 'unifi',
             'secret_encrypted' => Crypt::encryptString('test-unifi-key'),
             'secret_last4' => 'fifi',
-            'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
         ]);
     }
 

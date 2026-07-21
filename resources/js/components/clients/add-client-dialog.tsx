@@ -82,6 +82,7 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 type Option = {
     id: number;
     name: string;
+    site_id?: number | null;
     rooms?: Array<{ id: number; name: string; notes?: string | null }>;
 };
 type ServiceContextOption = { id: number; type?: string | null; name: string };
@@ -1322,7 +1323,11 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
                         <SelectInput
                             value={data.site_id}
                             onChange={(v) =>
-                                setMany({ site_id: v, room_id: '' })
+                                setMany({
+                                    site_id: v,
+                                    room_id: '',
+                                    house_geofence_id: '',
+                                })
                             }
                             placeholder="Choose a site"
                             options={sites.map((s) => ({
@@ -2006,6 +2011,9 @@ function StepAbout({ ctx }: { ctx: StepCtx }) {
 
 function StepCare({ ctx }: { ctx: StepCtx }) {
     const { data, set, keyWorkers, geofences } = ctx;
+    const siteGeofences = geofences.filter(
+        (geofence) => String(geofence.site_id ?? '') === data.site_id,
+    );
     return (
         <div className="animate-in duration-300 fade-in slide-in-from-right-2">
             <StepHead
@@ -2104,7 +2112,7 @@ function StepCare({ ctx }: { ctx: StepCtx }) {
                         value={data.house_geofence_id}
                         onChange={(v) => set('house_geofence_id', v)}
                         placeholder="Link a property boundary"
-                        options={geofences.map((g) => ({
+                        options={siteGeofences.map((g) => ({
                             value: String(g.id),
                             label: g.name,
                         }))}

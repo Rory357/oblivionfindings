@@ -160,7 +160,7 @@ class DeviceControllerTest extends TestCase
         );
     }
 
-    public function test_index_scopes_inventory_stats_saved_views_and_provider_options_to_the_tenant(): void
+    public function test_index_stats_saved_views_and_provider_options_cover_the_single_application_registry(): void
     {
         $this->admin->forceFill(['organization_id' => 42])->save();
         $profile = MonitoringProfile::factory()->create(['tenant_id' => 42]);
@@ -174,10 +174,10 @@ class DeviceControllerTest extends TestCase
             'name' => 'Unmonitored device',
             'provider' => 'tenant-provider',
         ]);
-        Device::factory()->create([
+        $legacyPartitioned = Device::factory()->create([
             'tenant_id' => 77,
-            'name' => 'Foreign device',
-            'provider' => 'foreign-provider',
+            'name' => 'Legacy partitioned device',
+            'provider' => 'legacy-provider',
         ]);
         Monitor::factory()->create([
             'tenant_id' => 42,
@@ -190,13 +190,16 @@ class DeviceControllerTest extends TestCase
         $response = $this->actingAs($this->admin)
             ->get('/security-devices/devices?view=unmonitored');
 
-        $response->assertOk()->assertInertia(function ($page) use ($unmonitored): void {
+        $response->assertOk()->assertInertia(function ($page) use ($legacyPartitioned, $unmonitored): void {
             $props = $page->toArray()['props'];
 
-            $this->assertSame([$unmonitored->id], collect($props['devices']['data'])->pluck('id')->all());
-            $this->assertSame(2, $props['stats']['total']);
-            $this->assertSame(1, collect($props['savedViews'])->firstWhere('key', 'unmonitored')['count']);
-            $this->assertSame(['tenant-provider'], $props['filterOptions']['providers']);
+            $this->assertEqualsCanonicalizing(
+                [$unmonitored->id, $legacyPartitioned->id],
+                collect($props['devices']['data'])->pluck('id')->all(),
+            );
+            $this->assertSame(3, $props['stats']['total']);
+            $this->assertSame(2, collect($props['savedViews'])->firstWhere('key', 'unmonitored')['count']);
+            $this->assertSame(['legacy-provider', 'tenant-provider'], $props['filterOptions']['providers']);
             $this->assertTrue($props['can']['export']);
             $this->assertSame('unmonitored', $props['filters']['view']);
         });
@@ -241,14 +244,14 @@ class DeviceControllerTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_cross_tenant_device_direct_link_is_non_revealing(): void
+    public function test_admin_can_open_unassigned_stock_regardless_of_legacy_partition_value(): void
     {
         $this->admin->forceFill(['organization_id' => 42])->save();
         $foreign = Device::factory()->create(['tenant_id' => 77]);
 
         $this->actingAs($this->admin)
             ->get("/security-devices/devices/{$foreign->id}")
-            ->assertNotFound();
+            ->assertOk();
     }
 
     // ── Show ──────────────────────────────────────────────────────
@@ -359,7 +362,7 @@ class DeviceControllerTest extends TestCase
         $this->assertEquals($this->admin->id, $device->created_by_user_id);
     }
 
-    public function test_store_uses_authenticated_users_organization_scope_for_tenant(): void
+    public function test_store_uses_inert_legacy_storage_value_not_user_organization(): void
     {
         $this->admin->forceFill(['organization_id' => 42])->save();
 
@@ -373,7 +376,7 @@ class DeviceControllerTest extends TestCase
 
         $this->assertDatabaseHas('devices', [
             'name' => 'Scoped Camera',
-            'tenant_id' => 42,
+            'tenant_id' => 1,
             'created_by_user_id' => $this->admin->id,
         ]);
     }

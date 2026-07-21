@@ -150,10 +150,10 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/discovery')
-                ->has('workspace.collectors', 2)
-                ->where('workspace.summary.collectors', 2)
+                ->has('workspace.collectors', 3)
+                ->where('workspace.summary.collectors', 3)
                 ->where('workspace.summary.online_collectors', 1)
-                ->where('workspace.summary.collection_paths_unavailable', 1)
+                ->where('workspace.summary.collection_paths_unavailable', 2)
             );
     }
 
@@ -170,7 +170,7 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
             );
     }
 
-    public function test_sites_destination_is_tenant_scoped_and_does_not_require_sites_module_access(): void
+    public function test_sites_destination_uses_explicit_all_sites_access_and_does_not_require_sites_module_access(): void
     {
         Site::factory()->create(['tenant_id' => 1, 'name' => 'Koru House']);
         Site::factory()->create(['tenant_id' => 2, 'name' => 'Other tenant site']);
@@ -180,12 +180,12 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/sites/index')
-                ->has('sites', 1)
+                ->has('sites', 2)
                 ->where('sites.0.name', 'Koru House')
             );
     }
 
-    public function test_site_technology_detail_is_tenant_scoped(): void
+    public function test_site_technology_detail_ignores_legacy_partition_values_for_all_sites_users(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1, 'name' => 'Koru House']);
         $otherTenantSite = Site::factory()->create(['tenant_id' => 2]);
@@ -202,6 +202,6 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
 
         $this->actingAs($this->admin)
             ->get("/security-devices/sites/{$otherTenantSite->id}")
-            ->assertNotFound();
+            ->assertOk();
     }
 }

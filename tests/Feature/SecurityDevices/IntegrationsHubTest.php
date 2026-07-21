@@ -7,10 +7,10 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Presenters\IntegrationsWorkspacePresenter;
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\Integration\IntegrationSyncLog;
-use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -165,20 +165,20 @@ class IntegrationsHubTest extends TestCase
     public function test_stats_reflect_connected_secrets_per_provider(): void
     {
         // Seed one connected + one errored secret for this tenant.
-        IntegrationTenantSecret::create([
+        IntegrationProviderConnection::create([
             'tenant_id' => $this->admin->tenant_id ?? 1,
             'provider' => 'unifi',
             'secret_encrypted' => 'dummy',
             'secret_last4' => '1234',
-            'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
         ]);
 
-        IntegrationTenantSecret::create([
+        IntegrationProviderConnection::create([
             'tenant_id' => $this->admin->tenant_id ?? 1,
             'provider' => 'queclink',
             'secret_encrypted' => 'dummy',
             'secret_last4' => '5678',
-            'status' => IntegrationTenantSecret::STATUS_ERROR,
+            'status' => IntegrationProviderConnection::STATUS_ERROR,
         ]);
 
         $response = $this->actingAs($this->admin)->get('/security-devices/integrations');
@@ -189,29 +189,29 @@ class IntegrationsHubTest extends TestCase
         );
     }
 
-    public function test_connection_state_device_and_event_rollups_are_scoped_to_the_users_tenant(): void
+    public function test_provider_state_is_application_wide_and_admin_rollups_cover_all_sites(): void
     {
         $this->admin->forceFill(['organization_id' => 42])->save();
 
-        IntegrationTenantSecret::create([
+        IntegrationProviderConnection::create([
             'tenant_id' => 42,
             'provider' => 'unifi',
-            'secret_encrypted' => 'tenant-secret',
+            'secret_encrypted' => 'provider-secret',
             'secret_last4' => '0042',
-            'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
         ]);
-        IntegrationTenantSecret::create([
+        IntegrationProviderConnection::create([
             'tenant_id' => 77,
             'provider' => 'milesight',
-            'secret_encrypted' => 'foreign-secret',
+            'secret_encrypted' => 'second-provider-secret',
             'secret_last4' => '0077',
-            'status' => IntegrationTenantSecret::STATUS_ERROR,
+            'status' => IntegrationProviderConnection::STATUS_ERROR,
         ]);
 
-        $tenantDevice = Device::factory()->create(['tenant_id' => 42, 'provider' => 'unifi']);
-        $foreignDevice = Device::factory()->create(['tenant_id' => 77, 'provider' => 'milesight']);
+        $firstSiteDevice = Device::factory()->create(['tenant_id' => 42, 'provider' => 'unifi']);
+        $secondSiteDevice = Device::factory()->create(['tenant_id' => 77, 'provider' => 'milesight']);
 
-        foreach ([['device' => $tenantDevice, 'source' => 'unifi'], ['device' => $foreignDevice, 'source' => 'milesight']] as $event) {
+        foreach ([['device' => $firstSiteDevice, 'source' => 'unifi'], ['device' => $secondSiteDevice, 'source' => 'milesight']] as $event) {
             DeviceEvent::create([
                 'device_id' => $event['device']->id,
                 'event_type' => 'heartbeat',
@@ -228,11 +228,11 @@ class IntegrationsHubTest extends TestCase
             $providers = collect($props['providers']);
 
             $this->assertSame(1, $props['stats']['providers_connected']);
-            $this->assertSame(0, $props['stats']['providers_errored']);
-            $this->assertSame(1, $props['stats']['imported_devices']);
-            $this->assertSame(1, $props['stats']['events_24h']);
+            $this->assertSame(1, $props['stats']['providers_errored']);
+            $this->assertSame(2, $props['stats']['imported_devices']);
+            $this->assertSame(2, $props['stats']['events_24h']);
             $this->assertSame('connected', $providers->firstWhere('slug', 'unifi')['connection_status']);
-            $this->assertSame('not_configured', $providers->firstWhere('slug', 'milesight')['connection_status']);
+            $this->assertSame('error', $providers->firstWhere('slug', 'milesight')['connection_status']);
         });
     }
 
@@ -240,14 +240,14 @@ class IntegrationsHubTest extends TestCase
     {
         $this->admin->forceFill(['organization_id' => 42])->save();
         $site = Site::factory()->create(['tenant_id' => 42, 'name' => 'Harbour House']);
-        $foreignSite = Site::factory()->create(['tenant_id' => 77, 'name' => 'Foreign House']);
+        $secondSite = Site::factory()->create(['tenant_id' => 77, 'name' => 'Southern House']);
 
-        IntegrationTenantSecret::create([
+        IntegrationProviderConnection::create([
             'tenant_id' => 42,
             'provider' => 'unifi',
-            'secret_encrypted' => 'RAW-TENANT-SECRET',
+            'secret_encrypted' => 'RAW-PROVIDER-SECRET',
             'secret_last4' => '0042',
-            'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
             'last_tested_at' => now()->subDay(),
             'last_synced_at' => now()->subHours(30),
             'rotated_at' => now()->subDays(120),
@@ -266,9 +266,9 @@ class IntegrationsHubTest extends TestCase
         ]);
         IntegrationSiteConfig::create([
             'tenant_id' => 77,
-            'site_id' => $foreignSite->id,
+            'site_id' => $secondSite->id,
             'provider' => 'unifi',
-            'mapped_external_site_id' => 'foreign',
+            'mapped_external_site_id' => 'southern-controller',
             'is_active' => true,
         ]);
         IntegrationSyncLog::create([
@@ -310,8 +310,8 @@ class IntegrationsHubTest extends TestCase
             $unifi = collect($props['providers'])->firstWhere('slug', 'unifi');
             $types = collect($unifi['exceptions'])->pluck('type');
 
-            $this->assertSame(1, $unifi['site_mapping']['total']);
-            $this->assertSame(0, $unifi['site_mapping']['mapped']);
+            $this->assertSame(2, $unifi['site_mapping']['total']);
+            $this->assertSame(1, $unifi['site_mapping']['mapped']);
             $this->assertSame(1, $unifi['site_mapping']['unmapped']);
             $this->assertSame('stale', $unifi['sync']['freshness']);
             $this->assertSame('failed', $unifi['sync']['status']);
@@ -336,12 +336,12 @@ class IntegrationsHubTest extends TestCase
         $manage = Permission::query()->where('key', 'securityDevices.integrations.manage')->firstOrFail();
         $this->admin->permissionOverrides()->attach($manage->id, ['allowed' => false]);
 
-        IntegrationTenantSecret::create([
+        IntegrationProviderConnection::create([
             'tenant_id' => 42,
             'provider' => 'unifi',
             'secret_encrypted' => 'RAW-SECRET',
             'secret_last4' => '1234',
-            'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
         ]);
 
         $this->actingAs($this->admin)
@@ -651,10 +651,10 @@ class IntegrationsHubTest extends TestCase
     public function test_non_unifi_provider_read_models_expose_only_bounded_connection_and_sync_state(): void
     {
         foreach (['milesight'] as $provider) {
-            IntegrationTenantSecret::create([
+            IntegrationProviderConnection::create([
                 'tenant_id' => 1, 'provider' => $provider,
                 'secret_encrypted' => 'RAW-'.$provider.'-SECRET', 'secret_last4' => '0042',
-                'status' => IntegrationTenantSecret::STATUS_ERROR,
+                'status' => IntegrationProviderConnection::STATUS_ERROR,
                 'last_error' => 'https://RAW-'.$provider.'-ERROR.test/?token=secret',
                 'config' => ['base_url' => 'https://RAW-'.$provider.'-HOST.test', 'token' => 'RAW-CONFIG'],
             ]);
@@ -667,7 +667,7 @@ class IntegrationsHubTest extends TestCase
             $response = $this->actingAs($this->admin)->get("/security-devices/integrations/{$provider}");
             $response->assertOk()->assertInertia(function ($page): void {
                 $props = $page->toArray()['props'];
-                $this->assertTrue($props['tenantSecret']['endpoint_configured']);
+                $this->assertTrue($props['providerConnection']['endpoint_configured']);
                 $this->assertSame('provider_failure', $props['syncLogs'][0]['failure_category']);
                 $encoded = json_encode($props, JSON_THROW_ON_ERROR);
                 foreach (['RAW-', 'base_url', 'last_error', 'error_message'] as $sentinel) {

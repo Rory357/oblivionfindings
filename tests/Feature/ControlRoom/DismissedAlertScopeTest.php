@@ -107,7 +107,7 @@ class DismissedAlertScopeTest extends TestCase
             'status' => ControlRoomAlert::STATUS_DISMISSED,
         ]);
 
-        $context = app(IntegrationContextProvider::class)->getContext(1, $site->id);
+        $context = app(IntegrationContextProvider::class)->getContext($site->id);
 
         $this->assertSame(1, $context['site_summary']['open_alerts']);
         $this->assertSame(1, $context['site_summary']['critical_alerts']);

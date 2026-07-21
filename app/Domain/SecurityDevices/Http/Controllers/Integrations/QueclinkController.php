@@ -2,12 +2,14 @@
 
 namespace App\Domain\SecurityDevices\Http\Controllers\Integrations;
 
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\Integration\Integration;
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSyncLog;
-use App\Models\Integration\IntegrationTenantSecret;
 use App\Services\Integration\Adapters\QueclinkAdapter;
 use App\Services\Integration\IntegrationAdapterRegistry;
+use App\Support\LegacyStorageContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Inertia\Inertia;
@@ -23,23 +25,25 @@ class QueclinkController extends Controller
 {
     private const PROVIDER = QueclinkAdapter::PROVIDER_SLUG;
 
+    public function __construct(private readonly SecurityDevicesAccessService $access) {}
+
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($this->userCanManage($user), 403);
 
-        $tenantId = $this->resolveTenantId($user);
-
-        $tenantSecret = IntegrationTenantSecret::query()
-            ->forTenant($tenantId)
-            ->where('provider', self::PROVIDER)
+        $providerConnection = IntegrationProviderConnection::query()
+            ->forProvider(self::PROVIDER)
             ->first();
 
-        $config = is_array($tenantSecret?->config) ? $tenantSecret->config : [];
+        $config = is_array($providerConnection?->config) ? $providerConnection->config : [];
+        $siteIds = $this->access->accessibleSiteIds($user);
 
         $syncLogs = IntegrationSyncLog::query()
-            ->forTenant($tenantId)
             ->forProvider(self::PROVIDER)
+            ->where(function ($query) use ($siteIds): void {
+                $query->whereNull('site_id')->orWhereIn('site_id', $siteIds);
+            })
             ->orderByDesc('created_at')
             ->limit(10)
             ->get()
@@ -59,11 +63,11 @@ class QueclinkController extends Controller
             ->all();
 
         return Inertia::render('security-devices/integrations/queclink', [
-            'tenantSecret' => $tenantSecret ? [
-                'status' => $tenantSecret->status,
-                'secret_last4' => $tenantSecret->secret_last4,
-                'last_tested_at' => $tenantSecret->last_tested_at?->toDateTimeString(),
-                'last_synced_at' => $tenantSecret->last_synced_at?->toDateTimeString(),
+            'providerConnection' => $providerConnection ? [
+                'status' => $providerConnection->status,
+                'secret_last4' => $providerConnection->secret_last4,
+                'last_tested_at' => $providerConnection->last_tested_at?->toDateTimeString(),
+                'last_synced_at' => $providerConnection->last_synced_at?->toDateTimeString(),
                 'endpoint_configured' => filled($config['base_url'] ?? null),
             ] : null,
             'syncLogs' => $syncLogs,
@@ -83,18 +87,17 @@ class QueclinkController extends Controller
             'base_url' => ['nullable', 'string', 'max:255', 'url'],
         ]);
 
-        $tenantId = $this->resolveTenantId($user);
         $baseUrl = trim((string) $request->input('base_url', '')) ?: null;
 
-        IntegrationTenantSecret::updateOrCreate(
+        IntegrationProviderConnection::updateOrCreate(
             [
-                'tenant_id' => $tenantId,
                 'provider' => self::PROVIDER,
             ],
             [
+                'tenant_id' => LegacyStorageContext::id(),
                 'secret_encrypted' => Crypt::encryptString($request->string('api_key')->toString()),
                 'secret_last4' => substr($request->string('api_key')->toString(), -4),
-                'status' => IntegrationTenantSecret::STATUS_DISCONNECTED,
+                'status' => IntegrationProviderConnection::STATUS_DISCONNECTED,
                 'last_error' => null,
                 'config' => $baseUrl ? ['base_url' => $baseUrl] : [],
                 'created_by' => $user->id,
@@ -103,10 +106,10 @@ class QueclinkController extends Controller
 
         Integration::updateOrCreate(
             [
-                'tenant_id' => $tenantId,
                 'provider' => self::PROVIDER,
             ],
             [
+                'tenant_id' => LegacyStorageContext::id(),
                 'display_name' => 'Queclink',
                 'status' => Integration::STATUS_INACTIVE,
                 'last_error' => null,
@@ -121,11 +124,8 @@ class QueclinkController extends Controller
         $user = $request->user();
         abort_unless($this->userCanManage($user), 403);
 
-        $tenantId = $this->resolveTenantId($user);
-
-        $secret = IntegrationTenantSecret::query()
-            ->forTenant($tenantId)
-            ->where('provider', self::PROVIDER)
+        $connection = IntegrationProviderConnection::query()
+            ->forProvider(self::PROVIDER)
             ->firstOrFail();
 
         if (! $registry->has(self::PROVIDER)) {
@@ -133,21 +133,21 @@ class QueclinkController extends Controller
         }
 
         $adapter = $registry->resolve(self::PROVIDER);
-        $ok = $adapter->testConnection($secret);
+        $ok = $adapter->testConnection($connection);
 
         if ($ok) {
-            $secret->update([
-                'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+            $connection->update([
+                'status' => IntegrationProviderConnection::STATUS_CONNECTED,
                 'last_tested_at' => now(),
                 'last_error' => null,
             ]);
 
             Integration::updateOrCreate(
                 [
-                    'tenant_id' => $tenantId,
                     'provider' => self::PROVIDER,
                 ],
                 [
+                    'tenant_id' => LegacyStorageContext::id(),
                     'display_name' => 'Queclink',
                     'status' => Integration::STATUS_ACTIVE,
                     'last_tested_at' => now(),
@@ -158,18 +158,18 @@ class QueclinkController extends Controller
             return redirect()->back()->with('success', 'Queclink connection test succeeded.');
         }
 
-        $secret->update([
-            'status' => IntegrationTenantSecret::STATUS_ERROR,
+        $connection->update([
+            'status' => IntegrationProviderConnection::STATUS_ERROR,
             'last_tested_at' => now(),
             'last_error' => 'Queclink rejected the key or the server was unreachable.',
         ]);
 
         Integration::updateOrCreate(
             [
-                'tenant_id' => $tenantId,
                 'provider' => self::PROVIDER,
             ],
             [
+                'tenant_id' => LegacyStorageContext::id(),
                 'display_name' => 'Queclink',
                 'status' => Integration::STATUS_ERROR,
                 'last_tested_at' => now(),
@@ -189,18 +189,15 @@ class QueclinkController extends Controller
             'api_key' => ['required', 'string'],
         ]);
 
-        $tenantId = $this->resolveTenantId($user);
-
-        $secret = IntegrationTenantSecret::query()
-            ->forTenant($tenantId)
-            ->where('provider', self::PROVIDER)
+        $connection = IntegrationProviderConnection::query()
+            ->forProvider(self::PROVIDER)
             ->firstOrFail();
 
-        $secret->update([
+        $connection->update([
             'secret_encrypted' => Crypt::encryptString($request->string('api_key')->toString()),
             'secret_last4' => substr($request->string('api_key')->toString(), -4),
             'rotated_at' => now(),
-            'status' => IntegrationTenantSecret::STATUS_DISCONNECTED,
+            'status' => IntegrationProviderConnection::STATUS_DISCONNECTED,
             'last_error' => null,
         ]);
 
@@ -212,15 +209,11 @@ class QueclinkController extends Controller
         $user = $request->user();
         abort_unless($this->userCanManage($user), 403);
 
-        $tenantId = $this->resolveTenantId($user);
-
-        IntegrationTenantSecret::query()
-            ->forTenant($tenantId)
-            ->where('provider', self::PROVIDER)
+        IntegrationProviderConnection::query()
+            ->forProvider(self::PROVIDER)
             ->delete();
 
         Integration::query()
-            ->where('tenant_id', $tenantId)
             ->where('provider', self::PROVIDER)
             ->update([
                 'status' => Integration::STATUS_INACTIVE,
@@ -232,10 +225,5 @@ class QueclinkController extends Controller
     private function userCanManage($user): bool
     {
         return $user && $user->canDo('securityDevices.integrations.manage');
-    }
-
-    private function resolveTenantId($user): int
-    {
-        return (int) ($user->tenant_id ?? $user->organization_id ?? 1);
     }
 }

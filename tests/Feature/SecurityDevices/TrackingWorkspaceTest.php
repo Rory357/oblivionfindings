@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -79,9 +80,9 @@ class TrackingWorkspaceTest extends TestCase
                     'fleet' => 1,
                     'assets' => 2,
                 ], $tracking['overview']['inventory']);
-                $this->assertSame(1, $tracking['overview']['attention']['unassigned']);
+                $this->assertSame(2, $tracking['overview']['attention']['unassigned']);
                 $this->assertSame(5, $tracking['activeTab']['inventoryTotal']);
-                $this->assertNotContains(
+                $this->assertContains(
                     $foreign->id,
                     collect($tracking['activeTab']['devices'])->pluck('id')->all(),
                 );
@@ -134,6 +135,7 @@ class TrackingWorkspaceTest extends TestCase
         $this->assign($device, DeviceAssignment::TARGET_CLIENT, $client->id, $consent->id);
 
         $viewer = $this->viewerWithRole('provider_manager');
+        $this->assignViewerToSite($viewer, $site);
         $this->actingAs($viewer)
             ->get('/security-devices/tracking?tab=personal-safety')
             ->assertOk()
@@ -239,11 +241,13 @@ class TrackingWorkspaceTest extends TestCase
         $viewer = $this->viewerWithPermissions([
             'securityDevices.viewAny',
             'securityDevices.devices.view',
+            'securityDevices.devices.viewAllSites',
             'hazards.view',
             'healthSafety.viewAllSites',
             'staff.viewAny',
             'assets.telemetry.view',
         ]);
+        $this->assignViewerToSite($worker, $site);
 
         $technicalViewer = $this->viewerWithPermissions([
             'securityDevices.viewAny',
@@ -310,6 +314,7 @@ class TrackingWorkspaceTest extends TestCase
         $this->link($assetDevice, $asset);
 
         $viewer = $this->viewerWithRole('provider_manager');
+        $this->assignViewerToSite($viewer, $site);
         $this->actingAs($viewer)
             ->get('/security-devices/tracking?tab=fleet')
             ->assertOk()
@@ -473,6 +478,16 @@ class TrackingWorkspaceTest extends TestCase
     private function site(string $name): Site
     {
         return Site::factory()->create(['tenant_id' => 42, 'name' => $name, 'is_active' => true]);
+    }
+
+    private function assignViewerToSite(User $viewer, Site $site): void
+    {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
     }
 
     private function trackingDevice(string $name, array $attributes = []): Device

@@ -12,10 +12,8 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\FleetTelemetryEvent;
 use App\Models\LoneWorkerSession;
-use App\Models\Site;
 use App\Models\User;
 use App\Services\ConsentValidationService;
-use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -28,11 +26,8 @@ class TrackingWorkspacePresenter
 
     private const LIVE_LONE_WORKER_STATES = ['active', 'overdue', 'emergency'];
 
-    private const HEALTH_SAFETY_SITE_BYPASS = ['healthSafety.viewAllSites'];
-
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
-        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     public function present(User $viewer, Builder $trackingScope, array $activeTab): array
@@ -45,9 +40,9 @@ class TrackingWorkspacePresenter
                     ->active()
                     ->with('consent.consentType'),
                 'activeAssetLinks.asset' => fn ($query) => $query->with([
-                    'site:id,name,tenant_id',
-                    'homeSite:id,name,tenant_id',
-                    'client:id,organization_id,site_id,first_name,preferred_name',
+                    'site:id,name',
+                    'homeSite:id,name',
+                    'client:id,site_id,first_name,preferred_name',
                     'categoryRef:id,slug',
                     'fleetState',
                 ]),
@@ -171,22 +166,16 @@ class TrackingWorkspacePresenter
 
         $clients = $clientIds->isEmpty()
             ? collect()
-            : Client::query()
-                ->where('organization_id', $this->access->tenantId($viewer))
-                ->whereKey($clientIds)
-                ->get(['id', 'organization_id', 'site_id', 'first_name', 'preferred_name'])
-                ->filter(fn (Client $client): bool => Gate::forUser($viewer)->allows('view', $client))
+            : $this->access->assignableClients($viewer)
+                ->whereIn('id', $clientIds)
                 ->keyBy('id');
 
         $staff = collect();
         if ($permissions['personalSafety'] && $viewer->canDo('hazards.view') && $staffIds->isNotEmpty()) {
-            $staffQuery = User::query()->whereKey($staffIds)->whereNotNull('approved_at');
-            $this->siteAccess->applyStaffScope(
-                $staffQuery,
-                $viewer,
-                self::HEALTH_SAFETY_SITE_BYPASS,
-            );
-            $staff = $staffQuery->get(['id', 'organization_id', 'name'])->keyBy('id');
+            $staff = $this->access->assignableStaff($viewer)
+                ->whereKey($staffIds)
+                ->get(['id', 'name'])
+                ->keyBy('id');
         }
 
         $assets = $assetIds->isEmpty()
@@ -194,9 +183,9 @@ class TrackingWorkspacePresenter
             : Asset::query()
                 ->whereKey($assetIds)
                 ->with([
-                    'site:id,name,tenant_id',
-                    'homeSite:id,name,tenant_id',
-                    'client:id,organization_id,site_id,first_name,preferred_name',
+                    'site:id,name',
+                    'homeSite:id,name',
+                    'client:id,site_id,first_name,preferred_name',
                     'categoryRef:id,slug',
                     'fleetState',
                 ])
@@ -209,14 +198,14 @@ class TrackingWorkspacePresenter
                 ->whereIn('user_id', $staff->keys())
                 ->whereIn('status', self::LIVE_LONE_WORKER_STATES)
                 ->with([
-                    'user:id,organization_id,name',
-                    'site:id,name,tenant_id',
-                    'client:id,organization_id,site_id',
-                    'client.site:id,tenant_id',
-                    'shift:id,organization_id,user_id,client_id,site_id',
-                    'shift.site:id,tenant_id',
-                    'shift.client:id,organization_id,site_id',
-                    'shift.client.site:id,tenant_id',
+                    'user:id,name',
+                    'site:id,name',
+                    'client:id,site_id',
+                    'client.site:id',
+                    'shift:id,user_id,client_id,site_id',
+                    'shift.site:id',
+                    'shift.client:id,site_id',
+                    'shift.client.site:id',
                 ])
                 ->latest('started_at')
                 ->get()
@@ -229,19 +218,12 @@ class TrackingWorkspacePresenter
 
     private function sessionAccessible(User $viewer, LoneWorkerSession $session): bool
     {
-        $tenantId = $this->access->tenantId($viewer);
-        if ((int) ($session->user?->organization_id ?? 0) !== $tenantId) {
-            return false;
-        }
-
-        if ($session->client
-            && (int) $session->client->organization_id !== $tenantId) {
+        if ($session->client && Gate::forUser($viewer)->denies('view', $session->client)) {
             return false;
         }
 
         if ($session->shift) {
-            if ((int) $session->shift->organization_id !== $tenantId
-                || ($session->shift->user_id && (int) $session->shift->user_id !== (int) $session->user_id)
+            if (($session->shift->user_id && (int) $session->shift->user_id !== (int) $session->user_id)
                 || ($session->client_id && $session->shift->client_id && (int) $session->shift->client_id !== (int) $session->client_id)) {
                 return false;
             }
@@ -260,16 +242,7 @@ class TrackingWorkspacePresenter
             return false;
         }
 
-        $siteTenant = Site::query()->whereKey($authoritativeSiteId)->value('tenant_id');
-        if ((int) $siteTenant !== $tenantId) {
-            return false;
-        }
-
-        return in_array(
-            $authoritativeSiteId,
-            $this->siteAccess->accessibleSiteIds($viewer, self::HEALTH_SAFETY_SITE_BYPASS),
-            true,
-        );
+        return in_array($authoritativeSiteId, $this->access->accessibleSiteIds($viewer), true);
     }
 
     private function mapDevice(
@@ -726,13 +699,13 @@ class TrackingWorkspacePresenter
 
         return AssetGeofence::query()
             ->whereIn('asset_id', $deviceByAsset->keys())
-            ->with(['asset:id,name,category,asset_tag,registration_number,client_id', 'site:id,name,tenant_id'])
+            ->with(['asset:id,name,category,asset_tag,registration_number,client_id', 'site:id,name'])
             ->orderBy('name')
             ->limit(100)
             ->get()
             ->filter(function (AssetGeofence $geofence) use ($viewer, $deviceByAsset): bool {
                 if ($geofence->site
-                    && (int) $geofence->site->tenant_id !== $this->access->tenantId($viewer)) {
+                    && ! in_array((int) $geofence->site->id, $this->access->accessibleSiteIds($viewer), true)) {
                     return false;
                 }
 

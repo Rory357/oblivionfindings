@@ -24,6 +24,8 @@ class SecurityDevicesPermissionsSeeder extends Seeder
         $permissions = [
             ['key' => 'securityDevices.viewAny', 'description' => 'Access the Security & Devices module', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.devices.view', 'description' => 'View device inventory', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.devices.viewAllSites', 'description' => 'View devices across all operational Sites', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.devices.viewUnassigned', 'description' => 'View unassigned device stock', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.devices.create', 'description' => 'Register new devices', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.devices.update', 'description' => 'Edit device records', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.devices.delete', 'description' => 'Decommission or delete devices', 'group' => 'security_devices', 'module' => 'Security & Devices'],
@@ -66,6 +68,7 @@ class SecurityDevicesPermissionsSeeder extends Seeder
         $this->attachToRole('facilities_manager', [
             'securityDevices.viewAny',
             'securityDevices.devices.view',
+            'securityDevices.devices.viewUnassigned',
             'securityDevices.devices.create',
             'securityDevices.devices.update',
             'securityDevices.devices.assign',
@@ -82,6 +85,14 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             'securityDevices.events.view',
             'securityDevices.maintenance.view',
             'securityDevices.reports.view',
+        ]);
+
+        $this->attachToRole('fleet_manager', [
+            'securityDevices.viewAny',
+            'securityDevices.devices.view',
+            'securityDevices.devices.viewUnassigned',
+            'securityDevices.devices.assign',
+            'securityDevices.events.view',
         ]);
 
         $this->attachToRole('coordinator', [

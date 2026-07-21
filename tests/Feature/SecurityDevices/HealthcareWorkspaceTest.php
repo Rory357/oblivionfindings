@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -59,15 +60,15 @@ class HealthcareWorkspaceTest extends TestCase
                 $healthcare = $page->toArray()['props']['healthcareWorkspace'];
 
                 $this->assertSame([
-                    'total' => 3,
+                    'total' => 4,
                     'client_assigned' => 1,
                     'shared_site' => 1,
-                    'unassigned' => 1,
+                    'unassigned' => 2,
                 ], $healthcare['overview']['inventory']);
                 $this->assertSame(1, $healthcare['overview']['attention']['offline']);
-                $this->assertSame(2, $healthcare['overview']['attention']['data_flow_issues']);
-                $this->assertSame(3, $healthcare['activeTab']['inventoryTotal']);
-                $this->assertNotContains(
+                $this->assertSame(3, $healthcare['overview']['attention']['data_flow_issues']);
+                $this->assertSame(4, $healthcare['activeTab']['inventoryTotal']);
+                $this->assertContains(
                     $foreignDevice->id,
                     collect($healthcare['activeTab']['devices'])->pluck('id')->all(),
                 );
@@ -80,6 +81,7 @@ class HealthcareWorkspaceTest extends TestCase
 
     public function test_client_devices_expose_minimum_identity_and_allowlisted_technical_support_context_only(): void
     {
+        $site = Site::factory()->create(['tenant_id' => 42]);
         $keyWorker = User::factory()->create([
             'organization_id' => 42,
             'approved_at' => now(),
@@ -92,6 +94,7 @@ class HealthcareWorkspaceTest extends TestCase
             'last_name' => 'Taonga',
             'nhi_number' => 'ZZZ9999',
             'key_worker_id' => $keyWorker->id,
+            'site_id' => $site->id,
         ]);
         $device = $this->healthcareDevice('Mere wearable', [
             'battery_level' => 72,
@@ -212,12 +215,21 @@ class HealthcareWorkspaceTest extends TestCase
     public function test_assigned_support_worker_sees_only_their_clients_healthcare_devices_and_direct_urls(): void
     {
         $viewer = $this->viewerWithRole('support_worker');
+        $site = Site::factory()->create(['tenant_id' => 42]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
         $assignedClient = Client::factory()->create([
             'organization_id' => 42,
+            'site_id' => $site->id,
             'preferred_name' => 'Assigned person',
         ]);
         $otherClient = Client::factory()->create([
             'organization_id' => 42,
+            'site_id' => $site->id,
             'preferred_name' => 'Other person',
         ]);
         $foreignClient = Client::factory()->create([

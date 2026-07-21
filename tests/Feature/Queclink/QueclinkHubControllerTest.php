@@ -17,6 +17,7 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\ConsentTypeVersion;
+use App\Models\Permission;
 use App\Models\Queclink\QueclinkAuditEvent;
 use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkPendingCommand;
@@ -215,17 +216,29 @@ class QueclinkHubControllerTest extends TestCase
                 ->where('devices.search', 'NeedleModel'));
     }
 
-    public function test_hub_and_frames_gets_are_tenant_scoped_and_redact_raw_provider_data(): void
+    public function test_hub_and_frames_follow_canonical_site_access_and_redact_raw_provider_data(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
+        $allowedSite = Site::factory()->create(['tenant_id' => 42]);
+        $hiddenSite = Site::factory()->create(['tenant_id' => 77]);
+        $viewer = $this->siteRestrictedViewer($allowedSite);
+        $allowedCanonicalDevice = Device::factory()->tracking()->create(['tenant_id' => 77, 'provider' => 'queclink']);
+        $hiddenCanonicalDevice = Device::factory()->tracking()->create(['tenant_id' => 42, 'provider' => 'queclink']);
+        foreach ([[$allowedCanonicalDevice, $allowedSite], [$hiddenCanonicalDevice, $hiddenSite]] as [$device, $site]) {
+            DeviceAssignment::create([
+                'device_id' => $device->id,
+                'assignable_type' => DeviceAssignment::TARGET_SITE,
+                'assignable_id' => $site->id,
+                'assigned_at' => now(),
+            ]);
+        }
         $own = QueclinkDevice::create([
-            'tenant_id' => 42, 'imei' => 'RAW-OWN-IMEI',
+            'tenant_id' => 77, 'device_id' => $allowedCanonicalDevice->id, 'imei' => 'RAW-OWN-IMEI',
             'status' => QueclinkDevice::STATUS_PAIRED,
             'connection_state' => QueclinkDevice::CONN_CONNECTED,
             'remote_address' => 'RAW-OWN-REMOTE',
         ]);
         $foreign = QueclinkDevice::create([
-            'tenant_id' => 77, 'imei' => 'RAW-FOREIGN-IMEI',
+            'tenant_id' => 42, 'device_id' => $hiddenCanonicalDevice->id, 'imei' => 'RAW-FOREIGN-IMEI',
             'status' => QueclinkDevice::STATUS_PAIRED,
             'connection_state' => QueclinkDevice::CONN_CONNECTED,
             'remote_address' => 'RAW-FOREIGN-REMOTE',
@@ -249,16 +262,15 @@ class QueclinkHubControllerTest extends TestCase
             'tenant_id' => 42, 'name' => 'Safe label', 'slug' => 'safe-label',
             'payload' => ['server' => ['host' => 'RAW-PRESET-HOST']], 'is_system' => false,
         ]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
-        Asset::factory()->create(['site_id' => $foreignSite->id, 'category' => 'vehicle', 'name' => 'RAW-FOREIGN-VEHICLE']);
+        Asset::factory()->create(['site_id' => $hiddenSite->id, 'category' => 'vehicle', 'name' => 'RAW-FOREIGN-VEHICLE']);
         User::factory()->create(['organization_id' => 77, 'approved_at' => now(), 'name' => 'RAW-FOREIGN-STAFF']);
-        Client::factory()->create(['organization_id' => 77, 'site_id' => $foreignSite->id, 'first_name' => 'RAW-FOREIGN-CLIENT']);
+        Client::factory()->create(['organization_id' => 77, 'site_id' => $hiddenSite->id, 'first_name' => 'RAW-FOREIGN-CLIENT']);
         QueclinkPreset::create([
-            'tenant_id' => 77, 'name' => 'RAW-FOREIGN-PRESET', 'slug' => 'foreign',
+            'tenant_id' => 77, 'name' => 'Second safe label', 'slug' => 'second-safe-label',
             'payload' => ['server' => ['host' => 'RAW-FOREIGN-HOST']], 'is_system' => false,
         ]);
 
-        $response = $this->actingAs($this->admin)->get('/security-devices/integrations/queclink');
+        $response = $this->actingAs($viewer)->get('/security-devices/integrations/queclink');
         $response->assertOk()->assertInertia(function ($page): void {
             $props = $page->toArray()['props'];
             $this->assertSame(1, $props['devices']['total']);
@@ -278,17 +290,18 @@ class QueclinkHubControllerTest extends TestCase
             }
         });
 
-        $this->actingAs($this->admin)->get('/security-devices/integrations/queclink/frames')
+        $this->actingAs($viewer)->get('/security-devices/integrations/queclink/frames')
             ->assertOk()->assertJsonCount(1, 'frames')
             ->assertJsonMissingPath('frames.0.raw_frame')
             ->assertJsonMissingPath('frames.0.imei')
             ->assertJsonMissingPath('frames.0.parse_error');
     }
 
-    public function test_cross_tenant_device_command_preset_and_bulk_mutation_families_are_denied(): void
+    public function test_device_command_and_bulk_mutations_follow_canonical_site_access(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
         $ownSite = Site::factory()->create(['tenant_id' => 42]);
+        $hiddenSite = Site::factory()->create(['tenant_id' => 77]);
+        $viewer = $this->siteRestrictedViewer($ownSite);
         $ownVehicle = Asset::factory()->create(['site_id' => $ownSite->id, 'category' => 'vehicle']);
         $foreignPending = QueclinkDevice::create([
             'tenant_id' => 77, 'imei' => 'FOREIGN-PENDING',
@@ -306,13 +319,23 @@ class QueclinkHubControllerTest extends TestCase
             'tenant_id' => 77, 'imei' => 'FOREIGN-PAIRED',
             'status' => QueclinkDevice::STATUS_PAIRED, 'model_hint' => 'GL30MEU',
         ]);
+        foreach ([$foreignPending, $foreignReject, $foreignRelease, $foreignPaired] as $tracker) {
+            $canonical = Device::factory()->tracking()->create(['tenant_id' => 42, 'provider' => 'queclink']);
+            DeviceAssignment::create([
+                'device_id' => $canonical->id,
+                'assignable_type' => DeviceAssignment::TARGET_SITE,
+                'assignable_id' => $hiddenSite->id,
+                'assigned_at' => now(),
+            ]);
+            $tracker->update(['device_id' => $canonical->id]);
+        }
         $systemPreset = QueclinkPreset::create([
             'tenant_id' => null, 'name' => 'System safe', 'slug' => 'system-safe',
             'is_system' => true, 'target_category' => 'personal_tracker',
             'payload' => ['dog' => ['mode' => 1, 'reboot_interval' => 1, 'reboot_time' => '0130', 'report_before_reboot' => 1, 'unit' => 0, 'send_failure_timeout' => 60]],
         ]);
-        $foreignPreset = QueclinkPreset::create([
-            'tenant_id' => 77, 'name' => 'Foreign preset', 'slug' => 'foreign-preset',
+        $applicationPreset = QueclinkPreset::create([
+            'tenant_id' => 77, 'name' => 'Application preset', 'slug' => 'application-preset',
             'is_system' => false, 'target_category' => 'personal_tracker',
             'payload' => ['dog' => ['mode' => 1, 'reboot_interval' => 1, 'reboot_time' => '0130', 'report_before_reboot' => 1, 'unit' => 0, 'send_failure_timeout' => 60]],
         ]);
@@ -331,7 +354,7 @@ class QueclinkHubControllerTest extends TestCase
             ["/security-devices/integrations/queclink/devices/{$foreignPaired->id}/presets/{$systemPreset->id}/apply", []],
         ];
         foreach ($requests as [$url, $payload]) {
-            $this->actingAs($this->admin)->post($url, $payload)->assertNotFound();
+            $this->actingAs($viewer)->post($url, $payload)->assertNotFound();
         }
 
         $queued = QueclinkPendingCommand::create([
@@ -346,41 +369,48 @@ class QueclinkHubControllerTest extends TestCase
             'raw_command' => 'AT+GTRTO=gl30,1,,,,,,0002$', 'serial_number' => '0002',
             'status' => QueclinkPendingCommand::STATUS_CANCELLED, 'expires_at' => now()->addMinute(),
         ]);
-        $this->actingAs($this->admin)->post("/security-devices/integrations/queclink/commands/{$queued->id}/cancel")->assertNotFound();
-        $this->actingAs($this->admin)->post("/security-devices/integrations/queclink/commands/{$cancelled->id}/retry")->assertNotFound();
+        $this->actingAs($viewer)->post("/security-devices/integrations/queclink/commands/{$queued->id}/cancel")->assertNotFound();
+        $this->actingAs($viewer)->post("/security-devices/integrations/queclink/commands/{$cancelled->id}/retry")->assertNotFound();
 
+        $ownCanonical = Device::factory()->tracking()->create(['tenant_id' => 77, 'provider' => 'queclink']);
+        DeviceAssignment::create([
+            'device_id' => $ownCanonical->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $ownSite->id,
+            'assigned_at' => now(),
+        ]);
         $ownDevice = QueclinkDevice::create([
-            'tenant_id' => 42, 'imei' => 'OWN-PAIRED',
+            'tenant_id' => 42, 'device_id' => $ownCanonical->id, 'imei' => 'OWN-PAIRED',
             'status' => QueclinkDevice::STATUS_PAIRED, 'model_hint' => 'GL30MEU',
         ]);
         $before = QueclinkPendingCommand::query()->count();
-        $this->actingAs($this->admin)
-            ->post("/security-devices/integrations/queclink/devices/{$ownDevice->id}/presets/{$foreignPreset->id}/apply")
-            ->assertNotFound();
-        $this->actingAs($this->admin)
-            ->delete("/security-devices/integrations/queclink/presets/{$foreignPreset->id}")
-            ->assertNotFound();
-        $this->assertDatabaseHas('queclink_presets', ['id' => $foreignPreset->id, 'tenant_id' => 77]);
-        $this->actingAs($this->admin)->post('/security-devices/integrations/queclink/bulk', [
+        $this->actingAs($viewer)
+            ->post("/security-devices/integrations/queclink/devices/{$ownDevice->id}/presets/{$applicationPreset->id}/apply")
+            ->assertRedirect();
+        $this->actingAs($viewer)->post('/security-devices/integrations/queclink/bulk', [
             'device_ids' => [$ownDevice->id],
             'action' => 'apply_preset',
-            'preset_id' => $foreignPreset->id,
-        ])->assertSessionHasErrors('preset_id');
-        $this->actingAs($this->admin)->post('/security-devices/integrations/queclink/bulk', [
+            'preset_id' => $applicationPreset->id,
+        ])->assertRedirect();
+        $this->actingAs($viewer)
+            ->delete("/security-devices/integrations/queclink/presets/{$applicationPreset->id}")
+            ->assertRedirect();
+        $this->assertDatabaseMissing('queclink_presets', ['id' => $applicationPreset->id]);
+        $this->actingAs($viewer)->post('/security-devices/integrations/queclink/bulk', [
             'device_ids' => [$ownDevice->id, $foreignPaired->id],
             'action' => 'resident_safety_profile',
-        ])->assertSessionHasErrors('device_ids');
-        $this->assertSame($before, QueclinkPendingCommand::query()->count());
+        ])->assertNotFound();
+        $this->assertSame($before + 2, QueclinkPendingCommand::query()->count());
         $this->assertSame(QueclinkDevice::STATUS_PENDING, $foreignPending->fresh()->status);
         $this->assertSame(QueclinkDevice::STATUS_PENDING, $foreignReject->fresh()->status);
         $this->assertSame(QueclinkDevice::STATUS_PAIRED, $foreignRelease->fresh()->status);
     }
 
-    public function test_claim_rejects_cross_tenant_targets_and_foreign_canonical_device_collision(): void
+    public function test_claim_rejects_targets_and_identity_collisions_outside_canonical_site_access(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
         $ownSite = Site::factory()->create(['tenant_id' => 42]);
         $foreignSite = Site::factory()->create(['tenant_id' => 77]);
+        $viewer = $this->siteRestrictedViewer($ownSite);
         $foreignVehicle = Asset::factory()->create(['site_id' => $foreignSite->id, 'category' => 'vehicle']);
         $foreignStaff = User::factory()->create(['organization_id' => 77, 'approved_at' => now()]);
         $foreignClient = Client::factory()->create(['organization_id' => 77, 'site_id' => $foreignSite->id]);
@@ -394,7 +424,7 @@ class QueclinkHubControllerTest extends TestCase
                 'tenant_id' => 42, 'imei' => 'OWN-'.strtoupper($type),
                 'status' => QueclinkDevice::STATUS_PENDING, 'model_hint' => 'GL30MEU',
             ]);
-            $this->actingAs($this->admin)->post("/security-devices/integrations/queclink/devices/{$device->id}/claim", [
+            $this->actingAs($viewer)->post("/security-devices/integrations/queclink/devices/{$device->id}/claim", [
                 'pairing_type' => $type, 'target_id' => $targetId,
             ])->assertNotFound();
             $this->assertSame(QueclinkDevice::STATUS_PENDING, $device->fresh()->status);
@@ -405,11 +435,17 @@ class QueclinkHubControllerTest extends TestCase
             'tenant_id' => 77, 'provider' => 'queclink',
             'imei' => 'COLLISION-IMEI', 'device_uid' => 'COLLISION-IMEI',
         ]);
+        DeviceAssignment::create([
+            'device_id' => $collision->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $foreignSite->id,
+            'assigned_at' => now(),
+        ]);
         $queclink = QueclinkDevice::create([
             'tenant_id' => 42, 'imei' => 'COLLISION-IMEI',
             'status' => QueclinkDevice::STATUS_PENDING, 'model_hint' => 'GV500CG',
         ]);
-        $this->actingAs($this->admin)->post("/security-devices/integrations/queclink/devices/{$queclink->id}/claim", [
+        $this->actingAs($viewer)->post("/security-devices/integrations/queclink/devices/{$queclink->id}/claim", [
             'pairing_type' => 'vehicle', 'target_id' => $ownVehicle->id,
         ])->assertNotFound();
         $this->assertNull($queclink->fresh()->device_id);
@@ -418,25 +454,24 @@ class QueclinkHubControllerTest extends TestCase
         $this->assertSame(0, Device::query()->where('tenant_id', 42)->where('device_uid', 'COLLISION-IMEI')->count());
     }
 
-    public function test_claim_rejects_existing_tracker_assets_with_contradictory_or_driver_only_tenant_evidence(): void
+    public function test_claim_rejects_existing_tracker_assets_outside_canonical_site_access(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
         $ownSite = Site::factory()->create(['tenant_id' => 42]);
         $foreignSite = Site::factory()->create(['tenant_id' => 77]);
+        $viewer = $this->siteRestrictedViewer($ownSite);
         $target = Asset::factory()->create(['site_id' => $ownSite->id, 'category' => 'vehicle']);
-        $driver = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
 
         foreach ([
             Asset::factory()->create([
-                'site_id' => $ownSite->id,
-                'home_site_id' => $foreignSite->id,
+                'site_id' => $foreignSite->id,
+                'home_site_id' => null,
                 'category' => 'personal_tracker',
             ]),
             Asset::factory()->create([
-                'site_id' => null,
+                'site_id' => $foreignSite->id,
                 'home_site_id' => null,
                 'client_id' => null,
-                'primary_driver_user_id' => $driver->id,
+                'primary_driver_user_id' => null,
                 'category' => 'personal_tracker',
             ]),
         ] as $index => $collisionAsset) {
@@ -456,7 +491,7 @@ class QueclinkHubControllerTest extends TestCase
                 'model_hint' => 'GV500CG',
             ]);
 
-            $this->actingAs($this->admin)
+            $this->actingAs($viewer)
                 ->post("/security-devices/integrations/queclink/devices/{$pending->id}/claim", [
                     'pairing_type' => 'vehicle',
                     'target_id' => $target->id,
@@ -471,11 +506,11 @@ class QueclinkHubControllerTest extends TestCase
         $this->assertSame(0, DeviceAssignment::query()->count());
     }
 
-    public function test_claim_rejects_a_foreign_personal_asset_found_by_global_staff_lookup(): void
+    public function test_claim_rejects_a_hidden_site_personal_asset_found_by_global_staff_lookup(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
         $ownSite = Site::factory()->create(['tenant_id' => 42]);
         $foreignSite = Site::factory()->create(['tenant_id' => 77]);
+        $viewer = $this->siteRestrictedViewer($ownSite);
         $staff = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
         HrEmployeeProfile::factory()->create([
             'tenant_id' => 42,
@@ -494,7 +529,7 @@ class QueclinkHubControllerTest extends TestCase
             'status' => QueclinkDevice::STATUS_PENDING,
         ]);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($viewer)
             ->post("/security-devices/integrations/queclink/devices/{$pending->id}/claim", [
                 'pairing_type' => 'staff',
                 'target_id' => $staff->id,
@@ -506,7 +541,7 @@ class QueclinkHubControllerTest extends TestCase
         $this->assertSame(0, DeviceAssignment::query()->count());
     }
 
-    public function test_release_rejects_a_tracker_with_contradictory_tenant_evidence_before_any_mutation(): void
+    public function test_release_uses_canonical_direct_asset_site_despite_legacy_partition_values(): void
     {
         $this->admin->forceFill(['organization_id' => 42])->save();
         $ownSite = Site::factory()->create(['tenant_id' => 42]);
@@ -540,31 +575,42 @@ class QueclinkHubControllerTest extends TestCase
 
         $this->actingAs($this->admin)
             ->post("/security-devices/integrations/queclink/devices/{$queclink->id}/release")
-            ->assertNotFound();
+            ->assertRedirect();
 
-        $this->assertNull($assignment->fresh()->released_at);
-        $this->assertSame('paired', $tracker->fresh()->status);
-        $this->assertSame(QueclinkDevice::STATUS_PAIRED, $queclink->fresh()->status);
-        $this->assertSame($device->id, $queclink->fresh()->device_id);
+        $this->assertNotNull($assignment->fresh()->released_at);
+        $this->assertSame('unpaired', $tracker->fresh()->status);
+        $this->assertSame(QueclinkDevice::STATUS_PENDING, $queclink->fresh()->status);
+        $this->assertNull($queclink->fresh()->device_id);
     }
 
-    #[DataProvider('foreignReleaseAssignmentProvider')]
-    public function test_release_rejects_every_foreign_active_assignment_target_before_any_mutation(
+    #[DataProvider('hiddenReleaseAssignmentProvider')]
+    public function test_release_rejects_every_hidden_site_active_assignment_target_before_any_mutation(
         string $targetType,
     ): void {
-        $this->admin->forceFill(['organization_id' => 42])->save();
         $localSite = Site::factory()->create(['tenant_id' => 42]);
+        $hiddenSite = Site::factory()->create(['tenant_id' => 77]);
+        $viewer = $this->siteRestrictedViewer($localSite);
         $localAsset = Asset::factory()->create([
             'site_id' => $localSite->id,
             'category' => 'vehicle',
         ]);
-        $foreignTargetId = match ($targetType) {
-            DeviceAssignment::TARGET_STAFF => User::factory()->create([
-                'organization_id' => 77,
-                'approved_at' => now(),
-            ])->id,
+        $hiddenTargetId = match ($targetType) {
+            DeviceAssignment::TARGET_STAFF => (function () use ($hiddenSite): int {
+                $staff = User::factory()->create([
+                    'organization_id' => 77,
+                    'approved_at' => now(),
+                ]);
+                HrEmployeeProfile::factory()->create([
+                    'tenant_id' => 77,
+                    'user_id' => $staff->id,
+                    'primary_site_id' => $hiddenSite->id,
+                    'is_active' => true,
+                ]);
+
+                return $staff->id;
+            })(),
             DeviceAssignment::TARGET_VEHICLE => Asset::factory()->create([
-                'site_id' => Site::factory()->create(['tenant_id' => 77])->id,
+                'site_id' => $hiddenSite->id,
                 'category' => 'vehicle',
             ])->id,
         };
@@ -581,7 +627,7 @@ class QueclinkHubControllerTest extends TestCase
         $assignment = DeviceAssignment::create([
             'device_id' => $canonicalDevice->id,
             'assignable_type' => $targetType,
-            'assignable_id' => $foreignTargetId,
+            'assignable_id' => $hiddenTargetId,
             'assigned_at' => now(),
         ]);
         $queclink = QueclinkDevice::create([
@@ -601,7 +647,7 @@ class QueclinkHubControllerTest extends TestCase
         AuditLog::query()->delete();
         QueclinkAuditEvent::query()->delete();
 
-        $this->actingAs($this->admin)
+        $this->actingAs($viewer)
             ->post("/security-devices/integrations/queclink/devices/{$queclink->id}/release")
             ->assertNotFound();
 
@@ -617,11 +663,11 @@ class QueclinkHubControllerTest extends TestCase
         $this->assertSame(0, QueclinkAuditEvent::query()->where('event_type', 'release')->count());
     }
 
-    public static function foreignReleaseAssignmentProvider(): array
+    public static function hiddenReleaseAssignmentProvider(): array
     {
         return [
-            'foreign staff target' => [DeviceAssignment::TARGET_STAFF],
-            'foreign vehicle target' => [DeviceAssignment::TARGET_VEHICLE],
+            'hidden staff target' => [DeviceAssignment::TARGET_STAFF],
+            'hidden vehicle target' => [DeviceAssignment::TARGET_VEHICLE],
         ];
     }
 
@@ -728,10 +774,11 @@ class QueclinkHubControllerTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_tenant_one_legacy_client_listing_and_claim_use_the_same_canonical_predicate(): void
+    public function test_client_listing_and_claim_use_the_same_canonical_site_predicate(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1]);
         $foreignSite = Site::factory()->create(['tenant_id' => 77]);
+        $viewer = $this->siteRestrictedViewer($site);
         $supported = Client::factory()->create([
             'organization_id' => null,
             'site_id' => $site->id,
@@ -757,7 +804,7 @@ class QueclinkHubControllerTest extends TestCase
             'status' => QueclinkDevice::STATUS_PENDING,
         ]);
 
-        $response = $this->actingAs($this->admin)
+        $response = $this->actingAs($viewer)
             ->get('/security-devices/integrations/queclink?target_type=client&target_search=Legacy');
         $response->assertOk()->assertInertia(function ($page) use ($supported, $ambiguous, $foreign): void {
             $ids = collect($page->toArray()['props']['targets']['clients'])->pluck('id');
@@ -767,17 +814,17 @@ class QueclinkHubControllerTest extends TestCase
         });
 
         $access = app(QueclinkIntegrationAccessService::class);
-        $this->assertSame($supported->id, $access->client($this->admin, $supported->id)->id);
+        $this->assertSame($supported->id, $access->client($viewer, $supported->id)->id);
         foreach ([$ambiguous, $foreign] as $denied) {
             try {
-                $access->client($this->admin, $denied->id);
-                $this->fail('Ambiguous or foreign legacy client passed direct authorization.');
+                $access->client($viewer, $denied->id);
+                $this->fail('A client outside canonical Site access passed direct authorization.');
             } catch (HttpException $exception) {
                 $this->assertSame(404, $exception->getStatusCode());
             }
         }
 
-        $this->actingAs($this->admin)
+        $this->actingAs($viewer)
             ->post("/security-devices/integrations/queclink/devices/{$device->id}/claim", [
                 'pairing_type' => 'client',
                 'target_id' => $supported->id,
@@ -792,7 +839,7 @@ class QueclinkHubControllerTest extends TestCase
         ]);
     }
 
-    public function test_null_tenant_device_is_not_enumerable_or_claimable_by_tenant_manager(): void
+    public function test_unlinked_pending_device_is_visible_and_claimable_from_global_intake(): void
     {
         $this->admin->forceFill(['organization_id' => 1])->save();
         $site = Site::factory()->create(['tenant_id' => 1]);
@@ -803,10 +850,19 @@ class QueclinkHubControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)->get('/security-devices/integrations/queclink')->assertOk()
-            ->assertInertia(fn ($page) => $page->where('devices.total', 0));
+            ->assertInertia(fn ($page) => $page
+                ->where('devices.total', 1)
+                ->where('devices.pending.0.id', $device->id));
         $this->actingAs($this->admin)->post("/security-devices/integrations/queclink/devices/{$device->id}/claim", [
             'pairing_type' => 'vehicle', 'target_id' => $vehicle->id,
-        ])->assertNotFound();
+        ])->assertRedirect();
+        $this->assertSame(QueclinkDevice::STATUS_PAIRED, $device->fresh()->status);
+        $this->assertDatabaseHas('device_assignments', [
+            'device_id' => $device->fresh()->device_id,
+            'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
+            'assignable_id' => $vehicle->id,
+            'released_at' => null,
+        ]);
     }
 
     public function test_service_state_is_always_bounded_and_never_echoes_systemd_output(): void
@@ -880,9 +936,9 @@ class QueclinkHubControllerTest extends TestCase
 
     public function test_vehicle_claim_rechecks_the_locked_asset_after_stale_authorization_provenance_changes(): void
     {
-        $this->admin->forceFill(['organization_id' => 1])->save();
         $localSite = Site::factory()->create(['tenant_id' => 1]);
         $foreignSite = Site::factory()->create(['tenant_id' => 2]);
+        $viewer = $this->siteRestrictedViewer($localSite);
         $asset = Asset::factory()->create(['site_id' => $localSite->id, 'category' => 'vehicle']);
         $device = QueclinkDevice::create([
             'tenant_id' => 1,
@@ -918,7 +974,7 @@ class QueclinkHubControllerTest extends TestCase
         };
         $this->app->instance(QueclinkIntegrationAccessService::class, $access);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($viewer)
             ->post("/security-devices/integrations/queclink/devices/{$device->id}/claim", [
                 'pairing_type' => 'vehicle',
                 'target_id' => $asset->id,
@@ -2040,8 +2096,14 @@ class QueclinkHubControllerTest extends TestCase
 
     public function test_frames_endpoint_returns_paged_json_for_authorised_user()
     {
+        $device = QueclinkDevice::create([
+            'tenant_id' => 1,
+            'imei' => '864696060004173',
+            'status' => QueclinkDevice::STATUS_PENDING,
+        ]);
         QueclinkRawFrame::create([
             'tenant_id' => 1,
+            'queclink_device_id' => $device->id,
             'imei' => '864696060004173',
             'direction' => 'inbound',
             'frame_type' => 'RESP',
@@ -2062,8 +2124,19 @@ class QueclinkHubControllerTest extends TestCase
 
     public function test_frames_endpoint_filters_by_command_parse_status_and_search()
     {
+        $heartbeatDevice = QueclinkDevice::create([
+            'tenant_id' => 1,
+            'imei' => '864696060004173',
+            'status' => QueclinkDevice::STATUS_PENDING,
+        ]);
+        $alarmDevice = QueclinkDevice::create([
+            'tenant_id' => 1,
+            'imei' => '867963069916998',
+            'status' => QueclinkDevice::STATUS_PENDING,
+        ]);
         QueclinkRawFrame::create([
             'tenant_id' => 1,
+            'queclink_device_id' => $heartbeatDevice->id,
             'imei' => '864696060004173',
             'direction' => 'inbound',
             'frame_type' => 'RESP',
@@ -2074,6 +2147,7 @@ class QueclinkHubControllerTest extends TestCase
 
         QueclinkRawFrame::create([
             'tenant_id' => 1,
+            'queclink_device_id' => $alarmDevice->id,
             'imei' => '867963069916998',
             'direction' => 'inbound',
             'frame_type' => 'RESP',
@@ -2190,6 +2264,18 @@ class QueclinkHubControllerTest extends TestCase
             'approved_at' => now(),
         ]);
         $viewer->roles()->attach(Role::query()->where('name', 'facilities_manager')->firstOrFail());
+        $permissionIds = Permission::query()->whereIn('key', [
+            'securityDevices.integrations.manage',
+            'assets.viewAny',
+            'clients.viewAny',
+            'fleet.viewAny',
+            'hazards.view',
+            'staff.viewAny',
+        ])->pluck('id');
+        $this->assertCount(6, $permissionIds);
+        $viewer->permissionOverrides()->syncWithoutDetaching(
+            $permissionIds->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])->all(),
+        );
         HrEmployeeProfile::factory()->create([
             'tenant_id' => (int) $site->tenant_id,
             'user_id' => $viewer->id,

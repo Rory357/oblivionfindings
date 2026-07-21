@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Sites;
 
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
-use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -46,7 +46,7 @@ class SiteIntegrationReadBoundaryTest extends TestCase
             'last_tested_at' => now(),
             'last_error' => 'RAW-LEGACY-SITE-ERROR',
         ]);
-        IntegrationTenantSecret::create([
+        IntegrationProviderConnection::create([
             'tenant_id' => 42,
             'provider' => 'unifi',
             'secret_encrypted' => 'RAW-LEGACY-TENANT-SECRET',
@@ -72,9 +72,9 @@ class SiteIntegrationReadBoundaryTest extends TestCase
         $this->assertTrue($payload['configs'][0]['overrides_configured']);
         $this->assertSame('error', $payload['siteSecrets'][0]['state']);
         $this->assertSame('provider_failure', $payload['siteSecrets'][0]['failure_category']);
-        $this->assertSame(1, $payload['tenantSecrets'][0]['discovery']['site_count']);
-        $this->assertSame(1, $payload['tenantSecrets'][0]['discovery']['host_count']);
-        $this->assertSame('unknown', $payload['tenantSecrets'][0]['status']);
+        $this->assertSame(1, $payload['providerConnections'][0]['discovery']['site_count']);
+        $this->assertSame(1, $payload['providerConnections'][0]['discovery']['host_count']);
+        $this->assertSame('unknown', $payload['providerConnections'][0]['status']);
 
         $encoded = json_encode($payload, JSON_THROW_ON_ERROR);
         foreach ([

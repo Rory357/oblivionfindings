@@ -5,11 +5,13 @@ namespace App\Jobs\Integration;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSyncLog;
-use App\Models\Integration\IntegrationTenantSecret;
+use App\Services\Integration\CanonicalIntegrationDeviceResolver;
 use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Services\Integration\UnifiOperationalBridgeService;
+use App\Support\LegacyStorageContext;
 use App\Support\SafeOperationalData;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -31,7 +33,6 @@ class PullIntegrationHealthJob implements ShouldQueue
     public int $backoff = 60;
 
     public function __construct(
-        public int $tenantId,
         public string $provider,
         public ?int $siteId = null,
     ) {}
@@ -51,29 +52,28 @@ class PullIntegrationHealthJob implements ShouldQueue
             return;
         }
 
-        $tenantSecret = IntegrationTenantSecret::forTenant($this->tenantId)
-            ->where('provider', $this->provider)
+        $providerConnection = IntegrationProviderConnection::query()
+            ->forProvider($this->provider)
             ->connected()
             ->first();
 
-        if (! $tenantSecret) {
-            Log::warning('PullIntegrationHealthJob: no connected secret found', SafeOperationalData::logContext([
-                'tenant_id' => $this->tenantId,
+        if (! $providerConnection) {
+            Log::warning('PullIntegrationHealthJob: no connected provider connection found', SafeOperationalData::logContext([
                 'provider' => $this->provider,
             ]));
 
             return;
         }
 
-        $siteConfigs = IntegrationSiteConfig::forTenant($this->tenantId)
+        $siteConfigs = IntegrationSiteConfig::query()
             ->forProvider($this->provider)
             ->active()
+            ->whereHas('site')
             ->when($this->siteId, fn ($q) => $q->where('site_id', $this->siteId))
             ->get();
 
         if ($siteConfigs->isEmpty()) {
             Log::info('PullIntegrationHealthJob: no active site configs found', SafeOperationalData::logContext([
-                'tenant_id' => $this->tenantId,
                 'provider' => $this->provider,
                 'site_id' => $this->siteId,
             ]));
@@ -83,7 +83,7 @@ class PullIntegrationHealthJob implements ShouldQueue
 
         foreach ($siteConfigs as $siteConfig) {
             $syncLog = IntegrationSyncLog::create([
-                'tenant_id' => $this->tenantId,
+                'tenant_id' => LegacyStorageContext::id(),
                 'provider' => $this->provider,
                 'site_id' => $siteConfig->site_id,
                 'action' => 'pull_health',
@@ -92,7 +92,7 @@ class PullIntegrationHealthJob implements ShouldQueue
             ]);
 
             try {
-                $healthResults = $adapter->pullHealth($siteConfig, $tenantSecret);
+                $healthResults = $adapter->pullHealth($siteConfig, $providerConnection);
 
                 $updated = 0;
                 $errored = 0;
@@ -153,7 +153,6 @@ class PullIntegrationHealthJob implements ShouldQueue
                 }
             } catch (\Throwable $e) {
                 Log::error('PullIntegrationHealthJob: pull failed for site', SafeOperationalData::logContext([
-                    'tenant_id' => $this->tenantId,
                     'provider' => $this->provider,
                     'site_id' => $siteConfig->site_id,
                     'error_category' => SafeOperationalData::failureCategory($e),
@@ -176,38 +175,8 @@ class PullIntegrationHealthJob implements ShouldQueue
      */
     private function resolveCanonicalDevice(IntegrationSiteConfig $siteConfig, array $entry): ?Device
     {
-        $deviceId = $entry['device_id'] ?? null;
-        if ($deviceId) {
-            return Device::query()
-                ->forTenant($siteConfig->tenant_id)
-                ->byProvider($this->provider)
-                ->find($deviceId);
-        }
-
-        $providerEntityId = isset($entry['provider_entity_id']) ? trim((string) $entry['provider_entity_id']) : '';
-        if ($providerEntityId !== '') {
-            $device = Device::query()
-                ->forTenant($siteConfig->tenant_id)
-                ->byProvider($this->provider)
-                ->where('external_ref->provider_entity_id', $providerEntityId)
-                ->latest('id')
-                ->first();
-
-            if ($device) {
-                return $device;
-            }
-        }
-
-        $hardwareId = $entry['hardware_id'] ?? null;
-        if ($hardwareId) {
-            return Device::query()
-                ->forTenant($siteConfig->tenant_id)
-                ->where('legacy_location_hardware_id', $hardwareId)
-                ->latest('id')
-                ->first();
-        }
-
-        return null;
+        return app(CanonicalIntegrationDeviceResolver::class)
+            ->resolveHealth($siteConfig, $this->provider, $entry);
     }
 
     private function mapCanonicalStatus(mixed $state): DeviceStatus

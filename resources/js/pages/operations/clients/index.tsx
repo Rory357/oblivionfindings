@@ -146,7 +146,7 @@ type Can = {
     timeline?: { create?: boolean };
 };
 
-type ClientFormOption = { id: number; name: string };
+type ClientFormOption = { id: number; name: string; site_id?: number | null };
 type ServiceContextOption = { id: number; type?: string | null; name: string };
 
 type PageProps = {

@@ -3,7 +3,6 @@
 namespace App\Domain\SecurityDevices\Http\Controllers;
 
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
-use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use Illuminate\Http\Request;
@@ -12,8 +11,6 @@ use Inertia\Inertia;
 
 class AlertsEventsController extends Controller
 {
-    use ResolvesDeviceTenant;
-
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
     ) {}
@@ -22,10 +19,8 @@ class AlertsEventsController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.events.view'), 403);
-        $tenantId = $this->resolveDeviceTenantId($user);
         $visibleDeviceIds = $this->access->visibleDevices($user)->select('devices.id');
         $eventScope = fn () => DeviceEvent::query()
-            ->forTenant($tenantId)
             ->whereIn('device_id', clone $visibleDeviceIds);
 
         // ── Stats ─────────────────────────────────────────────────

@@ -12,6 +12,7 @@ use App\Models\LocationHardware;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Services\Sites\SiteTypePlanPinStatusService;
+use App\Support\LegacyStorageContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -48,7 +49,7 @@ class UnifiOperationalBridgeService
         $productLine = strtolower((string) ($payload['productLine'] ?? ''));
 
         $device->fill([
-            'tenant_id' => $siteConfig->tenant_id,
+            'tenant_id' => LegacyStorageContext::id(),
             'name' => $this->resolveDeviceName($payload),
             'domain' => $domain,
             'category' => $category,
@@ -109,24 +110,22 @@ class UnifiOperationalBridgeService
         Device $device,
         ?SiteRoom $room,
         ?int $userId,
-        int $tenantId,
         ?int $expectedSiteId,
     ): DeviceAssignment {
-        return DB::transaction(function () use ($device, $room, $userId, $tenantId, $expectedSiteId) {
+        return DB::transaction(function () use ($device, $room, $userId, $expectedSiteId) {
             $freshDevice = Device::query()
-                ->forTenant($tenantId)
                 ->byProvider('unifi')
                 ->lockForUpdate()
                 ->find($device->id);
             abort_unless($freshDevice, 404);
 
-            $siteId = $this->resolveCurrentSiteId($freshDevice, $tenantId, lockForUpdate: true);
+            $siteId = $this->resolveCurrentSiteId($freshDevice, lockForUpdate: true);
             abort_unless($siteId !== null, 404);
             abort_unless($expectedSiteId === null || $siteId === $expectedSiteId, 404);
 
             $freshRoom = null;
             if ($room !== null) {
-                $freshRoom = $this->findScopedRoom($room->id, $tenantId, $siteId, lockForUpdate: true);
+                $freshRoom = $this->findScopedRoom($room->id, $siteId, lockForUpdate: true);
                 abort_unless($freshRoom, 404);
             }
 
@@ -257,104 +256,23 @@ class UnifiOperationalBridgeService
 
     private function findCanonicalDevice(IntegrationSiteConfig $siteConfig, string $providerEntityId, array $payload): ?Device
     {
-        $device = Device::query()
-            ->forTenant($siteConfig->tenant_id)
-            ->byProvider('unifi')
-            ->where('external_ref->provider_entity_id', $providerEntityId)
-            ->latest('id')
-            ->first();
-
-        if ($device) {
-            return $device;
-        }
-
-        $legacyShadow = LocationHardware::query()
-            ->where('tenant_id', $siteConfig->tenant_id)
-            ->where('provider', 'unifi')
-            ->where('external_ref->provider_entity_id', $providerEntityId)
-            ->latest('id')
-            ->first();
-
-        if ($legacyShadow) {
-            $device = Device::query()
-                ->forTenant($siteConfig->tenant_id)
-                ->where('legacy_location_hardware_id', $legacyShadow->id)
-                ->latest('id')
-                ->first();
-
-            if ($device) {
-                return $device;
-            }
-        }
-
-        $serial = trim((string) ($payload['serial'] ?? ''));
-        if ($serial !== '') {
-            $serialMatch = Device::query()
-                ->forTenant($siteConfig->tenant_id)
-                ->byProvider('unifi')
-                ->whereRaw('LOWER(serial_number) = ?', [strtolower($serial)])
-                ->get();
-
-            if ($serialMatch->count() === 1) {
-                return $serialMatch->first();
-            }
-        }
-
-        $mac = trim((string) ($payload['mac'] ?? ''));
-        if ($mac !== '') {
-            $macMatch = Device::query()
-                ->forTenant($siteConfig->tenant_id)
-                ->byProvider('unifi')
-                ->whereRaw('LOWER(mac_address) = ?', [strtolower($mac)])
-                ->get();
-
-            if ($macMatch->count() === 1) {
-                return $macMatch->first();
-            }
-        }
-
-        return null;
+        return app(CanonicalIntegrationDeviceResolver::class)->resolveInventory(
+            $siteConfig,
+            'unifi',
+            $providerEntityId,
+            $payload,
+        );
     }
 
     private function resolveCanonicalDeviceForHealth(IntegrationSiteConfig $siteConfig, array $entry): ?Device
     {
-        $deviceId = $entry['device_id'] ?? null;
-        if ($deviceId) {
-            return Device::query()
-                ->forTenant($siteConfig->tenant_id)
-                ->find($deviceId);
-        }
-
-        $providerEntityId = isset($entry['provider_entity_id']) ? trim((string) $entry['provider_entity_id']) : '';
-        if ($providerEntityId !== '') {
-            return Device::query()
-                ->forTenant($siteConfig->tenant_id)
-                ->byProvider('unifi')
-                ->where('external_ref->provider_entity_id', $providerEntityId)
-                ->latest('id')
-                ->first();
-        }
-
-        $hardwareId = $entry['hardware_id'] ?? null;
-        if ($hardwareId) {
-            return Device::query()
-                ->forTenant($siteConfig->tenant_id)
-                ->where('legacy_location_hardware_id', $hardwareId)
-                ->latest('id')
-                ->first();
-        }
-
-        return null;
+        return app(CanonicalIntegrationDeviceResolver::class)->resolveHealth($siteConfig, 'unifi', $entry);
     }
 
-    private function findLegacyShadowForDevice(
-        Device $device,
-        int $tenantId,
-        bool $lockForUpdate = false,
-    ): ?LocationHardware {
+    private function findLegacyShadowForDevice(Device $device, bool $lockForUpdate = false): ?LocationHardware
+    {
         if ($device->legacy_location_hardware_id) {
             $query = LocationHardware::query()
-                ->where('tenant_id', $tenantId)
                 ->where('provider', 'unifi')
                 ->whereKey($device->legacy_location_hardware_id);
             if ($lockForUpdate) {
@@ -369,7 +287,6 @@ class UnifiOperationalBridgeService
         $providerEntityId = $device->external_ref['provider_entity_id'] ?? null;
         if ($providerEntityId) {
             $query = LocationHardware::query()
-                ->where('tenant_id', $tenantId)
                 ->where('provider', 'unifi')
                 ->where('external_ref->provider_entity_id', $providerEntityId)
                 ->latest('id');
@@ -383,10 +300,9 @@ class UnifiOperationalBridgeService
         return null;
     }
 
-    public function resolveSiteId(Device $device, int $tenantId): ?int
+    public function resolveSiteId(Device $device): ?int
     {
         $freshDevice = Device::query()
-            ->forTenant($tenantId)
             ->byProvider('unifi')
             ->find($device->id);
 
@@ -394,12 +310,11 @@ class UnifiOperationalBridgeService
             return null;
         }
 
-        return $this->resolveCurrentSiteId($freshDevice, $tenantId);
+        return $this->resolveCurrentSiteId($freshDevice);
     }
 
     private function resolveCurrentSiteId(
         Device $device,
-        int $tenantId,
         bool $lockForUpdate = false,
     ): ?int {
         $assignmentQuery = $device->assignments()->active()->latest('id');
@@ -410,11 +325,11 @@ class UnifiOperationalBridgeService
 
         if ($active) {
             if ($active->assignable_type === DeviceAssignment::TARGET_SITE) {
-                return $this->findScopedSiteId($active->assignable_id, $tenantId, $lockForUpdate);
+                return $this->findScopedSiteId($active->assignable_id, $lockForUpdate);
             }
 
             if ($active->assignable_type === DeviceAssignment::TARGET_ROOM) {
-                $room = $this->findScopedRoom($active->assignable_id, $tenantId, lockForUpdate: $lockForUpdate);
+                $room = $this->findScopedRoom($active->assignable_id, lockForUpdate: $lockForUpdate);
 
                 return $room?->site_id;
             }
@@ -422,21 +337,19 @@ class UnifiOperationalBridgeService
             return null;
         }
 
-        $shadow = $this->findLegacyShadowForDevice($device, $tenantId, $lockForUpdate);
+        $shadow = $this->findLegacyShadowForDevice($device, $lockForUpdate);
 
         return $shadow
-            ? $this->findScopedSiteId($shadow->site_id, $tenantId, $lockForUpdate)
+            ? $this->findScopedSiteId($shadow->site_id, $lockForUpdate)
             : null;
     }
 
     private function findScopedRoom(
         int $roomId,
-        int $tenantId,
         ?int $siteId = null,
         bool $lockForUpdate = false,
     ): ?SiteRoom {
         $query = SiteRoom::query()
-            ->where('tenant_id', $tenantId)
             ->when($siteId !== null, fn ($roomQuery) => $roomQuery->where('site_id', $siteId))
             ->whereKey($roomId);
         if ($lockForUpdate) {
@@ -444,17 +357,16 @@ class UnifiOperationalBridgeService
         }
         $room = $query->first();
 
-        if (! $room || $this->findScopedSiteId($room->site_id, $tenantId, $lockForUpdate) === null) {
+        if (! $room || $this->findScopedSiteId($room->site_id, $lockForUpdate) === null) {
             return null;
         }
 
         return $room;
     }
 
-    private function findScopedSiteId(int $siteId, int $tenantId, bool $lockForUpdate = false): ?int
+    private function findScopedSiteId(int $siteId, bool $lockForUpdate = false): ?int
     {
         $query = Site::query()
-            ->where('tenant_id', $tenantId)
             ->whereKey($siteId);
         if ($lockForUpdate) {
             $query->lockForUpdate();

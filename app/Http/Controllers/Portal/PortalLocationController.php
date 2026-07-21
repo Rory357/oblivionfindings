@@ -30,7 +30,7 @@ class PortalLocationController extends Controller
 
         // Canonical device lookup — active tracking device assigned to this client.
         $device = app(DeviceRegistryService::class)
-            ->forClient($tenantId, $client->id)
+            ->forClient($client->id)
             ->where('domain', 'tracking')
             ->first();
 
@@ -139,7 +139,7 @@ class PortalLocationController extends Controller
 
         // Canonical device lookup.
         $device = app(DeviceRegistryService::class)
-            ->forClient($tenantId, $client->id)
+            ->forClient($client->id)
             ->where('domain', 'tracking')
             ->first();
 

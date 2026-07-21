@@ -8,21 +8,18 @@ use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Http\Controllers\HealthSafety\LoneWorkerController;
 use App\Models\ControlRoomAlert;
 use App\Models\Integration\IntegrationEvent;
-use App\Models\LoneWorkerSession;
 use App\Models\LocationHardware;
+use App\Models\LoneWorkerSession;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\Integration\IntegrationContextProvider;
 use Database\Seeders\RbacSeeder;
-use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
-use PHPUnit\Framework\Attributes\DataProvider;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 use Inertia\Testing\AssertableInertia as Assert;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
@@ -275,7 +272,7 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
         }
     }
 
-    public function test_integration_context_uses_the_supplied_tenant_for_site_devices(): void
+    public function test_integration_context_uses_the_supplied_canonical_site_for_devices(): void
     {
         $tenantId = 37;
         $site = Site::factory()->create(['tenant_id' => $tenantId]);
@@ -283,52 +280,38 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
         $this->assignDeviceToSite($tenantId, $site);
         $this->assignDeviceToSite(1, $site);
 
-        $context = app(IntegrationContextProvider::class)->getContext($tenantId, $site->id);
+        $context = app(IntegrationContextProvider::class)->getContext($site->id);
 
-        $this->assertSame(2, $context['site_summary']['hardware_total']);
-        $this->assertSame(2, $context['site_summary']['hardware_online']);
+        $this->assertSame(3, $context['site_summary']['hardware_total']);
+        $this->assertSame(3, $context['site_summary']['hardware_online']);
         $this->assertSame(0, $context['site_summary']['hardware_offline']);
     }
 
-    public function test_integration_context_does_not_return_a_site_from_another_tenant(): void
+    public function test_integration_context_returns_the_requested_canonical_site(): void
     {
-        $requestedTenantId = 41;
-        $foreignSite = Site::factory()->create(['tenant_id' => 42]);
+        $site = Site::factory()->create(['tenant_id' => 42]);
         IntegrationEvent::factory()->create([
             'tenant_id' => 42,
-            'site_id' => $foreignSite->id,
-            'event_type' => 'foreign_site_event',
+            'site_id' => $site->id,
+            'event_type' => 'site_event',
         ]);
         SiteRoom::create([
             'tenant_id' => 42,
-            'site_id' => $foreignSite->id,
-            'name' => 'Foreign tenant room',
+            'site_id' => $site->id,
+            'name' => 'Site room',
         ]);
         ControlRoomAlert::factory()->create([
-            'site_id' => $foreignSite->id,
+            'site_id' => $site->id,
             'source' => 'integration_nurse_call',
             'status' => ControlRoomAlert::STATUS_OPEN,
         ]);
 
-        try {
-            $context = app(IntegrationContextProvider::class)
-                ->getContext($requestedTenantId, $foreignSite->id);
-        } catch (ModelNotFoundException|AuthorizationException) {
-            $this->addToAssertionCount(1);
-
-            return;
-        } catch (HttpException $exception) {
-            $this->assertSame(403, $exception->getStatusCode());
-
-            return;
-        }
-
+        $context = app(IntegrationContextProvider::class)->getContext($site->id);
         $this->assertSame(0, $context['site_summary']['hardware_total']);
-        $this->assertSame(0, $context['site_summary']['open_alerts']);
-        $this->assertSame([], $context['recent_events']);
-        $this->assertSame([], $context['open_alerts']);
-        $this->assertSame([], $context['rooms']);
-        $this->assertSame([], $context['providers']);
+        $this->assertSame(1, $context['site_summary']['open_alerts']);
+        $this->assertCount(1, $context['recent_events']);
+        $this->assertCount(1, $context['open_alerts']);
+        $this->assertCount(1, $context['rooms']);
     }
 
     public function test_integration_context_does_not_follow_poisoned_cross_tenant_room_or_hardware_links(): void
@@ -364,7 +347,7 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
             'event_type' => 'poisoned_relation_event',
         ]);
 
-        $context = app(IntegrationContextProvider::class)->getContext($tenantId, $site->id);
+        $context = app(IntegrationContextProvider::class)->getContext($site->id);
 
         $this->assertCount(1, $context['recent_events']);
         $this->assertNull($context['recent_events'][0]['hardware']);

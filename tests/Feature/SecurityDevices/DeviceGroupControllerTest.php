@@ -16,7 +16,9 @@ class DeviceGroupControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $viewer;
+
     private User $noPerms;
 
     protected function setUp(): void
@@ -166,7 +168,7 @@ class DeviceGroupControllerTest extends TestCase
         ]);
     }
 
-    public function test_store_uses_authenticated_users_organization_scope_for_tenant(): void
+    public function test_store_uses_inert_legacy_storage_value_not_user_organization(): void
     {
         $this->admin->forceFill(['organization_id' => 77])->save();
 
@@ -180,7 +182,7 @@ class DeviceGroupControllerTest extends TestCase
 
         $this->assertDatabaseHas('device_groups', [
             'name' => 'Scoped Group',
-            'tenant_id' => 77,
+            'tenant_id' => 1,
         ]);
     }
 

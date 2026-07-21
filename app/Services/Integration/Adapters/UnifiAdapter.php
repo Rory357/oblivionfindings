@@ -2,9 +2,9 @@
 
 namespace App\Services\Integration\Adapters;
 
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
-use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\LocationHardware;
 use App\Services\Integration\IntegrationAdapterInterface;
 use App\Services\Integration\IntegrationDiscoveryException;
@@ -63,10 +63,10 @@ class UnifiAdapter implements IntegrationAdapterInterface
         return ['device_inventory', 'device_health', 'motion_events_webhook', 'access_events'];
     }
 
-    public function testConnection(IntegrationTenantSecret $secret): bool
+    public function testConnection(IntegrationProviderConnection $connection): bool
     {
         try {
-            $apiKey = Crypt::decryptString($secret->secret_encrypted);
+            $apiKey = Crypt::decryptString($connection->secret_encrypted);
 
             $response = Http::withHeaders([
                 'Accept' => 'application/json',
@@ -76,7 +76,7 @@ class UnifiAdapter implements IntegrationAdapterInterface
             return $response->successful();
         } catch (\Throwable $e) {
             Log::warning('UniFi testConnection failed', SafeOperationalData::logContext([
-                'tenant_id' => $secret->tenant_id,
+                'provider_connection_id' => $connection->id,
                 'error_category' => SafeOperationalData::failureCategory($e),
             ]));
 
@@ -84,10 +84,10 @@ class UnifiAdapter implements IntegrationAdapterInterface
         }
     }
 
-    public function discoverSites(IntegrationTenantSecret $secret): array
+    public function discoverSites(IntegrationProviderConnection $connection): array
     {
         try {
-            $apiKey = Crypt::decryptString($secret->secret_encrypted);
+            $apiKey = Crypt::decryptString($connection->secret_encrypted);
 
             $headers = [
                 'Accept' => 'application/json',
@@ -115,13 +115,13 @@ class UnifiAdapter implements IntegrationAdapterInterface
                     $hostsById = $this->indexHosts($hosts);
                 } else {
                     Log::warning('UniFi discoverSites hosts request failed', [
-                        'tenant_id' => $secret->tenant_id,
+                        'provider_connection_id' => $connection->id,
                         'status' => $hostsResponse->status(),
                     ]);
                 }
             } catch (\Throwable $e) {
                 Log::warning('UniFi discoverSites hosts enrichment failed', SafeOperationalData::logContext([
-                    'tenant_id' => $secret->tenant_id,
+                    'provider_connection_id' => $connection->id,
                     'error_category' => SafeOperationalData::failureCategory($e),
                 ]));
             }
@@ -145,7 +145,7 @@ class UnifiAdapter implements IntegrationAdapterInterface
                 }
             } catch (\Throwable $e) {
                 Log::warning('UniFi discoverSites device enrichment failed', SafeOperationalData::logContext([
-                    'tenant_id' => $secret->tenant_id,
+                    'provider_connection_id' => $connection->id,
                     'error_category' => SafeOperationalData::failureCategory($e),
                 ]));
             }
@@ -185,7 +185,7 @@ class UnifiAdapter implements IntegrationAdapterInterface
         } catch (\Throwable $e) {
             $failure = IntegrationDiscoveryException::fromThrowable($e);
             Log::error('UniFi discoverSites failed', SafeOperationalData::logContext([
-                'tenant_id' => $secret->tenant_id,
+                'provider_connection_id' => $connection->id,
                 'error_category' => $failure->failureCategory(),
             ]));
 
@@ -298,10 +298,10 @@ class UnifiAdapter implements IntegrationAdapterInterface
         throw IntegrationDiscoveryException::invalidResponse();
     }
 
-    public function discoverHosts(IntegrationTenantSecret $secret): array
+    public function discoverHosts(IntegrationProviderConnection $connection): array
     {
         try {
-            $apiKey = Crypt::decryptString($secret->secret_encrypted);
+            $apiKey = Crypt::decryptString($connection->secret_encrypted);
 
             $response = Http::withHeaders([
                 'Accept' => 'application/json',
@@ -326,7 +326,7 @@ class UnifiAdapter implements IntegrationAdapterInterface
         } catch (\Throwable $e) {
             $failure = IntegrationDiscoveryException::fromThrowable($e);
             Log::error('UniFi discoverHosts failed', SafeOperationalData::logContext([
-                'tenant_id' => $secret->tenant_id,
+                'provider_connection_id' => $connection->id,
                 'error_category' => $failure->failureCategory(),
             ]));
 
@@ -362,10 +362,10 @@ class UnifiAdapter implements IntegrationAdapterInterface
         ];
     }
 
-    public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): SyncResult
+    public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): SyncResult
     {
         try {
-            $apiKey = Crypt::decryptString($tenantSecret->secret_encrypted);
+            $apiKey = Crypt::decryptString($providerConnection->secret_encrypted);
             $externalSiteId = $siteConfig->mapped_external_site_id;
 
             $sitesResponse = Http::withHeaders([
@@ -464,17 +464,16 @@ class UnifiAdapter implements IntegrationAdapterInterface
         }
     }
 
-    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): array
+    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): array
     {
         // TODO: Implement pullHealth via UniFi Cloud API device status endpoint
         return [];
     }
 
-    public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret, ?\DateTimeInterface $since = null): array
+    public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection, ?\DateTimeInterface $since = null): array
     {
         try {
             $accessSecret = IntegrationSiteSecret::query()
-                ->where('tenant_id', $siteConfig->tenant_id)
                 ->where('site_id', $siteConfig->site_id)
                 ->where('provider', $this->provider())
                 ->where('capability', 'access_api')

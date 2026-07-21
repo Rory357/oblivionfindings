@@ -458,12 +458,11 @@ class SiteHardwareRefactorTest extends TestCase
                 Device $device,
                 ?SiteRoom $room,
                 ?int $userId,
-                int $tenantId,
                 ?int $expectedSiteId,
             ): DeviceAssignment {
                 ($this->beforeTransaction)();
 
-                return parent::syncRoomAssignment($device, $room, $userId, $tenantId, $expectedSiteId);
+                return parent::syncRoomAssignment($device, $room, $userId, $expectedSiteId);
             }
         };
         $this->app->instance(UnifiOperationalBridgeService::class, $bridge);
@@ -639,6 +638,12 @@ class SiteHardwareRefactorTest extends TestCase
             'updated_at' => now(),
         ]);
         $device = Device::factory()->security()->create();
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $this->siteA->id,
+            'assigned_at' => now(),
+        ]);
 
         DB::table('site_type_plan_pins')->insert([
             'tenant_id' => $this->siteA->tenant_id,

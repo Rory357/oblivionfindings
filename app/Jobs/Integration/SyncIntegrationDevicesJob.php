@@ -2,10 +2,11 @@
 
 namespace App\Jobs\Integration;
 
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSyncLog;
-use App\Models\Integration\IntegrationTenantSecret;
 use App\Services\Integration\IntegrationAdapterRegistry;
+use App\Support\LegacyStorageContext;
 use App\Support\SafeOperationalData;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -26,7 +27,6 @@ class SyncIntegrationDevicesJob implements ShouldQueue
     public int $backoff = 60;
 
     public function __construct(
-        public int $tenantId,
         public string $provider,
         public ?int $siteId = null,
     ) {}
@@ -44,29 +44,28 @@ class SyncIntegrationDevicesJob implements ShouldQueue
             return;
         }
 
-        $tenantSecret = IntegrationTenantSecret::forTenant($this->tenantId)
-            ->where('provider', $this->provider)
+        $providerConnection = IntegrationProviderConnection::query()
+            ->forProvider($this->provider)
             ->connected()
             ->first();
 
-        if (! $tenantSecret) {
-            Log::warning('SyncIntegrationDevicesJob: no connected secret found', SafeOperationalData::logContext([
-                'tenant_id' => $this->tenantId,
+        if (! $providerConnection) {
+            Log::warning('SyncIntegrationDevicesJob: no connected provider connection found', SafeOperationalData::logContext([
                 'provider' => $this->provider,
             ]));
 
             return;
         }
 
-        $siteConfigs = IntegrationSiteConfig::forTenant($this->tenantId)
+        $siteConfigs = IntegrationSiteConfig::query()
             ->forProvider($this->provider)
             ->active()
+            ->whereHas('site')
             ->when($this->siteId, fn ($q) => $q->where('site_id', $this->siteId))
             ->get();
 
         if ($siteConfigs->isEmpty()) {
             Log::info('SyncIntegrationDevicesJob: no active site configs found', SafeOperationalData::logContext([
-                'tenant_id' => $this->tenantId,
                 'provider' => $this->provider,
                 'site_id' => $this->siteId,
             ]));
@@ -76,7 +75,7 @@ class SyncIntegrationDevicesJob implements ShouldQueue
 
         foreach ($siteConfigs as $siteConfig) {
             $syncLog = IntegrationSyncLog::create([
-                'tenant_id' => $this->tenantId,
+                'tenant_id' => LegacyStorageContext::id(),
                 'provider' => $this->provider,
                 'site_id' => $siteConfig->site_id,
                 'action' => 'sync_devices',
@@ -85,7 +84,7 @@ class SyncIntegrationDevicesJob implements ShouldQueue
             ]);
 
             try {
-                $result = $adapter->syncDevices($siteConfig, $tenantSecret);
+                $result = $adapter->syncDevices($siteConfig, $providerConnection);
 
                 $syncLog->update([
                     'items_processed' => $result->processed,
@@ -102,11 +101,9 @@ class SyncIntegrationDevicesJob implements ShouldQueue
                     $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, SafeOperationalData::failureSummary());
                 }
 
-                // Update tenant secret last_synced_at timestamp
-                $tenantSecret->update(['last_synced_at' => now()]);
+                $providerConnection->update(['last_synced_at' => now()]);
             } catch (\Throwable $e) {
                 Log::error('SyncIntegrationDevicesJob: sync failed for site', SafeOperationalData::logContext([
-                    'tenant_id' => $this->tenantId,
                     'provider' => $this->provider,
                     'site_id' => $siteConfig->site_id,
                     'error_category' => SafeOperationalData::failureCategory($e),

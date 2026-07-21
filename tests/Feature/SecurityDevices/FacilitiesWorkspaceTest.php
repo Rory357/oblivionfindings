@@ -80,8 +80,8 @@ class FacilitiesWorkspaceTest extends TestCase
                 $facilities = $page->toArray()['props']['facilitiesWorkspace'];
 
                 $this->assertSame([
-                    'devices' => 4,
-                    'environment' => 1,
+                    'devices' => 5,
+                    'environment' => 2,
                     'building_systems' => 1,
                     'utilities' => 1,
                     'automations' => 1,
@@ -89,12 +89,12 @@ class FacilitiesWorkspaceTest extends TestCase
                 ], $facilities['overview']['inventory']);
                 $this->assertSame(1, $facilities['overview']['attention']['active_events']);
                 $this->assertSame(1, $facilities['overview']['attention']['monitoring']);
-                $this->assertSame(2, $facilities['overview']['attention']['unmonitored']);
+                $this->assertSame(3, $facilities['overview']['attention']['unmonitored']);
                 $this->assertSame(1, $facilities['overview']['attention']['overdue_maintenance']);
                 $this->assertSame(1, $facilities['overview']['freshness']['fresh']);
-                $this->assertSame(3, $facilities['overview']['freshness']['not_collected']);
+                $this->assertSame(4, $facilities['overview']['freshness']['not_collected']);
                 $this->assertSame($site->id, $facilities['overview']['sites'][0]['id']);
-                $this->assertNotContains(
+                $this->assertContains(
                     $foreign->id,
                     collect($facilities['activeTab']['devices'])->pluck('id')->all(),
                 );

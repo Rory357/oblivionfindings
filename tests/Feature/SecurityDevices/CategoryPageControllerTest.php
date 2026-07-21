@@ -157,7 +157,7 @@ class CategoryPageControllerTest extends TestCase
         );
     }
 
-    public function test_category_inventory_stats_and_providers_are_scoped_to_the_users_tenant(): void
+    public function test_category_inventory_stats_and_providers_cover_the_single_application_registry(): void
     {
         $this->admin->forceFill(['organization_id' => 42])->save();
 
@@ -175,10 +175,9 @@ class CategoryPageControllerTest extends TestCase
         $response = $this->actingAs($this->admin)->get('/security-devices/network-it');
 
         $response->assertInertia(fn ($page) => $page
-            ->has('devices.data', 1)
-            ->where('devices.data.0.name', 'Tenant switch')
-            ->where('stats.total', 1)
-            ->where('filterOptions.providers', ['tenant-provider'])
+            ->has('devices.data', 2)
+            ->where('stats.total', 2)
+            ->where('filterOptions.providers', ['foreign-provider', 'tenant-provider'])
         );
     }
 

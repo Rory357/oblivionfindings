@@ -393,27 +393,27 @@ class DeviceProfileWorkspaceTest extends TestCase
                     ->every(fn (array $section): bool => ! str_starts_with((string) ($section['href'] ?? ''), '/control-room/alerts/'))));
     }
 
-    public function test_profile_scopes_monitor_profile_and_collector_projections_to_device_tenant(): void
+    public function test_profile_uses_canonical_device_relationships_for_monitor_profile_and_collector_projections(): void
     {
         $device = Device::factory()->create(['tenant_id' => 42]);
-        $foreignProfile = MonitoringProfile::factory()->create(['tenant_id' => 77]);
-        $foreignCollector = MonitoringCollector::factory()->create([
+        $legacyPartitionedProfile = MonitoringProfile::factory()->create(['tenant_id' => 77]);
+        $legacyPartitionedCollector = MonitoringCollector::factory()->create([
             'tenant_id' => 77,
-            'name' => 'Foreign collector sentinel',
+            'name' => 'Remote site collector',
         ]);
         Monitor::factory()->create([
             'tenant_id' => 42,
             'device_id' => $device->id,
-            'profile_id' => $foreignProfile->id,
-            'collector_id' => $foreignCollector->id,
-            'name' => 'Tenant monitor',
+            'profile_id' => $legacyPartitionedProfile->id,
+            'collector_id' => $legacyPartitionedCollector->id,
+            'name' => 'Primary monitor',
         ]);
         Monitor::factory()->create([
             'tenant_id' => 77,
             'device_id' => $device->id,
-            'profile_id' => $foreignProfile->id,
-            'collector_id' => $foreignCollector->id,
-            'name' => 'Foreign monitor sentinel',
+            'profile_id' => $legacyPartitionedProfile->id,
+            'collector_id' => $legacyPartitionedCollector->id,
+            'name' => 'Legacy partitioned monitor',
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -421,10 +421,15 @@ class DeviceProfileWorkspaceTest extends TestCase
 
         $response->assertOk()->assertInertia(function ($page): void {
             $monitors = $page->toArray()['props']['profile']['monitors'];
-            $this->assertCount(1, $monitors);
-            $this->assertSame('Tenant monitor', $monitors[0]['name']);
-            $this->assertNull($monitors[0]['profile']);
-            $this->assertNull($monitors[0]['collector']);
+            $this->assertCount(2, $monitors);
+            $this->assertEqualsCanonicalizing(
+                ['Primary monitor', 'Legacy partitioned monitor'],
+                collect($monitors)->pluck('name')->all(),
+            );
+            foreach ($monitors as $monitor) {
+                $this->assertNotNull($monitor['profile']);
+                $this->assertSame('Remote site collector', $monitor['collector']['name']);
+            }
         });
     }
 

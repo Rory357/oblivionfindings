@@ -15,10 +15,9 @@ class IntegrationContextProvider
     /**
      * Build LLM-ready context for AI narrative generation.
      *
-     * Inferred Presence data requires explicit permission + tenant-wide toggle (config features.face_recognition).
+     * Inferred Presence data requires explicit permission plus the application feature toggle.
      */
     public function getContext(
-        int $tenantId,
         int $siteId,
         ?int $roomId = null,
         ?string $subject = null,
@@ -26,53 +25,22 @@ class IntegrationContextProvider
     ): array {
         $from = $timeWindow['from'] ?? Carbon::now()->subDay();
         $to = $timeWindow['to'] ?? Carbon::now();
-        $allowLegacyNullTenant = $tenantId === 1;
-
-        // Site IDs are globally addressable, so validate the tenant boundary before
-        // reading any site-derived context. Tenant 1 alone may read deliberately
-        // unassigned legacy rows; the verified site ID still contains that fallback.
-        Site::query()
-            ->whereKey($siteId)
-            ->where(function ($tenantQuery) use ($tenantId, $allowLegacyNullTenant) {
-                $tenantQuery->where('tenant_id', $tenantId);
-                if ($allowLegacyNullTenant) {
-                    $tenantQuery->orWhereNull('tenant_id');
-                }
-            })
-            ->firstOrFail();
+        Site::query()->whereKey($siteId)->firstOrFail();
 
         // Query integration events for the site within the time window
         $eventsQuery = IntegrationEvent::where('site_id', $siteId)
-            ->where(function ($tenantQuery) use ($tenantId, $allowLegacyNullTenant) {
-                $tenantQuery->where('tenant_id', $tenantId);
-                if ($allowLegacyNullTenant) {
-                    $tenantQuery->orWhereNull('tenant_id');
-                }
-            })
             ->whereBetween('occurred_at', [$from, $to]);
 
         if ($roomId) {
             SiteRoom::query()
                 ->whereKey($roomId)
                 ->where('site_id', $siteId)
-                ->where(function ($tenantQuery) use ($tenantId, $allowLegacyNullTenant) {
-                    $tenantQuery->where('tenant_id', $tenantId);
-                    if ($allowLegacyNullTenant) {
-                        $tenantQuery->orWhereNull('tenant_id');
-                    }
-                })
                 ->firstOrFail();
             $eventsQuery->where('room_id', $roomId);
         }
 
-        $relationScope = function ($query) use ($tenantId, $siteId, $allowLegacyNullTenant): void {
-            $query->where('site_id', $siteId)
-                ->where(function ($tenantQuery) use ($tenantId, $allowLegacyNullTenant) {
-                    $tenantQuery->where('tenant_id', $tenantId);
-                    if ($allowLegacyNullTenant) {
-                        $tenantQuery->orWhereNull('tenant_id');
-                    }
-                });
+        $relationScope = function ($query) use ($siteId): void {
+            $query->where('site_id', $siteId);
         };
         $events = $eventsQuery->with([
             'hardware' => $relationScope,
@@ -89,19 +57,13 @@ class IntegrationContextProvider
         $criticalAlertCount = $alerts->where('severity', 'critical')->count();
 
         // Query device status for the site (canonical Security & Devices registry).
-        $siteDevices = app(DeviceRegistryService::class)->forSite($tenantId, $siteId);
+        $siteDevices = app(DeviceRegistryService::class)->forSite($siteId);
         $hardwareCount = (clone $siteDevices)->count();
         $onlineCount = (clone $siteDevices)->where('status', DeviceStatus::Active->value)->count();
         $offlineCount = (clone $siteDevices)->where('status', DeviceStatus::Offline->value)->count();
 
         // Query rooms for the site
         $rooms = SiteRoom::where('site_id', $siteId)
-            ->where(function ($tenantQuery) use ($tenantId, $allowLegacyNullTenant) {
-                $tenantQuery->where('tenant_id', $tenantId);
-                if ($allowLegacyNullTenant) {
-                    $tenantQuery->orWhereNull('tenant_id');
-                }
-            })
             ->withCount(['hardware as scoped_hardware_count' => $relationScope])
             ->get();
 

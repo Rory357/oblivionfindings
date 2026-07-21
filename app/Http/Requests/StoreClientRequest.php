@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\SiteHouseRoom;
 use App\Services\Clients\ClientWorkerEligibility;
@@ -188,6 +189,25 @@ class StoreClientRequest extends FormRequest
 
             if (! $belongsToSite) {
                 $validator->errors()->add('room_id', 'Selected room does not belong to the chosen site.');
+            }
+        });
+
+        $validator->after(function (Validator $validator) {
+            $geofenceId = $this->input('house_geofence_id');
+            if (blank($geofenceId) || $validator->errors()->has('house_geofence_id')) {
+                return;
+            }
+
+            $siteId = filled($this->input('site_id')) ? (int) $this->input('site_id') : null;
+            if (! AssetGeofence::query()
+                ->eligibleForClientSite($siteId)
+                ->whereKey((int) $geofenceId)
+                ->exists()
+            ) {
+                $validator->errors()->add(
+                    'house_geofence_id',
+                    'Choose an active house or resident geofence for the selected Site.',
+                );
             }
         });
 

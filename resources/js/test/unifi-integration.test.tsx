@@ -43,7 +43,7 @@ describe('UniFi integration', () => {
     it('disables inactive mapping sync with an accessible recovery explanation', () => {
         render(
             <UnifiIntegration
-                tenantSecret={{ status: 'connected', secret_last4: '0042' }}
+                providerConnection={{ status: 'connected', secret_last4: '0042' }}
                 discoveredSites={[]}
                 siteConfigs={[
                     {

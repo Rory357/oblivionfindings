@@ -275,7 +275,7 @@ class HealthcareWorkspacePresenter
             : Client::query()
                 ->whereIn('id', $clientIds)
                 ->with('keyWorker:id,name')
-                ->get(['id', 'organization_id', 'first_name', 'preferred_name', 'key_worker_id'])
+                ->get(['id', 'first_name', 'preferred_name', 'key_worker_id'])
                 ->filter(fn (Client $client): bool => Gate::forUser($viewer)->allows('view', $client))
                 ->keyBy('id');
         $sites = $siteIds->isEmpty()
@@ -303,17 +303,15 @@ class HealthcareWorkspacePresenter
             return collect();
         }
 
-        $tenantId = (int) ($viewer->organization_id ?? 1);
-
         return ItTicketLink::query()
-            ->forTenant($tenantId)
             ->where('relationship', 'affected_device')
             ->where('linkable_type', Device::class)
             ->whereIn('linkable_id', $deviceIds)
-            ->with('ticket:id,tenant_id,reference,title,status')
+            ->with('ticket:id,reference,title,status')
             ->latest('id')
             ->get()
-            ->filter(fn (ItTicketLink $link): bool => (int) $link->ticket?->tenant_id === $tenantId)
+            ->filter(fn (ItTicketLink $link): bool => $link->ticket !== null
+                && Gate::forUser($viewer)->allows('view', $link->ticket))
             ->groupBy('linkable_id');
     }
 

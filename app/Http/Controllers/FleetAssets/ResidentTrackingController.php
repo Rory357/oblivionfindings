@@ -6,8 +6,8 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
-use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\ClientConsent;
@@ -15,14 +15,12 @@ use App\Models\ControlRoomAlert;
 use App\Models\FleetOuting;
 use App\Models\FleetTelemetryEvent;
 use App\Models\Queclink\QueclinkPendingCommand;
-use App\Models\Site;
 use App\Models\User;
 use App\Services\ConsentValidationService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\Integration\IntegrationEventHistoryService;
 use App\Services\Queclink\LocateNowService;
 use App\Services\Tracking\GeofenceStatusService;
-use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,34 +30,21 @@ use Inertia\Inertia;
 
 class ResidentTrackingController extends Controller
 {
-    private const SITE_BYPASS_PERMISSIONS = ['fleet.manage'];
-
     public function __construct(
         private readonly DeviceRegistryService $registry,
         private readonly DeviceAssignmentService $assignmentService,
         private readonly GeofenceStatusService $geofenceStatus,
-        private readonly UserSiteAccessService $siteAccess,
+        private readonly SecurityDevicesAccessService $deviceAccess,
     ) {}
 
     public function index(Request $request)
     {
         $user = $request->user();
-        $organizationId = $this->organizationId($user);
-
-        // Client and device queries share the same tenant boundary. Users and
-        // clients carry organization_id; sites and devices carry tenant_id.
         $authorizedClientIds = $this->getAuthorizedClientIds($user);
 
         // Get tracking devices actively assigned to clients (canonical).
-        $clientDevices = Device::query()
-            ->when(
-                $organizationId === null,
-                fn (Builder $query) => $query->whereRaw('1 = 0'),
-                fn (Builder $query) => $query->where('tenant_id', $organizationId),
-            )
+        $clientDevices = $this->deviceAccess->visibleDevices($user)
             ->where('domain', 'tracking')
-            ->whereDoesntHave('activeAssetLinks', fn (Builder $links) => $links
-                ->whereNotIn('asset_id', $this->accessibleAssetIds($user)))
             ->whereHas('assignments', function ($q) use ($authorizedClientIds) {
                 $q->active()
                     ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
@@ -91,12 +76,9 @@ class ResidentTrackingController extends Controller
         $clientIds = $clientDevices->map(fn ($d) => $d->assignments->first()?->assignable_id)->filter()->unique()->values();
         $allowedGeofenceIds = $geofences->pluck('id')->all();
         $clients = Client::with([
-            'site' => fn ($query) => $query
-                ->where('tenant_id', $organizationId)
-                ->select(['id', 'name']),
+            'site' => fn ($query) => $query->select(['id', 'name']),
             'houseGeofence' => fn ($query) => $query->whereIn('asset_geofences.id', $allowedGeofenceIds),
         ])
-            ->where('organization_id', $organizationId)
             ->whereIn('id', $clientIds)
             ->get()
             ->keyBy('id');
@@ -159,7 +141,6 @@ class ResidentTrackingController extends Controller
         $avgBattery = $totalTracked > 0 ? round($residents->avg(fn ($r) => $r['battery'] ?? 0), 0) : 0;
 
         $totalClientQuery = Client::query()
-            ->where('organization_id', $organizationId)
             ->where('status', 'active')
             ->whereIn('id', $authorizedClientIds);
         $totalClients = $totalClientQuery->count();
@@ -322,14 +303,12 @@ class ResidentTrackingController extends Controller
         // Load client data.
         $clientIds = $alerts->getCollection()->pluck('client_id')->unique()->filter();
         $clients = Client::query()
-            ->where('organization_id', $this->organizationId($request->user()))
             ->whereIn('id', $clientIds)
             ->get()
             ->keyBy('id');
 
         // Canonical tracking devices assigned to these clients for last-known location.
-        $devicesByClient = Device::query()
-            ->where('tenant_id', $this->organizationId($request->user()))
+        $devicesByClient = $this->deviceAccess->visibleDevices($request->user())
             ->where('domain', 'tracking')
             ->whereHas('assignments', function ($q) use ($clientIds) {
                 $q->active()
@@ -410,9 +389,6 @@ class ResidentTrackingController extends Controller
     private function assignPayload(User $user): array
     {
         $authorizedClientIds = $this->getAuthorizedClientIds($user);
-        $organizationId = $this->organizationId($user);
-        $accessibleAssetIds = $this->accessibleAssetIds($user);
-        $canManageTenant = $this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS);
 
         // Clients already tracked (have an active tracking device assignment).
         $trackedClientIds = DeviceAssignment::query()
@@ -420,13 +396,11 @@ class ResidentTrackingController extends Controller
             ->where('assignable_type', 'client')
             ->whereIn('assignable_id', $authorizedClientIds)
             ->whereHas('device', fn ($q) => $q
-                ->where('tenant_id', $organizationId)
                 ->where('domain', 'tracking'))
             ->pluck('assignable_id')
             ->toArray();
 
         $clientQuery = Client::query()
-            ->where('organization_id', $organizationId)
             ->where('status', 'active')
             ->whereIn('id', $authorizedClientIds)
             ->orderBy('first_name');
@@ -438,17 +412,10 @@ class ResidentTrackingController extends Controller
         ]);
 
         // Available trackers (tracking devices not assigned to anyone).
-        $availableTrackerQuery = Device::query()
-            ->where('tenant_id', $organizationId)
+        $availableTrackerQuery = $this->deviceAccess->visibleDevices($user)
             ->where('domain', 'tracking')
             ->whereNotIn('status', ['decommissioned', 'lost'])
-            ->whereDoesntHave('assignments', fn ($q) => $q->active())
-            ->whereDoesntHave('activeAssetLinks', fn (Builder $links) => $links
-                ->whereNotIn('asset_id', $accessibleAssetIds));
-        if (! $canManageTenant) {
-            $availableTrackerQuery->whereHas('activeAssetLinks', fn ($links) => $links
-                ->whereIn('asset_id', $accessibleAssetIds));
-        }
+            ->whereDoesntHave('assignments', fn ($q) => $q->active());
         $availableTrackers = $availableTrackerQuery
             ->orderBy('name')
             ->get()
@@ -464,11 +431,8 @@ class ResidentTrackingController extends Controller
             ]);
 
         // Currently assigned trackers.
-        $assignedDeviceQuery = Device::query()
-            ->where('tenant_id', $organizationId)
+        $assignedDeviceQuery = $this->deviceAccess->visibleDevices($user)
             ->where('domain', 'tracking')
-            ->whereDoesntHave('activeAssetLinks', fn (Builder $links) => $links
-                ->whereNotIn('asset_id', $accessibleAssetIds))
             ->whereHas('assignments', fn ($q) => $q
                 ->active()
                 ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
@@ -483,11 +447,8 @@ class ResidentTrackingController extends Controller
 
         $assignedClientIds = $assignedDevices->map(fn ($d) => $d->assignments->first()?->assignable_id)->filter()->unique()->all();
         $assignedClients = Client::with([
-            'site' => fn ($query) => $query
-                ->where('tenant_id', $organizationId)
-                ->select(['id', 'name']),
+            'site' => fn ($query) => $query->select(['id', 'name']),
         ])
-            ->where('organization_id', $organizationId)
             ->whereIn('id', $assignedClientIds)
             ->get()
             ->keyBy('id');
@@ -531,23 +492,17 @@ class ResidentTrackingController extends Controller
         ]);
 
         $user = $request->user();
-        $organizationId = $this->organizationId($user);
-        abort_unless($organizationId !== null, 403);
 
         try {
-            DB::transaction(function () use ($data, $user, $organizationId): void {
+            DB::transaction(function () use ($data, $user): void {
                 $client = Client::query()
-                    ->where('organization_id', $organizationId)
                     ->whereIn('id', $this->getAuthorizedClientIds($user))
                     ->lockForUpdate()
                     ->find($data['client_id']);
                 abort_unless($client, 403);
 
-                $device = Device::query()
-                    ->where('tenant_id', $organizationId)
+                $device = $this->deviceAccess->visibleDevices($user)
                     ->where('domain', 'tracking')
-                    ->whereDoesntHave('activeAssetLinks', fn (Builder $links) => $links
-                        ->whereNotIn('asset_id', $this->accessibleAssetIds($user)))
                     ->lockForUpdate()
                     ->find($data['tracker_id']);
                 abort_unless($device, 403);
@@ -579,15 +534,14 @@ class ResidentTrackingController extends Controller
     public function unassign(Request $request, Device $device)
     {
         $user = $request->user();
-        $organizationId = $this->organizationId($user);
-        abort_unless($organizationId !== null, 403);
 
-        DB::transaction(function () use ($device, $user, $organizationId): void {
-            $lockedDevice = Device::query()
-                ->where('tenant_id', $organizationId)
+        DB::transaction(function () use ($device, $user): void {
+            $lockedDevice = $this->deviceAccess->visibleDevices($user)
                 ->lockForUpdate()
                 ->find($device->id);
             abort_unless($lockedDevice, 403);
+
+            $this->deviceAccess->assertCanManageActiveAssignment($user, $lockedDevice, true);
 
             $activeClientAssignment = $lockedDevice->assignments()
                 ->active()
@@ -616,11 +570,9 @@ class ResidentTrackingController extends Controller
         $user = $request->user();
         $this->assertCanAccessClient($user, $client);
         $this->assertHasActiveTrackingConsent($client);
-        $organizationId = $this->organizationId($user);
-
         // Canonical device lookup.
         $device = $this->registry
-            ->forClient($organizationId, $client->id)
+            ->forClient($client->id)
             ->where('domain', 'tracking')
             ->first();
 
@@ -652,9 +604,7 @@ class ResidentTrackingController extends Controller
             ->unique()
             ->values();
 
-        $client->loadMissing(['site' => fn ($query) => $query
-            ->where('tenant_id', $organizationId)
-            ->select(['id', 'name'])]);
+        $client->loadMissing(['site' => fn ($query) => $query->select(['id', 'name'])]);
         $houseGeofence = $client->house_geofence_id
             ? $this->applyGeofenceScope(
                 AssetGeofence::query()->whereKey($client->house_geofence_id),
@@ -718,10 +668,8 @@ class ResidentTrackingController extends Controller
         $user = $request->user();
         $this->assertCanAccessClient($user, $client);
         $this->assertHasActiveTrackingConsent($client);
-        $organizationId = $this->organizationId($user);
-
         $device = $this->registry
-            ->forClient($organizationId, $client->id)
+            ->forClient($client->id)
             ->where('domain', 'tracking')
             ->first();
 
@@ -740,8 +688,7 @@ class ResidentTrackingController extends Controller
         Request $request,
         Client $client,
         ControlRoomAlertLifecycleService $lifecycle,
-    )
-    {
+    ) {
         $user = $request->user();
         $this->assertCanAccessClient($user, $client);
         $this->assertHasActiveTrackingConsent($client);
@@ -757,10 +704,8 @@ class ResidentTrackingController extends Controller
         ControlRoomAlertLifecycleService $lifecycle,
     ): void {
         DB::transaction(function () use ($client, $actor, $lifecycle): void {
-            $organizationId = $this->organizationId($actor);
-            abort_unless($organizationId !== null, 403);
             $device = $this->registry
-                ->forClient($organizationId, $client->id)
+                ->forClient($client->id)
                 ->where('domain', 'tracking')
                 ->first();
 
@@ -813,24 +758,16 @@ class ResidentTrackingController extends Controller
         Builder $query,
         User $user,
         array $authorizedClientIds,
-    ): Builder
-    {
-        $organizationId = $this->organizationId($user);
+    ): Builder {
         $assetIds = $this->accessibleAssetIds($user);
         $clientIds = $authorizedClientIds;
         if ($assetIds === [] && $clientIds === []) {
             return $query->whereRaw('1 = 0');
         }
 
-        return $query
-            ->where(function (Builder $tenant) use ($organizationId): void {
-                $tenant->where('tenant_id', $organizationId)
-                    ->orWhereNull('tenant_id');
-            })
-            ->whereIn('asset_id', $assetIds)
+        return $query->whereIn('asset_id', $assetIds)
             ->whereHas('clients', fn (Builder $clients) => $clients
-                ->whereIn('clients.id', $clientIds)
-                ->where('clients.organization_id', $organizationId));
+                ->whereIn('clients.id', $clientIds));
     }
 
     /**
@@ -838,73 +775,12 @@ class ResidentTrackingController extends Controller
      */
     private function accessibleAssetIds(User $user): array
     {
-        $siteIds = $this->accessibleSiteIds($user);
-        if ($siteIds === []) {
-            return [];
-        }
-
-        $hasHomeSite = Schema::hasColumn('assets', 'home_site_id');
-
-        return Asset::query()
-            ->where(function (Builder $sites) use ($siteIds, $hasHomeSite) {
-                $sites->whereIn('site_id', $siteIds);
-                if ($hasHomeSite) {
-                    $sites->orWhere(function (Builder $homeSite) use ($siteIds): void {
-                        $homeSite->whereNull('site_id')
-                            ->whereIn('home_site_id', $siteIds);
-                    });
-                }
-            })
-            ->pluck('id')
-            ->map(fn ($assetId) => (int) $assetId)
-            ->all();
+        return $this->deviceAccess->authorizedAssetIds($user);
     }
 
     private function getAuthorizedClientIds(User $user): array
     {
-        $organizationId = $this->organizationId($user);
-        if ($organizationId === null) {
-            return [];
-        }
-
-        $tenantSiteIds = $this->tenantSiteIds($user);
-        if ($tenantSiteIds === []) {
-            return [];
-        }
-
-        $query = Client::query()
-            ->where('organization_id', $organizationId);
-
-        if ($this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS)) {
-            $query->where(function (Builder $sites) use ($tenantSiteIds): void {
-                $sites->whereIn('site_id', $tenantSiteIds)
-                    ->orWhereNull('site_id');
-            });
-        } else {
-            $query->whereIn('site_id', $this->accessibleSiteIds($user));
-        }
-
-        return $query
-            ->pluck('id')
-            ->map(fn ($clientId) => (int) $clientId)
-            ->all();
-    }
-
-    /**
-     * @return array<int, int>
-     */
-    private function tenantSiteIds(User $user): array
-    {
-        $organizationId = $this->organizationId($user);
-        if ($organizationId === null) {
-            return [];
-        }
-
-        return Site::query()
-            ->where('tenant_id', $organizationId)
-            ->pluck('id')
-            ->map(fn ($siteId) => (int) $siteId)
-            ->all();
+        return $this->deviceAccess->authorizedClientIds($user);
     }
 
     /**
@@ -912,33 +788,13 @@ class ResidentTrackingController extends Controller
      */
     private function accessibleSiteIds(User $user): array
     {
-        $tenantSiteIds = $this->tenantSiteIds($user);
-        if ($this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS)) {
-            return $tenantSiteIds;
-        }
-
-        return array_values(array_intersect(
-            $this->siteAccess->accessibleSiteIds($user),
-            $tenantSiteIds,
-        ));
-    }
-
-    private function organizationId(?User $user): ?int
-    {
-        $organizationId = $user?->organization_id;
-
-        return is_numeric($organizationId) && (int) $organizationId > 0
-            ? (int) $organizationId
-            : null;
+        return $this->deviceAccess->accessibleSiteIds($user);
     }
 
     private function assertCanAccessClient(User $user, Client $client): void
     {
-        $organizationId = $this->organizationId($user);
         abort_unless(
-            $organizationId !== null
-                && (int) $client->organization_id === $organizationId
-                && in_array((int) $client->id, $this->getAuthorizedClientIds($user), true),
+            in_array((int) $client->id, $this->getAuthorizedClientIds($user), true),
             403,
         );
     }

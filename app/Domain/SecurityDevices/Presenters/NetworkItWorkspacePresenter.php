@@ -155,7 +155,6 @@ class NetworkItWorkspacePresenter
         }
 
         $ids = MonitorObservation::query()
-            ->forTenant((int) ($viewer->organization_id ?? 1))
             ->whereIn('monitor_id', $monitorIds)
             ->selectRaw('MAX(id)')
             ->groupBy('monitor_id');
@@ -513,17 +512,13 @@ class NetworkItWorkspacePresenter
             return collect();
         }
 
-        $tenantId = (int) ($viewer->organization_id ?? 1);
-
         return ItTicketLink::query()
-            ->forTenant($tenantId)
             ->where('relationship', 'affected_device')
             ->where('linkable_type', Device::class)
             ->whereIn('linkable_id', $deviceIds)
             ->whereHas('ticket', fn (Builder $ticket) => $ticket
-                ->where('tenant_id', $tenantId)
                 ->whereIn('status', ItTicket::OPEN_STATUSES))
-            ->with('ticket:id,tenant_id,reference,title,status,updated_at,requester_user_id')
+            ->with('ticket:id,reference,title,status,updated_at,requester_user_id')
             ->latest('id')
             ->get()
             ->filter(fn (ItTicketLink $link): bool => $link->ticket !== null

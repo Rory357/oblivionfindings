@@ -9,7 +9,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class IntegrationTenantSecret extends Model
+/**
+ * The one application-level credential connection for a provider.
+ *
+ * The legacy table and partition column remain until the separately approved
+ * storage migration. Neither is an authorization boundary.
+ */
+class IntegrationProviderConnection extends Model
 {
     use AuditableChanges;
     use HasFactory;
@@ -45,6 +51,8 @@ class IntegrationTenantSecret extends Model
 
     protected $hidden = [
         'secret_encrypted',
+        'config',
+        'last_error',
     ];
 
     protected array $auditExcludedAttributes = [
@@ -53,22 +61,14 @@ class IntegrationTenantSecret extends Model
         'last_error',
     ];
 
-    /* ---------------------------------------------------------------
-     * Relationships
-     * ------------------------------------------------------------- */
-
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    /* ---------------------------------------------------------------
-     * Scopes
-     * ------------------------------------------------------------- */
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
+    public function scopeForProvider(Builder $query, string $provider): Builder
     {
-        return $query->where('tenant_id', $tenantId);
+        return $query->where('provider', $provider);
     }
 
     public function scopeConnected(Builder $query): Builder

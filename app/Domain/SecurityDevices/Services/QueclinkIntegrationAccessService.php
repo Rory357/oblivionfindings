@@ -2,6 +2,7 @@
 
 namespace App\Domain\SecurityDevices\Services;
 
+use App\Domain\SecurityDevices\Models\Device;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\Queclink\QueclinkDevice;
@@ -12,23 +13,20 @@ use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 /**
- * One deny-by-default tenant and destination-policy boundary for every
+ * One deny-by-default provider and destination-policy boundary for every
  * route-bound Queclink mutation.
  */
 class QueclinkIntegrationAccessService
 {
     public function __construct(private readonly SecurityDevicesAccessService $devices) {}
 
-    public function tenantId(User $user): int
-    {
-        return $this->devices->tenantId($user);
-    }
-
     public function assertDevice(User $user, QueclinkDevice $device): void
     {
-        $this->assertDeviceTenant($user, $device);
+        abort_unless($user->canDo('securityDevices.integrations.manage'), 403);
 
-        if ($device->device_id !== null) {
+        if ($device->device_id === null) {
+            abort_unless($this->devices->canViewUnassigned($user), 404);
+        } else {
             abort_unless(
                 $this->devices->visibleDevices($user)->whereKey($device->device_id)->exists(),
                 404,
@@ -36,21 +34,20 @@ class QueclinkIntegrationAccessService
         }
     }
 
-    public function assertDeviceTenant(User $user, QueclinkDevice $device): void
+    public function assertDeviceForRelease(User $user, QueclinkDevice $device): void
     {
-        abort_unless(
-            $device->tenant_id !== null
-            && (int) $device->tenant_id === $this->tenantId($user),
-            404,
-        );
+        abort_unless($user->canDo('securityDevices.integrations.manage'), 403);
+        abort_unless($device->device_id !== null, 404);
+
+        $canonicalDevice = $this->devices->releasableDevices($user)->find($device->device_id);
+        abort_unless($canonicalDevice instanceof Device, 404);
+        $this->devices->assertCanReleaseActiveAssignment($user, $canonicalDevice);
     }
 
     public function assertCommand(User $user, QueclinkPendingCommand $command): void
     {
         abort_unless(
-            $command->tenant_id !== null
-            && (int) $command->tenant_id === $this->tenantId($user)
-            && $command->device !== null,
+            $command->device !== null,
             404,
         );
         $this->assertDevice($user, $command->device);
@@ -59,8 +56,7 @@ class QueclinkIntegrationAccessService
     public function assertPreset(User $user, QueclinkPreset $preset): void
     {
         abort_unless(
-            $preset->is_system
-            || ($preset->tenant_id !== null && (int) $preset->tenant_id === $this->tenantId($user)),
+            $preset->is_system || $user->canDo('securityDevices.integrations.manage'),
             404,
         );
     }
@@ -73,22 +69,15 @@ class QueclinkIntegrationAccessService
         return $asset;
     }
 
-    public function assertAssetTenant(User $user, ?Asset $asset): void
+    public function assertAsset(User $user, ?Asset $asset): void
     {
         abort_unless($asset !== null, 404);
-        abort_unless(
-            $this->devices->assetMatchesTenant($asset, $this->tenantId($user)),
-            404,
-        );
+        abort_unless($this->devices->assignableAsset($user, (int) $asset->id) !== null, 404);
     }
 
-    public function assertHistoricalAssetTenant(User $user, ?Asset $asset): void
+    public function assertHistoricalAsset(User $user, ?Asset $asset): void
     {
-        abort_unless($asset !== null, 404);
-        abort_unless(
-            $this->devices->assetMatchesTenantHistorically($asset, $this->tenantId($user)),
-            404,
-        );
+        $this->assertAsset($user, $asset);
     }
 
     public function staff(User $user, int $id, bool $lockForUpdate = false): User
@@ -112,7 +101,6 @@ class QueclinkIntegrationAccessService
     {
         $uniqueIds = array_values(array_unique(array_map('intval', $ids)));
         $devices = QueclinkDevice::query()
-            ->where('tenant_id', $this->tenantId($user))
             ->whereIn('id', $uniqueIds)
             ->get()
             ->keyBy('id');

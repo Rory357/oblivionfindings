@@ -143,7 +143,7 @@ class MaintenanceHealthControllerTest extends TestCase
         );
     }
 
-    public function test_maintenance_health_data_is_scoped_to_the_users_tenant(): void
+    public function test_maintenance_health_data_covers_the_single_application_registry_for_all_sites_users(): void
     {
         $this->admin->forceFill(['organization_id' => 42])->save();
 
@@ -179,11 +179,20 @@ class MaintenanceHealthControllerTest extends TestCase
         $response->assertInertia(function ($page) {
             $props = $page->toArray()['props'];
 
-            $this->assertSame(1, $props['stats']['overdue']);
-            $this->assertSame(1, $props['stats']['critical']);
-            $this->assertSame(['Tenant sensor maintenance'], collect($props['records']['data'])->pluck('description')->all());
-            $this->assertSame(['Tenant sensor'], collect($props['attentionDevices'])->pluck('name')->all());
-            $this->assertSame(['Tenant sensor'], collect($props['lowBatteryDevices'])->pluck('name')->all());
+            $this->assertSame(2, $props['stats']['overdue']);
+            $this->assertSame(2, $props['stats']['critical']);
+            $this->assertEqualsCanonicalizing(
+                ['Tenant sensor maintenance', 'Foreign sensor maintenance'],
+                collect($props['records']['data'])->pluck('description')->all(),
+            );
+            $this->assertEqualsCanonicalizing(
+                ['Tenant sensor', 'Foreign sensor'],
+                collect($props['attentionDevices'])->pluck('name')->all(),
+            );
+            $this->assertEqualsCanonicalizing(
+                ['Tenant sensor', 'Foreign sensor'],
+                collect($props['lowBatteryDevices'])->pluck('name')->all(),
+            );
         });
     }
 
@@ -280,7 +289,7 @@ class MaintenanceHealthControllerTest extends TestCase
             ->assertSessionHasErrors(['type']);
     }
 
-    public function test_maintenance_mutations_reject_resources_outside_the_users_tenant(): void
+    public function test_maintenance_mutations_ignore_legacy_partition_values_for_authorized_stock(): void
     {
         $this->admin->forceFill(['organization_id' => 42])->save();
         $foreignDevice = Device::factory()->create(['tenant_id' => 77]);
@@ -296,22 +305,22 @@ class MaintenanceHealthControllerTest extends TestCase
                 'type' => 'inspection',
                 'description' => 'Should not be created',
             ])
-            ->assertNotFound();
+            ->assertRedirect();
 
         $this->actingAs($this->admin)
             ->put("/security-devices/maintenance/{$foreignRecord->id}", [
                 'description' => 'Should not be updated',
             ])
-            ->assertNotFound();
+            ->assertRedirect();
 
         $this->actingAs($this->admin)
             ->post("/security-devices/maintenance/{$foreignRecord->id}/complete")
-            ->assertNotFound();
+            ->assertRedirect();
 
         $foreignRecord->refresh();
-        $this->assertSame('Foreign maintenance', $foreignRecord->description);
-        $this->assertSame('scheduled', $foreignRecord->status);
-        $this->assertDatabaseMissing('device_maintenance_records', [
+        $this->assertSame('Should not be updated', $foreignRecord->description);
+        $this->assertSame('completed', $foreignRecord->status);
+        $this->assertDatabaseHas('device_maintenance_records', [
             'device_id' => $foreignDevice->id,
             'description' => 'Should not be created',
         ]);

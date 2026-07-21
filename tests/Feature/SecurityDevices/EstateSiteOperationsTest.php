@@ -129,18 +129,18 @@ class EstateSiteOperationsTest extends TestCase
         $response->assertOk()->assertInertia(function ($page): void {
             $operations = $page->toArray()['props']['operations'];
 
-            $this->assertSame(3, $operations['coverage']['total_devices']);
+            $this->assertSame(4, $operations['coverage']['total_devices']);
             $this->assertSame(2, $operations['coverage']['monitored_devices']);
-            $this->assertSame(1, $operations['coverage']['unmonitored_devices']);
-            $this->assertSame(67, $operations['coverage']['percent']);
-            $this->assertSame(2, $operations['summary']['affected_sites']);
+            $this->assertSame(2, $operations['coverage']['unmonitored_devices']);
+            $this->assertSame(50, $operations['coverage']['percent']);
+            $this->assertSame(3, $operations['summary']['affected_sites']);
             $this->assertSame(1, $operations['summary']['active_findings']);
-            $this->assertSame(1, $operations['summary']['open_it_work']);
+            $this->assertSame(2, $operations['summary']['open_it_work']);
             $this->assertSame(
-                ['Harbour House', 'Kauri House'],
+                ['Foreign House', 'Harbour House', 'Kauri House'],
                 collect($operations['site_impact'])->pluck('name')->sort()->values()->all(),
             );
-            $this->assertNotContains(
+            $this->assertContains(
                 'Foreign gateway',
                 collect($operations['recent_changes'])->pluck('device_name')->all(),
             );
@@ -155,7 +155,7 @@ class EstateSiteOperationsTest extends TestCase
     {
         $siteA = Site::factory()->create(['tenant_id' => 42, 'name' => 'Action Site']);
         $siteB = Site::factory()->create(['tenant_id' => 42, 'name' => 'Empty Site']);
-        Site::factory()->create(['tenant_id' => 77, 'name' => 'Foreign Site']);
+        $legacyPartitionedSite = Site::factory()->create(['tenant_id' => 77, 'name' => 'Legacy Partitioned Site']);
 
         $device = Device::factory()->offline()->create([
             'tenant_id' => 42,
@@ -191,12 +191,15 @@ class EstateSiteOperationsTest extends TestCase
 
         $response = $this->actingAs($this->admin)->get('/security-devices/sites');
 
-        $response->assertOk()->assertInertia(function ($page) use ($siteA, $siteB): void {
+        $response->assertOk()->assertInertia(function ($page) use ($legacyPartitionedSite, $siteA, $siteB): void {
             $props = $page->toArray()['props'];
             $sites = collect($props['sites'])->keyBy('id');
 
-            $this->assertSame([$siteA->id, $siteB->id], $sites->keys()->sort()->values()->all());
-            $this->assertSame(2, $props['summary']['total']);
+            $this->assertSame(
+                collect([$siteA->id, $siteB->id, $legacyPartitionedSite->id])->sort()->values()->all(),
+                $sites->keys()->sort()->values()->all(),
+            );
+            $this->assertSame(3, $props['summary']['total']);
             $this->assertSame(1, $props['summary']['requiring_attention']);
 
             $action = $sites[$siteA->id];
@@ -363,13 +366,13 @@ class EstateSiteOperationsTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_cross_tenant_site_direct_link_is_non_revealing(): void
+    public function test_all_sites_user_can_open_a_site_regardless_of_legacy_partition_value(): void
     {
         $foreignSite = Site::factory()->create(['tenant_id' => 77]);
 
         $this->actingAs($this->admin)
             ->get("/security-devices/sites/{$foreignSite->id}")
-            ->assertNotFound();
+            ->assertOk();
     }
 
     private function assignToSite(Device $device, Site $site): void

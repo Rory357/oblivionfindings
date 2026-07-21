@@ -4,13 +4,14 @@ namespace App\Http\Controllers\Sites;
 
 use App\Domain\SecurityDevices\Presenters\IntegrationSiteCredentialsPresenter;
 use App\Http\Controllers\Controller;
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\Integration\IntegrationSyncLog;
-use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Services\Integration\IntegrationAdapterRegistry;
+use App\Support\LegacyStorageContext;
 use App\Support\SafeOperationalData;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -22,10 +23,8 @@ class SiteIntegrationController extends Controller
     public function index(Request $request, Site $site, IntegrationSiteCredentialsPresenter $siteCredentialsPresenter)
     {
         $this->authorize('view', $site);
-        $tenantId = $this->resolveTenantId($request->user(), $site);
 
         $configs = IntegrationSiteConfig::query()
-            ->forTenant($tenantId)
             ->where('site_id', $site->id)
             ->get()
             ->map(fn (IntegrationSiteConfig $config): array => [
@@ -44,31 +43,30 @@ class SiteIntegrationController extends Controller
             ->values();
 
         $siteSecrets = IntegrationSiteSecret::query()
-            ->forTenant($tenantId)
             ->where('site_id', $site->id)
             ->with('site:id,name,tenant_id')
             ->get()
             ->map(fn (IntegrationSiteSecret $secret): array => $siteCredentialsPresenter->project($secret))
             ->values();
 
-        $tenantSecrets = IntegrationTenantSecret::where('tenant_id', $tenantId)
+        $providerConnections = IntegrationProviderConnection::query()
             ->get()
-            ->map(function (IntegrationTenantSecret $secret): array {
-                $config = is_array($secret->config) ? $secret->config : [];
+            ->map(function (IntegrationProviderConnection $connection): array {
+                $config = is_array($connection->config) ? $connection->config : [];
 
                 return [
-                    'id' => $secret->id,
-                    'provider' => $secret->provider,
+                    'id' => $connection->id,
+                    'provider' => $connection->provider,
                     'configured' => true,
-                    'tested' => $secret->last_tested_at !== null,
-                    'status' => in_array($secret->status, [
-                        IntegrationTenantSecret::STATUS_CONNECTED,
-                        IntegrationTenantSecret::STATUS_DISCONNECTED,
-                        IntegrationTenantSecret::STATUS_ERROR,
-                    ], true) ? $secret->status : 'unknown',
-                    'failure_category' => filled($secret->last_error) ? 'provider_failure' : null,
-                    'last_tested_at' => $secret->last_tested_at?->toISOString(),
-                    'last_synced_at' => $secret->last_synced_at?->toISOString(),
+                    'tested' => $connection->last_tested_at !== null,
+                    'status' => in_array($connection->status, [
+                        IntegrationProviderConnection::STATUS_CONNECTED,
+                        IntegrationProviderConnection::STATUS_DISCONNECTED,
+                        IntegrationProviderConnection::STATUS_ERROR,
+                    ], true) ? $connection->status : 'unknown',
+                    'failure_category' => filled($connection->last_error) ? 'provider_failure' : null,
+                    'last_tested_at' => $connection->last_tested_at?->toISOString(),
+                    'last_synced_at' => $connection->last_synced_at?->toISOString(),
                     'discovery' => [
                         'site_count' => count(is_array($config['discovered_sites'] ?? null) ? $config['discovered_sites'] : []),
                         'host_count' => is_numeric($config['discovered_host_count'] ?? null)
@@ -82,14 +80,13 @@ class SiteIntegrationController extends Controller
         return response()->json([
             'configs' => $configs,
             'siteSecrets' => $siteSecrets,
-            'tenantSecrets' => $tenantSecrets,
+            'providerConnections' => $providerConnections,
         ]);
     }
 
     public function configure(Request $request, Site $site, string $provider)
     {
         $this->authorize('update', $site);
-        $tenantId = $this->resolveTenantId($request->user(), $site);
 
         $validated = $request->validate([
             'mapped_external_site_id' => 'nullable|string|max:255',
@@ -127,7 +124,7 @@ class SiteIntegrationController extends Controller
                 'provider' => $provider,
             ],
             [
-                'tenant_id' => $tenantId,
+                'tenant_id' => LegacyStorageContext::id(),
                 'mapped_external_site_id' => $mappedId,
                 'mapped_external_site_name' => $validated['mapped_external_site_name'] ?? null,
                 'status' => $status,
@@ -142,14 +139,13 @@ class SiteIntegrationController extends Controller
     public function syncSites(Request $request, Site $site, string $provider, IntegrationAdapterRegistry $registry)
     {
         $this->authorize('update', $site);
-        $tenantId = $this->resolveTenantId($request->user(), $site);
 
-        $tenantSecret = IntegrationTenantSecret::where('tenant_id', $tenantId)
-            ->where('provider', $provider)
+        $providerConnection = IntegrationProviderConnection::query()
+            ->forProvider($provider)
             ->first();
 
-        if (! $tenantSecret) {
-            return redirect()->back()->with('error', 'No tenant credentials found for this integration.');
+        if (! $providerConnection) {
+            return redirect()->back()->with('error', 'No provider connection is configured for this integration.');
         }
 
         if (! $registry->has($provider)) {
@@ -157,7 +153,7 @@ class SiteIntegrationController extends Controller
         }
 
         $syncLog = IntegrationSyncLog::create([
-            'tenant_id' => $tenantId,
+            'tenant_id' => LegacyStorageContext::id(),
             'provider' => $provider,
             'site_id' => $site->id,
             'action' => 'discover_sites',
@@ -166,12 +162,12 @@ class SiteIntegrationController extends Controller
         ]);
 
         try {
-            $sites = $registry->resolve($provider)->discoverSites($tenantSecret);
+            $sites = $registry->resolve($provider)->discoverSites($providerConnection);
             $hosts = [];
             $adapter = $registry->resolve($provider);
             if (method_exists($adapter, 'discoverHosts')) {
                 try {
-                    $hosts = $adapter->discoverHosts($tenantSecret);
+                    $hosts = $adapter->discoverHosts($providerConnection);
                 } catch (\Throwable) {
                     $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, SafeOperationalData::failureSummary());
 
@@ -180,7 +176,7 @@ class SiteIntegrationController extends Controller
             }
 
             $config = $this->mergeSecretConfig(
-                $tenantSecret->config,
+                $providerConnection->config,
                 [
                     'discovered_sites' => array_values($sites),
                     'discovered_host_count' => count($hosts),
@@ -188,7 +184,7 @@ class SiteIntegrationController extends Controller
                 ]
             );
 
-            $tenantSecret->update([
+            $providerConnection->update([
                 'config' => $config,
                 'last_synced_at' => now(),
                 'last_error' => null,
@@ -209,11 +205,11 @@ class SiteIntegrationController extends Controller
 
             return redirect()->back()->with('warning', 'No sites returned by provider API.');
         } catch (\Throwable $e) {
-            $failure = $this->providerFailure($tenantId, $site->id, $provider, $e);
+            $failure = $this->providerFailure($site->id, $provider, $e);
             $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, $failure);
 
-            $tenantSecret->update([
-                'status' => IntegrationTenantSecret::STATUS_ERROR,
+            $providerConnection->update([
+                'status' => IntegrationProviderConnection::STATUS_ERROR,
                 'last_error' => $failure,
             ]);
 
@@ -224,26 +220,25 @@ class SiteIntegrationController extends Controller
     public function testConnection(Request $request, Site $site, string $provider, IntegrationAdapterRegistry $registry)
     {
         $this->authorize('view', $site);
-        $tenantId = $this->resolveTenantId($request->user(), $site);
 
-        $tenantSecret = IntegrationTenantSecret::where('tenant_id', $tenantId)
-            ->where('provider', $provider)
+        $providerConnection = IntegrationProviderConnection::query()
+            ->forProvider($provider)
             ->first();
 
-        if (! $tenantSecret) {
-            return redirect()->back()->with('error', 'No tenant credentials found for this integration.');
+        if (! $providerConnection) {
+            return redirect()->back()->with('error', 'No provider connection is configured for this integration.');
         }
 
         if (! $registry->has($provider)) {
             return redirect()->back()->with('error', 'No adapter registered for this integration provider.');
         }
 
-        $isConnected = $registry->resolve($provider)->testConnection($tenantSecret);
+        $isConnected = $registry->resolve($provider)->testConnection($providerConnection);
 
-        $tenantSecret->update([
+        $providerConnection->update([
             'status' => $isConnected
-                ? IntegrationTenantSecret::STATUS_CONNECTED
-                : IntegrationTenantSecret::STATUS_ERROR,
+                ? IntegrationProviderConnection::STATUS_CONNECTED
+                : IntegrationProviderConnection::STATUS_ERROR,
             'last_tested_at' => now(),
             'last_error' => $isConnected ? null : 'Connection test failed.',
         ]);
@@ -263,10 +258,7 @@ class SiteIntegrationController extends Controller
             return redirect()->back()->with('error', 'No adapter registered for this integration provider.');
         }
 
-        $tenantId = $this->resolveTenantId($request->user(), $site);
-
         $siteConfig = IntegrationSiteConfig::query()
-            ->forTenant($tenantId)
             ->forProvider($provider)
             ->where('site_id', $site->id)
             ->active()
@@ -276,18 +268,17 @@ class SiteIntegrationController extends Controller
             return redirect()->back()->with('error', 'Integration mapping is missing for this location.');
         }
 
-        $tenantSecret = IntegrationTenantSecret::query()
-            ->forTenant($tenantId)
-            ->where('provider', $provider)
+        $providerConnection = IntegrationProviderConnection::query()
+            ->forProvider($provider)
             ->connected()
             ->first();
 
-        if (! $tenantSecret) {
-            return redirect()->back()->with('error', 'Tenant credentials are not connected for this integration.');
+        if (! $providerConnection) {
+            return redirect()->back()->with('error', 'The provider connection is not connected for this integration.');
         }
 
         $syncLog = IntegrationSyncLog::create([
-            'tenant_id' => $tenantId,
+            'tenant_id' => LegacyStorageContext::id(),
             'provider' => $provider,
             'site_id' => $site->id,
             'action' => 'sync_devices',
@@ -296,7 +287,7 @@ class SiteIntegrationController extends Controller
         ]);
 
         try {
-            $result = $registry->resolve($provider)->syncDevices($siteConfig, $tenantSecret);
+            $result = $registry->resolve($provider)->syncDevices($siteConfig, $providerConnection);
 
             $syncLog->update([
                 'items_processed' => $result->processed,
@@ -312,11 +303,11 @@ class SiteIntegrationController extends Controller
             } else {
                 $syncLog->markCompleted(
                     IntegrationSyncLog::STATUS_FAILED,
-                    $this->providerFailure($tenantId, $site->id, $provider),
+                    $this->providerFailure($site->id, $provider),
                 );
             }
 
-            $tenantSecret->update([
+            $providerConnection->update([
                 'last_synced_at' => now(),
                 'last_error' => $result->isSuccess() || $result->isPartial()
                     ? null
@@ -332,10 +323,10 @@ class SiteIntegrationController extends Controller
                 "Device sync complete. Processed {$result->processed}, created {$result->created}, updated {$result->updated}, errored {$result->errored}."
             );
         } catch (\Throwable $e) {
-            $failure = $this->providerFailure($tenantId, $site->id, $provider, $e);
+            $failure = $this->providerFailure($site->id, $provider, $e);
             $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, $failure);
-            $tenantSecret->update([
-                'status' => IntegrationTenantSecret::STATUS_ERROR,
+            $providerConnection->update([
+                'status' => IntegrationProviderConnection::STATUS_ERROR,
                 'last_error' => $failure,
             ]);
 
@@ -346,7 +337,6 @@ class SiteIntegrationController extends Controller
     public function pullEvents(Request $request, Site $site, string $provider, IntegrationAdapterRegistry $registry)
     {
         $this->authorize('update', $site);
-        $tenantId = $this->resolveTenantId($request->user(), $site);
 
         if (! $registry->has($provider)) {
             return redirect()->back()->with('error', 'No adapter registered for this integration provider.');
@@ -358,24 +348,22 @@ class SiteIntegrationController extends Controller
                 'provider' => $provider,
             ],
             [
-                'tenant_id' => $tenantId,
+                'tenant_id' => LegacyStorageContext::id(),
                 'status' => IntegrationSiteConfig::STATUS_TENANT_ONLY,
                 'is_active' => true,
             ]
         );
 
-        $tenantSecret = IntegrationTenantSecret::query()
-            ->forTenant($tenantId)
-            ->where('provider', $provider)
+        $providerConnection = IntegrationProviderConnection::query()
+            ->forProvider($provider)
             ->connected()
             ->first();
 
-        if (! $tenantSecret) {
-            return redirect()->back()->with('error', 'Tenant credentials are not connected for this integration.');
+        if (! $providerConnection) {
+            return redirect()->back()->with('error', 'The provider connection is not connected for this integration.');
         }
 
         $accessSecret = IntegrationSiteSecret::query()
-            ->where('tenant_id', $tenantId)
             ->where('site_id', $site->id)
             ->where('provider', $provider)
             ->where('capability', 'access_api')
@@ -399,7 +387,7 @@ class SiteIntegrationController extends Controller
         }
 
         try {
-            $events = $registry->resolve($provider)->pullEvents($siteConfig, $tenantSecret, $since);
+            $events = $registry->resolve($provider)->pullEvents($siteConfig, $providerConnection, $since);
             $created = 0;
             $updated = 0;
 
@@ -447,7 +435,7 @@ class SiteIntegrationController extends Controller
 
             return redirect()->back()->with('success', "Access events synced. Added {$created}, updated {$updated}.");
         } catch (\Throwable $e) {
-            $failure = $this->providerFailure($tenantId, $site->id, $provider, $e);
+            $failure = $this->providerFailure($site->id, $provider, $e);
             $accessSecret->update([
                 'last_tested_at' => now(),
                 'last_error' => $failure,
@@ -460,7 +448,6 @@ class SiteIntegrationController extends Controller
     public function updateSecret(Request $request, Site $site, string $provider, string $capability)
     {
         $this->authorize('update', $site);
-        $tenantId = $this->resolveTenantId($request->user(), $site);
 
         $validated = $request->validate([
             'base_url' => 'nullable|string|max:500',
@@ -475,7 +462,7 @@ class SiteIntegrationController extends Controller
                 'capability' => $capability,
             ],
             [
-                'tenant_id' => $tenantId,
+                'tenant_id' => LegacyStorageContext::id(),
                 'base_url' => $validated['base_url'] ?? null,
                 'secret_encrypted' => Crypt::encryptString($validated['secret']),
                 'is_enabled' => $validated['is_enabled'] ?? true,
@@ -504,13 +491,6 @@ class SiteIntegrationController extends Controller
         return redirect()->back()->with('success', 'Integration overrides updated successfully.');
     }
 
-    private function resolveTenantId($user, ?Site $site = null): int
-    {
-        $tenantId = $user->tenant_id ?? $user->organization_id ?? $site?->tenant_id ?? 1;
-
-        return (int) $tenantId;
-    }
-
     private function mergeSecretConfig(?array $existingConfig, array $newConfig): array
     {
         $existing = is_array($existingConfig) ? $existingConfig : [];
@@ -529,10 +509,9 @@ class SiteIntegrationController extends Controller
         return $merged;
     }
 
-    private function providerFailure(int $tenantId, int $siteId, string $provider, ?\Throwable $exception = null): string
+    private function providerFailure(int $siteId, string $provider, ?\Throwable $exception = null): string
     {
         Log::warning('Site integration provider operation failed', SafeOperationalData::logContext([
-            'tenant_id' => $tenantId,
             'site_id' => $siteId,
             'provider' => $provider,
             'failure_category' => SafeOperationalData::failureCategory($exception),

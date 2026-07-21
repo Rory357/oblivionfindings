@@ -50,7 +50,7 @@ export type Provider = {
         reference: string | null;
         reference_label: string | null;
         display_state:
-            | 'tenant_credential_configured'
+            | 'provider_connection_configured'
             | 'site_credentials_configured'
             | 'not_configured';
         rotation_state: string;

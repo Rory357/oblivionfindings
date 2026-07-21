@@ -2,10 +2,10 @@
 
 namespace Tests\Feature\Sites;
 
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\Integration\IntegrationSyncLog;
-use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -30,7 +30,7 @@ class SiteIntegrationMutationSafetyTest extends TestCase
 
     private Site $site;
 
-    private IntegrationTenantSecret $tenantSecret;
+    private IntegrationProviderConnection $providerConnection;
 
     protected function setUp(): void
     {
@@ -40,11 +40,11 @@ class SiteIntegrationMutationSafetyTest extends TestCase
         $this->site = Site::factory()->create(['tenant_id' => 42]);
         $this->manager = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
         $this->manager->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
-        $this->tenantSecret = IntegrationTenantSecret::create([
+        $this->providerConnection = IntegrationProviderConnection::create([
             'tenant_id' => 42,
             'provider' => self::PROVIDER,
             'secret_encrypted' => 'encrypted-at-rest',
-            'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
         ]);
 
         app(IntegrationAdapterRegistry::class)->register(self::PROVIDER, SentinelFailureAdapter::class);
@@ -65,7 +65,7 @@ class SiteIntegrationMutationSafetyTest extends TestCase
             SafeOperationalData::failureSummary(),
             IntegrationSyncLog::query()->latest('id')->value('error_message'),
         );
-        $this->assertSame(SafeOperationalData::failureSummary(), $this->tenantSecret->fresh()->last_error);
+        $this->assertSame(SafeOperationalData::failureSummary(), $this->providerConnection->fresh()->last_error);
 
         IntegrationSiteConfig::create([
             'tenant_id' => 42,
@@ -86,7 +86,7 @@ class SiteIntegrationMutationSafetyTest extends TestCase
             SafeOperationalData::failureSummary(),
             IntegrationSyncLog::query()->latest('id')->value('error_message'),
         );
-        $this->assertSame(SafeOperationalData::failureSummary(), $this->tenantSecret->fresh()->last_error);
+        $this->assertSame(SafeOperationalData::failureSummary(), $this->providerConnection->fresh()->last_error);
 
         SentinelFailureAdapter::$operation = 'sync-exception';
         $this->actingAs($this->manager)
@@ -104,7 +104,7 @@ class SiteIntegrationMutationSafetyTest extends TestCase
             'secret_encrypted' => 'encrypted-site-secret',
             'is_enabled' => true,
         ]);
-        $this->tenantSecret->refresh()->update(['status' => IntegrationTenantSecret::STATUS_CONNECTED]);
+        $this->providerConnection->refresh()->update(['status' => IntegrationProviderConnection::STATUS_CONNECTED]);
 
         SentinelFailureAdapter::$operation = 'events';
         $this->actingAs($this->manager)
@@ -120,7 +120,7 @@ class SiteIntegrationMutationSafetyTest extends TestCase
 
         $databaseEvidence = json_encode([
             IntegrationSyncLog::query()->pluck('error_message')->all(),
-            IntegrationTenantSecret::query()->pluck('last_error')->all(),
+            IntegrationProviderConnection::query()->pluck('last_error')->all(),
             IntegrationSiteSecret::query()->pluck('last_error')->all(),
         ], JSON_THROW_ON_ERROR);
         $this->assertStringNotContainsString(self::RAW_FAILURE, $databaseEvidence);
@@ -137,17 +137,17 @@ final class SentinelFailureAdapter implements IntegrationAdapterInterface
 {
     public static string $operation = 'discover';
 
-    public function testConnection(IntegrationTenantSecret $secret): bool
+    public function testConnection(IntegrationProviderConnection $secret): bool
     {
         return false;
     }
 
-    public function discoverSites(IntegrationTenantSecret $secret): array
+    public function discoverSites(IntegrationProviderConnection $secret): array
     {
         throw new \RuntimeException(SiteIntegrationMutationSafetyTest::RAW_FAILURE);
     }
 
-    public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): SyncResult
+    public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): SyncResult
     {
         if (self::$operation === 'result') {
             return new SyncResult(error: SiteIntegrationMutationSafetyTest::RAW_FAILURE);
@@ -156,12 +156,12 @@ final class SentinelFailureAdapter implements IntegrationAdapterInterface
         throw new \RuntimeException(SiteIntegrationMutationSafetyTest::RAW_FAILURE);
     }
 
-    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): array
+    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): array
     {
         return [];
     }
 
-    public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret, ?\DateTimeInterface $since = null): array
+    public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection, ?\DateTimeInterface $since = null): array
     {
         throw new \RuntimeException(SiteIntegrationMutationSafetyTest::RAW_FAILURE);
     }

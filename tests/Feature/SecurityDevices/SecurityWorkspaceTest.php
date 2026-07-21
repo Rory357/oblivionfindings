@@ -98,14 +98,14 @@ class SecurityWorkspaceTest extends TestCase
                 $security = $page->toArray()['props']['securityWorkspace'];
 
                 $this->assertSame([
-                    'total' => 3,
-                    'cctv' => 1,
+                    'total' => 4,
+                    'cctv' => 2,
                     'alarms' => 1,
                     'access_control' => 1,
                     'other' => 0,
                 ], $security['overview']['inventory']);
-                $this->assertSame(1, $security['overview']['attention']['devices']);
-                $this->assertSame(1, $security['overview']['attention']['sites']);
+                $this->assertSame(2, $security['overview']['attention']['devices']);
+                $this->assertSame(2, $security['overview']['attention']['sites']);
                 $this->assertSame(1, $security['overview']['attention']['overdue_maintenance']);
                 $this->assertSame(1, $security['overview']['attention']['unprocessed_events']);
                 $this->assertSame(1, $security['overview']['attention']['active_control_room_alerts']);
@@ -113,7 +113,7 @@ class SecurityWorkspaceTest extends TestCase
                     ['offline_devices', 'unmonitored_devices', 'unprocessed_events', 'overdue_maintenance', 'active_control_room_alerts'],
                     collect($security['overview']['requiredActions'])->pluck('key')->all(),
                 );
-                $this->assertNotContains(
+                $this->assertContains(
                     'Foreign camera',
                     collect($security['activeTab']['devices'])->pluck('name')->all(),
                 );

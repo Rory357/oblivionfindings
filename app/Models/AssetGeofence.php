@@ -61,4 +61,16 @@ class AssetGeofence extends Model
             );
         });
     }
+
+    public function scopeEligibleForClientSite(Builder $query, ?int $siteId): Builder
+    {
+        if ($siteId === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query
+            ->where('site_id', $siteId)
+            ->where('is_active', true)
+            ->whereIn('scope', ['house', 'resident']);
+    }
 }

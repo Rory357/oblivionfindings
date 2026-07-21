@@ -9,19 +9,17 @@ use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Enums\RelationshipType;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
-use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
-use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
 use App\Domain\SecurityDevices\Presenters\DeviceProfilePresenter;
 use App\Domain\SecurityDevices\Services\DeviceLinkService;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
-use App\Models\Client;
 use App\Models\Site;
 use App\Models\SiteRoom;
+use App\Support\LegacyStorageContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -30,7 +28,6 @@ use Inertia\Inertia;
 class DeviceController extends Controller
 {
     use MapsDevicesForList;
-    use ResolvesDeviceTenant;
 
     public function __construct(
         private readonly DeviceRegistryService $registry,
@@ -150,13 +147,10 @@ class DeviceController extends Controller
         if ($canViewEvents) {
             $relations['events'] = fn ($q) => $q->latest('occurred_at')->limit(20);
             $relations['monitors'] = fn ($q) => $q
-                ->where('tenant_id', $device->tenant_id)
                 ->with([
                     'profile' => fn ($profile) => $profile
-                        ->where('tenant_id', $device->tenant_id)
                         ->select('id', 'name', 'interval_seconds', 'stale_after_seconds'),
                     'collector' => fn ($collector) => $collector
-                        ->where('tenant_id', $device->tenant_id)
                         ->select('id', 'name', 'status', 'last_seen_at'),
                 ])
                 ->orderBy('name');
@@ -197,7 +191,6 @@ class DeviceController extends Controller
             ->values());
 
         $activeAssignment = $device->assignments->first(fn ($a) => $a->released_at === null);
-        $tenantId = $this->access->tenantId($user);
         $siteIds = $this->access->accessibleSiteIds($user);
         $canAssign = $user->canDo('securityDevices.devices.assign');
         $canUpdate = $user->canDo('securityDevices.devices.update');
@@ -205,9 +198,10 @@ class DeviceController extends Controller
         // Assignment target options for the assign dialog.
         $assignmentTargets = $canAssign ? [
             'sites' => Site::query()
-                ->where('tenant_id', $tenantId)
                 ->whereIn('id', $siteIds)
                 ->where('is_active', true)
+                ->where('archived', false)
+                ->whereNull('archived_at')
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'rooms' => SiteRoom::query()
@@ -217,34 +211,8 @@ class DeviceController extends Controller
             'staff' => $this->access->assignableStaff($user)
                 ->orderBy('name')
                 ->get(['id', 'name']),
-            'clients' => Client::query()
-                ->where('organization_id', $tenantId)
-                ->whereIn('site_id', $siteIds)
-                ->orderBy('first_name')
-                ->get(['id', 'first_name', 'last_name', 'organization_id', 'site_id'])
-                ->filter(fn (Client $client): bool => $this->access->canAccessAssignmentTarget(
-                    $user,
-                    $device,
-                    DeviceAssignment::TARGET_CLIENT,
-                    (int) $client->id,
-                ))
-                ->values(),
-            'vehicles' => Asset::query()
-                ->where(function ($query) use ($siteIds) {
-                    $query->whereIn('site_id', $siteIds)
-                        ->orWhereIn('home_site_id', $siteIds)
-                        ->orWhereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds));
-                })
-                ->vehicles()
-                ->orderBy('name')
-                ->get(['id', 'name', 'registration_number'])
-                ->filter(fn (Asset $asset): bool => $this->access->canAccessAssignmentTarget(
-                    $user,
-                    $device,
-                    DeviceAssignment::TARGET_VEHICLE,
-                    (int) $asset->id,
-                ))
-                ->values(),
+            'clients' => $this->access->assignableClients($user),
+            'vehicles' => $this->access->assignableVehicles($user),
         ] : [
             'sites' => [],
             'rooms' => [],
@@ -254,15 +222,7 @@ class DeviceController extends Controller
         ];
 
         $availableAssets = $canUpdate
-            ? Asset::query()
-                ->where(function ($query) use ($siteIds) {
-                    $query->whereIn('site_id', $siteIds)
-                        ->orWhereIn('home_site_id', $siteIds)
-                        ->orWhereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds));
-                })
-                ->orderBy('name')
-                ->limit(500)
-                ->get(['id', 'name', 'asset_tag'])
+            ? $this->access->assignableAssets($user)
                 ->map(fn (Asset $asset) => [
                     'id' => $asset->id,
                     'name' => $asset->name,
@@ -335,7 +295,7 @@ class DeviceController extends Controller
                 'value' => $t->value,
                 'label' => $t->label(),
             ]),
-            // Other devices in this tenant, excluding this one. Capped at 500
+            // Other visible devices, excluding this one. Capped at 500
             // to keep the page payload small; picker becomes search-driven
             // past that volume (future PR).
             'otherDevices' => $otherDevices,
@@ -506,11 +466,6 @@ class DeviceController extends Controller
         $other = Device::findOrFail($validated['other_device_id']);
         $this->access->assertCanViewDevice($user, $other);
 
-        // Tenant guard — prevent cross-tenant relationships.
-        if ($device->tenant_id && $other->tenant_id && $device->tenant_id !== $other->tenant_id) {
-            return redirect()->back()->with('error', 'Cannot link devices from different tenants.');
-        }
-
         $parentId = $validated['direction'] === 'downstream' ? $device->id : $other->id;
         $childId = $validated['direction'] === 'downstream' ? $other->id : $device->id;
 
@@ -633,7 +588,7 @@ class DeviceController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $validated['tenant_id'] = $this->resolveDeviceTenantId($user);
+        $validated['tenant_id'] = LegacyStorageContext::id();
         $validated['created_by_user_id'] = $user->id;
 
         $device = Device::create($validated);

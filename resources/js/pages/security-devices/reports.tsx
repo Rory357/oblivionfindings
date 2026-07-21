@@ -114,7 +114,7 @@ export default function SecurityDevicesReports({ stats, windowDays }: Props) {
                     </CardHeader>
                     <CardContent className="grid gap-3 text-sm md:grid-cols-2">
                         <div className="rounded-xl border p-4">
-                            <p className="font-medium">Tenant scope</p>
+                            <p className="font-medium">Site access scope</p>
                             <p className="leading-6 text-muted-foreground">
                                 Every export is filtered to the current
                                 tenant. Users without the

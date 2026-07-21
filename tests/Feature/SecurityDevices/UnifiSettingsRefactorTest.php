@@ -2,13 +2,15 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\AuditLog;
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSyncLog;
-use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\LocationHardware;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteRoom;
@@ -66,12 +68,12 @@ class UnifiSettingsRefactorTest extends TestCase
     public function test_provider_read_model_redacts_raw_discovery_config_errors_and_external_references(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1]);
-        IntegrationTenantSecret::create([
+        IntegrationProviderConnection::create([
             'tenant_id' => 1,
             'provider' => 'unifi',
             'secret_encrypted' => 'RAW-SECRET-SENTINEL',
             'secret_last4' => '0042',
-            'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
             'last_error' => 'https://private.example.test/?token=RAW-ERROR-SENTINEL',
             'config' => [
                 'api_token' => 'RAW-CONFIG-SENTINEL',
@@ -104,7 +106,7 @@ class UnifiSettingsRefactorTest extends TestCase
             $this->assertArrayHasKey('mapping_token', $props['discoveredSites'][0]);
             $this->assertArrayNotHasKey('external_id', $props['discoveredSites'][0]);
             $this->assertArrayNotHasKey('meta', $props['discoveredSites'][0]);
-            $this->assertArrayNotHasKey('config', $props['tenantSecret']);
+            $this->assertArrayNotHasKey('config', $props['providerConnection']);
             $this->assertArrayNotHasKey('error_message', $props['syncLogs'][0]);
             $this->assertArrayNotHasKey('provider_entity_id', $props['syncedDevices'][0]);
             $encoded = json_encode($props, JSON_THROW_ON_ERROR);
@@ -125,64 +127,67 @@ class UnifiSettingsRefactorTest extends TestCase
         );
     }
 
-    public function test_map_site_does_not_reveal_whether_a_location_exists_outside_the_tenant(): void
+    public function test_map_site_does_not_reveal_whether_a_location_exists_outside_approved_site_access(): void
     {
         config()->set('app.debug', false);
-        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
-        $missingSiteId = $foreignSite->id + 1000;
+        $allowedSite = Site::factory()->create(['tenant_id' => 1]);
+        $hiddenSite = Site::factory()->create(['tenant_id' => 77]);
+        $siteManager = $this->managerForSite($allowedSite);
+        $missingSiteId = $hiddenSite->id + 1000;
         $payload = ['mapping_token' => str_repeat('a', 64)];
 
-        $missing = $this->actingAs($this->admin)->postJson(
+        $missing = $this->actingAs($siteManager)->postJson(
             '/security-devices/integrations/unifi/map-site',
             [...$payload, 'site_id' => $missingSiteId],
         );
-        $foreign = $this->actingAs($this->admin)->postJson(
+        $hidden = $this->actingAs($siteManager)->postJson(
             '/security-devices/integrations/unifi/map-site',
-            [...$payload, 'site_id' => $foreignSite->id],
+            [...$payload, 'site_id' => $hiddenSite->id],
         );
 
         $missing->assertNotFound();
-        $foreign->assertNotFound();
-        $this->assertSame($missing->getContent(), $foreign->getContent());
+        $hidden->assertNotFound();
+        $this->assertSame($missing->getContent(), $hidden->getContent());
         $this->assertDatabaseCount('integration_site_configs', 0);
     }
 
     public function test_sync_devices_does_not_reveal_missing_foreign_or_non_unifi_site_configs(): void
     {
         config()->set('app.debug', false);
-        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
-        $foreignConfig = IntegrationSiteConfig::create([
+        $allowedSite = Site::factory()->create(['tenant_id' => 1]);
+        $siteManager = $this->managerForSite($allowedSite);
+        $hiddenSite = Site::factory()->create(['tenant_id' => 77]);
+        $hiddenConfig = IntegrationSiteConfig::create([
             'tenant_id' => 77,
-            'site_id' => $foreignSite->id,
+            'site_id' => $hiddenSite->id,
             'provider' => 'unifi',
             'mapped_external_site_id' => 'foreign-site',
             'is_active' => true,
         ]);
-        $localSite = Site::factory()->create(['tenant_id' => 1]);
         $otherProviderConfig = IntegrationSiteConfig::create([
             'tenant_id' => 1,
-            'site_id' => $localSite->id,
+            'site_id' => $allowedSite->id,
             'provider' => 'verkada',
             'mapped_external_site_id' => 'other-provider-site',
             'is_active' => true,
         ]);
-        $secondForeignSite = Site::factory()->create(['tenant_id' => 77]);
-        $foreignSiteConfig = IntegrationSiteConfig::create([
+        $secondHiddenSite = Site::factory()->create(['tenant_id' => 77]);
+        $hiddenSiteConfig = IntegrationSiteConfig::create([
             'tenant_id' => 1,
-            'site_id' => $secondForeignSite->id,
+            'site_id' => $secondHiddenSite->id,
             'provider' => 'unifi',
             'mapped_external_site_id' => 'foreign-related-site',
             'is_active' => true,
         ]);
-        $missingConfigId = max($foreignConfig->id, $otherProviderConfig->id, $foreignSiteConfig->id) + 1000;
+        $missingConfigId = max($hiddenConfig->id, $otherProviderConfig->id, $hiddenSiteConfig->id) + 1000;
 
         $registry = \Mockery::mock(IntegrationAdapterRegistry::class);
         $registry->shouldNotReceive('has');
         $registry->shouldNotReceive('resolve');
         $this->instance(IntegrationAdapterRegistry::class, $registry);
 
-        $responses = collect([$foreignSiteConfig->id, $missingConfigId, $foreignConfig->id, $otherProviderConfig->id])
-            ->map(fn (int $siteConfigId) => $this->actingAs($this->admin)->postJson(
+        $responses = collect([$hiddenSiteConfig->id, $missingConfigId, $hiddenConfig->id, $otherProviderConfig->id])
+            ->map(fn (int $siteConfigId) => $this->actingAs($siteManager)->postJson(
                 '/security-devices/integrations/unifi/sync-devices',
                 ['site_config_id' => $siteConfigId],
             ));
@@ -202,17 +207,17 @@ class UnifiSettingsRefactorTest extends TestCase
             'mapped_external_site_id' => 'local-site',
             'is_active' => true,
         ]);
-        IntegrationTenantSecret::create([
+        IntegrationProviderConnection::create([
             'tenant_id' => 1,
             'provider' => 'unifi',
             'secret_encrypted' => 'test-secret',
-            'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
         ]);
 
         $adapter = \Mockery::mock(IntegrationAdapterInterface::class);
         $adapter->shouldReceive('syncDevices')
             ->once()
-            ->withArgs(fn (IntegrationSiteConfig $config, IntegrationTenantSecret $secret): bool => $config->is($siteConfig) && $secret->tenant_id === 1 && $secret->provider === 'unifi')
+            ->withArgs(fn (IntegrationSiteConfig $config, IntegrationProviderConnection $secret): bool => $config->is($siteConfig) && $secret->tenant_id === 1 && $secret->provider === 'unifi')
             ->andReturn(new SyncResult(processed: 3, created: 1, updated: 2));
         $registry = \Mockery::mock(IntegrationAdapterRegistry::class);
         $registry->shouldReceive('has')->once()->with('unifi')->andReturnTrue();
@@ -247,11 +252,11 @@ class UnifiSettingsRefactorTest extends TestCase
             'mapped_external_site_id' => 'inactive-site',
             'is_active' => false,
         ]);
-        IntegrationTenantSecret::create([
+        IntegrationProviderConnection::create([
             'tenant_id' => 1,
             'provider' => 'unifi',
             'secret_encrypted' => 'test-secret',
-            'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
         ]);
 
         $syncCalls = 0;
@@ -297,10 +302,11 @@ class UnifiSettingsRefactorTest extends TestCase
         ]);
     }
 
-    public function test_site_mapping_read_model_excludes_configs_whose_related_site_belongs_to_another_tenant(): void
+    public function test_site_mapping_read_model_excludes_configs_outside_approved_site_access(): void
     {
         $validSite = Site::factory()->create(['tenant_id' => 1, 'name' => 'Valid tenant location']);
         $foreignSite = Site::factory()->create(['tenant_id' => 77, 'name' => 'FOREIGN-MAPPING-SENTINEL']);
+        $siteManager = $this->managerForSite($validSite);
         $validConfig = IntegrationSiteConfig::create([
             'tenant_id' => 1,
             'site_id' => $validSite->id,
@@ -318,7 +324,7 @@ class UnifiSettingsRefactorTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($siteManager)
             ->get('/security-devices/integrations/unifi')
             ->assertOk()
             ->assertInertia(function ($page) use ($validConfig, $foreignConfig): void {
@@ -330,6 +336,25 @@ class UnifiSettingsRefactorTest extends TestCase
     }
 
     // ── Canonical UniFi device display ─────────────────────────────
+
+    private function managerForSite(Site $site): User
+    {
+        $manager = User::factory()->create(['approved_at' => now()]);
+        $manager->roles()->attach(Role::query()->where('name', 'coordinator')->firstOrFail());
+        $permissionId = Permission::query()
+            ->where('key', 'securityDevices.integrations.manage')
+            ->value('id');
+        $this->assertNotNull($permissionId);
+        $manager->permissionOverrides()->attach($permissionId, ['allowed' => true]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $manager->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
+
+        return $manager;
+    }
 
     public function test_displays_unifi_devices_from_canonical_registry(): void
     {
@@ -592,7 +617,7 @@ class UnifiSettingsRefactorTest extends TestCase
         $this->assertSame($auditCount, AuditLog::query()->count());
     }
 
-    public function test_room_clear_rejects_foreign_or_contradictory_active_room_provenance_without_mutation(): void
+    public function test_room_clear_uses_canonical_active_room_site_despite_legacy_partition_values(): void
     {
         config()->set('app.debug', false);
         $localSite = Site::factory()->create(['tenant_id' => 1]);
@@ -637,7 +662,6 @@ class UnifiSettingsRefactorTest extends TestCase
             return $device;
         });
 
-        $before = $this->captureRoomMutationState($devices->pluck('id')->all());
         $missing = $this->actingAs($this->admin)->putJson(
             '/security-devices/integrations/unifi/hardware/'.($devices->max('id') + 1000).'/room',
             ['room_id' => null],
@@ -647,19 +671,16 @@ class UnifiSettingsRefactorTest extends TestCase
             ['room_id' => null],
         ));
 
-        $allResponses = collect([$missing])->concat($responses);
-        $this->assertSame([
-            'statuses' => [404, 404, 404],
-            'responses_match' => true,
-            'state_unchanged' => true,
-        ], [
-            'statuses' => $allResponses->map->getStatusCode()->all(),
-            'responses_match' => $allResponses->map->getContent()->unique()->count() === 1,
-            'state_unchanged' => $before === $this->captureRoomMutationState($devices->pluck('id')->all()),
-        ]);
+        $missing->assertNotFound();
+        $responses->each->assertRedirect();
+        foreach ($devices as $device) {
+            $active = $device->fresh()->assignments()->active()->sole();
+            $this->assertSame(DeviceAssignment::TARGET_SITE, $active->assignable_type);
+            $this->assertSame($foreignSite->id, $active->assignable_id);
+        }
     }
 
-    public function test_room_clear_rejects_foreign_or_contradictory_legacy_shadow_provenance_without_mutation(): void
+    public function test_room_clear_uses_legacy_shadow_site_as_compatibility_fallback(): void
     {
         config()->set('app.debug', false);
         $foreignSite = Site::factory()->create(['tenant_id' => 77]);
@@ -694,7 +715,6 @@ class UnifiSettingsRefactorTest extends TestCase
             ])
         );
 
-        $before = $this->captureRoomMutationState($devices->pluck('id')->all());
         $missing = $this->actingAs($this->admin)->putJson(
             '/security-devices/integrations/unifi/hardware/'.($devices->max('id') + 1000).'/room',
             ['room_id' => null],
@@ -704,16 +724,13 @@ class UnifiSettingsRefactorTest extends TestCase
             ['room_id' => null],
         ));
 
-        $allResponses = collect([$missing])->concat($responses);
-        $this->assertSame([
-            'statuses' => [404, 404, 404],
-            'responses_match' => true,
-            'state_unchanged' => true,
-        ], [
-            'statuses' => $allResponses->map->getStatusCode()->all(),
-            'responses_match' => $allResponses->map->getContent()->unique()->count() === 1,
-            'state_unchanged' => $before === $this->captureRoomMutationState($devices->pluck('id')->all()),
-        ]);
+        $missing->assertNotFound();
+        $responses->each->assertRedirect();
+        foreach ($devices as $device) {
+            $active = $device->fresh()->assignments()->active()->sole();
+            $this->assertSame(DeviceAssignment::TARGET_SITE, $active->assignable_type);
+            $this->assertSame($foreignSite->id, $active->assignable_id);
+        }
     }
 
     public function test_clearing_room_restores_site_assignment(): void

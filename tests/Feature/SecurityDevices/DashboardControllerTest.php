@@ -264,7 +264,7 @@ class DashboardControllerTest extends TestCase
         $response->assertInertia(fn ($page) => $page->where('groupCount', 2));
     }
 
-    public function test_dashboard_data_is_scoped_to_the_users_tenant(): void
+    public function test_dashboard_data_covers_the_single_application_registry_for_all_sites_users(): void
     {
         $this->admin->forceFill(['organization_id' => 42])->save();
 
@@ -304,13 +304,22 @@ class DashboardControllerTest extends TestCase
         $response->assertInertia(function ($page) {
             $props = $page->toArray()['props'];
 
-            $this->assertSame(1, $props['stats']['totalDevices']);
-            $this->assertSame(1, $props['stats']['criticalEvents24h']);
-            $this->assertSame(1, $props['stats']['overdueMaintenance']);
-            $this->assertSame(1, $props['groupCount']);
-            $this->assertSame(['Tenant camera'], collect($props['attentionDevices'])->pluck('name')->all());
-            $this->assertSame(['Tenant camera'], collect($props['recentEvents'])->pluck('device_name')->all());
-            $this->assertSame(['Tenant camera maintenance'], collect($props['overdueMaintenance'])->pluck('description')->all());
+            $this->assertSame(2, $props['stats']['totalDevices']);
+            $this->assertSame(2, $props['stats']['criticalEvents24h']);
+            $this->assertSame(2, $props['stats']['overdueMaintenance']);
+            $this->assertSame(2, $props['groupCount']);
+            $this->assertEqualsCanonicalizing(
+                ['Tenant camera', 'Foreign camera'],
+                collect($props['attentionDevices'])->pluck('name')->all(),
+            );
+            $this->assertEqualsCanonicalizing(
+                ['Tenant camera', 'Foreign camera'],
+                collect($props['recentEvents'])->pluck('device_name')->all(),
+            );
+            $this->assertEqualsCanonicalizing(
+                ['Tenant camera maintenance', 'Foreign camera maintenance'],
+                collect($props['overdueMaintenance'])->pluck('description')->all(),
+            );
         });
     }
 }

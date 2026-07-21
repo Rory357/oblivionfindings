@@ -4,9 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Integration\IntegrationEvent;
-use App\Models\Integration\IntegrationTenantSecret;
+use App\Models\Integration\IntegrationProviderConnection;
+use App\Models\Integration\IntegrationSiteConfig;
+use App\Models\Site;
 use App\Services\Integration\AlertRoutingService;
+use App\Support\LegacyStorageContext;
+use App\Support\SafeOperationalData;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class WebhookReceiverController extends Controller
@@ -35,24 +40,24 @@ class WebhookReceiverController extends Controller
             // Quick-filter by last 4 characters, then decrypt to confirm
             $last4 = substr($apiKey, -4);
 
-            $tenantSecret = IntegrationTenantSecret::where('secret_last4', $last4)
+            $providerConnection = IntegrationProviderConnection::where('secret_last4', $last4)
                 ->where('provider', $provider)
                 ->connected()
                 ->get()
-                ->first(function (IntegrationTenantSecret $secret) use ($apiKey) {
+                ->first(function (IntegrationProviderConnection $connection) use ($apiKey) {
                     try {
-                        return decrypt($secret->secret_encrypted) === $apiKey;
+                        return decrypt($connection->secret_encrypted) === $apiKey;
                     } catch (\Throwable $e) {
-                        Log::warning('WebhookReceiver: failed to decrypt tenant secret', [
-                            'secret_id' => $secret->id,
-                            'error' => $e->getMessage(),
-                        ]);
+                        Log::warning('WebhookReceiver: failed to decrypt provider connection', SafeOperationalData::logContext([
+                            'provider_connection_id' => $connection->id,
+                            'error_category' => SafeOperationalData::failureCategory($e),
+                        ]));
 
                         return false;
                     }
                 });
 
-            if (! $tenantSecret) {
+            if (! $providerConnection) {
                 return response()->json(['error' => 'Invalid integration key'], 401);
             }
 
@@ -65,7 +70,6 @@ class WebhookReceiverController extends Controller
                 }
             }
 
-            $tenantId = $tenantSecret->tenant_id;
             $payload = $request->all();
 
             // --- Step 2: Parse provider-specific payload ---
@@ -76,10 +80,21 @@ class WebhookReceiverController extends Controller
                 $parsed['event_type'] = $this->inferEventType($provider, $payload) ?? 'unknown';
             }
 
+            $siteId = is_numeric($parsed['site_id'] ?? null) ? (int) $parsed['site_id'] : null;
+            if ($siteId === null || ! Site::query()->whereKey($siteId)->exists()) {
+                return response()->json(['error' => 'Unknown site'], 422);
+            }
+            if (! IntegrationSiteConfig::query()
+                ->forProvider($provider)
+                ->active()
+                ->where('site_id', $siteId)
+                ->exists()) {
+                return response()->json(['error' => 'Site is not mapped for this provider'], 422);
+            }
+
             // --- Step 3: Deduplicate ---
             if (! empty($parsed['source_event_id'])) {
                 $existing = IntegrationEvent::where('provider', $provider)
-                    ->where('tenant_id', $tenantId)
                     ->where('source_event_id', $parsed['source_event_id'])
                     ->first();
 
@@ -98,8 +113,8 @@ class WebhookReceiverController extends Controller
 
             // --- Step 4: Persist the integration event ---
             $event = IntegrationEvent::create([
-                'tenant_id' => $tenantId,
-                'site_id' => $parsed['site_id'],
+                'tenant_id' => LegacyStorageContext::id(),
+                'site_id' => $siteId,
                 'provider' => $provider,
                 'source_app' => $parsed['source_app'] ?? $provider,
                 'source_event_id' => $parsed['source_event_id'],
@@ -120,12 +135,11 @@ class WebhookReceiverController extends Controller
                 'event_id' => $event->id,
             ], 200);
         } catch (\Throwable $e) {
-            Log::error('WebhookReceiver: unhandled error', [
+            Log::error('WebhookReceiver: unhandled error', SafeOperationalData::logContext([
                 'provider' => $provider,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'error_category' => SafeOperationalData::failureCategory($e),
                 'payload_keys' => array_keys($request->all()),
-            ]);
+            ]));
 
             return response()->json([
                 'error' => 'Internal server error',
@@ -191,7 +205,7 @@ class WebhookReceiverController extends Controller
                 : ($isTamper ? IntegrationEvent::SEVERITY_WARN : IntegrationEvent::SEVERITY_INFO),
             'event_type' => $eventType,
             'normalized_payload' => [
-                'summary' => $payload['message'] ?? ($eventType . ' from Queclink device'),
+                'summary' => $payload['message'] ?? ($eventType.' from Queclink device'),
                 'imei' => $payload['imei'] ?? $payload['device_id'] ?? null,
                 'latitude' => $payload['lat'] ?? $payload['latitude'] ?? null,
                 'longitude' => $payload['lng'] ?? $payload['lon'] ?? $payload['longitude'] ?? null,
@@ -622,7 +636,7 @@ class WebhookReceiverController extends Controller
     /**
      * Safely parse a timestamp value that may be a string, int (unix), or null.
      */
-    protected function parseTimestamp(mixed $value): ?\Illuminate\Support\Carbon
+    protected function parseTimestamp(mixed $value): ?Carbon
     {
         if (empty($value)) {
             return now();
@@ -636,15 +650,15 @@ class WebhookReceiverController extends Controller
                     $ts = (int) ($ts / 1000); // milliseconds → seconds
                 }
 
-                return \Illuminate\Support\Carbon::createFromTimestamp($ts);
+                return Carbon::createFromTimestamp($ts);
             }
 
-            return \Illuminate\Support\Carbon::parse($value);
+            return Carbon::parse($value);
         } catch (\Throwable $e) {
-            Log::warning('WebhookReceiver: unparseable timestamp, using now()', [
-                'value' => $value,
-                'error' => $e->getMessage(),
-            ]);
+            Log::warning('WebhookReceiver: unparseable timestamp, using now()', SafeOperationalData::logContext([
+                'value_type' => get_debug_type($value),
+                'error_category' => SafeOperationalData::failureCategory($e),
+            ]));
 
             return now();
         }

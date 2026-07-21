@@ -18,9 +18,9 @@ use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\Integration\Integration;
 use App\Models\Integration\IntegrationEvent;
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSyncLog;
-use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -60,12 +60,12 @@ class SettingsAuditTest extends TestCase
 
     public function test_settings_projects_real_safe_defaults_profiles_exceptions_and_feature_support(): void
     {
-        IntegrationTenantSecret::create([
+        IntegrationProviderConnection::create([
             'tenant_id' => 42,
             'provider' => 'unifi',
             'secret_encrypted' => 'RAW-SECRET',
             'secret_last4' => '0042',
-            'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
             'config' => [
                 'refresh_interval_minutes' => 15,
                 'alert_motion_events' => true,
@@ -98,8 +98,8 @@ class SettingsAuditTest extends TestCase
                     'refresh_interval_minutes' => 15,
                     'alert_motion_events' => true,
                 ], $props['providerOperationalDefaults'][0]['values']);
-                $this->assertSame(['Critical infrastructure'], collect($props['monitoringProfiles'])->pluck('name')->all());
-                $this->assertSame(1, $props['dataQuality']['unassigned_devices']);
+                $this->assertSame(['Critical infrastructure', 'Foreign profile'], collect($props['monitoringProfiles'])->pluck('name')->all());
+                $this->assertSame(2, $props['dataQuality']['unassigned_devices']);
                 $this->assertSame('unsupported', $props['featureSupport']['discovery_candidates']['state']);
                 $this->assertSame('read_only_append_only_application_evidence', $props['audit']['evidence_state']);
                 $encoded = json_encode($props, JSON_THROW_ON_ERROR);
@@ -108,7 +108,7 @@ class SettingsAuditTest extends TestCase
             });
     }
 
-    public function test_audit_is_report_permission_only_whitelisted_tenant_scoped_and_safely_projected(): void
+    public function test_audit_is_report_permission_only_whitelisted_record_scoped_and_safely_projected(): void
     {
         $device = Device::factory()->create(['tenant_id' => 42]);
         $client = Client::factory()->create(['organization_id' => 42]);
@@ -145,8 +145,10 @@ class SettingsAuditTest extends TestCase
             ->assertOk()
             ->assertInertia(function ($page): void {
                 $audit = $page->toArray()['props']['audit'];
-                $this->assertCount(1, $audit['entries']);
-                $this->assertSame(['name'], $audit['entries'][0]['fields']);
+                $this->assertCount(2, $audit['entries']);
+                $this->assertTrue(collect($audit['entries'])->every(
+                    fn (array $entry): bool => $entry['fields'] === ['name'],
+                ));
                 $encoded = json_encode($audit, JSON_THROW_ON_ERROR);
                 foreach (['RAW-', '10.1.2.3', 'secret_encrypted', 'external_ref', 'client.update'] as $sentinel) {
                     $this->assertStringNotContainsString($sentinel, $encoded);
@@ -165,12 +167,12 @@ class SettingsAuditTest extends TestCase
 
     public function test_integration_secret_mutation_audit_never_persists_reusable_secret_content(): void
     {
-        $secret = IntegrationTenantSecret::create([
+        $secret = IntegrationProviderConnection::create([
             'tenant_id' => 42,
             'provider' => 'unifi',
             'secret_encrypted' => 'RAW-CREATE-SECRET',
             'secret_last4' => '1234',
-            'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
             'config' => ['token' => 'RAW-CONFIG'],
         ]);
         $secret->update([
@@ -179,7 +181,7 @@ class SettingsAuditTest extends TestCase
         ]);
 
         $encoded = AuditLog::query()
-            ->where('auditable_type', IntegrationTenantSecret::class)
+            ->where('auditable_type', IntegrationProviderConnection::class)
             ->pluck('meta')
             ->toJson();
 
@@ -665,7 +667,7 @@ class SettingsAuditTest extends TestCase
         $this->assertNull(data_get($audit->meta, 'scope'));
     }
 
-    public function test_vehicle_assignment_with_mismatched_client_site_tenant_discards_all_scope(): void
+    public function test_all_sites_auditors_can_see_unscoped_legacy_assignment_evidence(): void
     {
         $canonicalSite = Site::factory()->create(['tenant_id' => 42]);
         $foreignSite = Site::factory()->create(['tenant_id' => 77]);
@@ -704,11 +706,18 @@ class SettingsAuditTest extends TestCase
 
         $foreignAdmin = User::factory()->create(['organization_id' => 77, 'approved_at' => now()]);
         $foreignAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
-        foreach ([$this->admin, $foreignAdmin, $this->siteRestrictedViewer($canonicalSite)] as $viewer) {
+        foreach ([$this->admin, $foreignAdmin] as $viewer) {
             $this->actingAs($viewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page): void {
-                $this->assertFalse(collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'));
+                $this->assertTrue(collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'));
             });
         }
+
+        $this->actingAs($this->siteRestrictedViewer($canonicalSite))
+            ->get('/security-devices/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $this->assertFalse(
+                collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'),
+            ));
     }
 
     public function test_vehicle_assignment_scope_preserves_only_consistent_tenant_evidence(): void

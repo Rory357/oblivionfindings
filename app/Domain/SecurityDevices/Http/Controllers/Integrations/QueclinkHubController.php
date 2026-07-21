@@ -7,6 +7,7 @@ use App\Domain\SecurityDevices\Enums\AssignmentType;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Presenters\IntegrationSiteCredentialsPresenter;
+use App\Domain\SecurityDevices\Services\DeviceLinkService;
 use App\Domain\SecurityDevices\Services\QueclinkIntegrationAccessService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
@@ -17,7 +18,7 @@ use App\Models\Asset;
 use App\Models\AssetTracker;
 use App\Models\Client;
 use App\Models\ClientConsent;
-use App\Models\Integration\IntegrationTenantSecret;
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Queclink\QueclinkAuditEvent;
 use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkPendingCommand;
@@ -29,6 +30,7 @@ use App\Models\User;
 use App\Services\ConsentValidationService;
 use App\Services\Queclink\CommandBuilder;
 use App\Services\Queclink\ConfigurationSnapshotService;
+use App\Support\LegacyStorageContext;
 use App\Support\SafeOperationalData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -47,8 +49,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * Queclink integration hub — TCP listener configuration, pending-tray
  * pairing, paired-device management, debug console, and AT command REPL.
  *
- * The existing QueclinkController.php remains the home for IMS cloud
- * credentials; this controller owns everything to do with direct
+ * The existing QueclinkController.php remains the home for the optional
+ * provider API connection; this controller owns everything to do with direct
  * device-to-server intake via the TCP listener.
  */
 class QueclinkHubController extends Controller
@@ -59,6 +61,7 @@ class QueclinkHubController extends Controller
         private readonly QueclinkIntegrationAccessService $queclinkAccess,
         private readonly IntegrationSiteCredentialsPresenter $siteCredentials,
         private readonly SecurityDevicesAccessService $devicesAccess,
+        private readonly DeviceLinkService $deviceLinks,
     ) {}
 
     /** Canonical section keys a preset payload may contain. */
@@ -71,7 +74,7 @@ class QueclinkHubController extends Controller
     public function index(Request $request, ConfigurationSnapshotService $configurations, SecurityDevicesAccessService $access)
     {
         abort_unless($this->userCanManage($request->user()), 403);
-        $tenantId = $this->resolveTenantId($request->user());
+        $user = $request->user();
         $targetType = in_array($request->string('target_type')->toString(), ['vehicle', 'staff', 'client'], true)
             ? $request->string('target_type')->toString()
             : null;
@@ -82,7 +85,7 @@ class QueclinkHubController extends Controller
         $deviceSearch = Str::limit(trim($request->string('device_search')->toString()), 100, '');
 
         return Inertia::render('security-devices/integrations/queclink-hub', [
-            'listener' => function () use ($tenantId): array {
+            'listener' => function () use ($user): array {
                 $port = (int) (AppSetting::query()->where('key', 'queclink.listener.port')->value('value')
                     ?? config('services.queclink.port', 8090));
                 $hostname = (string) (AppSetting::query()->where('key', 'queclink.public_hostname')->value('value')
@@ -93,37 +96,34 @@ class QueclinkHubController extends Controller
                     'port' => $port,
                     'endpoint_configured' => $hostname !== '',
                     'service_state' => $this->systemdState(),
-                    'connected_count' => $this->tenantDeviceQuery($tenantId)->connected()->count(),
+                    'connected_count' => $this->visibleDeviceQuery($user)->connected()->count(),
                 ];
             },
             'devices' => fn (): array => $this->devicePagePayload(
                 $request,
-                $tenantId,
                 $configurations,
-                $access,
                 $deviceSearch,
             ),
-            'statistics' => function () use ($tenantId): array {
-                $lastFrameAt = $this->tenantFrameQuery($tenantId)->max('created_at');
+            'statistics' => function () use ($user): array {
+                $lastFrameAt = $this->visibleFrameQuery($user)->max('created_at');
 
                 return [
-                    'frames_last_hour' => $this->tenantFrameQuery($tenantId)->where('created_at', '>=', now()->subHour())->count(),
+                    'frames_last_hour' => $this->visibleFrameQuery($user)->where('created_at', '>=', now()->subHour())->count(),
                     'last_frame_at' => $lastFrameAt ? Carbon::parse($lastFrameAt)->toDateTimeString() : null,
                 ];
             },
-            'imsCloud' => function () use ($tenantId): ?array {
-                $secret = IntegrationTenantSecret::query()
-                    ->forTenant($tenantId)
-                    ->where('provider', 'queclink')
+            'providerConnection' => function (): ?array {
+                $connection = IntegrationProviderConnection::query()
+                    ->forProvider('queclink')
                     ->first();
 
-                return $secret ? [
-                    'status' => $secret->status,
-                    'secret_last4' => $secret->secret_last4,
-                    'last_tested_at' => $secret->last_tested_at?->toDateTimeString(),
+                return $connection ? [
+                    'status' => $connection->status,
+                    'secret_last4' => $connection->secret_last4,
+                    'last_tested_at' => $connection->last_tested_at?->toDateTimeString(),
                 ] : null;
             },
-            'siteCredentials' => fn (): array => $this->siteCredentials->present($tenantId, 'queclink'),
+            'siteCredentials' => fn (): array => $this->siteCredentials->present($user, 'queclink'),
             'targets' => fn (): array => [
                 'vehicles' => $access->assignableVehicles(
                     $request->user(),
@@ -154,7 +154,6 @@ class QueclinkHubController extends Controller
                     ])->values(),
             ],
             'presets' => fn (): Collection => QueclinkPreset::query()
-                ->availableTo($tenantId)
                 ->orderByDesc('is_system')
                 ->orderBy('name')
                 ->get()
@@ -212,7 +211,6 @@ class QueclinkHubController extends Controller
             $this->queclinkAccess->assertDevice($request->user(), $lockedDevice);
             abort_unless($lockedDevice->isPending(), 422, 'Device is not in the pending state.');
 
-            $tenantId = $this->resolveTenantId($request->user());
             $pairingType = $validated['pairing_type'];
             $targetId = (int) $validated['target_id'];
             $target = match ($pairingType) {
@@ -230,15 +228,15 @@ class QueclinkHubController extends Controller
                 'staff' => $this->ensurePersonalTrackerAsset(
                     type: 'staff',
                     target: $target,
-                    tenantId: $tenantId,
+                    viewer: $request->user(),
                 ),
                 'client' => $this->ensurePersonalTrackerAsset(
                     type: 'client',
                     target: $target,
-                    tenantId: $tenantId,
+                    viewer: $request->user(),
                 ),
             };
-            $this->queclinkAccess->assertAssetTenant($request->user(), $asset);
+            $this->queclinkAccess->assertAsset($request->user(), $asset);
 
             if (in_array($pairingType, ['staff', 'client'], true)) {
                 $activeAssignments = DeviceAssignment::query()
@@ -277,7 +275,7 @@ class QueclinkHubController extends Controller
                 ->lockForUpdate()
                 ->first();
             if ($existingTracker) {
-                $this->queclinkAccess->assertAssetTenant($request->user(), $existingTracker->asset);
+                $this->queclinkAccess->assertAsset($request->user(), $existingTracker->asset);
                 abort_unless(
                     (int) $existingTracker->asset_id === (int) $asset->id,
                     409,
@@ -285,7 +283,18 @@ class QueclinkHubController extends Controller
                 );
             }
 
-            $device = $this->ensureCanonicalDevice($lockedDevice, $tenantId, $pairingType);
+            $device = $this->ensureCanonicalDevice($lockedDevice, $request->user(), $pairingType);
+
+            $activeAssetLinks = $device->activeAssetLinks()->lockForUpdate()->get();
+            abort_if(
+                $activeAssetLinks->count() > 1
+                || ($activeAssetLinks->isNotEmpty() && (int) $activeAssetLinks->first()->asset_id !== (int) $asset->id),
+                409,
+                'This provider identity is already linked to another canonical asset.',
+            );
+            if ($activeAssetLinks->isEmpty()) {
+                $this->deviceLinks->link($device, $asset, (int) $request->user()->id);
+            }
 
             DeviceAssignment::create([
                 'device_id' => $device->id,
@@ -322,7 +331,7 @@ class QueclinkHubController extends Controller
                 'status' => QueclinkDevice::STATUS_PAIRED,
                 'pending_pairing_type' => null,
                 'device_id' => $device->id,
-                'tenant_id' => $tenantId,
+                'tenant_id' => LegacyStorageContext::id(),
             ]);
 
             $this->logAudit($request, $lockedDevice, 'claim', null, null, [
@@ -409,15 +418,18 @@ class QueclinkHubController extends Controller
     public function releaseDevice(Request $request, QueclinkDevice $queclinkDevice)
     {
         abort_unless($this->userCanManage($request->user()), 403);
-        $this->queclinkAccess->assertDeviceTenant($request->user(), $queclinkDevice);
+        $this->queclinkAccess->assertDeviceForRelease($request->user(), $queclinkDevice);
 
         DB::transaction(function () use ($queclinkDevice, $request) {
             $lockedDevice = QueclinkDevice::query()
                 ->whereKey($queclinkDevice->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
-            $this->queclinkAccess->assertDeviceTenant($request->user(), $lockedDevice);
+            $this->queclinkAccess->assertDeviceForRelease($request->user(), $lockedDevice);
             abort_unless($lockedDevice->isPaired(), 422);
+
+            $canonicalDeviceId = $lockedDevice->device_id ? (int) $lockedDevice->device_id : null;
+            $auditSiteId = $this->resolveAuditSiteId($canonicalDeviceId);
 
             $tracker = AssetTracker::query()
                 ->where('vendor', 'queclink')
@@ -426,11 +438,10 @@ class QueclinkHubController extends Controller
                 ->lockForUpdate()
                 ->first();
             if ($tracker) {
-                $this->queclinkAccess->assertHistoricalAssetTenant($request->user(), $tracker->asset);
+                $this->queclinkAccess->assertHistoricalAsset($request->user(), $tracker->asset);
             }
 
             $canonicalDevice = Device::query()
-                ->forTenant($this->resolveTenantId($request->user()))
                 ->whereKey($lockedDevice->device_id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -446,6 +457,8 @@ class QueclinkHubController extends Controller
                 ]);
             }
 
+            $this->deviceLinks->unlinkAllForDevice($canonicalDevice);
+
             $tracker?->update(['status' => 'unpaired', 'unpaired_at' => now()]);
 
             $lockedDevice->update([
@@ -456,7 +469,7 @@ class QueclinkHubController extends Controller
             $this->logAudit($request, $lockedDevice, 'release', null, null, [
                 'status' => QueclinkDevice::STATUS_PENDING,
                 'device_id' => null,
-            ]);
+            ], canonicalDeviceId: $canonicalDeviceId, siteId: $auditSiteId);
         });
 
         return back()->with('success', "Device {$queclinkDevice->imei} released — moved back to pending.");
@@ -494,7 +507,7 @@ class QueclinkHubController extends Controller
         QueclinkPendingCommand::create([
             'queclink_device_id' => $queclinkDevice->id,
             'imei' => $queclinkDevice->imei,
-            'tenant_id' => $queclinkDevice->tenant_id,
+            'tenant_id' => LegacyStorageContext::id(),
             'command_word' => $built['command_word'],
             'raw_command' => $built['raw'],
             'serial_number' => $built['serial'],
@@ -684,7 +697,7 @@ class QueclinkHubController extends Controller
     }
 
     /**
-     * Save a reusable preset for the operator's tenant. Each section is built
+     * Save a reusable application preset. Each section is built
      * once up front so a preset that would fail to apply is never persisted.
      */
     public function storePreset(Request $request, CommandBuilder $builder)
@@ -721,12 +734,10 @@ class QueclinkHubController extends Controller
             );
         }
 
-        $tenantId = $this->resolveTenantId($request->user());
-
         $preset = QueclinkPreset::create([
-            'tenant_id' => $tenantId,
+            'tenant_id' => LegacyStorageContext::id(),
             'name' => $validated['name'],
-            'slug' => $this->uniquePresetSlug($validated['name'], $tenantId),
+            'slug' => $this->uniquePresetSlug($validated['name']),
             'description' => $validated['description'] ?? null,
             'target_category' => $validated['target_category'] ?? 'personal_tracker',
             'payload' => $sections,
@@ -742,11 +753,6 @@ class QueclinkHubController extends Controller
         abort_unless($this->userCanManage($request->user()), 403);
         $this->queclinkAccess->assertPreset($request->user(), $preset);
         abort_if($preset->is_system, 422, 'Built-in presets cannot be deleted.');
-        abort_unless(
-            $preset->tenant_id !== null && (int) $preset->tenant_id === $this->resolveTenantId($request->user()),
-            404,
-        );
-
         $name = $preset->name;
         $preset->delete();
 
@@ -795,7 +801,7 @@ class QueclinkHubController extends Controller
         $retry = QueclinkPendingCommand::create([
             'queclink_device_id' => $command->queclink_device_id,
             'imei' => $command->imei,
-            'tenant_id' => $command->tenant_id,
+            'tenant_id' => LegacyStorageContext::id(),
             'command_word' => $command->command_word,
             'raw_command' => $command->raw_command,
             'serial_number' => $command->serial_number,
@@ -837,7 +843,6 @@ class QueclinkHubController extends Controller
         $preset = null;
         if ($action === 'apply_preset') {
             $preset = QueclinkPreset::query()
-                ->availableTo($this->resolveTenantId($request->user()))
                 ->find((int) ($validated['preset_id'] ?? 0));
 
             if (! $preset || $preset->sectionPayloads() === [] || $preset->target_category === 'vehicle_tracker') {
@@ -911,8 +916,7 @@ class QueclinkHubController extends Controller
     {
         abort_unless($this->userCanManage($request->user()), 403);
 
-        $tenantId = $this->resolveTenantId($request->user());
-        $query = $this->tenantFrameQuery($tenantId)->orderByDesc('id')->limit(200);
+        $query = $this->visibleFrameQuery($request->user())->orderByDesc('id')->limit(200);
 
         if ($request->filled('direction')) {
             $query->where('direction', $request->string('direction')->toString());
@@ -945,13 +949,13 @@ class QueclinkHubController extends Controller
     {
         abort_unless($this->userCanManage($request->user()), 403);
 
-        $tenantId = $this->resolveTenantId($request->user());
+        $user = $request->user();
         $direction = $request->string('direction')->toString() ?: null;
         $commandWord = $request->string('command_word')->toString() ?: null;
         $parseStatus = $request->string('parse_status')->toString() ?: null;
-        $cursor = (int) ($request->input('since_id') ?? $this->tenantFrameQuery($tenantId)->max('id') ?? 0);
+        $cursor = (int) ($request->input('since_id') ?? $this->visibleFrameQuery($user)->max('id') ?? 0);
 
-        return new StreamedResponse(function () use (&$cursor, $tenantId, $direction, $commandWord, $parseStatus) {
+        return new StreamedResponse(function () use (&$cursor, $user, $direction, $commandWord, $parseStatus) {
             ignore_user_abort(false);
             @set_time_limit(0);
             echo "retry: 3000\n\n";
@@ -964,7 +968,7 @@ class QueclinkHubController extends Controller
                     break;
                 }
 
-                $query = $this->tenantFrameQuery($tenantId)
+                $query = $this->visibleFrameQuery($user)
                     ->where('id', '>', $cursor)
                     ->orderBy('id')
                     ->limit(100);
@@ -1031,15 +1035,10 @@ class QueclinkHubController extends Controller
     /** @return array<string, mixed> */
     private function devicePagePayload(
         Request $request,
-        int $tenantId,
         ConfigurationSnapshotService $configurations,
-        SecurityDevicesAccessService $access,
         string $search,
     ): array {
-        $baseQuery = $this->tenantDeviceQuery($tenantId)
-            ->where(fn (Builder $query): Builder => $query
-                ->whereNull('device_id')
-                ->orWhereHas('device', fn (Builder $device): Builder => $device->forTenant($tenantId)))
+        $baseQuery = $this->visibleDeviceQuery($request->user())
             ->when($search !== '', fn (Builder $query): Builder => $query->where(function (Builder $match) use ($search): void {
                 $match->where('imei', 'like', "%{$search}%")
                     ->orWhere('model_hint', 'like', "%{$search}%")
@@ -1090,7 +1089,7 @@ class QueclinkHubController extends Controller
             })
             ->filter()
             ->values();
-        $assignmentLabels = $this->assignmentLabels($assignments, $access, $tenantId);
+        $assignmentLabels = $this->assignmentLabels($assignments, $request->user());
 
         $serialised = $pages->map(fn (LengthAwarePaginator $page): Collection => $page->getCollection()
             ->map(fn (QueclinkDevice $device): array => $this->serialiseDevice(
@@ -1126,8 +1125,7 @@ class QueclinkHubController extends Controller
      */
     private function assignmentLabels(
         Collection $assignments,
-        SecurityDevicesAccessService $access,
-        int $tenantId,
+        User $viewer,
     ): array {
         $idsFor = fn (string $type): array => $assignments
             ->where('assignable_type', $type)
@@ -1140,31 +1138,29 @@ class QueclinkHubController extends Controller
 
         $assets = Asset::query()
             ->whereKey($idsFor(DeviceAssignment::TARGET_VEHICLE))
-            ->with(['site:id,tenant_id', 'homeSite:id,tenant_id', 'client:id,organization_id,site_id', 'client.site:id,tenant_id'])
-            ->get(['id', 'name', 'registration_number', 'site_id', 'home_site_id', 'client_id'])
-            ->filter(fn (Asset $asset): bool => $access->assetMatchesTenant($asset, $tenantId));
+            ->whereIn('id', $this->devicesAccess->authorizedAssetIds($viewer))
+            ->get(['id', 'name', 'registration_number']);
         foreach ($assets as $asset) {
             $labels[DeviceAssignment::TARGET_VEHICLE.':'.$asset->id] = $asset->name
                 .($asset->registration_number ? " ({$asset->registration_number})" : '');
         }
-        foreach (User::query()->whereKey($idsFor(DeviceAssignment::TARGET_STAFF))->where('organization_id', $tenantId)->get(['id', 'name']) as $staff) {
+        foreach ($this->devicesAccess->assignableStaff($viewer)->whereKey($idsFor(DeviceAssignment::TARGET_STAFF))->get(['id', 'name']) as $staff) {
             $labels[DeviceAssignment::TARGET_STAFF.':'.$staff->id] = $staff->name;
         }
         $clients = Client::query()
             ->whereKey($idsFor(DeviceAssignment::TARGET_CLIENT))
-            ->with('site:id,tenant_id')
-            ->get(['id', 'organization_id', 'site_id', 'first_name', 'last_name'])
-            ->filter(fn (Client $client): bool => $access->clientMatchesTenant($client, $tenantId));
+            ->whereIn('id', $this->devicesAccess->authorizedClientIds($viewer))
+            ->get(['id', 'first_name', 'last_name']);
         foreach ($clients as $client) {
             $labels[DeviceAssignment::TARGET_CLIENT.':'.$client->id] = trim(($client->first_name ?? '').' '.($client->last_name ?? ''));
         }
-        foreach (Site::query()->whereKey($idsFor(DeviceAssignment::TARGET_SITE))->where('tenant_id', $tenantId)->get(['id', 'name']) as $site) {
+        foreach (Site::query()->whereKey($idsFor(DeviceAssignment::TARGET_SITE))->whereIn('id', $this->devicesAccess->accessibleSiteIds($viewer))->get(['id', 'name']) as $site) {
             $labels[DeviceAssignment::TARGET_SITE.':'.$site->id] = $site->name;
         }
         foreach (SiteRoom::query()
             ->whereKey($idsFor(DeviceAssignment::TARGET_ROOM))
-            ->where('tenant_id', $tenantId)
-            ->whereHas('site', fn (Builder $site): Builder => $site->where('tenant_id', $tenantId))
+            ->whereIn('site_id', $this->devicesAccess->accessibleSiteIds($viewer))
+            ->whereHas('site')
             ->get(['id', 'name']) as $room) {
             $labels[DeviceAssignment::TARGET_ROOM.':'.$room->id] = $room->name;
         }
@@ -1227,17 +1223,7 @@ class QueclinkHubController extends Controller
         ];
     }
 
-    private function presetVisibleTo(QueclinkPreset $preset, ?User $user): bool
-    {
-        if ($preset->is_system) {
-            return true;
-        }
-
-        return $preset->tenant_id !== null
-            && (int) $preset->tenant_id === $this->resolveTenantId($user);
-    }
-
-    private function uniquePresetSlug(string $name, ?int $tenantId): string
+    private function uniquePresetSlug(string $name): string
     {
         $base = Str::slug($name) ?: 'preset';
         $slug = $base;
@@ -1245,7 +1231,6 @@ class QueclinkHubController extends Controller
 
         while (QueclinkPreset::query()
             ->where('slug', $slug)
-            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhere('is_system', true))
             ->exists()) {
             $slug = $base.'-'.$suffix;
             $suffix++;
@@ -1259,7 +1244,7 @@ class QueclinkHubController extends Controller
         return QueclinkPendingCommand::create([
             'queclink_device_id' => $queclinkDevice->id,
             'imei' => $queclinkDevice->imei,
-            'tenant_id' => $queclinkDevice->tenant_id,
+            'tenant_id' => LegacyStorageContext::id(),
             'command_word' => $built['command_word'],
             'raw_command' => $built['raw'],
             'serial_number' => $built['serial'],
@@ -1356,19 +1341,73 @@ class QueclinkHubController extends Controller
         ?array $after = null,
         ?string $rawCommand = null,
         ?string $notes = null,
+        ?int $canonicalDeviceId = null,
+        ?int $siteId = null,
     ): void {
+        $canonicalDeviceId ??= $queclinkDevice->device_id ? (int) $queclinkDevice->device_id : null;
+
         QueclinkAuditEvent::log([
-            'tenant_id' => $queclinkDevice->tenant_id ?? $this->resolveTenantId($request->user()),
+            'tenant_id' => LegacyStorageContext::id(),
+            'provider_connection_id' => IntegrationProviderConnection::query()
+                ->forProvider('queclink')
+                ->oldest('id')
+                ->value('id'),
+            'site_id' => $siteId ?? $this->resolveAuditSiteId($canonicalDeviceId),
+            'canonical_device_id' => $canonicalDeviceId,
             'queclink_device_id' => $queclinkDevice->id,
             'imei' => null,
             'user_id' => $request->user()?->id,
             'event_type' => $eventType,
+            'outcome' => 'succeeded',
             'section' => $section,
             'payload_before' => $before === null ? null : ['fields' => SafeOperationalData::auditFields($before)],
             'payload_after' => $after === null ? null : ['fields' => SafeOperationalData::auditFields($after)],
             'raw_command' => null,
             'notes' => null,
         ]);
+    }
+
+    private function resolveAuditSiteId(?int $canonicalDeviceId): ?int
+    {
+        if (! $canonicalDeviceId) {
+            return null;
+        }
+
+        $assignment = DeviceAssignment::query()
+            ->where('device_id', $canonicalDeviceId)
+            ->whereNull('released_at')
+            ->latest('assigned_at')
+            ->first(['assignable_type', 'assignable_id']);
+
+        if (! $assignment) {
+            return null;
+        }
+
+        return match ($assignment->assignable_type) {
+            DeviceAssignment::TARGET_SITE => Site::query()->whereKey($assignment->assignable_id)->value('id'),
+            DeviceAssignment::TARGET_ROOM => SiteRoom::query()->whereKey($assignment->assignable_id)->value('site_id'),
+            DeviceAssignment::TARGET_CLIENT => Client::query()->whereKey($assignment->assignable_id)->value('site_id'),
+            DeviceAssignment::TARGET_STAFF => HrEmployeeProfile::query()
+                ->where('user_id', $assignment->assignable_id)
+                ->where('is_active', true)
+                ->value('primary_site_id'),
+            DeviceAssignment::TARGET_VEHICLE => $this->resolveAssetSiteId((int) $assignment->assignable_id),
+            default => null,
+        };
+    }
+
+    private function resolveAssetSiteId(int $assetId): ?int
+    {
+        $asset = Asset::query()->find($assetId, ['site_id', 'room_id', 'home_site_id', 'client_id']);
+
+        if (! $asset) {
+            return null;
+        }
+
+        return $asset->site_id
+            ?? ($asset->room_id ? SiteRoom::query()->whereKey($asset->room_id)->value('site_id') : null)
+            ?? $asset->home_site_id
+            ?? ($asset->client_id ? Client::query()->whereKey($asset->client_id)->value('site_id') : null);
     }
 
     private function recentCommands(QueclinkDevice $d): array
@@ -1393,14 +1432,22 @@ class QueclinkHubController extends Controller
             ->all();
     }
 
-    private function tenantDeviceQuery(int $tenantId): Builder
+    private function visibleDeviceQuery(User $viewer): Builder
     {
-        return QueclinkDevice::query()->where('tenant_id', $tenantId);
+        return QueclinkDevice::query()->where(function (Builder $query) use ($viewer): void {
+            $query->whereIn('device_id', $this->devicesAccess->visibleDevices($viewer)->select('devices.id'))
+                ->orWhereIn('device_id', $this->devicesAccess->releasableDevices($viewer)->select('devices.id'));
+
+            if ($this->devicesAccess->canViewUnassigned($viewer)) {
+                $query->orWhereNull('device_id');
+            }
+        });
     }
 
-    private function tenantFrameQuery(int $tenantId): Builder
+    private function visibleFrameQuery(User $viewer): Builder
     {
-        return QueclinkRawFrame::query()->where('tenant_id', $tenantId);
+        return QueclinkRawFrame::query()
+            ->whereIn('queclink_device_id', $this->visibleDeviceQuery($viewer)->select('queclink_devices.id'));
     }
 
     /** @return array<string, mixed> */
@@ -1417,7 +1464,7 @@ class QueclinkHubController extends Controller
         ];
     }
 
-    private function ensurePersonalTrackerAsset(string $type, User|Client $target, int $tenantId): Asset
+    private function ensurePersonalTrackerAsset(string $type, User|Client $target, User $viewer): Asset
     {
         $targetId = (int) $target->getKey();
         $existing = Asset::query()
@@ -1428,7 +1475,7 @@ class QueclinkHubController extends Controller
             ->get();
 
         foreach ($existing as $candidate) {
-            abort_unless($this->devicesAccess->assetMatchesTenant($candidate, $tenantId), 404);
+            $this->queclinkAccess->assertAsset($viewer, $candidate);
         }
         abort_if($existing->count() > 1, 409, 'Multiple canonical personal assets require reconciliation before pairing.');
         if ($existing->isNotEmpty()) {
@@ -1437,16 +1484,13 @@ class QueclinkHubController extends Controller
 
         $siteId = match ($type) {
             'staff' => HrEmployeeProfile::query()
-                ->where('tenant_id', $tenantId)
                 ->where('user_id', $targetId)
+                ->where('is_active', true)
                 ->value('primary_site_id'),
             'client' => $target->site_id,
         };
-        abort_unless(
-            is_numeric($siteId)
-            && Site::query()->whereKey((int) $siteId)->where('tenant_id', $tenantId)->exists(),
-            404,
-        );
+        abort_unless(is_numeric($siteId), 404);
+        $this->devicesAccess->assertCanViewSite($viewer, (int) $siteId);
 
         $name = match ($type) {
             'staff' => 'Personal tracker — '.$target->name,
@@ -1463,7 +1507,7 @@ class QueclinkHubController extends Controller
         ]);
     }
 
-    private function ensureCanonicalDevice(QueclinkDevice $qd, int $tenantId, string $pairingType): Device
+    private function ensureCanonicalDevice(QueclinkDevice $qd, User $viewer, string $pairingType): Device
     {
         $identityQuery = Device::query()
             ->where('provider', 'queclink')
@@ -1471,19 +1515,17 @@ class QueclinkHubController extends Controller
                 $q->where('imei', $qd->imei)
                     ->orWhere('device_uid', $qd->imei);
             });
-        $collision = (clone $identityQuery)->first();
-        abort_if($collision && (int) $collision->tenant_id !== $tenantId, 404);
-
-        $existing = $identityQuery->where('tenant_id', $tenantId)->first();
+        $existing = $identityQuery->first();
 
         if ($existing) {
+            abort_unless($this->devicesAccess->visibleDevices($viewer)->whereKey($existing->id)->exists(), 404);
             $existing->fill([
                 'imei' => $qd->imei,
                 'device_uid' => $existing->device_uid ?: $qd->imei,
                 'manufacturer' => $existing->manufacturer ?: 'Queclink',
                 'model' => $existing->model ?: $qd->model_hint,
                 'firmware_version' => $existing->firmware_version ?: $qd->firmware_version,
-                'tenant_id' => $tenantId,
+                'tenant_id' => LegacyStorageContext::id(),
                 'last_seen_at' => $qd->last_seen_at ?: $existing->last_seen_at,
             ])->save();
 
@@ -1491,7 +1533,7 @@ class QueclinkHubController extends Controller
         }
 
         return Device::create([
-            'tenant_id' => $tenantId,
+            'tenant_id' => LegacyStorageContext::id(),
             'device_uid' => $qd->imei,
             'name' => match ($pairingType) {
                 'vehicle' => "Vehicle tracker {$qd->imei}",
@@ -1558,10 +1600,5 @@ class QueclinkHubController extends Controller
     private function userCanManage($user): bool
     {
         return $user && $user->canDo('securityDevices.integrations.manage');
-    }
-
-    private function resolveTenantId($user): int
-    {
-        return (int) ($user->tenant_id ?? $user->organization_id ?? 1);
     }
 }

@@ -12,10 +12,10 @@ use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\AuditLog;
 use App\Models\Integration\Integration;
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\Integration\IntegrationSyncLog;
-use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
@@ -30,7 +30,7 @@ class SettingsAuditPresenter
         MonitoringProfile::class,
         Monitor::class,
         Integration::class,
-        IntegrationTenantSecret::class,
+        IntegrationProviderConnection::class,
         IntegrationSiteConfig::class,
         IntegrationSiteSecret::class,
         IntegrationSyncLog::class,
@@ -52,23 +52,22 @@ class SettingsAuditPresenter
     /** @return array<string, mixed> */
     public function present(User $viewer): array
     {
-        $tenantId = $this->access->tenantId($viewer);
         $visibleDevices = $this->access->visibleDevices($viewer)->get(['id', 'provider', 'external_ref']);
         $deviceIds = $visibleDevices->pluck('id');
         $siteIds = $this->access->accessibleSiteIds($viewer);
         $canReport = $viewer->canDo('securityDevices.reports.view');
         $canManageIntegrations = $viewer->canDo('securityDevices.integrations.manage');
-        $canViewAllTenantSites = $this->access->canViewAllTenantSites($viewer);
+        $canViewAllSites = $this->access->canViewAllSites($viewer);
 
         $providerDefaults = $canManageIntegrations
-            ? IntegrationTenantSecret::query()->forTenant($tenantId)->get()->map(function (IntegrationTenantSecret $secret): array {
-                $config = is_array($secret->config) ? $secret->config : [];
+            ? IntegrationProviderConnection::query()->get()->map(function (IntegrationProviderConnection $connection): array {
+                $config = is_array($connection->config) ? $connection->config : [];
                 $values = collect($config)->only([
                     'refresh_interval_minutes', 'alert_motion_events', 'alert_device_offline',
                     'quiet_hours_start', 'quiet_hours_end',
                 ])->all();
 
-                return ['provider' => $secret->provider, 'state' => $values === [] ? 'not_configured' : 'configured', 'values' => $values];
+                return ['provider' => $connection->provider, 'state' => $values === [] ? 'not_configured' : 'configured', 'values' => $values];
             })->filter(fn (array $row): bool => $row['values'] !== [])->values()->all()
             : [];
 
@@ -79,19 +78,19 @@ class SettingsAuditPresenter
 
         return [
             'summary' => [
-                'device_groups' => DeviceGroup::query()->where('tenant_id', $tenantId)
-                    ->when(! $canViewAllTenantSites, fn ($query) => $query->whereHas('devices', fn ($devices) => $devices->whereIn('devices.id', $deviceIds)))
+                'device_groups' => DeviceGroup::query()
+                    ->when(! $canViewAllSites, fn ($query) => $query->whereHas('devices', fn ($devices) => $devices->whereIn('devices.id', $deviceIds)))
                     ->count(),
-                'audit_entries' => $canReport ? $this->auditQuery($tenantId, $deviceIds->all(), $siteIds, $canViewAllTenantSites)->count() : 0,
+                'audit_entries' => $canReport ? $this->auditQuery($deviceIds->all(), $siteIds, $canViewAllSites)->count() : 0,
             ],
             'areas' => $this->areas($viewer),
             'classificationDefaults' => [
                 'state' => 'not_configured',
                 'values' => [],
-                'note' => 'No canonical tenant classification-default record exists. Devices use the current Security & Devices taxonomy and explicit record values.',
+                'note' => 'No application classification-default record exists. Devices use the current Security & Devices taxonomy and explicit record values.',
             ],
             'providerOperationalDefaults' => $providerDefaults,
-            'monitoringProfiles' => MonitoringProfile::query()->forTenant($tenantId)->orderBy('name')->get()->map(fn (MonitoringProfile $profile): array => [
+            'monitoringProfiles' => MonitoringProfile::query()->orderBy('name')->get()->map(fn (MonitoringProfile $profile): array => [
                 'id' => $profile->id,
                 'name' => $profile->name,
                 'description' => $profile->description,
@@ -109,7 +108,7 @@ class SettingsAuditPresenter
             ],
             'featureSupport' => [
                 'classification_taxonomy' => ['state' => 'supported', 'note' => 'Current code-defined device taxonomy.'],
-                'monitoring_profiles' => ['state' => 'supported', 'note' => 'Current tenant monitoring profile records.'],
+                'monitoring_profiles' => ['state' => 'supported', 'note' => 'Current application monitoring profile records.'],
                 'integration_site_mapping' => ['state' => 'supported', 'note' => 'Current provider site configuration records.'],
                 'discovery_candidates' => ['state' => 'unsupported', 'note' => 'No canonical discovery-candidate records exist yet.'],
                 'database_audit_immutability' => ['state' => 'unsupported', 'note' => 'The application exposes read-only append-only evidence; database-level immutability is not claimed.'],
@@ -117,7 +116,7 @@ class SettingsAuditPresenter
             'audit' => [
                 'visible' => $canReport,
                 'evidence_state' => 'read_only_append_only_application_evidence',
-                'entries' => $canReport ? $this->auditEntries($tenantId, $deviceIds->all(), $siteIds, $canViewAllTenantSites) : [],
+                'entries' => $canReport ? $this->auditEntries($deviceIds->all(), $siteIds, $canViewAllSites) : [],
                 'limit' => 50,
             ],
         ];
@@ -132,17 +131,16 @@ class SettingsAuditPresenter
         ])->filter()->values()->all();
     }
 
-    private function auditQuery(int $tenantId, array $visibleDeviceIds, array $siteIds, bool $canViewAllTenantSites)
+    private function auditQuery(array $visibleDeviceIds, array $siteIds, bool $canViewAllSites)
     {
-        $monitorIds = Monitor::query()->where('tenant_id', $tenantId)->whereIn('device_id', $visibleDeviceIds)->pluck('id');
+        $monitorIds = Monitor::query()->whereIn('device_id', $visibleDeviceIds)->pluck('id');
         $deviceChildTypes = collect([DeviceAssetLink::class, DeviceMaintenanceRecord::class])
             ->flatMap(fn (string $type): array => $this->typeNames($type))->unique()->values()->all();
 
         return AuditLog::query()
-            ->forOrganization($tenantId)
             ->whereIn('auditable_type', $this->auditTypeNames())
             ->whereIn('action', collect(self::AUDIT_TYPES)->flatMap(fn (string $type) => collect(['create', 'update', 'delete'])->map(fn (string $verb) => strtolower(class_basename($type)).'.'.$verb)))
-            ->when($canViewAllTenantSites, fn ($query) => $query, fn ($query) => $query->where(function ($query) use ($tenantId, $visibleDeviceIds, $monitorIds, $siteIds, $deviceChildTypes): void {
+            ->when($canViewAllSites, fn ($query) => $query, fn ($query) => $query->where(function ($query) use ($visibleDeviceIds, $monitorIds, $siteIds, $deviceChildTypes): void {
                 $query->where(fn ($q) => $q->whereIn('auditable_type', $this->typeNames(Device::class))->whereIn('auditable_id', $visibleDeviceIds))
                     ->orWhere(fn ($q) => $q->whereIn('auditable_type', $this->typeNames(Device::class))->where(function ($scope) use ($visibleDeviceIds, $siteIds): void {
                         $scope->whereIn('meta->scope->device_id', $visibleDeviceIds)->orWhereIn('meta->scope->site_id', $siteIds);
@@ -164,7 +162,7 @@ class SettingsAuditPresenter
                     }))
                     ->orWhere(fn ($q) => $q->where('auditable_type', Monitor::class)->whereIn('auditable_id', $monitorIds))
                     ->orWhere(fn ($q) => $q->where('auditable_type', Monitor::class)->whereIn('meta->scope->device_id', $visibleDeviceIds))
-                    ->orWhere(fn ($q) => $q->where('auditable_type', DeviceGroup::class)->whereIn('auditable_id', DeviceGroup::query()->where('tenant_id', $tenantId)->whereHas('devices', fn ($devices) => $devices->whereIn('devices.id', $visibleDeviceIds))->select('id')))
+                    ->orWhere(fn ($q) => $q->where('auditable_type', DeviceGroup::class)->whereIn('auditable_id', DeviceGroup::query()->whereHas('devices', fn ($devices) => $devices->whereIn('devices.id', $visibleDeviceIds))->select('id')))
                     ->orWhere(function ($q) use ($visibleDeviceIds): void {
                         $q->where('auditable_type', DeviceGroup::class)
                             ->where(function ($scopes) use ($visibleDeviceIds): void {
@@ -176,19 +174,19 @@ class SettingsAuditPresenter
                                 }
                             });
                     })
-                    ->orWhere(fn ($q) => $q->where('auditable_type', MonitoringProfile::class)->whereIn('auditable_id', MonitoringProfile::query()->where('tenant_id', $tenantId)->select('id')))
-                    ->orWhere(fn ($q) => $q->where('auditable_type', IntegrationSiteConfig::class)->whereIn('auditable_id', IntegrationSiteConfig::query()->where('tenant_id', $tenantId)->whereIn('site_id', $siteIds)->select('id')))
+                    ->orWhere(fn ($q) => $q->where('auditable_type', MonitoringProfile::class)->whereIn('auditable_id', MonitoringProfile::query()->select('id')))
+                    ->orWhere(fn ($q) => $q->where('auditable_type', IntegrationSiteConfig::class)->whereIn('auditable_id', IntegrationSiteConfig::query()->whereIn('site_id', $siteIds)->select('id')))
                     ->orWhere(fn ($q) => $q->where('auditable_type', IntegrationSiteConfig::class)->whereIn('meta->scope->site_id', $siteIds))
-                    ->orWhere(fn ($q) => $q->where('auditable_type', IntegrationSiteSecret::class)->whereIn('auditable_id', IntegrationSiteSecret::query()->where('tenant_id', $tenantId)->whereIn('site_id', $siteIds)->select('id')))
+                    ->orWhere(fn ($q) => $q->where('auditable_type', IntegrationSiteSecret::class)->whereIn('auditable_id', IntegrationSiteSecret::query()->whereIn('site_id', $siteIds)->select('id')))
                     ->orWhere(fn ($q) => $q->where('auditable_type', IntegrationSiteSecret::class)->whereIn('meta->scope->site_id', $siteIds))
-                    ->orWhere(fn ($q) => $q->where('auditable_type', IntegrationSyncLog::class)->whereIn('auditable_id', IntegrationSyncLog::query()->where('tenant_id', $tenantId)->whereIn('site_id', $siteIds)->select('id')))
+                    ->orWhere(fn ($q) => $q->where('auditable_type', IntegrationSyncLog::class)->whereIn('auditable_id', IntegrationSyncLog::query()->whereIn('site_id', $siteIds)->select('id')))
                     ->orWhere(fn ($q) => $q->where('auditable_type', IntegrationSyncLog::class)->whereIn('meta->scope->site_id', $siteIds));
             }));
     }
 
-    private function auditEntries(int $tenantId, array $visibleDeviceIds, array $siteIds, bool $canViewAllTenantSites): array
+    private function auditEntries(array $visibleDeviceIds, array $siteIds, bool $canViewAllSites): array
     {
-        return $this->auditQuery($tenantId, $visibleDeviceIds, $siteIds, $canViewAllTenantSites)
+        return $this->auditQuery($visibleDeviceIds, $siteIds, $canViewAllSites)
             ->with('user:id,name')
             ->latest('id')
             ->limit(50)

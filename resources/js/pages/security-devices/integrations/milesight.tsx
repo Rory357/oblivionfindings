@@ -42,7 +42,7 @@ import {
 
 type ConnectionStatus = 'connected' | 'disconnected' | 'error';
 
-type TenantSecret = {
+type ProviderConnection = {
     status: ConnectionStatus;
     secret_last4?: string;
     last_tested_at?: string;
@@ -64,7 +64,7 @@ type SyncLog = {
 };
 
 type Props = {
-    tenantSecret: TenantSecret;
+    providerConnection: ProviderConnection;
     syncLogs: SyncLog[];
     siteCredentials: SiteCredentialRow[];
     can: {
@@ -113,7 +113,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function MilesightIntegration({
-    tenantSecret,
+    providerConnection,
     syncLogs,
     siteCredentials,
     can,
@@ -128,9 +128,9 @@ export default function MilesightIntegration({
 
     const rotateKeyForm = useForm<{ api_key: string }>({ api_key: '' });
 
-    const hasKey = !!tenantSecret;
-    const connStatus = tenantSecret
-        ? (connectionStatusConfig[tenantSecret.status] ??
+    const hasKey = !!providerConnection;
+    const connStatus = providerConnection
+        ? (connectionStatusConfig[providerConnection.status] ??
           connectionStatusConfig.disconnected)
         : null;
 
@@ -172,7 +172,7 @@ export default function MilesightIntegration({
                     <CardHeader>
                         <CardTitle>API credentials</CardTitle>
                         <CardDescription>
-                            Stored encrypted per tenant. Only the last four
+                            Stored encrypted for this application. Only the last four
                             characters are ever shown.
                         </CardDescription>
                     </CardHeader>
@@ -249,7 +249,7 @@ export default function MilesightIntegration({
                                     <span className="text-sm">
                                         Key ending in{' '}
                                         <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                                            •••{tenantSecret?.secret_last4}
+                                            •••{providerConnection?.secret_last4}
                                         </code>
                                     </span>
                                     {connStatus && (
@@ -259,7 +259,7 @@ export default function MilesightIntegration({
                                         </Badge>
                                     )}
                                 </div>
-                                {tenantSecret?.endpoint_configured && (
+                                {providerConnection?.endpoint_configured && (
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <MapPin className="h-3.5 w-3.5" />
                                         Provider endpoint configured
@@ -269,17 +269,17 @@ export default function MilesightIntegration({
                                     <p>
                                         Last tested:{' '}
                                         <span className="text-foreground">
-                                            {fmt(tenantSecret?.last_tested_at)}
+                                            {fmt(providerConnection?.last_tested_at)}
                                         </span>
                                     </p>
                                     <p>
                                         Last sync:{' '}
                                         <span className="text-foreground">
-                                            {fmt(tenantSecret?.last_synced_at)}
+                                            {fmt(providerConnection?.last_synced_at)}
                                         </span>
                                     </p>
                                 </div>
-                                {tenantSecret?.status === 'error' && (
+                                {providerConnection?.status === 'error' && (
                                     <div className="flex items-start gap-2 rounded-md border border-status-critical/30 bg-status-critical-bg p-3 text-xs text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                         <span>

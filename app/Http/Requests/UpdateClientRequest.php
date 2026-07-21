@@ -238,17 +238,32 @@ class UpdateClientRequest extends FormRequest
                 );
             }
 
+        });
+
+        $validator->after(function (Validator $validator) {
+            $geofenceId = $this->input('house_geofence_id');
+            $client = $this->route('client');
             if (
-                filled($this->input('house_geofence_id'))
-                && ! $validator->errors()->has('house_geofence_id')
-                && ! AssetGeofence::query()
-                    ->forOrganization($organizationId)
-                    ->whereKey((int) $this->input('house_geofence_id'))
-                    ->exists()
+                blank($geofenceId)
+                || ! $client instanceof Client
+                || $validator->errors()->has('house_geofence_id')
+            ) {
+                return;
+            }
+
+            $currentSiteId = is_numeric($client->site_id) ? (int) $client->site_id : null;
+            $siteId = $this->exists('site_id') && ! $validator->errors()->has('site_id')
+                ? (filled($this->input('site_id')) ? (int) $this->input('site_id') : null)
+                : $currentSiteId;
+
+            if (! AssetGeofence::query()
+                ->eligibleForClientSite($siteId)
+                ->whereKey((int) $geofenceId)
+                ->exists()
             ) {
                 $validator->errors()->add(
                     'house_geofence_id',
-                    'Choose a geofence from this organisation.',
+                    'Choose an active house or resident geofence for the selected Site.',
                 );
             }
         });

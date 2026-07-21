@@ -182,6 +182,7 @@ class ClientDeviceRefactorTest extends TestCase
     public function test_available_trackers_only_shows_unassigned_tracking_devices(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1]);
+        $this->clientA->update(['site_id' => $site->id]);
         $availableHardware = LocationHardware::query()->create([
             'tenant_id' => 1,
             'site_id' => $site->id,

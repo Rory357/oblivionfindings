@@ -4,7 +4,6 @@ namespace App\Domain\SecurityDevices\Http\Controllers;
 
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
-use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
 use App\Domain\SecurityDevices\Presenters\MaintenanceOperationsPresenter;
@@ -15,8 +14,6 @@ use Inertia\Inertia;
 
 class MaintenanceHealthController extends Controller
 {
-    use ResolvesDeviceTenant;
-
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
     ) {}
@@ -28,10 +25,8 @@ class MaintenanceHealthController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.maintenance.view'), 403);
-        $tenantId = $this->resolveDeviceTenantId($user);
         $visibleDeviceIds = $this->access->visibleDevices($user)->select('devices.id');
         $maintenanceScope = fn () => DeviceMaintenanceRecord::query()
-            ->forTenant($tenantId)
             ->whereIn('device_id', clone $visibleDeviceIds);
 
         // ── Stats ─────────────────────────────────────────────────
@@ -207,7 +202,7 @@ class MaintenanceHealthController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.maintenance.manage'), 403);
-        $record->loadMissing('device:id,tenant_id');
+        $record->loadMissing('device:id');
         abort_unless($record->device, 404);
         $this->access->assertCanViewDevice($user, $record->device);
 
@@ -241,7 +236,7 @@ class MaintenanceHealthController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.maintenance.manage'), 403);
-        $record->loadMissing('device:id,tenant_id');
+        $record->loadMissing('device:id');
         abort_unless($record->device, 404);
         $this->access->assertCanViewDevice($user, $record->device);
 

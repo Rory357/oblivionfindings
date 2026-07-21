@@ -186,7 +186,7 @@ type Props = {
         frames_last_hour: number;
         last_frame_at: string | null;
     };
-    imsCloud: {
+    providerConnection: {
         status: 'connected' | 'disconnected' | 'error';
         secret_last4?: string | null;
         last_tested_at?: string | null;
@@ -283,7 +283,7 @@ export default function QueclinkHub({
     listener,
     devices,
     statistics,
-    imsCloud,
+    providerConnection,
     siteCredentials,
     targets,
     presets,
@@ -479,7 +479,7 @@ export default function QueclinkHub({
                         </TabsContent>
 
                         <TabsContent value="ims" className="space-y-6 pt-6">
-                            <ImsCloudTab imsCloud={imsCloud} can={can} />
+                            <ImsCloudTab providerConnection={providerConnection} can={can} />
                         </TabsContent>
                     </Tabs>
                 </div>
@@ -4434,10 +4434,10 @@ function CommandRepl({
 // ── IMS Cloud tab (preserves existing scaffold behaviour) ─────────
 
 function ImsCloudTab({
-    imsCloud,
+    providerConnection,
     can,
 }: {
-    imsCloud: Props['imsCloud'];
+    providerConnection: Props['providerConnection'];
     can: Props['can'];
 }) {
     const form = useForm<{ api_key: string; base_url: string }>({
@@ -4457,18 +4457,18 @@ function ImsCloudTab({
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-                {imsCloud ? (
+                {providerConnection ? (
                     <div className="flex flex-wrap items-center gap-3 text-sm">
                         <span>
                             Key ending in{' '}
                             <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                                •••{imsCloud.secret_last4}
+                                •••{providerConnection.secret_last4}
                             </code>
                         </span>
-                        <Badge>{imsCloud.status}</Badge>
-                        {imsCloud.last_tested_at && (
+                        <Badge>{providerConnection.status}</Badge>
+                        {providerConnection.last_tested_at && (
                             <span className="text-xs text-muted-foreground">
-                                Last tested {fmt(imsCloud.last_tested_at)}
+                                Last tested {fmt(providerConnection.last_tested_at)}
                             </span>
                         )}
                     </div>

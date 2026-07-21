@@ -149,7 +149,7 @@ class ReportsExportTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_selected_device_export_is_tenant_scoped_and_contains_only_requested_rows(): void
+    public function test_selected_device_export_uses_requested_rows_from_the_single_application_registry(): void
     {
         $this->admin->forceFill(['organization_id' => 42])->save();
         $selected = Device::factory()->create(['tenant_id' => 42, 'name' => 'Selected device']);
@@ -164,6 +164,6 @@ class ReportsExportTest extends TestCase
 
         $this->assertStringContainsString('Selected device', $content);
         $this->assertStringNotContainsString('Unselected device', $content);
-        $this->assertStringNotContainsString('Foreign device', $content);
+        $this->assertStringContainsString('Foreign device', $content);
     }
 }

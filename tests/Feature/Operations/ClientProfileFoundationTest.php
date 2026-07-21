@@ -339,10 +339,52 @@ it('round trips the complete profile wizard payload through update and edit hydr
         ->assertJsonPath('initialValues.funding_type', 'EGL');
 });
 
-it('scopes edit wizard option lists to the client organization', function () {
+it('does not serialize Add Client geofences outside the available Site options', function () {
+    $manager = User::factory()->create(['organization_id' => 1]);
+    grantClientProfileFoundationPermissions($manager, ['clients.create']);
+    $availableSite = Site::factory()->create(['tenant_id' => 1, 'name' => 'Available home']);
+    $hiddenSite = Site::factory()->create(['tenant_id' => 2, 'name' => 'Hidden home']);
+    $availableFence = AssetGeofence::query()->create([
+        'site_id' => $availableSite->id,
+        'name' => 'AVAILABLE-GEOFENCE-SENTINEL',
+        'type' => 'circle',
+        'scope' => 'house',
+        'shape' => ['lat' => 1, 'lng' => 1, 'radius_m' => 50],
+        'breach_type' => 'both',
+        'is_active' => true,
+    ]);
+    $hiddenFence = AssetGeofence::query()->create([
+        'site_id' => $hiddenSite->id,
+        'name' => 'HIDDEN-GEOFENCE-SENTINEL',
+        'type' => 'circle',
+        'scope' => 'house',
+        'shape' => ['lat' => 2, 'lng' => 2, 'radius_m' => 50],
+        'breach_type' => 'both',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($manager)
+        ->get('/operations/clients/create')
+        ->assertOk()
+        ->assertInertia(function (Assert $page) use ($availableFence, $availableSite, $hiddenFence, $hiddenSite): void {
+            $props = $page->toArray()['props'];
+
+            expect(collect($props['sites'])->pluck('id')->all())
+                ->toBe([$availableSite->id])
+                ->not->toContain($hiddenSite->id)
+                ->and(collect($props['geofences'])->pluck('id')->all())
+                ->toBe([$availableFence->id])
+                ->not->toContain($hiddenFence->id)
+                ->and(json_encode($props['geofences'], JSON_THROW_ON_ERROR))
+                ->not->toContain('HIDDEN-GEOFENCE-SENTINEL');
+        });
+});
+
+it('scopes edit wizard geofences to the canonical client site and clears ineligible history', function () {
     $manager = User::factory()->create(['organization_id' => 1]);
     grantClientProfileFoundationPermissions($manager, ['clients.update']);
     $ownSite = Site::factory()->create(['tenant_id' => 1, 'name' => 'Own house']);
+    $samePartitionSite = Site::factory()->create(['tenant_id' => 1, 'name' => 'Other same-partition house']);
     $foreignSite = Site::factory()->create(['tenant_id' => 2, 'name' => 'Foreign house']);
     $ownContext = ServiceContext::factory()->create([
         'site_id' => $ownSite->id,
@@ -383,6 +425,15 @@ it('scopes edit wizard option lists to the client organization', function () {
         'breach_type' => 'both',
         'is_active' => true,
     ]);
+    $samePartitionGeofence = AssetGeofence::query()->create([
+        'site_id' => $samePartitionSite->id,
+        'name' => 'Other same-partition active fence',
+        'type' => 'circle',
+        'scope' => 'house',
+        'shape' => ['lat' => 4, 'lng' => 4, 'radius_m' => 50],
+        'breach_type' => 'both',
+        'is_active' => true,
+    ]);
     $client = Client::factory()->create([
         'organization_id' => 1,
         'site_id' => $ownSite->id,
@@ -392,7 +443,8 @@ it('scopes edit wizard option lists to the client organization', function () {
 
     $response = $this->actingAs($manager)
         ->getJson("/operations/clients/{$client->id}/edit?modal=1")
-        ->assertOk();
+        ->assertOk()
+        ->assertJsonPath('initialValues.house_geofence_id', '');
 
     expect(collect($response->json('sites'))->pluck('id')->all())
         ->toContain($ownSite->id)
@@ -401,8 +453,69 @@ it('scopes edit wizard option lists to the client organization', function () {
         ->toContain($ownContext->id, $globalContext->id)
         ->not->toContain($foreignContext->id);
     expect(collect($response->json('geofences'))->pluck('id')->all())
-        ->toContain($ownGeofence->id, $currentInactiveGeofence->id)
-        ->not->toContain($foreignGeofence->id);
+        ->toBe([$ownGeofence->id])
+        ->not->toContain($currentInactiveGeofence->id, $samePartitionGeofence->id, $foreignGeofence->id);
+
+    $this->from("/operations/clients/{$client->id}")
+        ->put("/operations/clients/{$client->id}", [
+            'first_name' => $client->first_name,
+            'last_name' => $client->last_name,
+            'status' => $client->status,
+            'site_id' => $ownSite->id,
+            'phone' => '021 555 0199',
+            'house_geofence_id' => '',
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($client->fresh()->phone)->toBe('021 555 0199')
+        ->and($client->fresh()->house_geofence_id)->toBeNull();
+});
+
+it('rejects same-partition cross-site geofences on client create and update', function () {
+    $manager = User::factory()->create(['organization_id' => 1]);
+    grantClientProfileFoundationPermissions($manager, ['clients.create', 'clients.update']);
+    $clientSite = Site::factory()->create(['tenant_id' => 1, 'name' => 'Client home']);
+    $otherSite = Site::factory()->create(['tenant_id' => 1, 'name' => 'Other home']);
+    $otherFence = AssetGeofence::query()->create([
+        'site_id' => $otherSite->id,
+        'name' => 'Other home fence',
+        'type' => 'circle',
+        'scope' => 'house',
+        'shape' => ['lat' => 5, 'lng' => 5, 'radius_m' => 50],
+        'breach_type' => 'both',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($manager)
+        ->from('/operations/clients')
+        ->post('/operations/clients', [
+            'first_name' => 'Create',
+            'last_name' => 'Boundary',
+            'status' => 'active',
+            'site_id' => $clientSite->id,
+            'house_geofence_id' => $otherFence->id,
+        ])
+        ->assertSessionHasErrors('house_geofence_id');
+
+    expect(Client::query()->count())->toBe(0);
+
+    $client = Client::factory()->create([
+        'organization_id' => 1,
+        'site_id' => $clientSite->id,
+        'house_geofence_id' => null,
+    ]);
+
+    $this->from("/operations/clients/{$client->id}")
+        ->put("/operations/clients/{$client->id}", [
+            'first_name' => $client->first_name,
+            'last_name' => $client->last_name,
+            'status' => $client->status,
+            'site_id' => $clientSite->id,
+            'house_geofence_id' => $otherFence->id,
+        ])
+        ->assertSessionHasErrors('house_geofence_id');
+
+    expect($client->fresh()->house_geofence_id)->toBeNull();
 });
 
 it('rejects foreign organization location options on profile update', function () {

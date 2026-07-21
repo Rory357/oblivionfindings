@@ -3,10 +3,12 @@
 namespace App\Domain\SecurityDevices\Http\Controllers;
 
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
-use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceGroup;
 use App\Domain\SecurityDevices\Services\DeviceGroupAutoRuleService;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Models\User;
+use App\Support\LegacyStorageContext;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Inertia\Inertia;
@@ -14,16 +16,16 @@ use Inertia\Inertia;
 class DeviceGroupController extends Controller
 {
     use MapsDevicesForList;
-    use ResolvesDeviceTenant;
 
     public function __construct(
         private readonly DeviceGroupAutoRuleService $autoRules,
+        private readonly SecurityDevicesAccessService $access,
     ) {}
 
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user->canDo('securityDevices.groups.manage'), 403);
+        $this->assertCanManageGroups($user);
 
         $query = DeviceGroup::query()->withCount('devices');
 
@@ -67,7 +69,7 @@ class DeviceGroupController extends Controller
     public function show(Request $request, DeviceGroup $group)
     {
         $user = $request->user();
-        abort_unless($user->canDo('securityDevices.groups.manage'), 403);
+        $this->assertCanManageGroups($user);
 
         $members = $group->devices()
             ->with(['assignments' => fn ($q) => $q->active()])
@@ -121,7 +123,7 @@ class DeviceGroupController extends Controller
     public function create(Request $request)
     {
         $user = $request->user();
-        abort_unless($user->canDo('securityDevices.groups.manage'), 403);
+        $this->assertCanManageGroups($user);
 
         return Inertia::render('security-devices/device-groups/create');
     }
@@ -129,7 +131,7 @@ class DeviceGroupController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        abort_unless($user->canDo('securityDevices.groups.manage'), 403);
+        $this->assertCanManageGroups($user);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:device_groups,name'],
@@ -138,7 +140,7 @@ class DeviceGroupController extends Controller
             'auto_rules' => ['nullable', 'array'],
         ]);
 
-        $validated['tenant_id'] = $this->resolveDeviceTenantId($user);
+        $validated['tenant_id'] = LegacyStorageContext::id();
         $validated['type'] = $validated['type'] ?? 'custom';
 
         $group = DeviceGroup::create($validated);
@@ -150,7 +152,7 @@ class DeviceGroupController extends Controller
     public function edit(Request $request, DeviceGroup $group)
     {
         $user = $request->user();
-        abort_unless($user->canDo('securityDevices.groups.manage'), 403);
+        $this->assertCanManageGroups($user);
 
         return Inertia::render('security-devices/device-groups/edit', [
             'group' => [
@@ -165,7 +167,7 @@ class DeviceGroupController extends Controller
     public function update(Request $request, DeviceGroup $group)
     {
         $user = $request->user();
-        abort_unless($user->canDo('securityDevices.groups.manage'), 403);
+        $this->assertCanManageGroups($user);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', "unique:device_groups,name,{$group->id}"],
@@ -187,7 +189,7 @@ class DeviceGroupController extends Controller
     public function previewAutoRules(Request $request, DeviceGroup $group)
     {
         $user = $request->user();
-        abort_unless($user->canDo('securityDevices.groups.manage'), 403);
+        $this->assertCanManageGroups($user);
 
         $result = $this->autoRules->preview($group);
 
@@ -209,7 +211,7 @@ class DeviceGroupController extends Controller
     public function syncAutoRules(Request $request, DeviceGroup $group)
     {
         $user = $request->user();
-        abort_unless($user->canDo('securityDevices.groups.manage'), 403);
+        $this->assertCanManageGroups($user);
 
         $rules = is_array($group->auto_rules) ? $group->auto_rules : [];
         if (empty($rules)) {
@@ -227,7 +229,7 @@ class DeviceGroupController extends Controller
     public function destroy(Request $request, DeviceGroup $group)
     {
         $user = $request->user();
-        abort_unless($user->canDo('securityDevices.groups.manage'), 403);
+        $this->assertCanManageGroups($user);
 
         $name = $group->name;
         $group->delete(); // soft delete
@@ -239,7 +241,7 @@ class DeviceGroupController extends Controller
     public function addMember(Request $request, DeviceGroup $group)
     {
         $user = $request->user();
-        abort_unless($user->canDo('securityDevices.groups.manage'), 403);
+        $this->assertCanManageGroups($user);
 
         $validated = $request->validate([
             'device_id' => ['required', 'integer', 'exists:devices,id'],
@@ -258,10 +260,18 @@ class DeviceGroupController extends Controller
     public function removeMember(Request $request, DeviceGroup $group, Device $device)
     {
         $user = $request->user();
-        abort_unless($user->canDo('securityDevices.groups.manage'), 403);
+        $this->assertCanManageGroups($user);
 
         $group->devices()->detach($device->id);
 
         return back()->with('success', 'Device removed from group.');
+    }
+
+    private function assertCanManageGroups(User $user): void
+    {
+        abort_unless(
+            $user->canDo('securityDevices.groups.manage') && $this->access->canViewAllSites($user),
+            403,
+        );
     }
 }

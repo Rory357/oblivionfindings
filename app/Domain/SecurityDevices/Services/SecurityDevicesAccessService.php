@@ -8,57 +8,132 @@ use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
 use App\Models\Client;
+use App\Models\LocationHardware;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
-use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 
-class SecurityDevicesAccessService
+/**
+ * Canonical Security & Devices authorization boundary.
+ *
+ * Oblivion Findings is one application. Device visibility comes from current
+ * operational Site access plus the Client, staff, Fleet/Asset and privacy
+ * policies that own the assigned record. Legacy partition columns are never
+ * consulted here.
+ */
+final class SecurityDevicesAccessService
 {
     private const ASSIGNMENT_PICKER_LIMIT = 500;
 
-    public function __construct(
-        private readonly UserSiteAccessService $siteAccess,
-    ) {}
-
-    public function tenantId(User $user): int
-    {
-        return (int) ($user->organization_id ?? 1);
-    }
-
-    /** @return array<int, int> */
+    /** @return list<int> */
     public function accessibleSiteIds(User $user): array
     {
-        return $this->siteAccess->accessibleSiteIds(
-            $user,
-            ['securityDevices.integrations.manage'],
-        );
+        if ($this->canViewAllSites($user)) {
+            return $this->operationalSites()->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        }
+
+        $profile = HrEmployeeProfile::query()
+            ->where('user_id', $user->getKey())
+            ->where('is_active', true)
+            ->where(function (Builder $query): void {
+                $query->whereNull('start_date')->orWhereDate('start_date', '<=', today());
+            })
+            ->where(function (Builder $query): void {
+                $query->whereNull('end_date')->orWhereDate('end_date', '>=', today());
+            })
+            ->first(['primary_site_id', 'secondary_site_ids']);
+
+        $ids = collect([
+            $profile?->primary_site_id,
+            ...($profile?->secondary_site_ids ?? []),
+        ]);
+
+        // Historic schemas may carry a direct pointer. It is accepted only as
+        // a Site identifier; Site remains the canonical authorization record.
+        if (Schema::hasColumn('users', 'site_id')) {
+            $ids->push(User::query()->whereKey($user->getKey())->value('site_id'));
+        }
+
+        $ids = $ids
+            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return $this->operationalSites()
+            ->whereKey($ids->all())
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
     }
 
-    public function canViewAllTenantSites(User $user): bool
+    public function canViewAllSites(User $user): bool
     {
-        return $user->canDo('securityDevices.integrations.manage');
+        return $user->canDo('securityDevices.devices.viewAllSites');
+    }
+
+    public function canViewUnassigned(User $user): bool
+    {
+        return $user->canDo('securityDevices.devices.viewUnassigned')
+            || $user->canDo('assets.trackers.manage');
+    }
+
+    public function unassignedTrackingDevicesForClient(User $user, Client $client): Builder
+    {
+        $query = $this->visibleDevices($user)
+            ->where('domain', 'tracking')
+            ->whereNotIn('status', ['decommissioned', 'lost'])
+            ->whereNotNull('legacy_location_hardware_id')
+            ->whereDoesntHave('assignments', fn (Builder $assignment): Builder => $assignment->active())
+            ->whereDoesntHave('activeAssetLinks');
+
+        if (! $this->canViewUnassigned($user) || ! is_numeric($client->site_id)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereExists(function ($hardware) use ($client): void {
+            $hardware->selectRaw('1')
+                ->from('location_hardware')
+                ->whereColumn('location_hardware.id', 'devices.legacy_location_hardware_id')
+                ->where('location_hardware.site_id', (int) $client->site_id)
+                ->where('location_hardware.category', LocationHardware::CATEGORY_TRACKER)
+                ->where('location_hardware.status', '!=', LocationHardware::STATUS_RETIRED)
+                ->whereNull('location_hardware.deleted_at');
+        });
+    }
+
+    public function unassignedTrackingDeviceForClient(
+        User $user,
+        Client $client,
+        int $deviceId,
+        bool $lockForUpdate = false,
+    ): ?Device {
+        $query = $this->unassignedTrackingDevicesForClient($user, $client)->whereKey($deviceId);
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        return $query->first();
     }
 
     public function assignableStaff(User $user): Builder
     {
-        $tenantId = $this->tenantId($user);
+        $siteIds = $this->accessibleSiteIds($user);
         $query = User::query()
-            ->where('organization_id', $tenantId)
             ->whereNotNull('approved_at')
-            ->whereHas('hrEmployeeProfile', fn (Builder $profile): Builder => $profile
-                ->where('tenant_id', $tenantId)
-                ->whereNotNull('primary_site_id')
-                ->whereHas('primarySite', fn (Builder $site): Builder => $site->where('tenant_id', $tenantId)));
+            ->whereHas('hrEmployeeProfile', fn (Builder $profile): Builder => $this->applyCurrentStaffSiteScope($profile, $siteIds));
 
         if (! $user->canDo('staff.viewAny') || ! $user->canDo('hazards.view')) {
-            return $query->whereKey($user->id);
+            $query->whereKey($user->getKey());
         }
-
-        $this->siteAccess->applyStaffScope($query, $user, ['securityDevices.integrations.manage']);
 
         return $query;
     }
@@ -116,7 +191,7 @@ class SecurityDevicesAccessService
             }
         }
 
-        return $clients;
+        return $clients->values();
     }
 
     public function assignableClient(User $user, int $id, bool $lockForUpdate = false): ?Client
@@ -132,45 +207,31 @@ class SecurityDevicesAccessService
             : null;
     }
 
+    /** @return list<int> */
+    public function authorizedClientIds(User $user): array
+    {
+        return $this->assignableClientQuery($user)
+            ->get()
+            ->filter(fn (Client $client): bool => Gate::forUser($user)->allows('view', $client))
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+    }
+
     public function assignableVehicles(User $user, ?string $search = null, ?int $selectedId = null): Collection
     {
-        $tenantId = $this->tenantId($user);
-        $siteIds = $this->accessibleSiteIds($user);
         $search = trim((string) $search);
         $assets = $this->assetCandidateQuery($user, true)
             ->when($search !== '', fn (Builder $query): Builder => $query->where(function (Builder $name) use ($search): void {
                 $name->where('name', 'like', "%{$search}%")
                     ->orWhere('registration_number', 'like', "%{$search}%");
             }))
-            ->with([
-                'site:id,tenant_id',
-                'homeSite:id,tenant_id',
-                'client:id,organization_id,site_id',
-                'client.site:id,tenant_id',
-                'categoryRef:id,slug',
-            ])
+            ->with(['site:id', 'homeSite:id', 'client:id,site_id', 'categoryRef:id,slug'])
             ->orderBy('name')
             ->orderBy('id')
             ->limit(self::ASSIGNMENT_PICKER_LIMIT)
             ->get()
-            ->filter(function (Asset $asset) use ($user, $tenantId, $siteIds): bool {
-                if (! $this->assetMatchesTenant($asset, $tenantId)) {
-                    return false;
-                }
-
-                if (! $this->canViewAllTenantSites($user)) {
-                    $assetSiteIds = array_filter([
-                        $asset->site_id,
-                        $asset->home_site_id,
-                        $asset->client?->site_id,
-                    ], fn ($id): bool => is_numeric($id));
-                    if (array_intersect($siteIds, array_map('intval', $assetSiteIds)) === []) {
-                        return false;
-                    }
-                }
-
-                return $user->canDo('fleet.viewAny') || Gate::forUser($user)->allows('view', $asset);
-            })
+            ->filter(fn (Asset $asset): bool => $user->canDo('fleet.viewAny') || Gate::forUser($user)->allows('view', $asset))
             ->values();
 
         if ($selectedId !== null && ! $assets->contains('id', $selectedId)) {
@@ -185,129 +246,214 @@ class SecurityDevicesAccessService
 
     public function assignableVehicle(User $user, int $id, bool $lockForUpdate = false): ?Asset
     {
-        $tenantId = $this->tenantId($user);
-        $query = $this->assetCandidateQuery($user, true)
-            ->whereKey($id)
-            ->with([
-                'site:id,tenant_id',
-                'homeSite:id,tenant_id',
-                'client:id,organization_id,site_id',
-                'client.site:id,tenant_id',
-                'categoryRef:id,slug',
-            ]);
+        $query = $this->assetCandidateQuery($user, true)->whereKey($id);
         if ($lockForUpdate) {
             $query->lockForUpdate();
         }
         $asset = $query->first();
 
-        if (! $asset instanceof Asset || ! $this->assetMatchesTenant($asset, $tenantId)) {
-            return null;
-        }
+        return $asset instanceof Asset
+            && ($user->canDo('fleet.viewAny') || Gate::forUser($user)->allows('view', $asset))
+                ? $asset
+                : null;
+    }
 
-        return $user->canDo('fleet.viewAny') || Gate::forUser($user)->allows('view', $asset)
+    /** @return Collection<int, Asset> */
+    public function assignableAssets(User $user, ?string $search = null): Collection
+    {
+        $search = trim((string) $search);
+
+        return $this->assetCandidateQuery($user)
+            ->when($search !== '', fn (Builder $query): Builder => $query->where(function (Builder $name) use ($search): void {
+                $name->where('name', 'like', "%{$search}%")
+                    ->orWhere('asset_tag', 'like', "%{$search}%");
+            }))
+            ->orderBy('name')
+            ->limit(self::ASSIGNMENT_PICKER_LIMIT)
+            ->get()
+            ->filter(fn (Asset $asset): bool => Gate::forUser($user)->allows('view', $asset))
+            ->values();
+    }
+
+    public function assignableAsset(User $user, int $id, bool $lockForUpdate = false): ?Asset
+    {
+        $query = $this->assetCandidateQuery($user)->whereKey($id);
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+        $asset = $query->first();
+
+        return $asset instanceof Asset && Gate::forUser($user)->allows('view', $asset)
             ? $asset
             : null;
     }
 
+    /** @return list<int> */
+    public function authorizedAssetIds(User $user): array
+    {
+        return $this->assetCandidateQuery($user)
+            ->with('categoryRef:id,slug')
+            ->get()
+            ->filter(function (Asset $asset) use ($user): bool {
+                $isVehicle = strcasecmp((string) $asset->category, 'vehicle') === 0
+                    || $asset->categoryRef?->slug === 'vehicle';
+
+                return ($isVehicle && $user->canDo('fleet.viewAny'))
+                    || Gate::forUser($user)->allows('view', $asset);
+            })
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+    }
+
     public function visibleDevices(User $user): Builder
     {
-        $tenantId = $this->tenantId($user);
-        $query = Device::query()->forTenant($tenantId);
-        $clientIds = $this->accessibleAssignedClientIds($user);
-        $staffIds = $this->accessibleAssignedStaffIds($user);
-        $assetIds = $this->accessibleAssetIds($user);
-
-        if ($this->canViewAllTenantSites($user)) {
-            return $query->where(function (Builder $visibility) use ($clientIds): void {
-                $visibility->whereDoesntHave('assignments', fn (Builder $assignment) => $assignment
-                    ->active()
-                    ->where('assignable_type', DeviceAssignment::TARGET_CLIENT));
-
-                if ($clientIds !== []) {
-                    $visibility->orWhereHas('assignments', fn (Builder $assignment) => $assignment
-                        ->active()
-                        ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
-                        ->whereIn('assignable_id', $clientIds));
-                }
-            });
-        }
-
         $siteIds = $this->accessibleSiteIds($user);
         $roomIds = $siteIds === []
-            ? collect()
-            : SiteRoom::query()->whereIn('site_id', $siteIds)->pluck('id');
+            ? []
+            : SiteRoom::query()->whereIn('site_id', $siteIds)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        $clientIds = $this->accessibleAssignedClientIds($user);
+        $staffIds = array_values(array_unique([(int) $user->getKey(), ...$this->accessibleAssignedStaffIds($user)]));
+        $assetIds = $this->accessibleAssetIds($user);
 
-        return $query->where(function (Builder $visibility) use ($user, $siteIds, $roomIds, $clientIds, $staffIds, $assetIds): void {
-            $visibility->whereHas('assignments', function (Builder $assignment) use ($user, $siteIds, $roomIds, $clientIds, $staffIds, $assetIds): void {
-                $assignment->active()->where(function (Builder $target) use ($user, $siteIds, $roomIds, $clientIds, $staffIds, $assetIds): void {
-                    if ($siteIds !== []) {
-                        $target->where(function (Builder $siteTarget) use ($siteIds): void {
-                            $siteTarget
-                                ->where('assignable_type', DeviceAssignment::TARGET_SITE)
-                                ->whereIn('assignable_id', $siteIds);
-                        });
-                    } else {
-                        $target->whereRaw('1 = 0');
-                    }
-
-                    if ($roomIds->isNotEmpty()) {
-                        $target->orWhere(function (Builder $roomTarget) use ($roomIds): void {
-                            $roomTarget
-                                ->where('assignable_type', DeviceAssignment::TARGET_ROOM)
-                                ->whereIn('assignable_id', $roomIds);
-                        });
-                    }
-
-                    $target->orWhere(function (Builder $staffTarget) use ($user): void {
-                        $staffTarget
-                            ->where('assignable_type', DeviceAssignment::TARGET_STAFF)
-                            ->where('assignable_id', $user->id);
-                    });
-
-                    if ($staffIds !== []) {
-                        $target->orWhere(function (Builder $staffTarget) use ($staffIds): void {
-                            $staffTarget
-                                ->where('assignable_type', DeviceAssignment::TARGET_STAFF)
-                                ->whereIn('assignable_id', $staffIds);
-                        });
-                    }
-
-                    if ($clientIds !== []) {
-                        $target->orWhere(function (Builder $clientTarget) use ($clientIds): void {
-                            $clientTarget
-                                ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
-                                ->whereIn('assignable_id', $clientIds);
-                        });
-                    }
-
-                    if ($assetIds !== []) {
-                        $target->orWhere(function (Builder $vehicleTarget) use ($assetIds): void {
-                            $vehicleTarget
-                                ->where('assignable_type', DeviceAssignment::TARGET_VEHICLE)
-                                ->whereIn('assignable_id', $assetIds);
-                        });
-                    }
+        $query = Device::query()->where(function (Builder $visibility) use (
+            $user,
+            $siteIds,
+            $roomIds,
+            $clientIds,
+            $staffIds,
+            $assetIds,
+        ): void {
+            $visibility->whereHas('assignments', function (Builder $assignment) use (
+                $siteIds,
+                $roomIds,
+                $clientIds,
+                $staffIds,
+                $assetIds,
+            ): void {
+                $assignment->active()->where(function (Builder $target) use (
+                    $siteIds,
+                    $roomIds,
+                    $clientIds,
+                    $staffIds,
+                    $assetIds,
+                ): void {
+                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_SITE, $siteIds, false);
+                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_ROOM, $roomIds);
+                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_CLIENT, $clientIds);
+                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_STAFF, $staffIds);
+                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_VEHICLE, $assetIds);
                 });
             });
 
             if ($assetIds !== []) {
-                $visibility->orWhereHas('activeAssetLinks', fn (Builder $link) => $link
-                    ->whereIn('asset_id', $assetIds));
+                $visibility->orWhereHas('activeAssetLinks', fn (Builder $link): Builder => $link->whereIn('asset_id', $assetIds));
             }
 
-            if ($user->canDo('securityDevices.devices.assign')
-                || $user->canDo('securityDevices.devices.update')) {
-                $visibility->orWhereDoesntHave('assignments', fn (Builder $assignment) => $assignment->active());
+            if ($this->canViewUnassigned($user)) {
+                $visibility->orWhere(function (Builder $stock): void {
+                    $stock->whereDoesntHave('assignments', fn (Builder $assignment) => $assignment->active())
+                        ->whereDoesntHave('activeAssetLinks');
+                });
             }
         });
+
+        // One visible assignment must not mask any other inaccessible active
+        // provenance. Mixed Site, Room, private-person, or Asset context fails
+        // closed until every active target is authorized.
+        $this->excludeUnauthorizedAssignments($query, DeviceAssignment::TARGET_SITE, $siteIds);
+        $this->excludeUnauthorizedAssignments($query, DeviceAssignment::TARGET_ROOM, $roomIds);
+        $this->excludeUnauthorizedAssignments($query, DeviceAssignment::TARGET_CLIENT, $clientIds);
+        $this->excludeUnauthorizedAssignments($query, DeviceAssignment::TARGET_STAFF, $staffIds);
+        $this->excludeUnauthorizedAssignments($query, DeviceAssignment::TARGET_VEHICLE, $assetIds);
+        if ($assetIds === []) {
+            $query->whereDoesntHave('activeAssetLinks');
+        } else {
+            $query->whereDoesntHave(
+                'activeAssetLinks',
+                fn (Builder $link): Builder => $link->whereNotIn('asset_id', $assetIds),
+            );
+        }
+
+        return $query;
     }
 
-    /**
-     * Staff tracking remains a projection of the H&S staff boundary. A device
-     * permission by itself never expands the visible staff population.
-     *
-     * @return array<int, int>
-     */
+    public function releasableDevices(User $user): Builder
+    {
+        $siteIds = $this->accessibleSiteIds($user);
+        $roomIds = $siteIds === []
+            ? []
+            : SiteRoom::query()->whereIn('site_id', $siteIds)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        $assetIds = $this->authorizedAssetIds($user);
+        $assetTargets = $assetIds === []
+            ? collect()
+            : Asset::query()->whereKey($assetIds)->get(['client_id', 'primary_driver_user_id']);
+        $clientIds = array_values(array_unique([
+            ...$this->authorizedClientIds($user),
+            ...$assetTargets->pluck('client_id')->filter()->map(fn (mixed $id): int => (int) $id)->all(),
+        ]));
+        $staffIds = array_values(array_unique([
+            (int) $user->getKey(),
+            ...$this->accessibleAssignedStaffIds($user),
+            ...$assetTargets->pluck('primary_driver_user_id')->filter()->map(fn (mixed $id): int => (int) $id)->all(),
+        ]));
+
+        $query = Device::query()->where(function (Builder $visibility) use (
+            $siteIds,
+            $roomIds,
+            $clientIds,
+            $staffIds,
+            $assetIds,
+        ): void {
+            $visibility->whereHas('assignments', function (Builder $assignment) use (
+                $siteIds,
+                $roomIds,
+                $clientIds,
+                $staffIds,
+                $assetIds,
+            ): void {
+                $assignment->active()->where(function (Builder $target) use (
+                    $siteIds,
+                    $roomIds,
+                    $clientIds,
+                    $staffIds,
+                    $assetIds,
+                ): void {
+                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_SITE, $siteIds, false);
+                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_ROOM, $roomIds);
+                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_CLIENT, $clientIds);
+                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_STAFF, $staffIds);
+                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_VEHICLE, $assetIds);
+                });
+            });
+
+            if ($assetIds !== []) {
+                $visibility->orWhereHas('activeAssetLinks', fn (Builder $link): Builder => $link->whereIn('asset_id', $assetIds));
+            }
+        });
+
+        foreach ([
+            DeviceAssignment::TARGET_SITE => $siteIds,
+            DeviceAssignment::TARGET_ROOM => $roomIds,
+            DeviceAssignment::TARGET_CLIENT => $clientIds,
+            DeviceAssignment::TARGET_STAFF => $staffIds,
+            DeviceAssignment::TARGET_VEHICLE => $assetIds,
+        ] as $targetType => $authorizedIds) {
+            $this->excludeUnauthorizedAssignments($query, $targetType, $authorizedIds);
+        }
+        if ($assetIds === []) {
+            $query->whereDoesntHave('activeAssetLinks');
+        } else {
+            $query->whereDoesntHave(
+                'activeAssetLinks',
+                fn (Builder $link): Builder => $link->whereNotIn('asset_id', $assetIds),
+            );
+        }
+
+        return $query;
+    }
+
+    /** @return list<int> */
     private function accessibleAssignedStaffIds(User $user): array
     {
         if (! $user->canDo('hazards.view') || ! $user->canDo('staff.viewAny')) {
@@ -317,74 +463,45 @@ class SecurityDevicesAccessService
         $candidateIds = DeviceAssignment::query()
             ->active()
             ->where('assignable_type', DeviceAssignment::TARGET_STAFF)
-            ->whereHas('device', fn (Builder $device) => $device->forTenant($this->tenantId($user)))
             ->distinct()
             ->pluck('assignable_id');
-
         if ($candidateIds->isEmpty()) {
             return [];
         }
 
-        $query = User::query()
+        return User::query()
             ->whereKey($candidateIds)
-            ->whereNotNull('approved_at');
-        $this->siteAccess->applyStaffScope(
-            $query,
-            $user,
-            ['healthSafety.viewAllSites'],
-        );
-
-        return $query
+            ->whereNotNull('approved_at')
+            ->whereHas('hrEmployeeProfile', fn (Builder $profile): Builder => $this->applyCurrentStaffSiteScope(
+                $profile,
+                $this->accessibleSiteIds($user),
+            ))
             ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->values()
+            ->map(fn (mixed $id): int => (int) $id)
             ->all();
     }
 
-    /**
-     * Resolve Fleet/Asset targets through their canonical destination policy
-     * and tenant provenance. A device link by itself never grants access to an
-     * otherwise foreign asset.
-     *
-     * @return array<int, int>
-     */
+    /** @return list<int> */
     public function accessibleAssetIds(User $user): array
     {
-        $tenantId = $this->tenantId($user);
-        $linkedIds = DeviceAssetLink::query()
+        $candidateIds = DeviceAssetLink::query()
             ->active()
-            ->whereHas('device', fn (Builder $device) => $device->forTenant($tenantId))
-            ->pluck('asset_id');
-        $assignedVehicleIds = DeviceAssignment::query()
-            ->active()
-            ->where('assignable_type', DeviceAssignment::TARGET_VEHICLE)
-            ->whereHas('device', fn (Builder $device) => $device->forTenant($tenantId))
-            ->pluck('assignable_id');
-        $candidateIds = $linkedIds
-            ->merge($assignedVehicleIds)
-            ->map(fn ($id): int => (int) $id)
+            ->pluck('asset_id')
+            ->merge(DeviceAssignment::query()
+                ->active()
+                ->where('assignable_type', DeviceAssignment::TARGET_VEHICLE)
+                ->pluck('assignable_id'))
+            ->map(fn (mixed $id): int => (int) $id)
             ->unique()
             ->values();
-
         if ($candidateIds->isEmpty()) {
             return [];
         }
 
-        return Asset::query()
-            ->whereKey($candidateIds)
-            ->with([
-                'site:id,tenant_id',
-                'homeSite:id,tenant_id',
-                'client:id,organization_id,site_id',
-                'client.site:id,tenant_id',
-                'categoryRef:id,slug',
-            ])
+        return $this->applyAssetSiteScope(Asset::query()->whereKey($candidateIds), $this->accessibleSiteIds($user))
+            ->with('categoryRef:id,slug')
             ->get()
-            ->filter(function (Asset $asset) use ($user, $tenantId): bool {
-                if (! $this->assetMatchesTenant($asset, $tenantId)) {
-                    return false;
-                }
-
+            ->filter(function (Asset $asset) use ($user): bool {
                 $isVehicle = strcasecmp((string) $asset->category, 'vehicle') === 0
                     || $asset->categoryRef?->slug === 'vehicle';
 
@@ -392,50 +509,34 @@ class SecurityDevicesAccessService
                     || Gate::forUser($user)->allows('view', $asset);
             })
             ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->values()
+            ->map(fn (mixed $id): int => (int) $id)
             ->all();
     }
 
-    /**
-     * Resolve client targets through the canonical per-client policy. Starting
-     * from client assignments in this device tenant keeps the candidate set
-     * bounded and ensures Security & Devices never invents a broader client
-     * access rule of its own.
-     *
-     * @return array<int, int>
-     */
+    /** @return list<int> */
     private function accessibleAssignedClientIds(User $user): array
     {
         $candidateIds = DeviceAssignment::query()
             ->active()
             ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
-            ->whereHas('device', fn (Builder $device) => $device->forTenant($this->tenantId($user)))
             ->distinct()
             ->pluck('assignable_id');
-
         if ($candidateIds->isEmpty()) {
             return [];
         }
 
-        return Client::query()
+        return $this->assignableClientQuery($user)
             ->whereKey($candidateIds)
-            ->with('site:id,tenant_id')
             ->get()
-            ->filter(fn (Client $client): bool => $this->clientMatchesTenant($client, $this->tenantId($user))
-                && Gate::forUser($user)->allows('view', $client))
+            ->filter(fn (Client $client): bool => Gate::forUser($user)->allows('view', $client))
             ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->values()
+            ->map(fn (mixed $id): int => (int) $id)
             ->all();
     }
 
     public function assertCanViewDevice(User $user, Device $device): void
     {
-        abort_unless(
-            $this->visibleDevices($user)->whereKey($device->getKey())->exists(),
-            404,
-        );
+        abort_unless($this->visibleDevices($user)->whereKey($device->getKey())->exists(), 404);
     }
 
     public function assertCanAssignTarget(User $user, Device $device, string $targetType, int $targetId): void
@@ -464,13 +565,7 @@ class SecurityDevicesAccessService
         return $assignments;
     }
 
-    /**
-     * Release is a historical cleanup operation. It proves the persisted
-     * target belonged to this device tenant and remains inside the operator's
-     * site authority without requiring the target to still be live/assignable.
-     *
-     * @return Collection<int, DeviceAssignment>
-     */
+    /** @return Collection<int, DeviceAssignment> */
     public function assertCanReleaseActiveAssignment(User $user, Device $device, bool $lockForUpdate = false): Collection
     {
         $query = $device->assignments()->active();
@@ -482,7 +577,6 @@ class SecurityDevicesAccessService
         foreach ($assignments as $assignment) {
             abort_unless($this->canAccessHistoricalAssignmentTarget(
                 $user,
-                $device,
                 $assignment->assignable_type,
                 (int) $assignment->assignable_id,
             ), 404);
@@ -493,121 +587,29 @@ class SecurityDevicesAccessService
 
     public function canAccessAssignmentTarget(User $user, Device $device, string $targetType, int $targetId): bool
     {
-        $siteIds = $this->accessibleSiteIds($user);
-        $isPlatformAdmin = $this->siteAccess->isUnrestrictedPlatformUser($user);
-        $tenantId = (int) $device->tenant_id;
-
         return match ($targetType) {
-            DeviceAssignment::TARGET_SITE => Site::query()
-                ->whereKey($targetId)
-                ->where('tenant_id', $tenantId)
-                ->when(! $isPlatformAdmin, fn (Builder $query): Builder => $query->whereIn('id', $siteIds))
-                ->exists(),
+            DeviceAssignment::TARGET_SITE => $this->siteIsAccessible($user, $targetId),
             DeviceAssignment::TARGET_ROOM => SiteRoom::query()
                 ->whereKey($targetId)
-                ->whereHas('site', fn (Builder $site): Builder => $site->where('tenant_id', $tenantId))
-                ->when(! $isPlatformAdmin, fn (Builder $query): Builder => $query->whereIn('site_id', $siteIds))
+                ->whereIn('site_id', $this->accessibleSiteIds($user))
+                ->whereHas('site', fn (Builder $site): Builder => $this->applyOperationalSiteScope($site))
                 ->exists(),
-            DeviceAssignment::TARGET_CLIENT => $this->canAssignClient(
-                $user,
-                $tenantId,
-                $targetId,
-                $siteIds,
-                $isPlatformAdmin,
-            ),
-            DeviceAssignment::TARGET_STAFF => (
-                $targetId === (int) $user->id
-                && (int) ($user->organization_id ?? 1) === $tenantId
-            ) || $this->canAssignStaff($user, $tenantId, $targetId),
-            DeviceAssignment::TARGET_VEHICLE => $this->canUseAsset($user, $device, $targetId, true),
+            DeviceAssignment::TARGET_CLIENT => $this->assignableClient($user, $targetId) !== null,
+            DeviceAssignment::TARGET_STAFF => $this->assignableStaffMember($user, $targetId) !== null,
+            DeviceAssignment::TARGET_VEHICLE => $this->canUseAsset($user, $targetId, true),
             default => false,
         };
     }
 
     public function assertCanUseAsset(User $user, Device $device, int $assetId): void
     {
-        abort_unless($this->canUseAsset($user, $device, $assetId), 404);
+        abort_unless($this->canUseAsset($user, $assetId), 404);
     }
 
-    private function canAssignStaff(User $user, int $tenantId, int $staffId): bool
+    private function canUseAsset(User $user, int $assetId, bool $vehicleOnly = false): bool
     {
-        if (! $user->canDo('staff.viewAny') || ! $user->canDo('hazards.view')) {
-            return false;
-        }
-
-        $isPlatformAdmin = $this->siteAccess->isUnrestrictedPlatformUser($user);
-        $query = User::query()
-            ->whereKey($staffId)
-            ->whereNotNull('approved_at')
-            ->where(function (Builder $organization) use ($isPlatformAdmin, $tenantId): void {
-                $organization->where('organization_id', $tenantId);
-                if ($isPlatformAdmin && $tenantId === 1) {
-                    $organization->orWhereNull('organization_id');
-                }
-            })
-            ->whereHas('hrEmployeeProfile', fn (Builder $profile): Builder => $profile
-                ->where('tenant_id', $tenantId)
-                ->whereNotNull('primary_site_id')
-                ->whereHas('primarySite', fn (Builder $site): Builder => $site->where('tenant_id', $tenantId)));
-
-        $this->siteAccess->applyStaffScope($query, $user, ['securityDevices.integrations.manage']);
-
-        return $query->exists();
-    }
-
-    /** @param array<int, int> $siteIds */
-    private function canAssignClient(
-        User $user,
-        int $tenantId,
-        int $clientId,
-        array $siteIds,
-        bool $isPlatformAdmin,
-    ): bool {
-        $client = $this->applyClientTenantPredicate(Client::query(), $tenantId)
-            ->whereKey($clientId)
-            ->whereNotNull('site_id')
-            ->whereHas('site', fn (Builder $site): Builder => $site->where('tenant_id', $tenantId))
-            ->when(! $isPlatformAdmin, fn (Builder $query): Builder => $query->whereIn('site_id', $siteIds))
-            ->first();
-
-        return $client !== null && Gate::forUser($user)->allows('view', $client);
-    }
-
-    private function canUseAsset(User $user, Device $device, int $assetId, bool $vehicleOnly = false): bool
-    {
-        $siteIds = $this->accessibleSiteIds($user);
-        $tenantId = (int) $device->tenant_id;
-        $query = Asset::query()
-            ->whereKey($assetId)
-            ->where(function (Builder $tenant) use ($tenantId): void {
-                $tenant->whereHas('site', fn (Builder $site): Builder => $site->where('tenant_id', $tenantId))
-                    ->orWhereHas('homeSite', fn (Builder $site): Builder => $site->where('tenant_id', $tenantId))
-                    ->orWhereHas('client', fn (Builder $client): Builder => $this->applyClientTenantPredicate($client, $tenantId));
-            });
-
-        if (! $this->siteAccess->isUnrestrictedPlatformUser($user)) {
-            if ($siteIds === []) {
-                return false;
-            }
-
-            $query->where(function (Builder $site) use ($siteIds): void {
-                $site->whereIn('site_id', $siteIds)
-                    ->orWhereIn('home_site_id', $siteIds)
-                    ->orWhereHas('client', fn (Builder $client): Builder => $client->whereIn('site_id', $siteIds));
-            });
-        }
-
-        if ($vehicleOnly) {
-            $query->vehicles();
-        }
-
-        $asset = $query->with([
-            'site:id,tenant_id',
-            'homeSite:id,tenant_id',
-            'client:id,organization_id,site_id',
-            'client.site:id,tenant_id',
-        ])->first();
-        if (! $asset || ! $this->assetMatchesTenant($asset, $tenantId)) {
+        $asset = $this->assetCandidateQuery($user, $vehicleOnly)->whereKey($assetId)->first();
+        if (! $asset) {
             return false;
         }
 
@@ -615,205 +617,148 @@ class SecurityDevicesAccessService
             || Gate::forUser($user)->allows('view', $asset);
     }
 
-    public function assetMatchesTenant(Asset $asset, int $tenantId): bool
-    {
-        $asset->loadMissing([
-            'site:id,tenant_id',
-            'homeSite:id,tenant_id',
-            'client:id,organization_id,site_id',
-            'client.site:id,tenant_id',
-        ]);
-
-        $hasTenantEvidence = false;
-        foreach ([['site_id', 'site'], ['home_site_id', 'homeSite']] as [$siteKey, $relation]) {
-            $siteId = $asset->getAttribute($siteKey);
-            if ($siteId === null) {
-                continue;
-            }
-
-            $hasTenantEvidence = true;
-            if (! is_numeric($siteId) || (int) ($asset->{$relation}?->tenant_id ?? 0) !== $tenantId) {
-                return false;
-            }
-        }
-
-        if ($asset->client_id !== null) {
-            $hasTenantEvidence = true;
-            $client = $asset->client;
-            if (! $client || ! $this->clientMatchesTenant($client, $tenantId)) {
-                return false;
-            }
-        }
-
-        return $hasTenantEvidence;
-    }
-
-    public function clientMatchesTenant(Client $client, int $tenantId): bool
-    {
-        $client->loadMissing('site:id,tenant_id');
-
-        if (is_numeric($client->organization_id)) {
-            return (int) $client->organization_id === $tenantId
-                && ($client->site_id === null
-                    || (is_numeric($client->site_id) && (int) ($client->site?->tenant_id ?? 0) === $tenantId));
-        }
-
-        return $tenantId === 1
-            && is_numeric($client->site_id)
-            && (int) ($client->site?->tenant_id ?? 0) === 1;
-    }
-
     private function assignableClientQuery(User $user): Builder
     {
-        $tenantId = $this->tenantId($user);
         $siteIds = $this->accessibleSiteIds($user);
 
-        return $this->applyClientTenantPredicate(Client::query(), $tenantId)
+        return Client::query()
             ->whereNotNull('site_id')
-            ->whereHas('site', fn (Builder $site): Builder => $site->where('tenant_id', $tenantId))
-            ->when(! $this->canViewAllTenantSites($user), fn (Builder $query): Builder => $siteIds === []
-                ? $query->whereRaw('1 = 0')
-                : $query->whereIn('site_id', $siteIds));
+            ->when($siteIds === [], fn (Builder $query): Builder => $query->whereRaw('1 = 0'))
+            ->when($siteIds !== [], fn (Builder $query): Builder => $query->whereIn('site_id', $siteIds))
+            ->whereHas('site', fn (Builder $site): Builder => $this->applyOperationalSiteScope($site));
     }
 
     private function assetCandidateQuery(User $user, bool $vehicleOnly = false): Builder
     {
-        $tenantId = $this->tenantId($user);
-        $siteIds = $this->accessibleSiteIds($user);
-        $query = Asset::query()
-            ->where(function (Builder $tenant) use ($tenantId): void {
-                $tenant->whereHas('site', fn (Builder $site): Builder => $site->where('tenant_id', $tenantId))
-                    ->orWhereHas('homeSite', fn (Builder $site): Builder => $site->where('tenant_id', $tenantId))
-                    ->orWhereHas('client', fn (Builder $client): Builder => $this->applyClientTenantPredicate($client, $tenantId));
-            })
-            ->when(! $this->canViewAllTenantSites($user), fn (Builder $query): Builder => $siteIds === []
-                ? $query->whereRaw('1 = 0')
-                : $query->where(function (Builder $site) use ($siteIds): void {
-                    $site->whereIn('site_id', $siteIds)
-                        ->orWhereIn('home_site_id', $siteIds)
-                        ->orWhereHas('client', fn (Builder $client): Builder => $client->whereIn('site_id', $siteIds));
-                }));
+        $query = $this->applyAssetSiteScope(Asset::query(), $this->accessibleSiteIds($user));
 
         return $vehicleOnly ? $query->vehicles() : $query;
     }
 
-    private function applyClientTenantPredicate(Builder $query, int $tenantId): Builder
+    private function canAccessHistoricalAssignmentTarget(User $user, string $targetType, int $targetId): bool
     {
-        return $query->where(function (Builder $candidate) use ($tenantId): void {
-            $candidate->where(function (Builder $owned) use ($tenantId): void {
-                $owned->where('organization_id', $tenantId)
-                    ->where(function (Builder $site) use ($tenantId): void {
-                        $site->whereNull('site_id')
-                            ->orWhereHas('site', fn (Builder $related): Builder => $related->where('tenant_id', $tenantId));
-                    });
-            });
-
-            if ($tenantId === 1) {
-                $candidate->orWhere(function (Builder $legacy): void {
-                    $legacy->whereNull('organization_id')
-                        ->whereNotNull('site_id')
-                        ->whereHas('site', fn (Builder $site): Builder => $site->where('tenant_id', 1));
-                });
-            }
-        });
-    }
-
-    public function assetMatchesTenantHistorically(Asset $asset, int $tenantId): bool
-    {
-        $hasTenantEvidence = false;
-        foreach (['site_id', 'home_site_id'] as $siteKey) {
-            $siteId = $asset->getAttribute($siteKey);
-            if ($siteId === null) {
-                continue;
-            }
-
-            $hasTenantEvidence = true;
-            if (! is_numeric($siteId)
-                || ! Site::query()->whereKey((int) $siteId)->where('tenant_id', $tenantId)->exists()) {
-                return false;
-            }
-        }
-
-        if ($asset->client_id !== null) {
-            $hasTenantEvidence = true;
-            $client = Client::withTrashed()->with('site:id,tenant_id')->find($asset->client_id);
-            if (! $client || ! $this->clientMatchesTenant($client, $tenantId)) {
-                return false;
-            }
-        }
-
-        return $hasTenantEvidence;
-    }
-
-    private function canAccessHistoricalAssignmentTarget(User $user, Device $device, string $targetType, int $targetId): bool
-    {
-        $tenantId = (int) $device->tenant_id;
-        $siteIds = $this->accessibleSiteIds($user);
-        $isPlatformAdmin = $this->siteAccess->isUnrestrictedPlatformUser($user);
-        $siteIsAuthorized = fn (int $siteId): bool => Site::query()
-            ->whereKey($siteId)
-            ->where('tenant_id', $tenantId)
-            ->when(! $isPlatformAdmin, fn (Builder $site): Builder => $site->whereIn('id', $siteIds))
-            ->exists();
-
         return match ($targetType) {
-            DeviceAssignment::TARGET_SITE => $siteIsAuthorized($targetId),
+            DeviceAssignment::TARGET_SITE => $this->siteIsAccessible($user, $targetId),
             DeviceAssignment::TARGET_ROOM => SiteRoom::query()
                 ->whereKey($targetId)
-                ->where('tenant_id', $tenantId)
-                ->whereHas('site', fn (Builder $site): Builder => $site
-                    ->where('tenant_id', $tenantId)
-                    ->when(! $isPlatformAdmin, fn (Builder $bounded): Builder => $bounded->whereIn('id', $siteIds)))
+                ->whereIn('site_id', $this->accessibleSiteIds($user))
+                ->whereHas('site', fn (Builder $site): Builder => $this->applyOperationalSiteScope($site))
                 ->exists(),
-            DeviceAssignment::TARGET_CLIENT => (function () use ($targetId, $tenantId, $siteIsAuthorized): bool {
-                $client = Client::withTrashed()->with('site:id,tenant_id')->find($targetId);
+            DeviceAssignment::TARGET_CLIENT => (function () use ($user, $targetId): bool {
+                $client = Client::withTrashed()->whereKey($targetId)->first();
 
-                return $client !== null
+                return ($client instanceof Client
                     && is_numeric($client->site_id)
-                    && $this->clientMatchesTenant($client, $tenantId)
-                    && $siteIsAuthorized((int) $client->site_id);
+                    && $this->siteIsAccessible($user, (int) $client->site_id)
+                    && Gate::forUser($user)->allows('view', $client))
+                    || Asset::query()
+                        ->whereKey($this->authorizedAssetIds($user))
+                        ->where('client_id', $targetId)
+                        ->exists();
             })(),
-            DeviceAssignment::TARGET_STAFF => (function () use ($targetId, $tenantId, $siteIsAuthorized): bool {
-                $staff = User::query()->whereKey($targetId)->first(['id', 'organization_id']);
-                $profile = HrEmployeeProfile::withTrashed()
-                    ->where('tenant_id', $tenantId)
-                    ->where('user_id', $targetId)
-                    ->first(['id', 'tenant_id', 'user_id', 'primary_site_id']);
-
-                return $staff !== null
-                    && (int) $staff->organization_id === $tenantId
-                    && $profile !== null
-                    && is_numeric($profile->primary_site_id)
-                    && $siteIsAuthorized((int) $profile->primary_site_id);
-            })(),
-            DeviceAssignment::TARGET_VEHICLE => (function () use ($targetId, $tenantId, $siteIds, $isPlatformAdmin): bool {
-                $asset = Asset::query()->whereKey($targetId)->first();
-                if (! $asset || ! $this->assetMatchesTenantHistorically($asset, $tenantId)) {
-                    return false;
-                }
-
-                if ($isPlatformAdmin) {
-                    return true;
-                }
-
-                $assetSiteIds = collect([$asset->site_id, $asset->home_site_id])
-                    ->filter(fn ($id): bool => is_numeric($id))
-                    ->map(fn ($id): int => (int) $id);
-                if ($asset->client_id !== null) {
-                    $clientSiteId = Client::withTrashed()->whereKey($asset->client_id)->value('site_id');
-                    if (is_numeric($clientSiteId)) {
-                        $assetSiteIds->push((int) $clientSiteId);
-                    }
-                }
-
-                return $assetSiteIds->intersect($siteIds)->isNotEmpty();
-            })(),
+            DeviceAssignment::TARGET_STAFF => $this->assignableStaffMember($user, $targetId) !== null
+                || Asset::query()
+                    ->whereKey($this->authorizedAssetIds($user))
+                    ->where('primary_driver_user_id', $targetId)
+                    ->exists(),
+            DeviceAssignment::TARGET_VEHICLE => $this->canUseAsset($user, $targetId, true),
             default => false,
         };
     }
 
     public function assertCanViewSite(User $user, int $siteId): void
     {
-        abort_unless(in_array($siteId, $this->accessibleSiteIds($user), true), 404);
+        abort_unless($this->siteIsAccessible($user, $siteId), 404);
+    }
+
+    private function siteIsAccessible(User $user, int $siteId): bool
+    {
+        return in_array($siteId, $this->accessibleSiteIds($user), true)
+            && $this->operationalSites()->whereKey($siteId)->exists();
+    }
+
+    private function operationalSites(): Builder
+    {
+        return $this->applyOperationalSiteScope(Site::query());
+    }
+
+    private function applyOperationalSiteScope(Builder $query): Builder
+    {
+        return $query
+            ->where('is_active', true)
+            ->where('archived', false)
+            ->whereNull('archived_at');
+    }
+
+    /** @param list<int> $siteIds */
+    private function applyCurrentStaffSiteScope(Builder $query, array $siteIds): Builder
+    {
+        $query
+            ->where('is_active', true)
+            ->where(function (Builder $dates): void {
+                $dates->whereNull('start_date')->orWhereDate('start_date', '<=', today());
+            })
+            ->where(function (Builder $dates): void {
+                $dates->whereNull('end_date')->orWhereDate('end_date', '>=', today());
+            });
+
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function (Builder $sites) use ($siteIds): void {
+            $sites->whereIn('primary_site_id', $siteIds);
+            foreach ($siteIds as $siteId) {
+                $sites->orWhereJsonContains('secondary_site_ids', $siteId);
+            }
+        });
+    }
+
+    /** @param list<int> $siteIds */
+    private function applyAssetSiteScope(Builder $query, array $siteIds): Builder
+    {
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function (Builder $site) use ($siteIds): void {
+            $site->where(function (Builder $direct) use ($siteIds): void {
+                $direct->whereIn('site_id', $siteIds)
+                    ->whereHas('site', fn (Builder $canonical): Builder => $this->applyOperationalSiteScope($canonical));
+            })->orWhere(function (Builder $home) use ($siteIds): void {
+                $home->whereIn('home_site_id', $siteIds)
+                    ->whereHas('homeSite', fn (Builder $canonical): Builder => $this->applyOperationalSiteScope($canonical));
+            })->orWhereHas('client', fn (Builder $client): Builder => $client
+                ->whereIn('site_id', $siteIds)
+                ->whereHas('site', fn (Builder $canonical): Builder => $this->applyOperationalSiteScope($canonical)));
+        });
+    }
+
+    /** @param list<int> $ids */
+    private function addAssignmentTargetBranch(Builder $target, string $type, array $ids, bool $or = true): void
+    {
+        if ($ids === []) {
+            if (! $or) {
+                $target->whereRaw('1 = 0');
+            }
+
+            return;
+        }
+
+        $method = $or ? 'orWhere' : 'where';
+        $target->{$method}(fn (Builder $branch): Builder => $branch
+            ->where('assignable_type', $type)
+            ->whereIn('assignable_id', $ids));
+    }
+
+    /** @param list<int> $authorizedIds */
+    private function excludeUnauthorizedAssignments(Builder $query, string $type, array $authorizedIds): void
+    {
+        $query->whereDoesntHave('assignments', function (Builder $assignment) use ($type, $authorizedIds): void {
+            $assignment->active()->where('assignable_type', $type);
+            if ($authorizedIds !== []) {
+                $assignment->whereNotIn('assignable_id', $authorizedIds);
+            }
+        });
     }
 }

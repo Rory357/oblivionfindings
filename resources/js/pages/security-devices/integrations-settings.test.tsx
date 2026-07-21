@@ -53,7 +53,7 @@ describe('Security & Devices integrations and settings', () => {
                 configured: true,
                 reference: '0042',
                 reference_label: 'Credential ending 0042',
-                display_state: 'tenant_credential_configured',
+                display_state: 'provider_connection_configured',
                 rotation_state: 'rotation_due',
                 rotation_cadence_days: 90,
                 rotated_at: null,

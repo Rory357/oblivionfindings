@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Client;
 use App\Models\ClientPersonalAsset;
 use App\Models\LocationHardware;
@@ -51,7 +51,7 @@ class ClientPersonalAssetController extends Controller
     }
 
     /**
-     * Validate profile picker IDs against the client's organisation and convert
+     * Validate profile picker IDs against the client's canonical Site and convert
      * the canonical Device id back to the temporary LocationHardware FK.
      *
      * @return array<string, mixed>
@@ -62,32 +62,31 @@ class ClientPersonalAssetController extends Controller
         ?ClientPersonalAsset $asset = null,
     ): array {
         $validated = $request->validate($this->validationRules());
-        $tenantId = $this->clientTenantId($client, $request);
         $errors = [];
+        $clientSiteId = is_numeric($client->site_id) ? (int) $client->site_id : null;
 
         $siteId = isset($validated['site_id']) ? (int) $validated['site_id'] : null;
         if ($siteId !== null) {
-            $siteIsEligible = $tenantId !== null
+            $siteIsEligible = $clientSiteId !== null
+                && $siteId === $clientSiteId
                 && Site::query()
                     ->whereKey($siteId)
-                    ->where('tenant_id', $tenantId)
                     ->where('is_active', true)
                     ->exists();
 
             if (! $siteIsEligible) {
-                $errors['site_id'] = 'Choose an active site from this organisation.';
+                $errors['site_id'] = "Choose the client's active Site.";
             }
         }
 
         $roomId = isset($validated['room_id']) ? (int) $validated['room_id'] : null;
         if ($roomId !== null) {
-            $roomIsEligible = $tenantId !== null
-                && $siteId !== null
+            $roomIsEligible = $siteId !== null
+                && $siteId === $clientSiteId
                 && SiteHouseRoom::query()
                     ->whereKey($roomId)
                     ->where('site_id', $siteId)
                     ->where('is_active', true)
-                    ->whereHas('site', fn ($query) => $query->where('tenant_id', $tenantId))
                     ->exists();
 
             if (! $roomIsEligible) {
@@ -101,10 +100,13 @@ class ClientPersonalAssetController extends Controller
                 : (int) $validated['tracker_hardware_id'];
             $canManageTrackers = (bool) ($request->user()?->canDo('fleet.manage')
                 || $request->user()?->canDo('assets.trackers.manage'));
+            $access = app(SecurityDevicesAccessService::class);
+            $canUseUnassignedStock = $request->user() !== null
+                && $access->canViewUnassigned($request->user());
 
-            if (! $canManageTrackers) {
+            if (! $canManageTrackers || ! $canUseUnassignedStock) {
                 if ($submittedDeviceId !== null) {
-                    $errors['tracker_hardware_id'] = 'Managing trackers requires tracker manager access.';
+                    $errors['tracker_hardware_id'] = 'Managing trackers requires unassigned stock access.';
                 }
 
                 // Ordinary client editors may update other asset fields without
@@ -113,26 +115,18 @@ class ClientPersonalAssetController extends Controller
             } elseif ($submittedDeviceId === null) {
                 $validated['tracker_hardware_id'] = null;
             } else {
-                $device = $tenantId === null
-                    ? null
-                    : Device::query()
-                        ->forTenant($tenantId)
-                        ->whereKey($submittedDeviceId)
-                        ->where('domain', 'tracking')
-                        ->whereNotIn('status', ['decommissioned', 'lost'])
-                        ->whereDoesntHave('assignments', fn ($query) => $query->active())
-                        ->first();
+                $device = $access->unassignedTrackingDeviceForClient(
+                    $request->user(),
+                    $client,
+                    $submittedDeviceId,
+                );
 
-                $legacyHardware = ($device?->legacy_location_hardware_id && $tenantId !== null)
+                $legacyHardware = ($device?->legacy_location_hardware_id && $clientSiteId !== null)
                     ? LocationHardware::query()
-                        ->forTenant($tenantId)
                         ->whereKey($device->legacy_location_hardware_id)
+                        ->where('site_id', $clientSiteId)
                         ->where('category', LocationHardware::CATEGORY_TRACKER)
                         ->where('status', '!=', LocationHardware::STATUS_RETIRED)
-                        ->where(function ($query) use ($tenantId): void {
-                            $query->whereNull('site_id')
-                                ->orWhereHas('site', fn ($sites) => $sites->where('tenant_id', $tenantId));
-                        })
                         ->first()
                     : null;
 
@@ -145,7 +139,7 @@ class ClientPersonalAssetController extends Controller
 
                 if (! $device || ! $legacyHardware || $usedByAnotherAsset) {
                     $errors['tracker_hardware_id'] = ! $device
-                        ? 'Choose an unassigned tracking device from this organisation.'
+                        ? "Choose an unassigned tracking device for the client's Site."
                         : (! $legacyHardware
                             ? 'That tracking device is not linked to the required compatibility record.'
                             : 'That tracking device is already linked to another personal asset.');
@@ -160,15 +154,6 @@ class ClientPersonalAssetController extends Controller
         }
 
         return $validated;
-    }
-
-    private function clientTenantId(Client $client, Request $request): ?int
-    {
-        $tenantId = $client->organization_id
-            ?? $client->site()->value('tenant_id')
-            ?? $request->user()?->organization_id;
-
-        return $tenantId === null ? null : (int) $tenantId;
     }
 
     public function store(Request $request, Client $client)

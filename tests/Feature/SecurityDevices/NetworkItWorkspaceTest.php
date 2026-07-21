@@ -95,19 +95,22 @@ class NetworkItWorkspaceTest extends TestCase
 
                 $this->assertSame('Native monitoring, honest evidence', $network['boundary']['title']);
                 $this->assertSame([
-                    'devices' => 2,
+                    'devices' => 3,
                     'sites' => 1,
-                    'wan_paths' => 1,
+                    'wan_paths' => 2,
                     'monitored_devices' => 2,
-                    'unmonitored_devices' => 0,
+                    'unmonitored_devices' => 1,
                 ], $network['overview']['inventory']);
                 $this->assertSame(1, $network['overview']['attention']['monitoring']);
                 $this->assertSame(1, $network['overview']['attention']['capacity']);
                 $this->assertSame(1, $network['overview']['attention']['open_work']);
                 $this->assertSame($site->id, $network['overview']['sites'][0]['id']);
-                $this->assertSame('Kauri SD-WAN gateway', $network['overview']['wanPaths'][0]['name']);
+                $this->assertContains(
+                    'Kauri SD-WAN gateway',
+                    collect($network['overview']['wanPaths'])->pluck('name')->all(),
+                );
                 $this->assertSame('Investigate Kauri uplink capacity', $network['overview']['itWork'][0]['title']);
-                $this->assertNotContains(
+                $this->assertContains(
                     $foreign->id,
                     collect($network['activeTab']['devices'])->pluck('id')->all(),
                 );
@@ -146,8 +149,8 @@ class NetworkItWorkspaceTest extends TestCase
                 $topology = $network['activeTab']['topology'];
 
                 $this->assertSame('partial', $topology['state']);
-                $this->assertSame(3, $topology['nodeCount']);
-                $this->assertSame(1, $topology['edgeCount']);
+                $this->assertSame(4, $topology['nodeCount']);
+                $this->assertSame(2, $topology['edgeCount']);
                 $this->assertSame($known->id, $topology['edges'][0]['id']);
                 $this->assertSame(1, $topology['unlinkedCount']);
                 $this->assertStringContainsString('incomplete', $topology['label']);

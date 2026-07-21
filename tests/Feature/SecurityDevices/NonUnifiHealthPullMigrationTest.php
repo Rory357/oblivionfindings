@@ -5,10 +5,11 @@ namespace Tests\Feature\SecurityDevices;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Jobs\Integration\PullIntegrationHealthJob;
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSyncLog;
-use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\LocationHardware;
 use App\Models\Site;
 use App\Services\Integration\IntegrationAdapterInterface;
@@ -36,7 +37,7 @@ class NonUnifiHealthPullMigrationTest extends TestCase
     {
         $site = Site::factory()->create(['tenant_id' => 1, 'name' => 'Hik Site']);
         $siteConfig = $this->makeSiteConfig($site, 'hikvision');
-        $tenantSecret = $this->makeTenantSecret('hikvision');
+        $providerConnection = $this->makeProviderConnection('hikvision');
 
         $shadow = LocationHardware::create([
             'tenant_id' => 1,
@@ -58,6 +59,7 @@ class NonUnifiHealthPullMigrationTest extends TestCase
             'legacy_location_hardware_id' => $shadow->id,
             'external_ref' => ['provider_entity_id' => 'hik-cam-1'],
         ]);
+        $this->assignToSite($device, $site);
 
         $adapter = $this->makeFakeAdapter('hikvision', [[
             'provider_entity_id' => 'hik-cam-1',
@@ -68,7 +70,7 @@ class NonUnifiHealthPullMigrationTest extends TestCase
         $registry = \Mockery::mock(IntegrationAdapterRegistry::class);
         $registry->shouldReceive('resolve')->once()->with('hikvision')->andReturn($adapter);
 
-        $job = new PullIntegrationHealthJob(1, 'hikvision', $site->id);
+        $job = new PullIntegrationHealthJob('hikvision', $site->id);
         $job->handle($registry, app(UnifiOperationalBridgeService::class));
 
         $device->refresh();
@@ -88,7 +90,7 @@ class NonUnifiHealthPullMigrationTest extends TestCase
     {
         $site = Site::factory()->create(['tenant_id' => 1, 'name' => 'IoT Site']);
         $siteConfig = $this->makeSiteConfig($site, 'iot');
-        $tenantSecret = $this->makeTenantSecret('iot');
+        $providerConnection = $this->makeProviderConnection('iot');
 
         // This legacy shadow exists but the canonical Device has no provider_entity_id
         // in external_ref — the only link is legacy_location_hardware_id. The
@@ -112,6 +114,7 @@ class NonUnifiHealthPullMigrationTest extends TestCase
             'legacy_location_hardware_id' => $shadow->id,
             'external_ref' => [],
         ]);
+        $this->assignToSite($device, $site);
 
         $adapter = $this->makeFakeAdapter('iot', [[
             'hardware_id' => $shadow->id,
@@ -122,7 +125,7 @@ class NonUnifiHealthPullMigrationTest extends TestCase
         $registry = \Mockery::mock(IntegrationAdapterRegistry::class);
         $registry->shouldReceive('resolve')->once()->with('iot')->andReturn($adapter);
 
-        $job = new PullIntegrationHealthJob(1, 'iot', $site->id);
+        $job = new PullIntegrationHealthJob('iot', $site->id);
         $job->handle($registry, app(UnifiOperationalBridgeService::class));
 
         $device->refresh();
@@ -140,7 +143,7 @@ class NonUnifiHealthPullMigrationTest extends TestCase
     {
         $site = Site::factory()->create(['tenant_id' => 1, 'name' => 'Orphan Site']);
         $siteConfig = $this->makeSiteConfig($site, 'hikvision');
-        $tenantSecret = $this->makeTenantSecret('hikvision');
+        $providerConnection = $this->makeProviderConnection('hikvision');
 
         // Adapter returns an entry that won't match anything.
         $adapter = $this->makeFakeAdapter('hikvision', [[
@@ -151,7 +154,7 @@ class NonUnifiHealthPullMigrationTest extends TestCase
         $registry = \Mockery::mock(IntegrationAdapterRegistry::class);
         $registry->shouldReceive('resolve')->once()->with('hikvision')->andReturn($adapter);
 
-        $job = new PullIntegrationHealthJob(1, 'hikvision', $site->id);
+        $job = new PullIntegrationHealthJob('hikvision', $site->id);
         $job->handle($registry, app(UnifiOperationalBridgeService::class));
 
         // Must not have thrown. No devices exist to assert against, but no
@@ -160,11 +163,45 @@ class NonUnifiHealthPullMigrationTest extends TestCase
         $this->assertSame(0, LocationHardware::query()->count());
     }
 
+    public function test_non_unifi_health_cannot_cross_the_mapped_site_boundary(): void
+    {
+        $mappedSite = Site::factory()->create(['tenant_id' => 1]);
+        $otherSite = Site::factory()->create(['tenant_id' => 1]);
+        $this->makeSiteConfig($mappedSite, 'hikvision');
+        $this->makeProviderConnection('hikvision');
+        $device = Device::factory()->security()->create([
+            'tenant_id' => 1,
+            'provider' => 'hikvision',
+            'status' => DeviceStatus::Active,
+            'health_status' => HealthStatus::Healthy,
+            'external_ref' => ['provider_entity_id' => 'other-site-camera'],
+        ]);
+        $this->assignToSite($device, $otherSite);
+        $adapter = $this->makeFakeAdapter('hikvision', [[
+            'device_id' => $device->id,
+            'provider_entity_id' => 'other-site-camera',
+            'status' => 'offline',
+        ]]);
+        $registry = \Mockery::mock(IntegrationAdapterRegistry::class);
+        $registry->shouldReceive('resolve')->once()->with('hikvision')->andReturn($adapter);
+
+        (new PullIntegrationHealthJob('hikvision', $mappedSite->id))
+            ->handle($registry, app(UnifiOperationalBridgeService::class));
+
+        $this->assertSame(DeviceStatus::Active, $device->fresh()->status);
+        $this->assertDatabaseHas('integration_sync_logs', [
+            'provider' => 'hikvision',
+            'site_id' => $mappedSite->id,
+            'items_updated' => 0,
+            'items_errored' => 1,
+        ]);
+    }
+
     public function test_provider_exception_is_sanitized_in_sync_evidence_and_application_logs(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1]);
         $this->makeSiteConfig($site, 'hikvision');
-        $this->makeTenantSecret('hikvision');
+        $this->makeProviderConnection('hikvision');
         $adapter = new NonUnifiHealthPullFakeAdapter(
             'hikvision',
             [],
@@ -174,7 +211,7 @@ class NonUnifiHealthPullMigrationTest extends TestCase
         $registry->shouldReceive('resolve')->once()->andReturn($adapter);
         Log::spy();
 
-        (new PullIntegrationHealthJob(1, 'hikvision', $site->id))
+        (new PullIntegrationHealthJob('hikvision', $site->id))
             ->handle($registry, app(UnifiOperationalBridgeService::class));
 
         $encodedEvidence = IntegrationSyncLog::query()->pluck('error_message')->toJson();
@@ -202,20 +239,30 @@ class NonUnifiHealthPullMigrationTest extends TestCase
         ]);
     }
 
-    private function makeTenantSecret(string $provider): IntegrationTenantSecret
+    private function makeProviderConnection(string $provider): IntegrationProviderConnection
     {
-        return IntegrationTenantSecret::create([
+        return IntegrationProviderConnection::create([
             'tenant_id' => 1,
             'provider' => $provider,
             'secret_encrypted' => Crypt::encryptString('test-key'),
             'secret_last4' => '1234',
-            'status' => IntegrationTenantSecret::STATUS_CONNECTED,
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
         ]);
     }
 
     private function makeFakeAdapter(string $provider, array $healthResults): IntegrationAdapterInterface
     {
         return new NonUnifiHealthPullFakeAdapter($provider, $healthResults);
+    }
+
+    private function assignToSite(Device $device, Site $site): void
+    {
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now(),
+        ]);
     }
 }
 
@@ -227,22 +274,22 @@ final class NonUnifiHealthPullFakeAdapter implements IntegrationAdapterInterface
         private ?\Throwable $pullFailure = null,
     ) {}
 
-    public function testConnection(IntegrationTenantSecret $secret): bool
+    public function testConnection(IntegrationProviderConnection $secret): bool
     {
         return true;
     }
 
-    public function discoverSites(IntegrationTenantSecret $secret): array
+    public function discoverSites(IntegrationProviderConnection $secret): array
     {
         return [];
     }
 
-    public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): SyncResult
+    public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): SyncResult
     {
         return new SyncResult;
     }
 
-    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): array
+    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): array
     {
         if ($this->pullFailure !== null) {
             throw $this->pullFailure;
@@ -251,7 +298,7 @@ final class NonUnifiHealthPullFakeAdapter implements IntegrationAdapterInterface
         return $this->healthResults;
     }
 
-    public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret, ?\DateTimeInterface $since = null): array
+    public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection, ?\DateTimeInterface $since = null): array
     {
         return [];
     }

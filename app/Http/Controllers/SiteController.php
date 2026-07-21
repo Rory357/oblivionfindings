@@ -10,19 +10,17 @@ use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\CredentialType;
 use App\Models\FirstAidRecord;
-use App\Models\HsRiskAssessment;
-use App\Support\HealthSafety\RiskAssessmentPresenter;
 use App\Models\FleetFuelLog;
 use App\Models\FleetIncident;
 use App\Models\FleetOuting;
 use App\Models\FleetTrip;
 use App\Models\FleetVehicleBooking;
+use App\Models\HsRiskAssessment;
 use App\Models\Integration\IntegrationSiteConfig;
+use App\Models\PpeInventory;
+use App\Models\SafeWorkProcedure;
 use App\Models\ServiceContext;
 use App\Models\Site;
-use App\Models\SafeWorkProcedure;
-use App\Models\SiteHazard;
-use App\Support\HazardDetailPresenter;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteContact;
@@ -31,6 +29,7 @@ use App\Models\SiteCredential;
 use App\Models\SiteDocument;
 use App\Models\SiteDocumentFolder;
 use App\Models\SiteFacilityZone;
+use App\Models\SiteHazard;
 use App\Models\SiteHoResource;
 use App\Models\SiteHouseRoom;
 use App\Models\SiteInspectionRecord;
@@ -39,6 +38,7 @@ use App\Models\SiteStaffRequirement;
 use App\Models\SiteVendor;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\HealthSafety\DrillComplianceService;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\NotificationService;
 use App\Services\ShiftCoverageService;
@@ -48,6 +48,8 @@ use App\Services\Sites\SiteReadinessService;
 use App\Services\Sites\SiteTypePlanService;
 use App\Services\UserSiteAccessService;
 use App\Support\ChecklistsDashboardData;
+use App\Support\HazardDetailPresenter;
+use App\Support\HealthSafety\RiskAssessmentPresenter;
 use App\Support\NzRegions;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -317,8 +319,7 @@ class SiteController extends Controller
         }
 
         $user = $request->user();
-        $tenantId = $site->tenant_id ?? $user?->tenant_id ?? $user?->organization_id ?? 1;
-        $siteDevices = app(DeviceRegistryService::class)->forSite($tenantId, $site->id);
+        $siteDevices = app(DeviceRegistryService::class)->visibleForSite($user, $site->id);
         $houseLedger = $this->buildHouseLedgerData($site, $user);
 
         // Assets linked to this site (includes both site-owned assets and client-owned assets stored at the site)
@@ -704,7 +705,7 @@ class SiteController extends Controller
             'runDetail' => $checklistsData['runDetail'],
             'templateDetail' => $checklistsData['templateDetail'],
             'inspectionsSummary' => $inspectionsSummary,
-            'drillsSummary' => app(\App\Services\HealthSafety\DrillComplianceService::class)->siteSummary($site->id),
+            'drillsSummary' => app(DrillComplianceService::class)->siteSummary($site->id),
             'siteHazards' => SiteHazard::where('site_id', $site->id)
                 ->whereIn('status', ['open', 'in_progress'])
                 ->with('assignedTo:id,name')
@@ -819,7 +820,7 @@ class SiteController extends Controller
     {
         $in30 = now()->addDays(30)->toDateString();
         $in60 = now()->addDays(60)->toDateString();
-        $base = fn () => \App\Models\PpeInventory::query()->where('site_id', $site->id);
+        $base = fn () => PpeInventory::query()->where('site_id', $site->id);
 
         return [
             'counts' => [
@@ -833,7 +834,7 @@ class SiteController extends Controller
             'items' => $base()->with('ppeType:id,name,category')
                 ->whereNotIn('status', ['disposed'])
                 ->orderByDesc('created_at')->limit(8)->get()
-                ->map(fn (\App\Models\PpeInventory $i) => [
+                ->map(fn (PpeInventory $i) => [
                     'id' => $i->id,
                     'type_name' => $i->ppeType?->name,
                     'category' => $i->ppeType?->category,

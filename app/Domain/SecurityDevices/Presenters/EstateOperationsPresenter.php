@@ -2,6 +2,7 @@
 
 namespace App\Domain\SecurityDevices\Presenters;
 
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
@@ -29,6 +30,7 @@ class EstateOperationsPresenter
 
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
+        private readonly ItWorkAccessService $itAccess,
     ) {}
 
     /** @return array<string, mixed> */
@@ -119,8 +121,8 @@ class EstateOperationsPresenter
             ])
             ->values();
 
-        $groupQuery = DeviceGroup::query()->forTenant($context['tenantId']);
-        if (! $this->access->canViewAllTenantSites($viewer)) {
+        $groupQuery = DeviceGroup::query();
+        if (! $this->access->canViewAllSites($viewer)) {
             $groupQuery->whereHas('devices', fn ($query) => $query->whereIn('devices.id', $deviceIds));
         }
 
@@ -163,7 +165,7 @@ class EstateOperationsPresenter
     public function site(User $viewer, Site $site): array
     {
         $this->access->assertCanViewSite($viewer, (int) $site->id);
-        abort_unless((int) $site->tenant_id === $this->access->tenantId($viewer) && ! $site->archived, 404);
+        abort_unless(! $site->archived && $site->is_active && $site->archived_at === null, 404);
 
         $context = $this->context($viewer, [(int) $site->id]);
         $devices = $this->devicesForSite($context, (int) $site->id);
@@ -194,7 +196,6 @@ class EstateOperationsPresenter
         $groups = $deviceIds === []
             ? collect()
             : DeviceGroup::query()
-                ->forTenant($context['tenantId'])
                 ->whereHas('devices', fn ($query) => $query->whereIn('devices.id', $deviceIds))
                 ->withCount(['devices' => fn ($query) => $query->whereIn('devices.id', $deviceIds)])
                 ->orderBy('name')
@@ -313,7 +314,6 @@ class EstateOperationsPresenter
                 ->values(),
             'changes' => $this->recentChanges($context, (int) $site->id),
             'contacts' => SiteContact::query()
-                ->where('tenant_id', $context['tenantId'])
                 ->where('site_id', $site->id)
                 ->orderByDesc('is_primary')
                 ->orderBy('name')
@@ -486,7 +486,6 @@ class EstateOperationsPresenter
     /** @return array<string, mixed> */
     private function context(User $viewer, ?array $onlySiteIds = null): array
     {
-        $tenantId = $this->access->tenantId($viewer);
         $siteIds = $this->access->accessibleSiteIds($viewer);
         if ($onlySiteIds !== null) {
             $siteIds = array_values(array_intersect($siteIds, $onlySiteIds));
@@ -495,9 +494,10 @@ class EstateOperationsPresenter
         $sites = $siteIds === []
             ? collect()
             : Site::query()
-                ->where('tenant_id', $tenantId)
                 ->whereIn('id', $siteIds)
+                ->where('is_active', true)
                 ->where('archived', false)
+                ->whereNull('archived_at')
                 ->orderBy('name')
                 ->get();
 
@@ -513,7 +513,6 @@ class EstateOperationsPresenter
         $activeEvents = $deviceIds->isEmpty()
             ? collect()
             : DeviceEvent::query()
-                ->forTenant($tenantId)
                 ->with('device:id,name')
                 ->whereIn('device_id', $deviceIds)
                 ->whereIn('severity', ['critical', 'warning'])
@@ -523,7 +522,6 @@ class EstateOperationsPresenter
         $maintenance = $deviceIds->isEmpty()
             ? collect()
             : DeviceMaintenanceRecord::query()
-                ->forTenant($tenantId)
                 ->with('device:id,name')
                 ->whereIn('device_id', $deviceIds)
                 ->whereNotIn('status', ['completed', 'cancelled'])
@@ -532,18 +530,14 @@ class EstateOperationsPresenter
         $collectors = $siteIds === []
             ? collect()
             : MonitoringCollector::query()
-                ->forTenant($tenantId)
                 ->whereIn('site_id', $siteIds)
                 ->get();
 
         $canIt = $viewer->canDo('it.view');
-        $tickets = $canIt
-            ? ItTicket::query()
-                ->forTenant($tenantId)
-                ->whereIn('status', ItTicket::OPEN_STATUSES)
-                ->with(['links' => fn ($query) => $query->whereIn('relationship', ['affected_site', 'affected_device'])])
-                ->get()
-            : collect();
+        $ticketQuery = ItTicket::query()
+            ->whereIn('status', ItTicket::OPEN_STATUSES)
+            ->with(['links' => fn ($query) => $query->whereIn('relationship', ['affected_site', 'affected_device'])]);
+        $tickets = $canIt ? $this->itAccess->applyViewScope($ticketQuery, $viewer)->get() : collect();
 
         $canControlRoom = $viewer->canDo('controlRoom.viewAny')
             || $viewer->canDo('controlRoom.alerts.view');
@@ -561,7 +555,6 @@ class EstateOperationsPresenter
             : collect();
 
         return compact(
-            'tenantId',
             'sites',
             'devices',
             'deviceSiteMap',

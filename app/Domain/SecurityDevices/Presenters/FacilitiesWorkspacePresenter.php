@@ -146,7 +146,6 @@ class FacilitiesWorkspacePresenter
         }
 
         $ids = MonitorObservation::query()
-            ->forTenant((int) ($viewer->organization_id ?? 1))
             ->whereIn('monitor_id', $monitorIds)
             ->selectRaw('MAX(id)')
             ->groupBy('monitor_id');
@@ -210,14 +209,11 @@ class FacilitiesWorkspacePresenter
             return [collect(), collect()];
         }
 
-        $tenantId = (int) ($viewer->organization_id ?? 1);
         $integrations = Integration::query()
-            ->forTenant($tenantId)
             ->whereIn('provider', $providers)
             ->get(['id', 'provider', 'display_name', 'status', 'capabilities', 'last_tested_at'])
             ->keyBy('provider');
         $syncs = IntegrationSyncLog::query()
-            ->forTenant($tenantId)
             ->whereIn('provider', $providers)
             ->latest('completed_at')
             ->latest('id')
@@ -618,7 +614,6 @@ class FacilitiesWorkspacePresenter
                 : $monitors->keys();
             if ($monitorIds->isNotEmpty()) {
                 $observations = MonitorObservation::query()
-                    ->forTenant((int) ($viewer->organization_id ?? 1))
                     ->whereIn('monitor_id', $monitorIds)
                     ->latest('observed_at')
                     ->limit(50)

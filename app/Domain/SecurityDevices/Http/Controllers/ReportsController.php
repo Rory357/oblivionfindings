@@ -22,7 +22,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  *   • Device events (rolling 90 days)
  *   • Maintenance records
  *
- * Exports are streamed as CSV, so they remain cheap on large tenants.
+ * Exports are streamed as CSV, so they remain cheap across a large estate.
  * Report design favours stability over breadth — a broader per-domain
  * reporting surface will live in a dedicated Reporting module when that
  * exists.
@@ -148,7 +148,7 @@ class ReportsController extends Controller
             ->when($filters['severity'] ?? null, fn ($query, string $severity) => $query->where('severity', $severity))
             ->when($filters['event_type'] ?? null, fn ($query, string $eventType) => $query->where('event_type', $eventType))
             ->when($filters['source'] ?? null, fn ($query, string $source) => $query->where('source', $source))
-            ->with(['device:id,name,tenant_id'])
+            ->with(['device:id,name'])
             ->orderBy('occurred_at', 'desc');
 
         return $this->streamCsv($filename, $columns, $query->cursor(), function (DeviceEvent $e) {

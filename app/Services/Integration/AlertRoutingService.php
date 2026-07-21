@@ -4,7 +4,7 @@ namespace App\Services\Integration;
 
 use App\Models\ControlRoomAlert;
 use App\Models\Integration\IntegrationEvent;
-use App\Models\Integration\IntegrationTenantSecret;
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Services\ControlRoom\SignalProcessingService;
 use App\Support\SafeOperationalData;
 use Illuminate\Support\Facades\Log;
@@ -51,7 +51,7 @@ class AlertRoutingService
 
         // Step 2: Apply quiet hours suppression for non-critical events
         if ($event->severity !== IntegrationEvent::SEVERITY_CRITICAL) {
-            if ($this->isQuietHours($event->tenant_id, $event->provider)) {
+            if ($this->isQuietHours($event->provider)) {
                 Log::info('AlertRoutingService: event suppressed during quiet hours', SafeOperationalData::logContext([
                     'integration_event_id' => $event->id,
                     'event_type' => $event->event_type,
@@ -109,21 +109,21 @@ class AlertRoutingService
     }
 
     /**
-     * Check if the current time falls within the tenant's configured quiet hours.
+     * Check if the current time falls within the provider's configured quiet hours.
      */
-    protected function isQuietHours(int $tenantId, string $provider): bool
+    protected function isQuietHours(string $provider): bool
     {
-        $secret = IntegrationTenantSecret::where('tenant_id', $tenantId)
-            ->where('provider', $provider)
+        $connection = IntegrationProviderConnection::query()
+            ->forProvider($provider)
             ->connected()
             ->first();
 
-        if (! $secret || ! $secret->config) {
+        if (! $connection || ! $connection->config) {
             return false;
         }
 
-        $quietStart = $secret->config['quiet_hours_start'] ?? null;
-        $quietEnd = $secret->config['quiet_hours_end'] ?? null;
+        $quietStart = $connection->config['quiet_hours_start'] ?? null;
+        $quietEnd = $connection->config['quiet_hours_end'] ?? null;
 
         if (! $quietStart || ! $quietEnd) {
             return false;

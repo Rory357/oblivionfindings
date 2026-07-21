@@ -48,15 +48,12 @@ class DeviceGroupAutoRuleService
      * Returns an Eloquent Builder the caller can page / count / get off.
      * Unrecognised fields / ops are skipped silently.
      */
-    public function queryFromRules(array $rules, ?int $tenantId = null): Builder
+    public function queryFromRules(array $rules): Builder
     {
         $match = ($rules['match'] ?? 'all') === 'any' ? 'any' : 'all';
         $conditions = is_array($rules['conditions'] ?? null) ? $rules['conditions'] : [];
 
         $query = Device::query();
-        if ($tenantId !== null) {
-            $query->where('tenant_id', $tenantId);
-        }
 
         if (empty($conditions)) {
             // An empty rule set must NOT match everything — that would be a
@@ -116,7 +113,7 @@ class DeviceGroupAutoRuleService
             return ['count' => 0, 'sample' => collect()];
         }
 
-        $query = $this->queryFromRules($rules, $group->tenant_id);
+        $query = $this->queryFromRules($rules);
 
         return [
             'count' => (clone $query)->count(),
@@ -139,7 +136,7 @@ class DeviceGroupAutoRuleService
             return ['added' => 0, 'removed' => 0, 'kept' => 0, 'total' => 0];
         }
 
-        $matchingIds = $this->queryFromRules($rules, $group->tenant_id)
+        $matchingIds = $this->queryFromRules($rules)
             ->pluck('id')
             ->all();
 

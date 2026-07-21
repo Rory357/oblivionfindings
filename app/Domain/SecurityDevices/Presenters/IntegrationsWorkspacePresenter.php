@@ -4,10 +4,10 @@ namespace App\Domain\SecurityDevices\Presenters;
 
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\Integration\IntegrationSyncLog;
-use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -33,7 +33,6 @@ class IntegrationsWorkspacePresenter
     /** @return array<string, mixed> */
     public function present(User $viewer): array
     {
-        $tenantId = $this->access->tenantId($viewer);
         $canManage = $viewer->canDo('securityDevices.integrations.manage');
         $canViewDevices = $viewer->canDo('securityDevices.devices.view');
         $siteIds = $this->access->accessibleSiteIds($viewer);
@@ -59,12 +58,14 @@ class IntegrationsWorkspacePresenter
             ->selectRaw('source, count(*) as aggregate')
             ->groupBy('source')
             ->pluck('aggregate', 'source');
-        $secrets = IntegrationTenantSecret::query()->forTenant($tenantId)->get()->keyBy('provider');
+        $connections = IntegrationProviderConnection::query()->get()->keyBy('provider');
         $configQuery = IntegrationSiteConfig::query()
-            ->forTenant($tenantId)
             ->when($siteIds === [], fn ($query) => $query->whereRaw('1 = 0'))
             ->when($siteIds !== [], fn ($query) => $query->whereIn('site_id', $siteIds))
-            ->whereHas('site', fn ($site) => $site->where('tenant_id', $tenantId));
+            ->whereHas('site', fn ($site) => $site
+                ->where('is_active', true)
+                ->where('archived', false)
+                ->whereNull('archived_at'));
         $configStats = (clone $configQuery)
             ->select('provider')
             ->selectRaw('COUNT(*) as total_count')
@@ -74,16 +75,18 @@ class IntegrationsWorkspacePresenter
             ->keyBy('provider');
         $configs = $providerSlugs->flatMap(fn (string $provider) => (clone $configQuery)
             ->where('provider', $provider)
-            ->with('site:id,name,tenant_id')
+            ->with('site:id,name')
             ->orderBy('site_id')
             ->limit(self::SITE_MAPPING_DISPLAY_LIMIT)
             ->get())
             ->groupBy('provider');
         $siteSecretQuery = IntegrationSiteSecret::query()
-            ->forTenant($tenantId)
             ->when($siteIds === [], fn ($query) => $query->whereRaw('1 = 0'))
             ->when($siteIds !== [], fn ($query) => $query->whereIn('site_id', $siteIds))
-            ->whereHas('site', fn ($site) => $site->where('tenant_id', $tenantId));
+            ->whereHas('site', fn ($site) => $site
+                ->where('is_active', true)
+                ->where('archived', false)
+                ->whereNull('archived_at'));
         $siteSecretStats = (clone $siteSecretQuery)
             ->select('provider')
             ->selectRaw('COUNT(*) as total_count')
@@ -105,11 +108,11 @@ class IntegrationsWorkspacePresenter
             ->get()
             ->groupBy('provider')
             ->map(fn ($rows) => $rows->pluck('capability')->values()->all());
-        $syncSummaries = $this->syncSummaries($tenantId, $siteIds, $this->access->canViewAllTenantSites($viewer));
+        $syncSummaries = $this->syncSummaries($siteIds, $this->access->canViewAllSites($viewer));
 
-        $providers = collect(self::PROVIDERS)->map(function (array $catalog) use ($canManage, $canViewDevices, $configStats, $configs, $deviceCounts, $duplicateCounts, $eventsByProvider, $secrets, $siteSecretCapabilities, $siteSecretStats, $syncSummaries, $unassignedCounts): array {
+        $providers = collect(self::PROVIDERS)->map(function (array $catalog) use ($canManage, $canViewDevices, $configStats, $configs, $deviceCounts, $duplicateCounts, $eventsByProvider, $connections, $siteSecretCapabilities, $siteSecretStats, $syncSummaries, $unassignedCounts): array {
             $slug = $catalog['slug'];
-            $secret = $secrets->get($slug);
+            $connection = $connections->get($slug);
             $siteSecretStat = $siteSecretStats->get($slug);
             $siteSecretTotal = (int) ($siteSecretStat?->total_count ?? 0);
             $enabledSiteSecretCount = (int) ($siteSecretStat?->enabled_count ?? 0);
@@ -118,11 +121,11 @@ class IntegrationsWorkspacePresenter
             $untestedSiteSecretCount = (int) ($siteSecretStat?->untested_count ?? 0);
             $disabledSiteSecretCount = (int) ($siteSecretStat?->disabled_count ?? 0);
             $siteSecretExceptionCount = $erroredSiteSecretCount + $untestedSiteSecretCount;
-            $credentialConfigured = $secret !== null || $siteSecretTotal > 0;
+            $credentialConfigured = $connection !== null || $siteSecretTotal > 0;
             $connectionStatus = match (true) {
-                $erroredSiteSecretCount > 0 => IntegrationTenantSecret::STATUS_ERROR,
-                $secret !== null => $secret->status,
-                $connectedSiteSecretCount > 0 => IntegrationTenantSecret::STATUS_CONNECTED,
+                $erroredSiteSecretCount > 0 => IntegrationProviderConnection::STATUS_ERROR,
+                $connection !== null => $connection->status,
+                $connectedSiteSecretCount > 0 => IntegrationProviderConnection::STATUS_CONNECTED,
                 $untestedSiteSecretCount > 0 => IntegrationSiteCredentialsPresenter::STATE_UNTESTED,
                 $disabledSiteSecretCount > 0 => IntegrationSiteCredentialsPresenter::STATE_DISABLED,
                 default => 'not_configured',
@@ -136,7 +139,7 @@ class IntegrationsWorkspacePresenter
             $unassigned = (int) ($unassignedCounts[$slug] ?? 0);
             $duplicateCandidates = (int) ($duplicateCounts[$slug] ?? 0);
             $unsupportedChecks = 0;
-            $syncAt = $sync['at'] ?? $secret?->last_synced_at;
+            $syncAt = $sync['at'] ?? $connection?->last_synced_at;
             $syncFreshness = $syncAt === null
                 ? 'never'
                 : (($sync['stale_scope_count'] ?? 0) > 0 || $syncAt->lt(now()->subHours(self::STALE_SYNC_HOURS)) ? 'stale' : 'current');
@@ -156,7 +159,7 @@ class IntegrationsWorkspacePresenter
             }
             if (in_array($sync['status'], [IntegrationSyncLog::STATUS_FAILED, IntegrationSyncLog::STATUS_PARTIAL], true)) {
                 $exceptions->push($this->exception('integration_error', 'The latest provider sync did not complete successfully.', 'Review sync diagnostics', $canManage ? "/security-devices/integrations/{$slug}" : null, max(1, $sync['items_errored'])));
-            } elseif ($secret?->status === IntegrationTenantSecret::STATUS_ERROR) {
+            } elseif ($connection?->status === IntegrationProviderConnection::STATUS_ERROR) {
                 $exceptions->push($this->exception('integration_error', 'The provider connection needs attention.', 'Test the connection', $canManage ? "/security-devices/integrations/{$slug}" : null));
             }
             if ($syncFreshness === 'stale') {
@@ -172,8 +175,8 @@ class IntegrationsWorkspacePresenter
             $provider = array_merge($catalog, [
                 'docs_href' => $canManage ? "/security-devices/integrations/{$slug}" : null,
                 'connection_status' => $connectionStatus,
-                'connected' => $connectionStatus === IntegrationTenantSecret::STATUS_CONNECTED,
-                'last_tested_at' => $secret?->last_tested_at?->toISOString()
+                'connected' => $connectionStatus === IntegrationProviderConnection::STATUS_CONNECTED,
+                'last_tested_at' => $connection?->last_tested_at?->toISOString()
                     ?? (filled($siteSecretStat?->latest_tested_at) ? Carbon::parse($siteSecretStat->latest_tested_at)->toISOString() : null),
                 'last_synced_at' => $syncAt?->toISOString(),
                 'device_count' => $deviceCount,
@@ -222,16 +225,16 @@ class IntegrationsWorkspacePresenter
             if ($canManage) {
                 $provider['credential'] = [
                     'configured' => $credentialConfigured,
-                    'reference' => $secret?->secret_last4,
-                    'reference_label' => $secret?->secret_last4 ? 'Credential ending '.$secret->secret_last4 : null,
-                    'display_state' => $secret !== null
-                        ? 'tenant_credential_configured'
+                    'reference' => $connection?->secret_last4,
+                    'reference_label' => $connection?->secret_last4 ? 'Credential ending '.$connection->secret_last4 : null,
+                    'display_state' => $connection !== null
+                        ? 'provider_connection_configured'
                         : ($siteSecretTotal > 0 ? 'site_credentials_configured' : 'not_configured'),
-                    'rotation_state' => $this->rotationState($secret, $siteSecretTotal),
+                    'rotation_state' => $this->rotationState($connection, $siteSecretTotal),
                     'rotation_cadence_days' => self::ROTATION_CADENCE_DAYS,
-                    'rotated_at' => $secret?->rotated_at?->toISOString(),
-                    'created_at' => $secret?->created_at?->toISOString(),
-                    'last_tested_at' => $secret?->last_tested_at?->toISOString(),
+                    'rotated_at' => $connection?->rotated_at?->toISOString(),
+                    'created_at' => $connection?->created_at?->toISOString(),
+                    'last_tested_at' => $connection?->last_tested_at?->toISOString(),
                     'site_credentials' => [
                         'total' => $siteSecretTotal,
                         'enabled' => $enabledSiteSecretCount,
@@ -250,7 +253,7 @@ class IntegrationsWorkspacePresenter
                 'providers_total' => count(self::PROVIDERS),
                 'providers_live' => collect(self::PROVIDERS)->where('implementation_status', 'live')->count(),
                 'providers_connected' => collect($providers)->where('connected', true)->count(),
-                'providers_errored' => collect($providers)->where('connection_status', IntegrationTenantSecret::STATUS_ERROR)->count(),
+                'providers_errored' => collect($providers)->where('connection_status', IntegrationProviderConnection::STATUS_ERROR)->count(),
                 'imported_devices' => collect($providers)->sum('device_count'),
                 'events_24h' => collect($providers)->sum('events_24h'),
                 'exceptions' => collect($providers)->sum('exception_count'),
@@ -296,12 +299,11 @@ class IntegrationsWorkspacePresenter
     }
 
     /** @return Collection<string, array{status: ?string, at: ?Carbon, items_processed: int, items_errored: int, stale_site_count: int, affected_site_count: int, stale_scope_count: int}> */
-    private function syncSummaries(int $tenantId, array $siteIds, bool $canViewAllTenantSites): Collection
+    private function syncSummaries(array $siteIds, bool $canViewAllSites): Collection
     {
         $scoped = IntegrationSyncLog::query()
-            ->forTenant($tenantId)
             ->when(
-                $canViewAllTenantSites,
+                $canViewAllSites,
                 fn ($query) => $query,
                 fn ($query) => $siteIds === [] ? $query->whereRaw('1 = 0') : $query->whereIn('site_id', $siteIds),
             )
@@ -358,12 +360,12 @@ class IntegrationsWorkspacePresenter
         ];
     }
 
-    private function rotationState(?IntegrationTenantSecret $secret, int $siteCredentials = 0): string
+    private function rotationState(?IntegrationProviderConnection $connection, int $siteCredentials = 0): string
     {
-        if (! $secret) {
+        if (! $connection) {
             return $siteCredentials > 0 ? 'unknown' : 'not_configured';
         }
-        $reference = $secret->rotated_at ?? $secret->created_at;
+        $reference = $connection->rotated_at ?? $connection->created_at;
         if (! $reference) {
             return 'unknown';
         }

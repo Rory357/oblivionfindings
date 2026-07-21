@@ -37,7 +37,7 @@ import {
     type SiteCredentialRow,
 } from './site-credentials';
 
-type TenantSecret = {
+type ProviderConnection = {
     status: 'connected' | 'disconnected' | 'error';
     secret_last4?: string;
     last_tested_at?: string;
@@ -98,7 +98,7 @@ type SyncLog = {
 };
 
 type Props = {
-    tenantSecret: TenantSecret;
+    providerConnection: ProviderConnection;
     discoveredSites: DiscoveredSite[];
     siteConfigs: SiteConfig[];
     sites: SiteLite[];
@@ -219,7 +219,7 @@ function formatUnifiSiteLabel(site: DiscoveredSite): {
 }
 
 export default function UnifiIntegration({
-    tenantSecret,
+    providerConnection,
     discoveredSites,
     siteConfigs,
     sites,
@@ -252,9 +252,9 @@ export default function UnifiIntegration({
         ),
     );
 
-    const hasKey = !!tenantSecret;
-    const connStatus = tenantSecret
-        ? (connectionStatusConfig[tenantSecret.status] ??
+    const hasKey = !!providerConnection;
+    const connStatus = providerConnection
+        ? (connectionStatusConfig[providerConnection.status] ??
           connectionStatusConfig.disconnected)
         : null;
     const roomsBySite = useMemo(
@@ -276,13 +276,13 @@ export default function UnifiIntegration({
     const mapForm = useForm({ site_id: '', mapping_token: '' });
     const defaultsForm = useForm({
         refresh_interval_minutes:
-            tenantSecret?.defaults?.refresh_interval_minutes ?? 15,
+            providerConnection?.defaults?.refresh_interval_minutes ?? 15,
         alert_motion_events:
-            tenantSecret?.defaults?.alert_motion_events ?? false,
+            providerConnection?.defaults?.alert_motion_events ?? false,
         alert_device_offline:
-            tenantSecret?.defaults?.alert_device_offline ?? true,
-        quiet_hours_start: tenantSecret?.defaults?.quiet_hours_start ?? '',
-        quiet_hours_end: tenantSecret?.defaults?.quiet_hours_end ?? '',
+            providerConnection?.defaults?.alert_device_offline ?? true,
+        quiet_hours_start: providerConnection?.defaults?.quiet_hours_start ?? '',
+        quiet_hours_end: providerConnection?.defaults?.quiet_hours_end ?? '',
     });
 
     const handleSaveDefaults = (e: React.FormEvent) => {
@@ -377,7 +377,7 @@ export default function UnifiIntegration({
                                     <span className="text-sm">
                                         Key ending in{' '}
                                         <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                                            •••{tenantSecret?.secret_last4}
+                                            •••{providerConnection?.secret_last4}
                                         </code>
                                     </span>
                                     {connStatus && (
@@ -390,11 +390,11 @@ export default function UnifiIntegration({
                                 <div className="space-y-1 text-sm text-muted-foreground">
                                     <p>
                                         Last tested:{' '}
-                                        {fmt(tenantSecret?.last_tested_at)}
+                                        {fmt(providerConnection?.last_tested_at)}
                                     </p>
                                     <p>
                                         Last sync:{' '}
-                                        {fmt(tenantSecret?.last_synced_at)}
+                                        {fmt(providerConnection?.last_synced_at)}
                                     </p>
                                 </div>
                                 <div className="flex flex-wrap gap-2">

@@ -2,8 +2,8 @@
 
 namespace App\Services\Integration\Adapters;
 
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
-use App\Models\Integration\IntegrationTenantSecret;
 use App\Services\Integration\IntegrationAdapterInterface;
 use App\Services\Integration\SyncResult;
 use App\Support\SafeOperationalData;
@@ -27,7 +27,7 @@ class QueclinkAdapter implements IntegrationAdapterInterface
 
     /**
      * Default base URL for the Queclink IoT platform. Operators can override
-     * via IntegrationTenantSecret.config['base_url'].
+     * via IntegrationProviderConnection.config['base_url'].
      */
     private const DEFAULT_BASE_URL = 'https://ims.queclink.com';
 
@@ -46,15 +46,15 @@ class QueclinkAdapter implements IntegrationAdapterInterface
         ];
     }
 
-    public function testConnection(IntegrationTenantSecret $secret): bool
+    public function testConnection(IntegrationProviderConnection $connection): bool
     {
-        $apiKey = $this->decryptSecret($secret);
+        $apiKey = $this->decryptSecret($connection);
         if ($apiKey === null) {
             return false;
         }
 
         try {
-            $baseUrl = $this->resolveBaseUrl($secret);
+            $baseUrl = $this->resolveBaseUrl($connection);
             // Lightweight probe: HEAD against the account / status endpoint.
             // Queclink's exact identity endpoint differs between product
             // lines (IoT Platform vs GV-series controller). We use a generic
@@ -70,7 +70,7 @@ class QueclinkAdapter implements IntegrationAdapterInterface
             return $response->successful();
         } catch (\Throwable $e) {
             Log::info('Queclink testConnection failed', SafeOperationalData::logContext([
-                'tenant_id' => $secret->tenant_id,
+                'provider_connection_id' => $connection->id,
                 'error_category' => SafeOperationalData::failureCategory($e),
             ]));
 
@@ -78,7 +78,7 @@ class QueclinkAdapter implements IntegrationAdapterInterface
         }
     }
 
-    public function discoverSites(IntegrationTenantSecret $secret): array
+    public function discoverSites(IntegrationProviderConnection $connection): array
     {
         // Site discovery is a scaffold stage — returns empty until PR C1.
         // Queclink groups devices by fleet / account, not by "site" in the
@@ -87,7 +87,7 @@ class QueclinkAdapter implements IntegrationAdapterInterface
         return [];
     }
 
-    public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): SyncResult
+    public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): SyncResult
     {
         // Device sync is deferred to PR C1. Returning a graceful
         // "not implemented" result keeps sync orchestration honest rather
@@ -101,35 +101,35 @@ class QueclinkAdapter implements IntegrationAdapterInterface
         );
     }
 
-    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): array
+    public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): array
     {
         return [];
     }
 
-    public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret, ?\DateTimeInterface $since = null): array
+    public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection, ?\DateTimeInterface $since = null): array
     {
         return [];
     }
 
-    private function resolveBaseUrl(IntegrationTenantSecret $secret): string
+    private function resolveBaseUrl(IntegrationProviderConnection $connection): string
     {
-        $config = is_array($secret->config) ? $secret->config : [];
+        $config = is_array($connection->config) ? $connection->config : [];
         $candidate = $config['base_url'] ?? self::DEFAULT_BASE_URL;
 
         return rtrim((string) $candidate, '/');
     }
 
-    private function decryptSecret(IntegrationTenantSecret $secret): ?string
+    private function decryptSecret(IntegrationProviderConnection $connection): ?string
     {
-        if (! $secret->secret_encrypted) {
+        if (! $connection->secret_encrypted) {
             return null;
         }
 
         try {
-            return Crypt::decryptString($secret->secret_encrypted);
+            return Crypt::decryptString($connection->secret_encrypted);
         } catch (\Throwable $e) {
             Log::warning('Queclink secret decryption failed', SafeOperationalData::logContext([
-                'tenant_id' => $secret->tenant_id,
+                'provider_connection_id' => $connection->id,
                 'error_category' => SafeOperationalData::failureCategory($e),
             ]));
 

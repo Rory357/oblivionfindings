@@ -5,28 +5,42 @@ namespace App\Domain\SecurityDevices\Services;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
-use App\Domain\SecurityDevices\Models\DeviceAssetLink;
+use App\Models\Asset;
+use App\Models\SiteRoom;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
 class DeviceRegistryService
 {
-    /**
-     * Base query scoped to a tenant.
-     */
-    public function query(int $tenantId): Builder
+    public function __construct(private readonly SecurityDevicesAccessService $access) {}
+
+    /** Base query for the single application registry. */
+    public function query(): Builder
     {
-        return Device::query()->forTenant($tenantId);
+        return Device::query();
     }
 
     /**
      * Devices with an active assignment to a given site (including room-level assignments
      * within that site).
      */
-    public function forSite(int $tenantId, int $siteId): Builder
+    public function forSite(int $siteId): Builder
     {
-        $roomIds = \App\Models\SiteRoom::where('site_id', $siteId)->pluck('id');
+        $roomIds = SiteRoom::where('site_id', $siteId)->pluck('id');
 
-        return $this->query($tenantId)
+        return $this->applySiteScope($this->query(), $siteId, $roomIds);
+    }
+
+    public function visibleForSite(User $user, int $siteId): Builder
+    {
+        $roomIds = SiteRoom::where('site_id', $siteId)->pluck('id');
+
+        return $this->applySiteScope($this->access->visibleDevices($user), $siteId, $roomIds);
+    }
+
+    private function applySiteScope(Builder $query, int $siteId, $roomIds): Builder
+    {
+        return $query
             ->whereHas('assignments', function (Builder $q) use ($siteId, $roomIds) {
                 $q->active()->where(function (Builder $q) use ($siteId, $roomIds) {
                     $q->where(function ($q) use ($siteId) {
@@ -41,15 +55,29 @@ class DeviceRegistryService
                         });
                     }
                 });
+            })
+            ->whereDoesntHave('assignments', function (Builder $q) use ($siteId, $roomIds): void {
+                $q->active()->where(function (Builder $outside) use ($siteId, $roomIds): void {
+                    $outside->where(function (Builder $site) use ($siteId): void {
+                        $site->where('assignable_type', DeviceAssignment::TARGET_SITE)
+                            ->where('assignable_id', '!=', $siteId);
+                    })->orWhere(function (Builder $room) use ($roomIds): void {
+                        $room->where('assignable_type', DeviceAssignment::TARGET_ROOM);
+                        if ($roomIds->isEmpty()) {
+                            return;
+                        }
+                        $room->whereNotIn('assignable_id', $roomIds);
+                    });
+                });
             });
     }
 
     /**
      * Devices with an active assignment to a given client.
      */
-    public function forClient(int $tenantId, int $clientId): Builder
+    public function forClient(int $clientId): Builder
     {
-        return $this->query($tenantId)
+        return $this->query()
             ->whereHas('assignments', function (Builder $q) use ($clientId) {
                 $q->active()
                     ->forTarget(DeviceAssignment::TARGET_CLIENT, $clientId);
@@ -59,9 +87,9 @@ class DeviceRegistryService
     /**
      * Devices with an active asset link to a given vehicle/asset (e.g. trackers installed in a vehicle).
      */
-    public function forVehicle(int $tenantId, int $assetId): Builder
+    public function forVehicle(int $assetId): Builder
     {
-        return $this->query($tenantId)
+        return $this->query()
             ->whereHas('assetLinks', function (Builder $q) use ($assetId) {
                 $q->active()->forAsset($assetId);
             });
@@ -70,9 +98,9 @@ class DeviceRegistryService
     /**
      * Devices with an active assignment to a given staff member.
      */
-    public function forStaff(int $tenantId, int $userId): Builder
+    public function forStaff(int $userId): Builder
     {
-        return $this->query($tenantId)
+        return $this->query()
             ->whereHas('assignments', function (Builder $q) use ($userId) {
                 $q->active()
                     ->forTarget(DeviceAssignment::TARGET_STAFF, $userId);
@@ -82,9 +110,9 @@ class DeviceRegistryService
     /**
      * Devices with no active assignment (pooled stock / available for checkout).
      */
-    public function unassigned(int $tenantId): Builder
+    public function unassigned(): Builder
     {
-        return $this->query($tenantId)
+        return $this->query()
             ->whereDoesntHave('assignments', function (Builder $q) {
                 $q->active();
             });
@@ -93,25 +121,25 @@ class DeviceRegistryService
     /**
      * Devices filtered by domain.
      */
-    public function byDomain(int $tenantId, string|DeviceDomain $domain): Builder
+    public function byDomain(string|DeviceDomain $domain): Builder
     {
-        return $this->query($tenantId)->byDomain($domain);
+        return $this->query()->byDomain($domain);
     }
 
     /**
      * Devices filtered by category.
      */
-    public function byCategory(int $tenantId, string $category): Builder
+    public function byCategory(string $category): Builder
     {
-        return $this->query($tenantId)->byCategory($category);
+        return $this->query()->byCategory($category);
     }
 
     /**
      * Devices that belong to a specific group.
      */
-    public function forGroup(int $tenantId, int $groupId): Builder
+    public function forGroup(int $groupId): Builder
     {
-        return $this->query($tenantId)
+        return $this->query()
             ->whereHas('groups', function (Builder $q) use ($groupId) {
                 $q->where('device_groups.id', $groupId);
             });
@@ -133,7 +161,7 @@ class DeviceRegistryService
      */
     public function assetsForDevice(int $deviceId): Builder
     {
-        return \App\Models\Asset::query()
+        return Asset::query()
             ->whereHas('deviceLinks', function (Builder $q) use ($deviceId) {
                 // Note: requires Asset model to have a deviceLinks() relationship added later.
                 // For now, query directly.

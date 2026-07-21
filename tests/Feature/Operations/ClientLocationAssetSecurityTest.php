@@ -336,7 +336,7 @@ it('does not expose telemetry to fleet or asset viewers without the telemetry ca
         ->assertForbidden();
 });
 
-it('uses the client organization for location and picker queries without a global geofence fallback', function () {
+it('uses the canonical client site for tracking and picker queries while ignoring legacy partition ids', function () {
     $user = User::factory()->create(['organization_id' => 2]);
     grantClientLocationAssetPermissions($user, [
         'clients.viewAny',
@@ -346,59 +346,61 @@ it('uses the client organization for location and picker queries without a globa
         'assets.trackers.manage',
     ]);
 
+    $clientSite = makeClientLocationAssetSite(501, 'Canonical Client Home');
+    $hiddenSite = makeClientLocationAssetSite(501, 'Hidden Same-Legacy-Partition Home');
     $client = Client::factory()->create([
         'organization_id' => 2,
-        'site_id' => null,
+        'site_id' => $clientSite->id,
         'status' => 'active',
     ]);
     grantClientLocationAssetTrackingConsent($client, $user);
 
-    $foreignSite = makeClientLocationAssetSite(1, 'Foreign Home');
-    $localSite = makeClientLocationAssetSite(2, 'Local Home');
-    AssetGeofence::query()->create([
-        'site_id' => $foreignSite->id,
-        'name' => 'Global fallback must not leak',
+    $clientFence = AssetGeofence::query()->create([
+        'site_id' => $clientSite->id,
+        'name' => 'Canonical client home fence',
         'type' => 'circle',
         'scope' => 'house',
         'shape' => ['lat' => -36.8, 'lng' => 174.7, 'radius_m' => 100],
         'is_active' => true,
     ]);
+    AssetGeofence::query()->create([
+        'site_id' => $hiddenSite->id,
+        'name' => 'Same legacy partition must not leak',
+        'type' => 'circle',
+        'scope' => 'house',
+        'shape' => ['lat' => -36.9, 'lng' => 174.8, 'radius_m' => 100],
+        'is_active' => true,
+    ]);
 
-    $foreignAssigned = makeClientLocationAssetTracker(1, 'Wrong Tenant Assigned Tracker');
+    $assignedTracker = makeClientLocationAssetTracker(999, 'Canonically Assigned Tracker');
     DeviceAssignment::query()->create([
-        'device_id' => $foreignAssigned->id,
+        'device_id' => $assignedTracker->id,
         'assignable_type' => DeviceAssignment::TARGET_CLIENT,
         'assignable_id' => $client->id,
         'assigned_at' => now(),
     ]);
-    $localAssigned = makeClientLocationAssetTracker(2, 'Correct Tenant Assigned Tracker');
-    DeviceAssignment::query()->create([
-        'device_id' => $localAssigned->id,
-        'assignable_type' => DeviceAssignment::TARGET_CLIENT,
-        'assignable_id' => $client->id,
-        'assigned_at' => now(),
-    ]);
 
-    $foreignHardware = makeClientLocationAssetHardware(1, $foreignSite, 'Foreign Picker Shadow');
-    $foreignAvailable = makeClientLocationAssetTracker(1, 'Foreign Available Tracker', $foreignHardware);
-    $localHardware = makeClientLocationAssetHardware(2, $localSite, 'Local Picker Shadow');
-    $localAvailable = makeClientLocationAssetTracker(2, 'Local Available Tracker', $localHardware);
+    $clientHardware = makeClientLocationAssetHardware(701, $clientSite, 'Canonical Picker Shadow');
+    $clientAvailable = makeClientLocationAssetTracker(801, 'Canonical Available Tracker', $clientHardware);
+    $hiddenHardware = makeClientLocationAssetHardware(701, $hiddenSite, 'Hidden Picker Shadow');
+    $hiddenAvailable = makeClientLocationAssetTracker(801, 'Hidden Available Tracker', $hiddenHardware);
 
     $this->actingAs($user)
         ->get("/operations/clients/{$client->id}")
         ->assertOk()
-        ->assertInertia(function (Assert $page) use ($foreignAvailable, $foreignSite, $localAvailable, $localSite): void {
+        ->assertInertia(function (Assert $page) use ($assignedTracker, $clientAvailable, $clientFence, $clientSite, $hiddenAvailable, $hiddenSite): void {
             $props = $page->toArray()['props'];
 
             expect(data_get($props, 'location.tracker.name'))
-                ->toBe('Correct Tenant Assigned Tracker')
-                ->and(data_get($props, 'location.geofences'))->toBe([])
+                ->toBe($assignedTracker->name)
+                ->and(collect(data_get($props, 'location.geofences'))->pluck('id')->all())
+                ->toBe([(string) $clientFence->id])
                 ->and(collect($props['available_trackers'])->pluck('id')->all())
-                ->toBe([$localAvailable->id])
-                ->not->toContain($foreignAvailable->id)
+                ->toBe([$clientAvailable->id])
+                ->not->toContain($hiddenAvailable->id)
                 ->and(collect($props['asset_locations'])->pluck('id')->all())
-                ->toBe([$localSite->id])
-                ->not->toContain($foreignSite->id);
+                ->toBe([$clientSite->id])
+                ->not->toContain($hiddenSite->id);
         });
 });
 
@@ -436,7 +438,7 @@ it('does not emit tracker choices to ordinary client editors and rejects direct 
     expect(ClientPersonalAsset::query()->count())->toBe(0);
 });
 
-it('rejects foreign or ineligible asset picker ids and persists an eligible canonical tracker through its legacy bridge', function () {
+it('enforces the canonical client site on asset writes and persists eligible trackers despite legacy partition mismatches', function () {
     $user = User::factory()->create(['organization_id' => 1]);
     grantClientLocationAssetPermissions($user, [
         'clients.viewAny',
@@ -457,7 +459,10 @@ it('rejects foreign or ineligible asset picker ids and persists an eligible cano
     ]);
 
     $localHardware = makeClientLocationAssetHardware(1, $localSite, 'Eligible Shadow');
-    $eligibleDevice = makeClientLocationAssetTracker(1, 'Eligible Tracker', $localHardware);
+    $eligibleDevice = makeClientLocationAssetTracker(801, 'Eligible Tracker', $localHardware);
+    $localHardware->update(['tenant_id' => 701]);
+    $samePartitionHiddenHardware = makeClientLocationAssetHardware(1, $otherLocalSite, 'Hidden Same Partition Shadow');
+    $samePartitionHiddenDevice = makeClientLocationAssetTracker(1, 'Hidden Same Partition Tracker', $samePartitionHiddenHardware);
     $foreignHardware = makeClientLocationAssetHardware(2, $foreignSite, 'Foreign Shadow');
     $foreignDevice = makeClientLocationAssetTracker(2, 'Foreign Tracker', $foreignHardware);
     $unbridgedDevice = makeClientLocationAssetTracker(1, 'Unbridged Tracker');
@@ -475,10 +480,24 @@ it('rejects foreign or ineligible asset picker ids and persists an eligible cano
 
     $this->from($returnUrl)
         ->post("/operations/clients/{$client->id}/personal-assets", $basePayload + [
+            'site_id' => $otherLocalSite->id,
+        ])
+        ->assertSessionHasErrors('site_id');
+
+    $this->from($returnUrl)
+        ->post("/operations/clients/{$client->id}/personal-assets", $basePayload + [
             'site_id' => $localSite->id,
             'room_id' => $mismatchedRoom->id,
         ])
         ->assertSessionHasErrors('room_id');
+
+    $this->from($returnUrl)
+        ->post("/operations/clients/{$client->id}/personal-assets", $basePayload + [
+            'site_id' => $localSite->id,
+            'room_id' => $localRoom->id,
+            'tracker_hardware_id' => $samePartitionHiddenDevice->id,
+        ])
+        ->assertSessionHasErrors('tracker_hardware_id');
 
     $this->from($returnUrl)
         ->post("/operations/clients/{$client->id}/personal-assets", $basePayload + [

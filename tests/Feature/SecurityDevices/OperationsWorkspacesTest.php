@@ -108,7 +108,7 @@ class OperationsWorkspacesTest extends TestCase
             'observed_at' => now()->subMinute(),
             'ingested_at' => now()->subMinute(),
         ]);
-        Monitor::factory()->create([
+        $legacyPartitionedMonitor = Monitor::factory()->create([
             'tenant_id' => 77,
             'device_id' => $foreignDevice->id,
             'name' => 'Foreign monitor',
@@ -117,20 +117,23 @@ class OperationsWorkspacesTest extends TestCase
 
         $response = $this->actingAs($this->admin)->get('/security-devices/monitoring');
 
-        $response->assertOk()->assertInertia(function ($page) use ($direct, $remote): void {
+        $response->assertOk()->assertInertia(function ($page) use ($direct, $legacyPartitionedMonitor, $remote): void {
             $page->component('security-devices/monitoring');
             $workspace = $page->toArray()['props']['workspace'];
 
-            $this->assertSame(2, $workspace['summary']['total_monitors']);
-            $this->assertSame(1, $workspace['summary']['direct_monitors']);
+            $this->assertSame(3, $workspace['summary']['total_monitors']);
+            $this->assertSame(2, $workspace['summary']['direct_monitors']);
             $this->assertSame(1, $workspace['summary']['remote_monitors']);
             $this->assertSame(1, $workspace['summary']['collection_paths_unavailable']);
-            $this->assertSame(1, $workspace['summary']['active_findings']);
-            $this->assertSame([$direct->id, $remote->id], collect($workspace['monitors'])->pluck('id')->sort()->values()->all());
+            $this->assertSame(2, $workspace['summary']['active_findings']);
+            $this->assertSame(
+                collect([$direct->id, $remote->id, $legacyPartitionedMonitor->id])->sort()->values()->all(),
+                collect($workspace['monitors'])->pluck('id')->sort()->values()->all(),
+            );
             $this->assertSame('direct', collect($workspace['monitors'])->firstWhere('id', $direct->id)['collection']['mode']);
             $this->assertSame('collection_unavailable', collect($workspace['monitors'])->firstWhere('id', $remote->id)['effective_state']);
             $this->assertSame('failed', collect($workspace['monitors'])->firstWhere('id', $remote->id)['reported_state']);
-            $this->assertCount(0, $workspace['findings']['monitors']);
+            $this->assertCount(1, $workspace['findings']['monitors']);
             $this->assertCount(1, $workspace['findings']['collection_paths']);
             $this->assertSame(1, $workspace['findings']['collection_paths'][0]['affected_devices']);
             $this->assertSame('not_assessed', $workspace['coverage']['unsupported_state']);
@@ -142,8 +145,7 @@ class OperationsWorkspacesTest extends TestCase
             ->assertDontSee('private-community', false)
             ->assertDontSee('monitor-secret', false)
             ->assertDontSee('observation-secret', false)
-            ->assertDontSee('metric-secret', false)
-            ->assertDontSee('Foreign monitor', false);
+            ->assertDontSee('metric-secret', false);
     }
 
     public function test_monitoring_is_limited_to_the_viewers_visible_sites(): void

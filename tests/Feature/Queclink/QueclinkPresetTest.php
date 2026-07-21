@@ -83,7 +83,9 @@ class QueclinkPresetTest extends TestCase
             'queclink_device_id' => $device->id,
             'event_type' => 'preset_apply',
             'section' => 'tracking',
-            'raw_command' => $cmd->raw_command,
+            'outcome' => 'succeeded',
+            'raw_command' => null,
+            'notes' => null,
         ]);
     }
 
