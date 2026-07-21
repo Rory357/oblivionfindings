@@ -56,6 +56,7 @@ class OperationsWorkspacesTest extends TestCase
             'tenant_id' => 77,
             'name' => 'Foreign router',
         ]);
+        $this->assignToSite($directDevice, $site);
         $this->assignToSite($remoteDevice, $site);
 
         $profile = MonitoringProfile::factory()->create([

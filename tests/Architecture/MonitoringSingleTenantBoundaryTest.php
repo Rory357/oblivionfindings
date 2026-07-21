@@ -6,14 +6,8 @@ it('keeps the new monitoring delivery boundary single tenant', function () {
     $root = str_replace('\\', '/', dirname(__DIR__, 2));
     $runtimeEnvelope = new ReflectionClass(RuntimeEnvelope::class);
     $legacyRuntimeFiles = [
-        $root.'/app/Domain/Monitoring/Models/Monitor.php',
-        $root.'/app/Domain/Monitoring/Models/MonitoringCollector.php',
-        $root.'/app/Domain/Monitoring/Models/MonitoringProfile.php',
-        $root.'/app/Domain/Monitoring/Models/MonitorObservation.php',
-        $root.'/app/Domain/Monitoring/Services/MonitoringObservationIngestor.php',
         $root.'/database/migrations/2026_07_18_100001_create_monitoring_foundation_tables.php',
-        $root.'/tests/Feature/Monitoring/MonitoringSchemaTest.php',
-        $root.'/app/Listeners/It/CreateOrUpdateMonitoringTicket.php',
+        $root.'/database/migrations/2026_07_21_150000_refactor_monitoring_foundations_for_single_application.php',
         $root.'/app/Domain/SecurityDevices/Presenters/MonitoringOperationsPresenter.php',
         $root.'/tests/Feature/It/ItMonitoringTicketIntegrationTest.php',
     ];

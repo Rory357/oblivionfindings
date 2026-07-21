@@ -77,7 +77,7 @@ $device->forceFill([
 ]);
 
 $profile = \\App\\Domain\\Monitoring\\Models\\MonitoringProfile::query()->firstOrCreate(
-    ['tenant_id' => $tenantId, 'name' => 'Playwright device profile monitoring'],
+    ['name' => 'Playwright device profile monitoring'],
     [
         'description' => 'Device profile browser acceptance',
         'interval_seconds' => 60,
@@ -89,7 +89,6 @@ $profile = \\App\\Domain\\Monitoring\\Models\\MonitoringProfile::query()->firstO
 );
 $monitor = \\App\\Domain\\Monitoring\\Models\\Monitor::query()->updateOrCreate(
     [
-        'tenant_id' => $tenantId,
         'device_id' => $device->id,
         'name' => 'WAN interface health',
     ],
@@ -108,13 +107,14 @@ $monitor = \\App\\Domain\\Monitoring\\Models\\Monitor::query()->updateOrCreate(
     ],
 );
 \\App\\Domain\\Monitoring\\Models\\MonitorObservation::query()
-    ->where('tenant_id', $tenantId)
     ->where('monitor_id', $monitor->id)
     ->where('source_key', 'playwright-device-profile')
     ->delete();
 \\App\\Domain\\Monitoring\\Models\\MonitorObservation::create([
-    'tenant_id' => $tenantId,
     'monitor_id' => $monitor->id,
+    'device_id' => $device->id,
+    'site_id' => $site->id,
+    'collector_id' => $monitor->collector_id,
     'source_key' => 'playwright-device-profile',
     'state' => 'failed',
     'value' => 91.4,

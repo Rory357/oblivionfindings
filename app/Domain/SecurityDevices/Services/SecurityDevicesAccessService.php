@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\Schema;
  * policies that own the assigned record. Legacy partition columns are never
  * consulted here.
  */
-final class SecurityDevicesAccessService
+class SecurityDevicesAccessService
 {
     private const ASSIGNMENT_PICKER_LIMIT = 500;
 

@@ -55,16 +55,16 @@ it('changes the debt fingerprint when equal-count tenant shortcut semantics chan
 it('keeps legacy storage compatibility narrow and rejects the same field in a new model', function () {
     $storageDeclaration = <<<'PHP'
         <?php
-        class Monitor {
+        class Device {
             protected $fillable = [
                 'tenant_id',
             ];
         }
         PHP;
 
-    expect(itSecurityScanTenantSource('app/Domain/Monitoring/Models/Monitor.php', $storageDeclaration))
+    expect(itSecurityScanTenantSource('app/Domain/SecurityDevices/Models/Device.php', $storageDeclaration))
         ->not->toHaveKey('tenant_storage_or_usage')
-        ->and(itSecurityScanTenantSource('app/Domain/Monitoring/Models/NewMonitor.php', $storageDeclaration))
+        ->and(itSecurityScanTenantSource('app/Domain/SecurityDevices/Models/NewDevice.php', $storageDeclaration))
         ->toHaveKey('tenant_storage_or_usage');
 });
 
@@ -415,10 +415,6 @@ function itSecurityScanTenantMigration(string $relativePath, string $contents): 
 function itSecurityLegacyStorageFiles(): array
 {
     return [
-        'app/Domain/Monitoring/Models/Monitor.php',
-        'app/Domain/Monitoring/Models/MonitorObservation.php',
-        'app/Domain/Monitoring/Models/MonitoringCollector.php',
-        'app/Domain/Monitoring/Models/MonitoringProfile.php',
         'app/Domain/SecurityDevices/Models/Device.php',
         'app/Domain/SecurityDevices/Models/DeviceEvent.php',
         'app/Domain/SecurityDevices/Models/DeviceGroup.php',
@@ -519,19 +515,6 @@ function itSecurityApprovedTenantDebt(): array
         'app/Domain/It/Services/ItServiceManagementSetupService.php|tenant_storage_or_usage|3|bfb9582a8486b739',
         'app/Domain/It/Services/ItTicketLinkService.php|tenant_storage_or_usage|2|625c39a9d1e487b2',
         'app/Domain/It/Services/ItWorkTaskService.php|tenant_storage_or_usage|1|f7915255c9b5d99f',
-        'app/Domain/Monitoring/Models/Monitor.php|tenant_parameter|2|a540e8e58df557ce',
-        'app/Domain/Monitoring/Models/Monitor.php|tenant_query_scope|1|ff1a1800f4b43f9e',
-        'app/Domain/Monitoring/Models/Monitor.php|tenant_storage_or_usage|1|836a829ebef78cf7',
-        'app/Domain/Monitoring/Models/MonitorObservation.php|tenant_parameter|2|a540e8e58df557ce',
-        'app/Domain/Monitoring/Models/MonitorObservation.php|tenant_query_scope|1|ff1a1800f4b43f9e',
-        'app/Domain/Monitoring/Models/MonitorObservation.php|tenant_storage_or_usage|1|836a829ebef78cf7',
-        'app/Domain/Monitoring/Models/MonitoringCollector.php|tenant_parameter|2|a540e8e58df557ce',
-        'app/Domain/Monitoring/Models/MonitoringCollector.php|tenant_query_scope|1|ff1a1800f4b43f9e',
-        'app/Domain/Monitoring/Models/MonitoringCollector.php|tenant_storage_or_usage|1|836a829ebef78cf7',
-        'app/Domain/Monitoring/Models/MonitoringProfile.php|tenant_parameter|2|a540e8e58df557ce',
-        'app/Domain/Monitoring/Models/MonitoringProfile.php|tenant_query_scope|1|ff1a1800f4b43f9e',
-        'app/Domain/Monitoring/Models/MonitoringProfile.php|tenant_storage_or_usage|1|836a829ebef78cf7',
-        'app/Domain/Monitoring/Services/MonitoringObservationIngestor.php|tenant_storage_or_usage|2|a8e441f26cab8b94',
         'app/Domain/SecurityDevices/Console/MigrateDevicesCommand.php|tenant_parameter|5|c626c268d4fcc7a4',
         'app/Domain/SecurityDevices/Console/MigrateDevicesCommand.php|tenant_storage_or_usage|7|db6e6459a75d9978',
         'app/Domain/SecurityDevices/Http/Controllers/DeviceController.php|tenant_storage_or_usage|1|b64c761624fab3fd',
@@ -562,7 +545,6 @@ function itSecurityApprovedTenantDebt(): array
         'app/Http/Controllers/Settings/ItMailboxOAuthController.php|tenant_storage_or_usage|1|40af267c79d5309c',
         'app/Http/Middleware/RecordItApiRequest.php|organisation_comparison|2|a17c4566b8ddf75e',
         'app/Http/Middleware/RecordItApiRequest.php|tenant_storage_or_usage|4|54a3f00b0661a185',
-        'app/Listeners/It/CreateOrUpdateMonitoringTicket.php|tenant_storage_or_usage|1|02ca858e5a8381c5',
         'app/Models/Integration/IntegrationEvent.php|tenant_parameter|3|0a26eeb7f7f2d8aa',
         'app/Models/Integration/IntegrationEvent.php|tenant_query_scope|1|d6336fc18d0750f5',
         'app/Models/Integration/IntegrationEvent.php|tenant_storage_or_usage|1|836a829ebef78cf7',
@@ -654,7 +636,6 @@ function itSecurityApprovedTenantDebt(): array
         'tests/Feature/It/ItMailboxSettingsTest.php|organisation_comparison|1|5ee49190f2392f41',
         'tests/Feature/It/ItMailboxSettingsTest.php|tenant_storage_or_usage|1|47df747d13fc36a0',
         'tests/Feature/It/ItMajorIncidentManagementTest.php|tenant_storage_or_usage|3|c81228e8435f0a54',
-        'tests/Feature/It/ItMonitoringTicketIntegrationTest.php|tenant_storage_or_usage|2|7c6668132ccb2e27',
         'tests/Feature/It/ItProblemManagementTest.php|tenant_storage_or_usage|3|eb649e09315328ce',
         'tests/Feature/It/ItProvisioningBulkTest.php|tenant_storage_or_usage|10|5327263fefb274bf',
         'tests/Feature/It/ItProvisioningTest.php|tenant_storage_or_usage|15|f164fc351cc7b896',
@@ -679,8 +660,6 @@ function itSecurityApprovedTenantDebt(): array
         'tests/Feature/It/ItWorkTransitionTest.php|organisation_comparison|2|f66fa140beb45615',
         'tests/Feature/It/ItWorkTransitionTest.php|tenant_storage_or_usage|4|1190c6bfc93ae790',
         'tests/Feature/Monitoring/MonitoringDeliveryTest.php|organisation_comparison|3|25790f063ee2f159',
-        'tests/Feature/Monitoring/MonitoringSchemaTest.php|tenant_query_scope|2|7b1d9a17d385501d',
-        'tests/Feature/Monitoring/MonitoringSchemaTest.php|tenant_storage_or_usage|9|7b836260683a19d1',
         'tests/Feature/Monitoring/RuntimeEnvelopePersistenceTest.php|tenant_storage_or_usage|4|5982c3b52df7a0d4',
         'tests/Feature/SecurityDevices/AlertsEventsControllerTest.php|organisation_comparison|1|0a88791b4d93bc24',
         'tests/Feature/SecurityDevices/AlertsEventsControllerTest.php|tenant_storage_or_usage|2|03c8628b6520729d',

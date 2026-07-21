@@ -337,6 +337,7 @@ it('guards normal Eloquent bulk writes against inbox evidence bypasses', functio
         ->toThrow(UnexpectedValueException::class, 'Monitoring inbox delivery identity and evidence are immutable.');
     expect(fn () => MonitoringInbox::query()->whereKey($inbox->id)->touch('SOURCE'))
         ->toThrow(UnexpectedValueException::class, 'Monitoring inbox delivery identity and evidence are immutable.');
+    DB::table('monitoring_inbox')->where('id', $inbox->id)->update(['updated_at' => now()->subMinute()]);
     expect(MonitoringInbox::query()->whereKey($inbox->id)->touch())->toBe(1);
 
     foreach (['insert', 'insertOrIgnore', 'insertOrIgnoreReturning', 'insertGetId'] as $method) {

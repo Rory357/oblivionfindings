@@ -13,7 +13,6 @@ class MonitoringCollectorFactory extends Factory
     public function definition(): array
     {
         return [
-            'tenant_id' => 1,
             'collector_uuid' => fake()->uuid(),
             'name' => fake()->words(3, true),
             'status' => 'online',

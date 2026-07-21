@@ -96,7 +96,7 @@ $automation = $upsertDevice('PW-FAC-AUTOMATION', $automationName, 'facility_acce
 ]);
 
 $profile = \\App\\Domain\\Monitoring\\Models\\MonitoringProfile::query()->updateOrCreate(
-    ['tenant_id' => $tenantId, 'name' => 'Playwright native facilities profile'],
+    ['name' => 'Playwright native facilities profile'],
     [
         'description' => 'Browser acceptance evidence for native Facilities and IoT.',
         'interval_seconds' => 60,
@@ -107,9 +107,9 @@ $profile = \\App\\Domain\\Monitoring\\Models\\MonitoringProfile::query()->update
     ],
 );
 
-$upsertMonitor = function ($device, string $name, string $kind, string $state, array $attributes = []) use ($tenantId, $profile) {
+$upsertMonitor = function ($device, string $name, string $kind, string $state, array $attributes = []) use ($profile) {
     return \\App\\Domain\\Monitoring\\Models\\Monitor::query()->updateOrCreate(
-        ['tenant_id' => $tenantId, 'device_id' => $device->id, 'name' => $name],
+        ['device_id' => $device->id, 'name' => $name],
         array_merge([
             'profile_id' => $profile->id,
             'collector_id' => null,
@@ -135,15 +135,17 @@ $buildingMonitor = $upsertMonitor($building, 'Playwright fire panel availability
 $utilityMonitor = $upsertMonitor($utility, 'Playwright generator availability', 'provider', 'healthy');
 $automationMonitor = $upsertMonitor($automation, 'Playwright relay availability', 'provider', 'healthy');
 
-$observe = function ($monitor, string $sourceKey, string $state, ?float $value, ?string $unit, array $metrics = []) use ($tenantId) {
+$observe = function ($monitor, string $sourceKey, string $state, ?float $value, ?string $unit, array $metrics = []) use ($site) {
     \\App\\Domain\\Monitoring\\Models\\MonitorObservation::query()
         ->where('monitor_id', $monitor->id)
         ->where('source_key', $sourceKey)
         ->delete();
 
     return \\App\\Domain\\Monitoring\\Models\\MonitorObservation::query()->create([
-        'tenant_id' => $tenantId,
         'monitor_id' => $monitor->id,
+        'device_id' => $monitor->device_id,
+        'site_id' => $site->id,
+        'collector_id' => $monitor->collector_id,
         'source_key' => $sourceKey,
         'state' => $state,
         'value' => $value,

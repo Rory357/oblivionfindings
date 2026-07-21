@@ -5,6 +5,7 @@ namespace App\Domain\Monitoring\Models;
 use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Database\Factories\MonitorFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Monitor extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     protected static function newFactory(): MonitorFactory
     {
@@ -21,7 +22,6 @@ class Monitor extends Model
     }
 
     protected $fillable = [
-        'tenant_id',
         'device_id',
         'profile_id',
         'collector_id',
@@ -70,10 +70,5 @@ class Monitor extends Model
     public function observations(): HasMany
     {
         return $this->hasMany(MonitorObservation::class, 'monitor_id');
-    }
-
-    public function scopeForTenant($query, int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 }

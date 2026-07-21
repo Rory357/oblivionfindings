@@ -163,7 +163,9 @@ class NetworkItWorkspaceTest extends TestCase
 
     public function test_interfaces_and_capacity_use_an_allowlist_of_retained_observation_metrics(): void
     {
+        $site = Site::factory()->create();
         $device = $this->networkDevice('Core switch');
+        $this->assignToSite($device, $site);
         $interface = $this->monitor($device, 'WAN 1', MonitorKind::SnmpInterface, MonitorState::Healthy);
         $this->observe($interface, [
             'interface_name' => 'WAN 1',

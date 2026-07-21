@@ -48,6 +48,15 @@ beforeEach(function () {
             'delivery-test-key' => base64_encode(str_repeat("\x2a", SODIUM_CRYPTO_AUTH_KEYBYTES)),
         ],
     ]);
+
+    Permission::firstOrCreate(
+        ['key' => 'securityDevices.integrations.manage'],
+        [
+            'description' => 'Manage device sync and discovery',
+            'group' => 'security_devices',
+            'module' => 'Security & Devices',
+        ],
+    );
 });
 
 function deliveryEnvelope(

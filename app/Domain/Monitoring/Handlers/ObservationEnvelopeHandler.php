@@ -11,12 +11,15 @@ use App\Domain\Monitoring\Exceptions\RuntimeScopeViolation;
 use App\Domain\Monitoring\Exceptions\RuntimeSiteScopeViolation;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Services\MonitoringObservationIngestor;
-use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\Monitoring\Services\MonitoringObservationScopeGuard;
 use Carbon\CarbonImmutable;
 
 final class ObservationEnvelopeHandler implements RuntimeEnvelopeHandler
 {
-    public function __construct(private readonly MonitoringObservationIngestor $ingestor) {}
+    public function __construct(
+        private readonly MonitoringObservationIngestor $ingestor,
+        private readonly MonitoringObservationScopeGuard $scopeGuard,
+    ) {}
 
     public function handle(RuntimeEnvelope $envelope, ?int $trustedSiteId = null): void
     {
@@ -50,7 +53,11 @@ final class ObservationEnvelopeHandler implements RuntimeEnvelopeHandler
             latencyMs: $this->integer($envelope->payload['latency_ms'] ?? null),
             message: $this->string($envelope->payload['message'] ?? null),
             metrics: is_array($envelope->payload['metrics'] ?? null) ? $envelope->payload['metrics'] : [],
-        ));
+        ),
+            (int) $envelope->payload['site_id'],
+            (int) $envelope->payload['device_id'],
+            $envelope->payload['collector_uuid'] ?? null,
+        );
     }
 
     private function assertCanonicalScope(
@@ -64,17 +71,7 @@ final class ObservationEnvelopeHandler implements RuntimeEnvelopeHandler
             throw new RuntimeScopeViolation('Observation device does not match its canonical monitor.');
         }
 
-        $collectorReference = $envelope->payload['collector_uuid'] ?? null;
-
-        if ($monitor->collector !== null
-            && (! is_string($collectorReference)
-                || ! hash_equals($monitor->collector->collector_uuid, $collectorReference))) {
-            throw new RuntimeScopeViolation('Observation collector does not match its canonical monitor.');
-        }
-
-        if ($monitor->collector === null && $collectorReference !== null) {
-            throw new RuntimeScopeViolation('Observation collector does not match its canonical monitor.');
-        }
+        $this->scopeGuard->assertCollectorReference($monitor, $envelope->payload['collector_uuid'] ?? null);
 
         $payloadSiteId = $envelope->payload['site_id'] ?? null;
 
@@ -86,24 +83,7 @@ final class ObservationEnvelopeHandler implements RuntimeEnvelopeHandler
             throw new RuntimeSiteScopeViolation('Observation site does not match trusted routing context.');
         }
 
-        $canonicalSiteIds = $monitor->device->assignments
-            ->whereNull('released_at')
-            ->where('assignable_type', DeviceAssignment::TARGET_SITE)
-            ->pluck('assignable_id')
-            ->filter(fn (mixed $siteId): bool => is_numeric($siteId) && (int) $siteId > 0)
-            ->map(fn (mixed $siteId): int => (int) $siteId)
-            ->unique()
-            ->values();
-
-        if ($monitor->collector !== null && (int) $monitor->collector->site_id !== $payloadSiteId) {
-            throw new RuntimeSiteScopeViolation('Observation collector site does not match its canonical device site.');
-        }
-
-        foreach (array_filter([$trustedSiteId, $payloadSiteId]) as $siteId) {
-            if (! $canonicalSiteIds->contains((int) $siteId)) {
-                throw new RuntimeSiteScopeViolation('Observation site does not match its canonical active assignment.');
-            }
-        }
+        $this->scopeGuard->assertCanonicalSite($monitor, $payloadSiteId);
     }
 
     private function number(mixed $value): int|float|null

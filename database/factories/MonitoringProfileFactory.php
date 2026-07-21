@@ -13,7 +13,6 @@ class MonitoringProfileFactory extends Factory
     public function definition(): array
     {
         return [
-            'tenant_id' => 1,
             'name' => fake()->unique()->words(3, true),
             'interval_seconds' => 60,
             'failure_confirmations' => 3,

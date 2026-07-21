@@ -81,7 +81,7 @@ $device->forceFill([
 ]);
 
 $profile = \\App\\Domain\\Monitoring\\Models\\MonitoringProfile::query()->firstOrCreate(
-    ['tenant_id' => $tenantId, 'name' => 'Playwright native monitoring'],
+    ['name' => 'Playwright native monitoring'],
     [
         'description' => 'Deterministic Security and Devices browser fixture',
         'interval_seconds' => 60,
@@ -94,7 +94,6 @@ $profile = \\App\\Domain\\Monitoring\\Models\\MonitoringProfile::query()->firstO
 
 \\App\\Domain\\Monitoring\\Models\\Monitor::query()->updateOrCreate(
     [
-        'tenant_id' => $tenantId,
         'device_id' => $device->id,
         'name' => 'Playwright ICMP availability',
     ],

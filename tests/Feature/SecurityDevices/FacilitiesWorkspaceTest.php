@@ -103,10 +103,12 @@ class FacilitiesWorkspaceTest extends TestCase
 
     public function test_environment_uses_allowlisted_observations_and_threshold_events_without_raw_payloads(): void
     {
+        $site = Site::factory()->create();
         $device = $this->facilityDevice('Cool room sensor', 'cold_chain', 'cool_room_sensor', [
             'config' => ['provider_secret' => 'RAW-FACILITY-DEVICE-SECRET'],
             'meta' => ['clinical_payload' => 'RAW-FACILITY-META-SENTINEL'],
         ]);
+        $this->assignToSite($device, $site);
         $monitor = $this->monitor($device, 'Cool room temperature', MonitorState::Healthy, [
             'config' => ['authorization' => 'RAW-FACILITY-MONITOR-SECRET'],
         ]);
@@ -247,7 +249,9 @@ class FacilitiesWorkspaceTest extends TestCase
 
     public function test_history_filters_canonical_events_and_observations_and_gates_export(): void
     {
+        $site = Site::factory()->create();
         $device = $this->facilityDevice('Leak detector', 'leak_detection', 'water_sensor');
+        $this->assignToSite($device, $site);
         $monitor = $this->monitor($device, 'Leak sensor state', MonitorState::Healthy);
         $this->observe($monitor, value: 0, unit: 'boolean');
         DeviceEvent::create([

@@ -5,20 +5,51 @@ namespace App\Domain\Monitoring\Services;
 use App\Domain\Monitoring\Data\ObservationInput;
 use App\Domain\Monitoring\Data\ObservationResult;
 use App\Domain\Monitoring\Enums\MonitorState;
+use App\Domain\Monitoring\Exceptions\RuntimeScopeViolation;
 use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use Illuminate\Support\Facades\DB;
 
 final class MonitoringObservationIngestor
 {
-    public function ingest(Monitor $monitor, ObservationInput $input): ObservationResult
-    {
-        return DB::transaction(function () use ($monitor, $input): ObservationResult {
+    public function __construct(private readonly MonitoringObservationScopeGuard $scopeGuard) {}
+
+    public function ingest(
+        Monitor $monitor,
+        ObservationInput $input,
+        int $siteId,
+        int $deviceId,
+        mixed $collectorReference,
+    ): ObservationResult {
+        return DB::transaction(function () use (
+            $monitor,
+            $input,
+            $siteId,
+            $deviceId,
+            $collectorReference,
+        ): ObservationResult {
             $locked = Monitor::query()
-                ->with(['profile', 'device'])
+                ->with(['profile', 'device', 'collector'])
                 ->lockForUpdate()
                 ->findOrFail($monitor->getKey());
+
+            if ((int) $locked->device_id !== $deviceId) {
+                throw new RuntimeScopeViolation(
+                    'Observation device does not match its canonical monitor.',
+                );
+            }
+
+            if ($locked->collector_id !== null) {
+                $collector = MonitoringCollector::query()
+                    ->lockForUpdate()
+                    ->findOrFail($locked->collector_id);
+                $locked->setRelation('collector', $collector);
+            }
+
+            $this->scopeGuard->assertCollectorReference($locked, $collectorReference);
+            $this->scopeGuard->assertCanonicalSite($locked, $siteId);
 
             $existing = $locked->observations()
                 ->where('source_key', $input->sourceKey)
@@ -36,7 +67,6 @@ final class MonitoringObservationIngestor
             }
 
             $observation = MonitorObservation::create([
-                'tenant_id' => $locked->tenant_id,
                 'monitor_id' => $locked->id,
                 'source_key' => $input->sourceKey,
                 'state' => $input->state,

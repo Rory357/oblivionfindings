@@ -4,7 +4,9 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Monitoring\Contracts\ApprovedProbeScopeProvider;
 use App\Domain\Monitoring\Data\ProbeScope;
 use App\Domain\Monitoring\Exceptions\EgressDenied;
+use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\CanonicalProbeScopeResolver;
+use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
@@ -60,7 +62,7 @@ function taskFourCanonicalResolver(?Closure $provide = null): array
         [443],
     ));
 
-    return [new CanonicalProbeScopeResolver($provider), $provider];
+    return [new CanonicalProbeScopeResolver($provider, app(CanonicalDeviceSiteResolver::class)), $provider];
 }
 
 function taskFourAssign(Device $device, string $type, int $targetId, bool $released = false): DeviceAssignment
@@ -81,6 +83,8 @@ it('resolves every canonical active assignment shape to one site before asking f
 
     $direct = Device::factory()->create();
     taskFourAssign($direct, DeviceAssignment::TARGET_SITE, $site->id);
+    $offline = Device::factory()->create(['status' => DeviceStatus::Offline]);
+    taskFourAssign($offline, DeviceAssignment::TARGET_SITE, $site->id);
 
     $roomModel = new SiteRoom;
     $requiredContextKey = collect($roomModel->getFillable())
@@ -120,7 +124,7 @@ it('resolves every canonical active assignment shape to one site before asking f
     $withVehicle = Device::factory()->create();
     taskFourAssign($withVehicle, DeviceAssignment::TARGET_VEHICLE, $vehicle->id);
 
-    foreach ([$direct, $inRoom, $withClient, $withStaff, $withVehicle] as $device) {
+    foreach ([$direct, $offline, $inRoom, $withClient, $withStaff, $withVehicle] as $device) {
         expect($resolver->resolve($site->id, $device->id))
             ->siteId->toBe($site->id)
             ->deviceId->toBe($device->id);
@@ -128,6 +132,7 @@ it('resolves every canonical active assignment shape to one site before asking f
 
     expect($provider->calls)->toBe([
         [$site->id, $direct->id],
+        [$site->id, $offline->id],
         [$site->id, $inRoom->id],
         [$site->id, $withClient->id],
         [$site->id, $withStaff->id],

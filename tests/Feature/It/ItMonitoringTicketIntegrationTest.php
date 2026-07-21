@@ -9,6 +9,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\LegacyStorageContext;
 use Database\Seeders\SecurityDevicesSignalSeeder;
 
 function monitoredDevice(string $domain = 'it_infrastructure'): Device
@@ -229,7 +230,7 @@ it('does not recover a system ticket that lacks the enforced monitoring principa
         'status_reason' => 'monitoring_outage',
     ]);
     $ticket->links()->create([
-        'tenant_id' => $ticket->tenant_id,
+        ...LegacyStorageContext::attributes(),
         'relationship' => 'affected_device',
         'linkable_type' => $device->getMorphClass(),
         'linkable_id' => $device->id,

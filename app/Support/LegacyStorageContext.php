@@ -11,8 +11,19 @@ namespace App\Support;
  */
 final class LegacyStorageContext
 {
+    public static function column(): string
+    {
+        return 'tenant_id';
+    }
+
     public static function id(): int
     {
         return 1;
+    }
+
+    /** @return array<string, int> */
+    public static function attributes(): array
+    {
+        return [self::column() => self::id()];
     }
 }

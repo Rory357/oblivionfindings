@@ -8,6 +8,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
+use App\Support\LegacyStorageContext;
 use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -79,7 +80,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             }
 
             $ticket = ItTicket::createWithReference([
-                'tenant_id' => 0,
+                ...LegacyStorageContext::attributes(),
                 'site_id' => $siteId,
                 'is_organisation_wide' => false,
                 'title' => Str::limit('Monitoring outage: '.$event->device->name, 255, ''),

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Monitoring\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Database\Factories\MonitoringProfileFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MonitoringProfile extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     protected static function newFactory(): MonitoringProfileFactory
     {
@@ -17,7 +18,6 @@ class MonitoringProfile extends Model
     }
 
     protected $fillable = [
-        'tenant_id',
         'name',
         'description',
         'interval_seconds',
@@ -38,10 +38,5 @@ class MonitoringProfile extends Model
     public function monitors(): HasMany
     {
         return $this->hasMany(Monitor::class, 'profile_id');
-    }
-
-    public function scopeForTenant($query, int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 }

@@ -17,7 +17,6 @@ class MonitorFactory extends Factory
     public function definition(): array
     {
         return [
-            'tenant_id' => 1,
             'device_id' => Device::factory()->itInfrastructure(),
             'profile_id' => MonitoringProfile::factory(),
             'kind' => MonitorKind::Icmp,

@@ -87,7 +87,7 @@ $directDevice = $upsertDevice('PW-OPS-DIRECT', $directDeviceName);
 $remoteDevice = $upsertDevice('PW-OPS-REMOTE', $remoteDeviceName);
 
 $profile = \\App\\Domain\\Monitoring\\Models\\MonitoringProfile::query()->updateOrCreate(
-    ['tenant_id' => $tenantId, 'name' => 'Playwright operations profile'],
+    ['name' => 'Playwright operations profile'],
     [
         'description' => 'Browser acceptance evidence for native monitoring operations.',
         'interval_seconds' => 60,
@@ -99,7 +99,7 @@ $profile = \\App\\Domain\\Monitoring\\Models\\MonitoringProfile::query()->update
 );
 $collectorName = 'Playwright remote collector';
 $collector = \\App\\Domain\\Monitoring\\Models\\MonitoringCollector::query()->updateOrCreate(
-    ['tenant_id' => $tenantId, 'collector_uuid' => '0f25e52a-b2b4-42bf-8d4a-145f82cd4301'],
+    ['collector_uuid' => '0f25e52a-b2b4-42bf-8d4a-145f82cd4301'],
     [
         'name' => $collectorName,
         'site_id' => $site->id,
@@ -112,7 +112,7 @@ $collector = \\App\\Domain\\Monitoring\\Models\\MonitoringCollector::query()->up
 $directMonitorName = 'Playwright direct WAN availability';
 $remoteMonitorName = 'Playwright remote SNMP availability';
 $directMonitor = \\App\\Domain\\Monitoring\\Models\\Monitor::query()->updateOrCreate(
-    ['tenant_id' => $tenantId, 'device_id' => $directDevice->id, 'name' => $directMonitorName],
+    ['device_id' => $directDevice->id, 'name' => $directMonitorName],
     [
         'profile_id' => $profile->id,
         'collector_id' => null,
@@ -128,7 +128,7 @@ $directMonitor = \\App\\Domain\\Monitoring\\Models\\Monitor::query()->updateOrCr
     ],
 );
 $remoteMonitor = \\App\\Domain\\Monitoring\\Models\\Monitor::query()->updateOrCreate(
-    ['tenant_id' => $tenantId, 'device_id' => $remoteDevice->id, 'name' => $remoteMonitorName],
+    ['device_id' => $remoteDevice->id, 'name' => $remoteMonitorName],
     [
         'profile_id' => $profile->id,
         'collector_id' => $collector->id,
@@ -154,8 +154,10 @@ foreach ([
         ->where('source_key', $sourceKey)
         ->delete();
     \\App\\Domain\\Monitoring\\Models\\MonitorObservation::query()->create([
-        'tenant_id' => $tenantId,
         'monitor_id' => $monitor->id,
+        'device_id' => $monitor->device_id,
+        'site_id' => $site->id,
+        'collector_id' => $monitor->collector_id,
         'source_key' => $sourceKey,
         'state' => $state,
         'value' => $value,

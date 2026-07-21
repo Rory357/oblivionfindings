@@ -105,7 +105,7 @@ $printer = $upsertDevice('PW-NET-PRINTER', $printerName, 'network_printer', [
 );
 
 $profile = \\App\\Domain\\Monitoring\\Models\\MonitoringProfile::query()->updateOrCreate(
-    ['tenant_id' => $tenantId, 'name' => 'Playwright native network profile'],
+    ['name' => 'Playwright native network profile'],
     [
         'description' => 'Browser acceptance evidence for native Network & IT.',
         'interval_seconds' => 60,
@@ -116,9 +116,9 @@ $profile = \\App\\Domain\\Monitoring\\Models\\MonitoringProfile::query()->update
     ],
 );
 
-$upsertMonitor = function ($device, string $name, string $kind, string $state, array $attributes = []) use ($tenantId, $profile) {
+$upsertMonitor = function ($device, string $name, string $kind, string $state, array $attributes = []) use ($profile) {
     $monitor = \\App\\Domain\\Monitoring\\Models\\Monitor::query()->updateOrCreate(
-        ['tenant_id' => $tenantId, 'device_id' => $device->id, 'name' => $name],
+        ['device_id' => $device->id, 'name' => $name],
         array_merge([
             'profile_id' => $profile->id,
             'collector_id' => null,
@@ -153,10 +153,12 @@ $interface = $upsertMonitor($switch, $interfaceName, 'snmp_interface', 'degraded
     'config' => ['community' => $rawSentinel],
 ]);
 
-$observe = function ($monitor, string $state, array $metrics) use ($tenantId) {
+$observe = function ($monitor, string $state, array $metrics) use ($site) {
     return \\App\\Domain\\Monitoring\\Models\\MonitorObservation::query()->create([
-        'tenant_id' => $tenantId,
         'monitor_id' => $monitor->id,
+        'device_id' => $monitor->device_id,
+        'site_id' => $site->id,
+        'collector_id' => $monitor->collector_id,
         'source_key' => 'playwright-current',
         'state' => $state,
         'latency_ms' => 12,

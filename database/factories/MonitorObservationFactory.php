@@ -15,7 +15,6 @@ class MonitorObservationFactory extends Factory
     public function definition(): array
     {
         return [
-            'tenant_id' => 1,
             'monitor_id' => Monitor::factory(),
             'source_key' => fake()->uuid(),
             'state' => MonitorState::Healthy,
