@@ -44,7 +44,7 @@ test('tickets carry the full ticketing schema and tolerate null references', fun
     expect($ticket->reopened_count)->toBe(0);
     expect($ticket->csat_score)->toBeNull();
 
-    // The legacy composite reference index must tolerate many NULLs (rows
+    // The application-global reference index must tolerate many NULLs (rows
     // written outside Eloquent bypass the generating hook). Blank them via
     // raw SQL to prove the index property.
     $ids = ItTicket::factory()->count(2)->create()->pluck('id');

@@ -120,9 +120,8 @@ test('linked context includes only canonical device alert and related work visib
         ->and(collect($context['changes'])->pluck('id')->all())->toBe([$allowedChange->id]);
 });
 
-test('inbound replies quarantine unknown inactive ambiguous sensitive and unrelated senders without comments', function () {
+test('inbound replies quarantine unknown inactive sensitive and unrelated senders without comments', function () {
     $site = Site::factory()->create();
-    $otherSite = Site::factory()->create();
     $requester = ingressContextActor($site, ['it.request']);
     $unrelated = ingressContextActor($site, ['it.request']);
     $sensitiveAgent = ingressContextActor($site, ['it.view', 'it.manage']);
@@ -140,18 +139,6 @@ test('inbound replies quarantine unknown inactive ambiguous sensitive and unrela
         'reference' => 'IT-90002',
         'is_sensitive' => true,
     ]);
-    $ambiguousA = ItTicket::factory()->create([
-        'tenant_id' => 41,
-        'site_id' => $site->id,
-        'requester_user_id' => $requester->id,
-        'reference' => 'IT-90003',
-    ]);
-    $ambiguousB = ItTicket::factory()->create([
-        'tenant_id' => 42,
-        'site_id' => $otherSite->id,
-        'requester_user_id' => $requester->id,
-        'reference' => 'IT-90003',
-    ]);
     $ingestor = app(InboundEmailIngestor::class);
 
     $cases = [
@@ -159,7 +146,6 @@ test('inbound replies quarantine unknown inactive ambiguous sensitive and unrela
         [$inactive->email, 'IT-90001', 'sender_inactive'],
         [$unrelated->email, 'IT-90001', 'sender_unauthorized'],
         [$sensitiveAgent->email, 'IT-90002', 'sensitive_work'],
-        [$requester->email, 'IT-90003', 'reference_ambiguous'],
     ];
 
     foreach ($cases as $index => [$from, $reference, $reason]) {
@@ -180,9 +166,7 @@ test('inbound replies quarantine unknown inactive ambiguous sensitive and unrela
     }
 
     expect($ticket->comments()->count())->toBe(0)
-        ->and($sensitive->comments()->count())->toBe(0)
-        ->and($ambiguousA->comments()->count())->toBe(0)
-        ->and($ambiguousB->comments()->count())->toBe(0);
+        ->and($sensitive->comments()->count())->toBe(0);
 });
 
 test('inbound replies accept participants responsible staff watcher and explicit mailbox principal only through current work access', function () {

@@ -25,7 +25,10 @@ use Illuminate\Support\Str;
  */
 class InboundEmailIngestor
 {
-    public function __construct(private readonly ItWorkAccessService $workAccess) {}
+    public function __construct(
+        private readonly ItWorkAccessService $workAccess,
+        private readonly ItTicketReferenceResolver $ticketReferences,
+    ) {}
 
     /**
      * @param  array{from: string, subject?: string|null, text?: string|null, message_id?: string|null, in_reply_to?: string|null}  $message
@@ -70,18 +73,15 @@ class InboundEmailIngestor
             }
 
             if ($references !== []) {
-                $tickets = ItTicket::query()
-                    ->where('reference', $references[0])
-                    ->limit(2)
-                    ->get();
-                if ($tickets->count() !== 1) {
-                    return $this->quarantine(
-                        $message,
-                        $tickets->isEmpty() ? 'reference_not_found' : 'reference_ambiguous',
-                    );
+                $resolution = $this->ticketReferences->resolve($references[0]);
+                if ($resolution['failure'] !== null) {
+                    return $this->quarantine($message, $resolution['failure']);
                 }
 
-                $ticket = $tickets->firstOrFail();
+                $ticket = $resolution['ticket'];
+                if (! $ticket instanceof ItTicket) {
+                    return $this->quarantine($message, 'reference_not_found');
+                }
                 $authorizationFailure = $this->replyAuthorizationFailure($sender, $ticket);
                 if ($authorizationFailure !== null) {
                     return $this->quarantine($message, $authorizationFailure);

@@ -6,6 +6,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Support\Facades\DB;
 
 function itQueueUser(string $role): User
 {
@@ -57,10 +58,11 @@ test('created tickets are stamped with sequential application references and a c
     // Every create writes a `created` row on the activity trail.
     expect($first->events()->where('type', 'created')->count())->toBe(1);
 
-    // The generator is max-based, so gaps and manual references never
-    // produce collisions.
+    // The application sequence raises its global floor above imported/manual
+    // references before allocating under the shared row lock.
     ItTicket::factory()->create(['reference' => 'IT-000500']);
     expect(ItTicket::nextReference())->toBe('IT-000501');
+    expect(DB::table('reference_sequences')->where('scope', 'IT')->value('next_value'))->toBe(502);
 
     // Factory creates (no explicit reference) get one from the hook too.
     $fromFactory = ItTicket::factory()->create();

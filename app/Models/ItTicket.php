@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Services\References\ReferenceNumberGenerator;
 use App\Support\It\BusinessHours;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -129,8 +130,8 @@ class ItTicket extends Model
     {
         // Every ticket gets a human-facing reference (IT-000123) — filled
         // here so factories and secondary write paths never miss it. The
-        // legacy composite index is the current backstop; createWithReference() adds
-        // the retry for genuinely concurrent creates.
+        // application-global index is the final backstop; createWithReference()
+        // also recognises the compatibility index during a rolling deploy.
         static::creating(function (self $ticket) {
             if (! $ticket->reference) {
                 $ticket->reference = static::nextReference();
@@ -138,7 +139,7 @@ class ItTicket extends Model
         });
     }
 
-    /** Next application sequence value, based on the highest stamped so far. */
+    /** Allocate the next globally serialized application reference. */
     public static function nextReference(): string
     {
         $max = (int) static::query()
@@ -146,7 +147,10 @@ class ItTicket extends Model
             ->selectRaw('MAX(CAST(SUBSTRING(reference, 4) AS UNSIGNED)) AS seq')
             ->value('seq');
 
-        return sprintf('IT-%06d', $max + 1);
+        $generator = app(ReferenceNumberGenerator::class);
+        $generator->ensureAtLeast('IT', $max + 1);
+
+        return $generator->nextGlobal('IT', 6);
     }
 
     /**
@@ -166,7 +170,8 @@ class ItTicket extends Model
                 return static::create($attributes);
             } catch (QueryException $exception) {
                 $attempts++;
-                $collidedOnReference = str_contains($exception->getMessage(), 'it_tickets_tenant_reference_uq');
+                $collidedOnReference = str_contains($exception->getMessage(), 'it_tickets_reference_uq')
+                    || str_contains($exception->getMessage(), 'it_tickets_tenant_reference_uq');
                 if (! $collidedOnReference || $attempts >= 5) {
                     throw $exception;
                 }
