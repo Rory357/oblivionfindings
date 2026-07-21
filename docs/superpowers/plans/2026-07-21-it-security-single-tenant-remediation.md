@@ -1,6 +1,6 @@
 # IT, Security & Devices, and Monitoring Single-Tenant Remediation Plan
 
-> **Status:** Approved architecture correction; implementation pending.
+> **Status:** In progress; Tasks 1-3 are complete and Task 4 is active.
 >
 > **Product boundary:** Oblivion Findings is one application for one operating organisation across all configured sites. Site access, canonical record ownership, role/capability, direct-object denial, and privacy policy are the security boundaries. A legacy `tenant_id` or `organization_id` column is storage compatibility only and must never decide access.
 >
@@ -97,6 +97,8 @@ Child records must delegate to the parent work item's access. Bulk actions, coun
 
 ## Task 3: Close high-risk IT ingress and linked-context paths
 
+**Status: Completed in `5f54c8a0d`.** Inbound email, service API, linked context, delivery retry, service identities, and monitoring-ticket correlation now reauthorize canonical records at use time and fail closed when Site, participant, sensitivity, device, alert, or execution-principal evidence is absent. The final independent review returned approved with no Critical or Important findings.
+
 **Modify first:**
 
 - `app/Domain/It/Presenters/ItTicketContextPresenter.php`
@@ -118,6 +120,8 @@ Service identities authenticate by active credential and execution account, then
 Monitoring-created tickets use canonical Device/Site evidence and a system principal with only the required operation, never a tenant-derived shortcut.
 
 ## Task 4: Refactor all remaining IT controllers and services
+
+**Status: In progress.**
 
 Remove `ResolvesHrTenant` from:
 
@@ -224,8 +228,8 @@ Only after a repository-wide dependency audit, data backup/restore rehearsal, an
 | --- | --- | --- |
 | 1. Boundary gate and collision report | Completed | Commit `4eaa0771b`; independently approved initial 476 path-rule / 3,083-occurrence no-regression baseline; 206-line redacted local development audit; 12 focused tests / 149 assertions |
 | 2. IT access kernel | Completed | Commit `a1696b8c3`; independently approved Site/team/sensitivity/explicit organisation-wide boundary; pre-validation direct-object concealment across ticket, child, approval, merge, and nested-task routes; 18 focused tests / 196 assertions plus parent gate 24 tests / 242 assertions; ratchet reduced to 472 path-rule entries / 2,935 occurrences |
-| 3. High-risk IT ingress and context | Pending | Email/API/context/monitoring/link direct-object tests |
-| 4. Remaining IT refactor | Pending | IT controller/service/regression matrix |
+| 3. High-risk IT ingress and context | Completed | Commit `5f54c8a0d`; independent review approved with no Critical/Important findings; 78 affected tests / 770 assertions; architecture gate 6 tests / 31 assertions and ratchet reduced to 458 path-rule entries / 2,877 occurrences; TypeScript, targeted ESLint/Prettier, Pint, 36-file PHP syntax and diff checks; client and SSR production builds |
+| 4. Remaining IT refactor | In progress | IT controller/service/regression matrix |
 | 5. Security & Devices access refactor | Pending | Site/privacy/count/export/mutation matrix |
 | 6. Provider connection refactor | Pending | Secret/capability/Site mapping tests and UI contracts |
 | 7. Monitoring foundation refactor | Pending | Global collector/profile and canonical Device/Site tests |
