@@ -1,7 +1,9 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\ItTicket;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
@@ -19,10 +21,28 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->worker = csatUser('support_worker'); // the requester
     $this->agent = csatUser('hr');              // it.manage
+    $this->site = Site::factory()->create();
+    foreach ([$this->worker, $this->agent] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+    }
 });
 
+function csatTicket(array $overrides = []): ItTicket
+{
+    return ItTicket::factory()->create([
+        'site_id' => test()->site->id,
+        ...$overrides,
+    ]);
+}
+
 test('a requester rates their own resolved ticket — score, comment and a single trail entry land', function () {
-    $ticket = ItTicket::factory()->create([
+    $ticket = csatTicket([
         'requester_user_id' => $this->worker->id,
         'status' => 'resolved',
         'resolved_at' => now(),
@@ -40,7 +60,7 @@ test('a requester rates their own resolved ticket — score, comment and a singl
 });
 
 test('CSAT is editable while resolved, but a re-rate never duplicates the event or moves the stamp', function () {
-    $ticket = ItTicket::factory()->create([
+    $ticket = csatTicket([
         'requester_user_id' => $this->worker->id,
         'status' => 'resolved',
         'resolved_at' => now(),
@@ -66,7 +86,7 @@ test('CSAT is editable while resolved, but a re-rate never duplicates the event 
 });
 
 test('only the requester rates, and only while the ticket is resolved', function () {
-    $resolved = ItTicket::factory()->create([
+    $resolved = csatTicket([
         'requester_user_id' => $this->worker->id,
         'status' => 'resolved',
         'resolved_at' => now(),
@@ -77,21 +97,21 @@ test('only the requester rates, and only while the ticket is resolved', function
         ->post("/it/tickets/{$resolved->id}/csat", ['score' => 5])
         ->assertForbidden();
 
-    // A different requester cannot rate someone else's ticket.
+    // A different requester cannot discover or rate someone else's ticket.
     $stranger = csatUser('support_worker');
     $this->actingAs($stranger)
         ->post("/it/tickets/{$resolved->id}/csat", ['score' => 5])
-        ->assertForbidden();
+        ->assertNotFound();
     expect($resolved->fresh()->csat_submitted_at)->toBeNull();
 
     // Nothing to rate before resolution…
-    $open = ItTicket::factory()->create(['requester_user_id' => $this->worker->id, 'status' => 'open']);
+    $open = csatTicket(['requester_user_id' => $this->worker->id, 'status' => 'open']);
     $this->actingAs($this->worker)
         ->post("/it/tickets/{$open->id}/csat", ['score' => 5])
         ->assertForbidden();
 
     // …and a close locks the rating in (editable UNTIL closed).
-    $closed = ItTicket::factory()->create([
+    $closed = csatTicket([
         'requester_user_id' => $this->worker->id,
         'status' => 'closed',
         'resolved_at' => now()->subDay(),
@@ -103,7 +123,7 @@ test('only the requester rates, and only while the ticket is resolved', function
 });
 
 test('the score must be a 1–5 star; the comment is optional', function () {
-    $ticket = ItTicket::factory()->create([
+    $ticket = csatTicket([
         'requester_user_id' => $this->worker->id,
         'status' => 'resolved',
         'resolved_at' => now(),
@@ -124,7 +144,7 @@ test('the score must be a 1–5 star; the comment is optional', function () {
 });
 
 test('the workspace rail and My-tickets row carry the CSAT prompt then the result', function () {
-    $ticket = ItTicket::factory()->create([
+    $ticket = csatTicket([
         'requester_user_id' => $this->worker->id,
         'status' => 'resolved',
         'resolved_at' => now(),

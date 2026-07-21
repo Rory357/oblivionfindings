@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Asset;
 use App\Models\ItAttachment;
 use App\Models\ItChange;
 use App\Models\ItMajorIncident;
@@ -121,6 +122,42 @@ test('direct ticket reads and mutations conceal inaccessible work', function () 
         ->assertNotFound();
 
     expect($hidden->fresh()->priority)->not->toBe('urgent');
+});
+
+test('ticket workspace options and bulk assignment follow exact Site access', function () {
+    $approvedSite = Site::factory()->create();
+    $otherSite = Site::factory()->create();
+    $agent = itControllerAccessActor(['it.view', 'it.manage', 'assets.viewAny'], $approvedSite);
+    $localTechnician = itControllerAccessActor(['it.view', 'it.manage'], $approvedSite);
+    $remoteTechnician = itControllerAccessActor(['it.view', 'it.manage'], $otherSite);
+    $inactiveTechnician = itControllerAccessActor(['it.view', 'it.manage'], $approvedSite);
+    $inactiveTechnician->update(['approved_at' => null]);
+    $ticket = ItTicket::factory()->create([
+        'site_id' => $approvedSite->id,
+        'assigned_to_user_id' => null,
+    ]);
+    $localAsset = Asset::factory()->create(['site_id' => $approvedSite->id, 'status' => 'active']);
+    Asset::factory()->create(['site_id' => $otherSite->id, 'status' => 'active']);
+
+    $this->actingAs($agent)
+        ->get(route('it.tickets.show', $ticket))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('assignees', fn ($agents) => collect($agents)->pluck('id')->sort()->values()->all()
+                === collect([$agent->id, $localTechnician->id])->sort()->values()->all())
+            ->where('assetOptions', fn ($assets) => collect($assets)->pluck('id')->values()->all()
+                === [$localAsset->id]));
+
+    $this->actingAs($agent)
+        ->post(route('it.tickets.bulk'), [
+            'ids' => [$ticket->id],
+            'action' => 'assign',
+            'assigned_to_user_id' => $remoteTechnician->id,
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success', '0 ticket(s) assigned · 1 unchanged.');
+
+    expect($ticket->fresh()->assigned_to_user_id)->toBeNull();
 });
 
 test('bulk work silently excludes forged inaccessible ticket ids', function () {

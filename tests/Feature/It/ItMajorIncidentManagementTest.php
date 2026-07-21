@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\ControlRoomAlert;
 use App\Models\ItMajorIncident;
 use App\Models\ItService;
@@ -13,25 +14,47 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
 
-function majorIncidentUser(string $role, int $tenantId = 1): User
+function majorIncidentUser(string $role, ?Site $site = null): User
 {
     $user = User::factory()->create([
         'role' => $role,
         'approved_at' => now(),
-        'organization_id' => $tenantId,
     ]);
     $user->roles()->syncWithoutDetaching([
         Role::query()->where('name', $role)->first()->id,
     ]);
 
+    if ($site) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+    }
+
     return $user;
+}
+
+/** @param array<string, mixed> $attributes */
+function majorIncidentAtSite(Site $site, array $attributes = []): ItMajorIncident
+{
+    $majorIncident = ItMajorIncident::factory()->create($attributes);
+    $majorIncident->ticket()->update(['site_id' => $site->id]);
+
+    return $majorIncident->refresh();
 }
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
-    $this->commander = majorIncidentUser('hr');
-    $this->communicationsLead = majorIncidentUser('hr');
-    $this->requester = majorIncidentUser('support_worker');
+    $this->site = Site::factory()->create();
+    $this->commander = majorIncidentUser('provider_manager', $this->site);
+    $this->communicationsLead = majorIncidentUser('provider_manager', $this->site);
+    $this->requester = majorIncidentUser('support_worker', $this->site);
 });
 
 afterEach(function () {
@@ -73,12 +96,12 @@ test('an agent declares and finds a canonical major incident with command accoun
 });
 
 test('impacted services sites related incidents and the canonical Control Room alert use typed links', function () {
-    $majorIncident = ItMajorIncident::factory()->create();
+    $majorIncident = majorIncidentAtSite($this->site);
     $service = ItService::factory()->create();
-    $site = Site::factory()->create();
+    $site = $this->site;
     $alert = ControlRoomAlert::factory()->critical()->create(['site_id' => $site->id]);
     $incident = ItTicket::factory()->create([
-        'tenant_id' => 1,
+        'site_id' => $site->id,
         'work_type' => 'incident',
         'requester_user_id' => $this->requester->id,
     ]);
@@ -115,12 +138,12 @@ test('impacted services sites related incidents and the canonical Control Room a
 test('update cadence becomes overdue and audience safe communications notify affected requesters', function () {
     Notification::fake();
     Carbon::setTestNow('2026-07-19 10:00:00');
-    $majorIncident = ItMajorIncident::factory()->create([
+    $majorIncident = majorIncidentAtSite($this->site, [
         'target_update_minutes' => 30,
         'next_update_due_at' => now()->subMinute(),
     ]);
     $incident = ItTicket::factory()->create([
-        'tenant_id' => 1,
+        'site_id' => $this->site->id,
         'work_type' => 'incident',
         'requester_user_id' => $this->requester->id,
     ]);
@@ -164,7 +187,7 @@ test('update cadence becomes overdue and audience safe communications notify aff
 });
 
 test('restoration resolution review and closure require explicit evidence', function () {
-    $majorIncident = ItMajorIncident::factory()->create([
+    $majorIncident = majorIncidentAtSite($this->site, [
         'impact_summary' => 'Authentication is unavailable.',
     ]);
 
@@ -224,7 +247,7 @@ test('restoration resolution review and closure require explicit evidence', func
 });
 
 test('the live workspace reuses shared ticket work and exposes communications state', function () {
-    $majorIncident = ItMajorIncident::factory()->create();
+    $majorIncident = majorIncidentAtSite($this->site);
     $majorIncident->ticket->comments()->create([
         'tenant_id' => 1,
         'author_user_id' => $this->commander->id,
@@ -253,22 +276,23 @@ test('the live workspace reuses shared ticket work and exposes communications st
             ->where('ticket.events_count', $majorIncident->ticket->events()->count()));
 });
 
-test('major incident command is agent only tenant concealed and rejects cross tenant impact', function () {
-    $majorIncident = ItMajorIncident::factory()->create(['tenant_id' => 1]);
+test('major incident command is agent only site concealed and rejects inactive impact', function () {
+    $majorIncident = majorIncidentAtSite($this->site);
 
     $this->actingAs($this->requester)->get('/it/major-incidents')->assertForbidden();
     $this->actingAs($this->requester)
         ->patch("/it/major-incidents/{$majorIncident->id}", ['severity' => 'sev4'])
         ->assertForbidden();
 
-    $foreignAgent = majorIncidentUser('hr', 2);
-    $this->actingAs($foreignAgent)
+    $otherSite = Site::factory()->create();
+    $remoteSiteAgent = majorIncidentUser('hr', $otherSite);
+    $this->actingAs($remoteSiteAgent)
         ->get("/it/major-incidents/{$majorIncident->id}")
         ->assertNotFound();
 
-    $foreignService = ItService::factory()->create(['tenant_id' => 2]);
+    $inactiveService = ItService::factory()->create(['is_active' => false]);
     $this->actingAs($this->commander)
-        ->patch("/it/major-incidents/{$majorIncident->id}", ['service_ids' => [$foreignService->id]])
+        ->patch("/it/major-incidents/{$majorIncident->id}", ['service_ids' => [$inactiveService->id]])
         ->assertRedirect()
         ->assertSessionHas('error');
 });

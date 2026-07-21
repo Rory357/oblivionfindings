@@ -5,7 +5,6 @@ namespace App\Http\Controllers\It;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\It\Services\ItWorkTaskService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\It\CompleteItWorkTaskRequest;
 use App\Http\Requests\It\ReopenItWorkTaskRequest;
 use App\Http\Requests\It\StoreItWorkTaskRequest;
@@ -16,8 +15,6 @@ use DomainException;
 
 class ItWorkTaskController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         private readonly ItWorkTaskService $taskService,
         private readonly ItWorkAccessService $workAccess,
@@ -25,10 +22,10 @@ class ItWorkTaskController extends Controller
 
     public function store(StoreItWorkTaskRequest $request, ItTicket $ticket)
     {
-        $tenantId = $this->workContext($request, $ticket);
+        $this->workContext($request, $ticket);
 
         try {
-            $task = $this->taskService->create($ticket, $request->user(), $tenantId, $request->validated());
+            $task = $this->taskService->create($ticket, $request->user(), $request->validated());
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -38,10 +35,10 @@ class ItWorkTaskController extends Controller
 
     public function update(UpdateItWorkTaskRequest $request, ItTicket $ticket, ItWorkTask $task)
     {
-        $tenantId = $this->workContext($request, $ticket, $task);
+        $this->workContext($request, $ticket, $task);
 
         try {
-            $this->taskService->update($ticket, $task, $request->user(), $tenantId, $request->validated());
+            $this->taskService->update($ticket, $task, $request->user(), $request->validated());
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -51,10 +48,10 @@ class ItWorkTaskController extends Controller
 
     public function complete(CompleteItWorkTaskRequest $request, ItTicket $ticket, ItWorkTask $task)
     {
-        $tenantId = $this->workContext($request, $ticket, $task);
+        $this->workContext($request, $ticket, $task);
 
         try {
-            $this->taskService->complete($ticket, $task, $request->user(), $tenantId, $request->validated());
+            $this->taskService->complete($ticket, $task, $request->user(), $request->validated());
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -64,14 +61,13 @@ class ItWorkTaskController extends Controller
 
     public function reopen(ReopenItWorkTaskRequest $request, ItTicket $ticket, ItWorkTask $task)
     {
-        $tenantId = $this->workContext($request, $ticket, $task);
+        $this->workContext($request, $ticket, $task);
 
         try {
             $this->taskService->reopen(
                 $ticket,
                 $task,
                 $request->user(),
-                $tenantId,
                 (string) $request->validated('reason'),
             );
         } catch (DomainException $exception) {
@@ -81,15 +77,12 @@ class ItWorkTaskController extends Controller
         return redirect()->back()->with('success', 'Task reopened.');
     }
 
-    private function workContext($request, ItTicket $ticket, ?ItWorkTask $task = null): int
+    private function workContext($request, ItTicket $ticket, ?ItWorkTask $task = null): void
     {
         abort_unless($this->workAccess->canWork($request->user(), $ticket), 404);
         if ($task !== null) {
             abort_unless((int) $task->ticket_id === (int) $ticket->id, 404);
         }
 
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
-
-        return $tenantId;
     }
 }

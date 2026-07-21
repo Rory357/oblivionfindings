@@ -13,7 +13,7 @@ use Laravel\Socialite\Facades\Socialite;
 
 /*
  * E6a — the support-mailbox connect/disconnect backend (mirrors the
- * calendar-sync OAuth flow; gated on integrations.manage_tenant_secrets).
+ * calendar-sync OAuth flow; gated on the existing connection-management permission).
  */
 
 function itMailboxSettingsUser(string $role): User
@@ -67,6 +67,24 @@ test('the mailbox settings surface is admin-gated', function () {
             ->has('connections.microsoft')
             ->has('connections.google')
             ->where('connections.microsoft.status', null));
+});
+
+test('the support mailbox connection is an application-wide setting', function () {
+    $this->admin->forceFill(['organization_id' => 99])->save();
+    itSettingsConnection();
+
+    $this->actingAs($this->admin)
+        ->get('/settings/it-mailbox')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('connections.microsoft.status', ItMailboxConnection::STATUS_CONNECTED)
+            ->where('connections.microsoft.account_email', 'admin@example.test'));
+
+    $this->actingAs($this->admin)
+        ->put('/settings/it-mailbox/mailbox/microsoft', ['mailbox_email' => 'helpdesk@example.test'])
+        ->assertRedirect(route('settings.it-mailbox'));
+
+    expect(ItMailboxConnection::query()->sole()->mailbox_email)->toBe('helpdesk@example.test');
 });
 
 test('the OAuth callback stores a connected mailbox row', function () {

@@ -169,6 +169,10 @@ final class ItTicketContextPresenter
     /** @return array<int, array<string, mixed>> */
     private function presentTasks(ItTicket $ticket, User $viewer): array
     {
+        if (! $this->workAccess->canWork($viewer, $ticket)) {
+            return [];
+        }
+
         return $ticket->tasks()
             ->with(['dependencies:id,title,status', 'team:id,name', 'assignee:id,name', 'completedBy:id,name'])
             ->get()

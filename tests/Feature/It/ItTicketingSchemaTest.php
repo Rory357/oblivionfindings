@@ -7,9 +7,11 @@ use App\Models\ItTicket;
 use App\Models\ItTicketComment;
 use App\Models\ItTicketEvent;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 
 function itSchemaAgent(): User
 {
@@ -42,11 +44,11 @@ test('tickets carry the full ticketing schema and tolerate null references', fun
     expect($ticket->reopened_count)->toBe(0);
     expect($ticket->csat_score)->toBeNull();
 
-    // The tenant-unique reference index must tolerate many NULLs (rows
+    // The legacy composite reference index must tolerate many NULLs (rows
     // written outside Eloquent bypass the generating hook). Blank them via
     // raw SQL to prove the index property.
     $ids = ItTicket::factory()->count(2)->create()->pluck('id');
-    \Illuminate\Support\Facades\DB::table('it_tickets')->whereIn('id', $ids)->update(['reference' => null]);
+    DB::table('it_tickets')->whereIn('id', $ids)->update(['reference' => null]);
     expect(ItTicket::query()->whereNull('reference')->count())->toBe(2);
 
     // waiting is now a legal status (per §P.10 — display "Waiting on requester").
@@ -57,7 +59,15 @@ test('tickets carry the full ticketing schema and tolerate null references', fun
 
 test('agents can move a ticket to waiting through the update route', function () {
     $agent = itSchemaAgent();
-    $ticket = ItTicket::factory()->create();
+    $site = Site::factory()->create();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $agent->id,
+        'primary_site_id' => $site->id,
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+    ]);
+    $ticket = ItTicket::factory()->create(['site_id' => $site->id]);
 
     $this->actingAs($agent)
         ->patch("/it/tickets/{$ticket->id}", ['status' => 'waiting'])

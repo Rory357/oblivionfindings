@@ -1,8 +1,10 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\ItSlaPolicy;
 use App\Models\ItTicket;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Notifications\It\TicketSlaNotification;
 use App\Support\It\BusinessHours;
@@ -40,10 +42,26 @@ function itSlaCmdTicket(User $requester, array $overrides = []): ItTicket
     return $ticket;
 }
 
+function itSlaCmdAssignSite(User $user, Site $site): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+        'created_by' => $user->id,
+        'updated_by' => $user->id,
+    ]);
+}
+
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->hr = itSlaCmdUser('hr');
     $this->worker = itSlaCmdUser('support_worker');
+    itSlaCmdAssignSite($this->hr, $this->site);
+    itSlaCmdAssignSite($this->worker, $this->site);
 });
 
 test('the command flags a ticket at risk and tells the assignee exactly once', function () {
@@ -76,6 +94,7 @@ test('the command flags a ticket at risk and tells the assignee exactly once', f
 test('a breach notifies the assignee and every it.manage agent exactly once', function () {
     Notification::fake();
     $manager = itSlaCmdUser('provider_manager'); // holds it.manage via the seeder
+    itSlaCmdAssignSite($manager, $this->site);
     $ticket = itSlaCmdTicket($this->worker, [
         'priority' => 'urgent',
         'assigned_to_user_id' => $this->hr->id,
@@ -133,6 +152,7 @@ test('paused waiting minutes hold the resolution clock back', function () {
 test('an unassigned urgent ticket escalates to admins once after 30 minutes', function () {
     Notification::fake();
     $admin = itSlaCmdUser('admin');
+    itSlaCmdAssignSite($admin, $this->site);
     $unassignedUrgent = itSlaCmdTicket($this->worker, ['priority' => 'urgent']);
     $assignedUrgent = itSlaCmdTicket($this->worker, [
         'priority' => 'urgent',

@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\It;
 
-use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItProvisioningTemplate;
 use App\Models\ItProvisioningTemplateTask;
@@ -20,14 +20,15 @@ class StoreItProvisioningTemplateRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        $tenantId = $this->tenantId();
-
         return [
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
             'lifecycle_type' => ['required', Rule::in(ItProvisioningTemplate::LIFECYCLE_TYPES)],
             'position_role' => ['nullable', 'string', 'max:100'],
-            'site_id' => ['nullable', 'integer', Rule::exists('sites', 'id')->where('tenant_id', $tenantId)],
+            'site_id' => ['nullable', 'integer', Rule::exists('sites', 'id')->where(fn ($site) => $site
+                ->where('is_active', true)
+                ->where('archived', false)
+                ->whereNull('archived_at'))],
             'employment_type' => ['nullable', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])],
             'selection_priority' => ['required', 'integer', 'min:-1000', 'max:1000'],
             'is_active' => ['required', 'boolean'],
@@ -39,7 +40,7 @@ class StoreItProvisioningTemplateRequest extends FormRequest
             'tasks.*.action' => ['required', Rule::in(ItProvisioningTemplateTask::ACTIONS)],
             'tasks.*.request_type' => ['required', Rule::in(ItProvisioningRequest::TYPES)],
             'tasks.*.responsible_team_id' => [
-                'nullable', 'integer', Rule::exists('it_teams', 'id')->where('tenant_id', $tenantId),
+                'nullable', 'integer', Rule::exists('it_teams', 'id')->where('is_active', true),
             ],
             'tasks.*.stage' => ['required', 'integer', 'min:1', 'max:50'],
             'tasks.*.sort_order' => ['required', 'integer', 'min:0', 'max:1000'],
@@ -59,6 +60,15 @@ class StoreItProvisioningTemplateRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
+            $user = $this->user();
+            $siteId = $this->input('site_id');
+            if (is_numeric($siteId)
+                && (! $user
+                    || (! $user->canDo('it.organisationWide')
+                        && ! in_array((int) $siteId, app(ItWorkAccessService::class)->approvedSiteIds($user), true)))) {
+                $validator->errors()->add('site_id', 'Choose a Site in your approved Site access.');
+            }
+
             $tasks = collect($this->input('tasks', []))->keyBy('task_key');
             foreach ($tasks as $key => $task) {
                 foreach ((array) ($task['dependency_task_keys'] ?? []) as $dependencyKey) {
@@ -71,19 +81,5 @@ class StoreItProvisioningTemplateRequest extends FormRequest
                 }
             }
         }];
-    }
-
-    private function tenantId(): int
-    {
-        foreach (['tenant_id', 'organization_id'] as $attribute) {
-            $value = $this->user()->getAttribute($attribute);
-            if (is_numeric($value)) {
-                return (int) $value;
-            }
-        }
-
-        return (int) (HrEmployeeProfile::query()
-            ->where('user_id', $this->user()->id)
-            ->value('tenant_id') ?? 1);
     }
 }

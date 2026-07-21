@@ -330,7 +330,9 @@ test('the rail can retag category, subcategory and linked asset', function () {
     // The workspace offers agents the asset picker; requesters never get it.
     $this->actingAs($this->hr)
         ->get("/it/tickets/{$ticket->id}")
-        ->assertInertia(fn ($page) => $page->has('assetOptions'));
+        ->assertInertia(fn ($page) => $page
+            ->has('assetOptions', 1)
+            ->where('assetOptions.0.id', $asset->id));
     $this->actingAs($this->worker)
         ->get("/it/tickets/{$ticket->id}")
         ->assertInertia(fn ($page) => $page->has('assetOptions', 0));
@@ -395,6 +397,7 @@ test('triage updates write the activity trail and notify the new assignee', func
         'requester_user_id' => $this->worker->id,
     ]);
     $colleague = itWorkspaceUser('hr');
+    assignItWorkspaceUserToSite($colleague, $this->site);
 
     $this->actingAs($this->hr)
         ->patch("/it/tickets/{$ticket->id}", [

@@ -14,6 +14,7 @@ use App\Models\ItTicketEvent;
 use App\Models\Site;
 use App\Models\User;
 use App\Notifications\It\MajorIncidentUpdateNotification;
+use App\Support\LegacyStorageContext;
 use DomainException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
@@ -25,16 +26,24 @@ final class ItMajorIncidentService
     public function __construct(
         private readonly ItWorkTransitionService $transitionService,
         private readonly ItTicketLinkService $linkService,
+        private readonly ItWorkAccessService $workAccess,
     ) {}
 
     /** @param array<string, mixed> $data */
-    public function create(User $actor, int $tenantId, array $data): ItMajorIncident
+    public function create(User $actor, array $data): ItMajorIncident
     {
-        return DB::transaction(function () use ($actor, $tenantId, $data): ItMajorIncident {
-            $this->guardCommandUser($tenantId, $data['communications_lead_user_id'] ?? null, 'communications lead');
+        return DB::transaction(function () use ($actor, $data): ItMajorIncident {
+            if (! $this->workAccess->canAssignScope(
+                $actor,
+                $data['site_id'] ?? null,
+                (bool) ($data['is_organisation_wide'] ?? false),
+            )) {
+                throw new DomainException('Choose an approved Site or authorised organisation-wide scope.');
+            }
 
+            $storageContextId = LegacyStorageContext::id();
             $ticket = ItTicket::createWithReference([
-                'tenant_id' => $tenantId,
+                'tenant_id' => $storageContextId,
                 'title' => $data['title'],
                 'description' => $data['description'] ?? null,
                 'requester_user_id' => $actor->id,
@@ -55,9 +64,10 @@ final class ItMajorIncidentService
             $ticket->stampSlaDueDates();
             $ticket->save();
             ItTicketEvent::record($ticket, 'created', $actor->id, ['source' => 'major_incident_management']);
+            $this->guardCommandUser($ticket, $data['communications_lead_user_id'] ?? null, 'communications lead');
 
             $majorIncident = ItMajorIncident::query()->create([
-                'tenant_id' => $tenantId,
+                'tenant_id' => $storageContextId,
                 'ticket_id' => $ticket->id,
                 'severity' => $data['severity'],
                 'impact_summary' => $data['impact_summary'],
@@ -76,17 +86,17 @@ final class ItMajorIncidentService
     }
 
     /** @param array<string, mixed> $data */
-    public function update(ItMajorIncident $majorIncident, User $actor, int $tenantId, array $data): ItMajorIncident
+    public function update(ItMajorIncident $majorIncident, User $actor, array $data): ItMajorIncident
     {
-        return DB::transaction(function () use ($majorIncident, $actor, $tenantId, $data): ItMajorIncident {
-            $majorIncident = $this->lockedMajorIncident($majorIncident, $actor, $tenantId);
+        return DB::transaction(function () use ($majorIncident, $actor, $data): ItMajorIncident {
+            $majorIncident = $this->lockedMajorIncident($majorIncident, $actor);
             $ticket = $majorIncident->ticket()->lockForUpdate()->firstOrFail();
 
             if (array_key_exists('commander_user_id', $data)) {
-                $this->guardCommandUser($tenantId, $data['commander_user_id'], 'incident commander');
+                $this->guardCommandUser($ticket, $data['commander_user_id'], 'incident commander');
             }
             if (array_key_exists('communications_lead_user_id', $data)) {
-                $this->guardCommandUser($tenantId, $data['communications_lead_user_id'], 'communications lead');
+                $this->guardCommandUser($ticket, $data['communications_lead_user_id'], 'communications lead');
             }
 
             $ticket->fill(Arr::only($data, ['title', 'description', 'category', 'priority', 'next_action']));
@@ -122,12 +132,12 @@ final class ItMajorIncidentService
     }
 
     /** @param array<string, mixed> $data */
-    public function postUpdate(ItMajorIncident $majorIncident, User $actor, int $tenantId, array $data): ItMajorIncidentUpdate
+    public function postUpdate(ItMajorIncident $majorIncident, User $actor, array $data): ItMajorIncidentUpdate
     {
-        return DB::transaction(function () use ($majorIncident, $actor, $tenantId, $data): ItMajorIncidentUpdate {
-            $majorIncident = $this->lockedMajorIncident($majorIncident, $actor, $tenantId);
+        return DB::transaction(function () use ($majorIncident, $actor, $data): ItMajorIncidentUpdate {
+            $majorIncident = $this->lockedMajorIncident($majorIncident, $actor);
             $update = $majorIncident->updates()->create([
-                'tenant_id' => $tenantId,
+                'tenant_id' => LegacyStorageContext::id(),
                 ...Arr::only($data, ['update_kind', 'audience', 'summary', 'service_status']),
                 'published_at' => now(),
                 'author_user_id' => $actor->id,
@@ -159,18 +169,16 @@ final class ItMajorIncidentService
     public function transition(
         ItMajorIncident $majorIncident,
         User $actor,
-        int $tenantId,
         ItWorkflowState $state,
         string $reason,
         ?string $resolutionCode = null,
         ?string $resolutionSummary = null,
     ): ItMajorIncident {
-        return DB::transaction(function () use ($majorIncident, $actor, $tenantId, $state, $reason, $resolutionCode, $resolutionSummary): ItMajorIncident {
-            $majorIncident = $this->lockedMajorIncident($majorIncident, $actor, $tenantId);
+        return DB::transaction(function () use ($majorIncident, $actor, $state, $reason, $resolutionCode, $resolutionSummary): ItMajorIncident {
+            $majorIncident = $this->lockedMajorIncident($majorIncident, $actor);
             $this->guardTransition($majorIncident, $state);
 
             $this->transitionService->transition($majorIncident->ticket, new ItTransitionInput(
-                tenantId: $tenantId,
                 actor: $actor,
                 to: $state,
                 reason: $reason,
@@ -199,27 +207,28 @@ final class ItMajorIncidentService
         });
     }
 
-    private function lockedMajorIncident(ItMajorIncident $majorIncident, User $actor, int $tenantId): ItMajorIncident
+    private function lockedMajorIncident(ItMajorIncident $majorIncident, User $actor): ItMajorIncident
     {
-        if (! $actor->canDo('it.manage')) {
-            throw new DomainException('You are not allowed to manage major incidents.');
-        }
-
-        return ItMajorIncident::query()
+        $locked = ItMajorIncident::query()
             ->whereKey($majorIncident->id)
-            ->where('tenant_id', $tenantId)
             ->with('ticket')
             ->lockForUpdate()
             ->firstOrFail();
+
+        if (! $locked->ticket || ! $this->workAccess->canWork($actor, $locked->ticket)) {
+            throw new DomainException('You are not allowed to manage major incidents.');
+        }
+
+        return $locked;
     }
 
-    private function guardCommandUser(int $tenantId, mixed $userId, string $label): void
+    private function guardCommandUser(ItTicket $ticket, mixed $userId, string $label): void
     {
         if ($userId === null || $userId === '') {
             return;
         }
-        if (! ItStaffDirectory::agents($tenantId)->contains('id', (int) $userId)) {
-            throw new DomainException("The {$label} must be an IT agent in this organisation.");
+        if (! ItStaffDirectory::agentsForTicket($ticket)->contains('id', (int) $userId)) {
+            throw new DomainException("The {$label} must be a current IT technician with access to this Site.");
         }
     }
 
@@ -319,7 +328,7 @@ final class ItMajorIncidentService
             ->get()
             ->keyBy('id');
         if ($incidents->count() !== count($ids)) {
-            throw new DomainException('Every affected incident must be an incident in this organisation.');
+            throw new DomainException('Every affected record must be an incident.');
         }
 
         $ticketType = (new ItTicket)->getMorphClass();

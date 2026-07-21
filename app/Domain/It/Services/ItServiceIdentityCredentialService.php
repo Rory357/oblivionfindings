@@ -6,6 +6,7 @@ use App\Domain\It\ItStaffDirectory;
 use App\Models\ItServiceIdentity;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Support\LegacyStorageContext;
 use DomainException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -23,23 +24,23 @@ final class ItServiceIdentityCredentialService
      * @param  array<string, mixed>  $data
      * @return array{identity: ItServiceIdentity, secret: string, token: string}
      */
-    public function create(User $actor, int $tenantId, array $data): array
+    public function create(User $actor, array $data): array
     {
-        return DB::transaction(function () use ($actor, $tenantId, $data): array {
+        return DB::transaction(function () use ($actor, $data): array {
             $manager = User::query()->whereKey($actor->id)->lockForUpdate()->firstOrFail();
             $executionAccount = User::query()
                 ->whereKey((int) $data['actor_user_id'])
                 ->lockForUpdate()
                 ->firstOrFail();
-            $this->guardManager($manager, $tenantId);
-            $this->guardExecutionAccount($tenantId, $executionAccount);
+            $this->guardManager($manager);
+            $this->guardExecutionAccount($executionAccount);
             $this->guardDelegatedScope($manager, $executionAccount, $data);
 
             $publicId = Str::lower(Str::random(20));
             $secret = Str::random(64);
             $token = "ofi_{$publicId}_{$secret}";
             $identity = ItServiceIdentity::query()->create([
-                'tenant_id' => $tenantId,
+                'tenant_id' => LegacyStorageContext::id(),
                 'actor_user_id' => (int) $data['actor_user_id'],
                 'created_by_user_id' => $manager->id,
                 'public_id' => $publicId,
@@ -52,7 +53,7 @@ final class ItServiceIdentityCredentialService
             ]);
 
             AuditLogger::logOrFail('it.api.identity.created', $identity, [
-                'organization_id' => $tenantId,
+                'application_scope' => 'single_installation',
                 'actor_id' => $manager->id,
                 'abilities' => $identity->abilities,
                 'allowed_work_types' => $identity->allowed_work_types,
@@ -64,13 +65,12 @@ final class ItServiceIdentityCredentialService
         });
     }
 
-    public function revoke(ItServiceIdentity $identity, User $actor, int $tenantId): ItServiceIdentity
+    public function revoke(ItServiceIdentity $identity, User $actor): ItServiceIdentity
     {
-        return DB::transaction(function () use ($identity, $actor, $tenantId): ItServiceIdentity {
+        return DB::transaction(function () use ($identity, $actor): ItServiceIdentity {
             $manager = User::query()->whereKey($actor->id)->lockForUpdate()->firstOrFail();
-            $this->guardManager($manager, $tenantId);
+            $this->guardManager($manager);
             $locked = ItServiceIdentity::query()
-                ->forTenant($tenantId)
                 ->with('actor')
                 ->whereKey($identity->id)
                 ->lockForUpdate()
@@ -85,7 +85,7 @@ final class ItServiceIdentityCredentialService
                     'revoked_by_user_id' => $manager->id,
                 ])->save();
                 AuditLogger::logOrFail('it.api.identity.revoked', $locked, [
-                    'organization_id' => $tenantId,
+                    'application_scope' => 'single_installation',
                     'actor_id' => $manager->id,
                 ]);
             }
@@ -94,10 +94,10 @@ final class ItServiceIdentityCredentialService
         });
     }
 
-    public function canManage(User $manager, ItServiceIdentity $identity, int $tenantId): bool
+    public function canManage(User $manager, ItServiceIdentity $identity): bool
     {
         try {
-            $this->guardManager($manager, $tenantId);
+            $this->guardManager($manager);
         } catch (DomainException) {
             return false;
         }
@@ -108,17 +108,17 @@ final class ItServiceIdentityCredentialService
     }
 
     /** @return Collection<int, User> */
-    public function delegableExecutionAccounts(User $manager, int $tenantId): Collection
+    public function delegableExecutionAccounts(User $manager): Collection
     {
         try {
-            $this->guardManager($manager, $tenantId);
+            $this->guardManager($manager);
         } catch (DomainException) {
             return collect();
         }
 
         $managerSiteIds = $this->workAccess->approvedSiteIds($manager);
 
-        return ItStaffDirectory::agents($tenantId)
+        return ItStaffDirectory::agents()
             ->filter(function (User $candidate) use ($manager, $managerSiteIds): bool {
                 if (! $this->workItems->isCurrentExecutionAccount($candidate)) {
                     return false;
@@ -130,21 +130,20 @@ final class ItServiceIdentityCredentialService
             ->values();
     }
 
-    private function guardManager(User $actor, int $tenantId): void
+    private function guardManager(User $actor): void
     {
-        if ((int) $actor->organization_id !== $tenantId
-            || ! $this->workItems->isCurrentExecutionAccount($actor)) {
+        if (! $this->workItems->isCurrentExecutionAccount($actor)) {
             throw new DomainException('You are not allowed to manage IT service identities.');
         }
     }
 
-    private function guardExecutionAccount(int $tenantId, User $executionAccount): void
+    private function guardExecutionAccount(User $executionAccount): void
     {
         if (! $this->workItems->isCurrentExecutionAccount($executionAccount)
-            || ! ItStaffDirectory::agents($tenantId)->contains(
+            || ! ItStaffDirectory::agents()->contains(
                 fn (User $user): bool => $user->id === $executionAccount->id,
             )) {
-            throw new DomainException('The execution account must be an IT agent in this organisation.');
+            throw new DomainException('The execution account must be a current IT agent.');
         }
     }
 

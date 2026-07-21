@@ -36,7 +36,7 @@ test('needsRefresh trips inside the 5-minute expiry window and on a missing expi
     expect(itMailboxConnection()->needsRefresh())->toBeFalse(); // expires in 1h
 
     $stale = itMailboxConnection([
-        'provider' => ItMailboxConnection::PROVIDER_GOOGLE, // dodge the (tenant, provider) unique
+        'provider' => ItMailboxConnection::PROVIDER_GOOGLE, // dodge the legacy composite provider unique
         'token_expires_at' => now()->addMinutes(2),
     ]);
     expect($stale->needsRefresh())->toBeTrue();

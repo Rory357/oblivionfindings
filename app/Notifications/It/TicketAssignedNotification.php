@@ -24,7 +24,6 @@ class TicketAssignedNotification extends Notification implements ShouldQueue, Tr
     public function itEmailDeliveryContext(): array
     {
         return [
-            'tenant_id' => (int) $this->ticket->tenant_id,
             'ticket_id' => (int) $this->ticket->id,
             'type' => 'ticket_assigned',
             'subject' => "Assigned to you — {$this->ticket->reference} {$this->ticket->title}",

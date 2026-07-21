@@ -9,16 +9,17 @@ use App\Domain\It\Data\ItTransitionInput;
 use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\ItStaffDirectory;
 use App\Domain\It\Services\ItEmailDeliveryService;
+use App\Domain\It\Services\ItProvisioningAccessService;
 use App\Domain\It\Services\ItProvisioningRequestLifecycleService;
 use App\Domain\It\Services\ItTicketRoutingService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\It\Services\ItWorkTransitionService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\It\BulkProvisioningActionRequest;
 use App\Http\Requests\It\ResolveTicketRequest;
 use App\Http\Requests\It\StoreProvisioningRequestRequest;
 use App\Http\Requests\It\UpdateSlaPoliciesRequest;
+use App\Models\Asset;
 use App\Models\ItCatalogItem;
 use App\Models\ItKbArticle;
 use App\Models\ItProvisioningRequest;
@@ -33,6 +34,7 @@ use App\Notifications\It\TicketAssignedNotification;
 use App\Notifications\It\TicketCreatedNotification;
 use App\Notifications\It\TicketResolvedNotification;
 use App\Support\It\BusinessHours;
+use App\Support\LegacyStorageContext;
 use DomainException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -50,7 +52,7 @@ use Inertia\Inertia;
  */
 class ItProvisioningController extends Controller
 {
-    use Concerns\BuildsItOptions, Concerns\StoresItAttachments, ResolvesHrTenant;
+    use Concerns\BuildsItOptions, Concerns\StoresItAttachments;
 
     public function __construct(
         private readonly OnboardingService $onboardingService,
@@ -59,6 +61,7 @@ class ItProvisioningController extends Controller
         private readonly ItProvisioningRequestLifecycleService $provisioningLifecycle,
         private readonly ItEmailDeliveryService $emailDeliveries,
         private readonly ItWorkAccessService $workAccess,
+        private readonly ItProvisioningAccessService $provisioningAccess,
     ) {}
 
     /* ================================================================== */
@@ -71,8 +74,6 @@ class ItProvisioningController extends Controller
         $isAgent = $user && ($user->canDo('it.view') || $user->canDo('it.manage'));
         $canRequest = $user && $user->canDo('it.request');
         abort_unless($isAgent || $canRequest, 403);
-
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $filters = [
             'status' => $this->cleanFilter($request->query('status'), ItProvisioningRequest::STATUSES),
@@ -107,22 +108,22 @@ class ItProvisioningController extends Controller
         // Requesters get ONLY their own tickets — the agent queues, summary
         // and staff directory never reach a self-service payload.
         $agentProps = $isAgent ? [
-            'requests' => $this->requestPage($tenantId, $filters),
-            'provisioningWorkflows' => $this->provisioningWorkflows($tenantId),
-            'tickets' => $this->ticketPage($tenantId, $filters, $user),
-            'assignees' => $this->tenantUserOptions($tenantId),
-            'employeeOptions' => $this->employeeOptions($tenantId),
-            'assetOptions' => $this->assetOptions(),
+            'requests' => $this->requestPage($filters, $user),
+            'provisioningWorkflows' => $this->provisioningWorkflows($user),
+            'tickets' => $this->ticketPage($filters, $user),
+            'assignees' => $this->staffUserOptions($user),
+            'employeeOptions' => $this->employeeOptions($user),
+            'assetOptions' => $this->assetOptions($user),
             'filters' => $filters,
             // The effective SLA targets go to every agent — the Log & triage
             // wizard reads them for its live "resolution due …" preview. Only
             // editing them is admin-gated (can.edit_sla drives the editor button).
-            'slaPolicies' => $this->slaPolicyGrid($tenantId),
-            'slaCalendar' => $this->slaCalendar($tenantId),
-            'overview' => $this->overview($tenantId, $user),
-            'kbArticles' => $this->kbArticles($tenantId),
+            'slaPolicies' => $this->slaPolicyGrid(),
+            'slaCalendar' => $this->slaCalendar(),
+            'overview' => $this->overview($user),
+            'kbArticles' => $this->kbArticles(),
             'kbOptions' => [
-                'owners' => ItStaffDirectory::agents($tenantId)
+                'owners' => ItStaffDirectory::agentsForSharedSites($user)
                     ->sortBy('name')
                     ->map(fn (User $agent) => ['id' => $agent->id, 'name' => $agent->name])
                     ->values(),
@@ -133,7 +134,6 @@ class ItProvisioningController extends Controller
                     ->orderBy('name')
                     ->get(['id', 'name']),
                 'services' => ItService::query()
-                    ->forTenant($tenantId)
                     ->where('is_active', true)
                     ->orderBy('name')
                     ->get(['id', 'name']),
@@ -142,9 +142,8 @@ class ItProvisioningController extends Controller
 
         return Inertia::render('it/index', [
             ...$agentProps,
-            'myTickets' => $canRequest ? $this->myTicketRows($tenantId, $user) : [],
+            'myTickets' => $canRequest ? $this->myTicketRows($user) : [],
             'catalogItems' => $canRequest ? ItCatalogItem::query()
-                ->forTenant($tenantId)
                 ->published()
                 ->when(! $canManage, fn ($query) => $query->where('internal_only', false))
                 ->orderBy('sort_order')
@@ -155,8 +154,8 @@ class ItProvisioningController extends Controller
                 ->all() : [],
             // Requester KB browse (§I) — pure requesters only; agents browse the
             // full catalogue in their Knowledge tab.
-            'kbPublished' => ($canRequest && ! $isAgent) ? $this->kbPublished($tenantId, $user) : [],
-            'summary' => $this->summary($tenantId, $user, $isAgent),
+            'kbPublished' => ($canRequest && ! $isAgent) ? $this->kbPublished($user) : [],
+            'summary' => $this->summary($user, $isAgent),
             'can' => [
                 'view' => $isAgent,
                 'manage' => $canManage,
@@ -167,22 +166,19 @@ class ItProvisioningController extends Controller
     }
 
     /**
-     * §N7: rewrite the tenant's SLA grid — one row per priority, values
+     * §N7: rewrite the application's SLA grid — one row per priority, values
      * become the stamping source for every ticket created (or re-triaged)
      * from here on. Existing tickets keep the targets they were promised.
      */
     public function updateSlaPolicies(UpdateSlaPoliciesRequest $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        // Build the tenant-wide calendar once (null = 24/7) and stamp it onto
+        // Build the application-wide calendar once (null = 24/7) and stamp it onto
         // every priority row — "apply to all policies".
         [$businessHours, $holidayDates] = $this->calendarFromRequest($request);
 
         foreach (ItTicket::PRIORITIES as $priority) {
             ItSlaPolicy::query()->updateOrCreate(
-                ['tenant_id' => $tenantId, 'priority' => $priority],
+                ['tenant_id' => LegacyStorageContext::id(), 'priority' => $priority],
                 [
                     'first_response_minutes' => (int) $request->validated("{$priority}.first_response_minutes"),
                     'resolution_minutes' => (int) $request->validated("{$priority}.resolution_minutes"),
@@ -223,15 +219,14 @@ class ItProvisioningController extends Controller
     }
 
     /**
-     * The effective SLA grid for the policy editor: tenant row when set,
+     * The effective SLA grid for the policy editor: application row when set,
      * §G default otherwise, flagged so the UI can say which is which.
      *
      * @return array<string, array{first_response_minutes: int, resolution_minutes: int, is_custom: bool}>
      */
-    private function slaPolicyGrid(int $tenantId): array
+    private function slaPolicyGrid(): array
     {
         $rows = ItSlaPolicy::query()
-            ->where('tenant_id', $tenantId)
             ->get()
             ->keyBy('priority');
 
@@ -250,16 +245,15 @@ class ItProvisioningController extends Controller
     }
 
     /**
-     * The current tenant calendar for the editor, flattened to the single-
+     * The current application calendar for the editor, flattened to the single-
      * window/working-days view the UI edits. Falls back to disabled (Mon–Fri
-     * 08:00–17:00 presets) when the tenant runs 24/7.
+     * 08:00–17:00 presets) when the application runs 24/7.
      *
      * @return array{enabled: bool, open_time: string, close_time: string, working_days: array<int, string>, holiday_dates: array<int, string>}
      */
-    private function slaCalendar(int $tenantId): array
+    private function slaCalendar(): array
     {
         $row = ItSlaPolicy::query()
-            ->where('tenant_id', $tenantId)
             ->whereNotNull('business_hours')
             ->first();
 
@@ -305,15 +299,13 @@ class ItProvisioningController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('it.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $provisioning->tenant_id);
+        abort_unless($this->provisioningAccess->canManage($user, $provisioning), 404);
 
         $validated = $request->validate([
-            'assigned_to_user_id' => [
-                'required', 'integer', 'exists:users,id',
-                $this->rejectForeignTenantRecipient($tenantId),
-            ],
+            'assigned_to_user_id' => ['required', 'integer', 'exists:users,id'],
         ]);
+        $assignee = User::query()->whereNotNull('approved_at')->find((int) $validated['assigned_to_user_id']);
+        abort_unless($assignee && $this->provisioningAccess->canAssignAgentForRequest($assignee, $provisioning), 403);
 
         if (in_array($provisioning->status, ['done', 'cancelled'], true)) {
             return redirect()->back()->with('error', 'This request is closed — reopen it before reassigning.');
@@ -339,8 +331,7 @@ class ItProvisioningController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('it.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $provisioning->tenant_id);
+        abort_unless($this->provisioningAccess->canManage($user, $provisioning), 404);
 
         $validated = $request->validate([
             'external_ref' => ['nullable', 'string', 'max:255'],
@@ -361,8 +352,7 @@ class ItProvisioningController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('it.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $provisioning->tenant_id);
+        abort_unless($this->provisioningAccess->canManage($user, $provisioning), 404);
         $validated = $request->validate([
             'decision_note' => ['nullable', 'string', 'max:1000'],
         ]);
@@ -384,8 +374,7 @@ class ItProvisioningController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('it.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $provisioning->tenant_id);
+        abort_unless($this->provisioningAccess->canManage($user, $provisioning), 404);
         $validated = $request->validate([
             'failure_reason' => ['required', 'string', 'max:2000'],
         ]);
@@ -403,8 +392,7 @@ class ItProvisioningController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('it.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $provisioning->tenant_id);
+        abort_unless($this->provisioningAccess->canManage($user, $provisioning), 404);
 
         $validated = $request->validate([
             'reason' => ['nullable', 'string', 'max:500'],
@@ -457,33 +445,26 @@ class ItProvisioningController extends Controller
 
     /**
      * §H manual "New provisioning request" — the ad-hoc path agents raise
-     * outside onboarding (a swapped device, a one-off access grant). Tenant
-     * ownership of the employee profile and any assignee is asserted here,
-     * mirroring assign/fulfil; a `created` event opens the activity trail.
+     * outside onboarding (a swapped device, a one-off access grant). Canonical
+     * Site access for the employee and any assignee is asserted here; a
+     * `created` event opens the activity trail.
      */
     public function storeProvisioning(StoreProvisioningRequestRequest $request)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $data = $request->validated();
 
         $profile = HrEmployeeProfile::query()->find((int) $data['employee_profile_id']);
-        $this->assertHrTenantAccess($tenantId, $profile?->tenant_id);
+        abort_unless($profile && $this->provisioningAccess->canSelectProfile($user, $profile), 403);
 
         $assigneeId = ! empty($data['assigned_to_user_id']) ? (int) $data['assigned_to_user_id'] : null;
         if ($assigneeId) {
-            $inOtherTenant = HrEmployeeProfile::query()
-                ->where('user_id', $assigneeId)
-                ->whereNotNull('tenant_id')
-                ->where('tenant_id', '!=', $tenantId)
-                ->exists();
-            if ($inOtherTenant) {
-                return redirect()->back()->with('error', 'That colleague is in a different organisation.');
-            }
+            $assignee = User::query()->whereNotNull('approved_at')->find($assigneeId);
+            abort_unless($assignee && $this->provisioningAccess->canAssignAgentForProfile($assignee, $profile), 403);
         }
 
         $provisioning = ItProvisioningRequest::query()->create([
-            'tenant_id' => $tenantId,
+            'tenant_id' => LegacyStorageContext::id(),
             'employee_profile_id' => (int) $data['employee_profile_id'],
             'type' => $data['type'],
             'item' => $data['item'],
@@ -504,20 +485,18 @@ class ItProvisioningController extends Controller
     }
 
     /**
-     * Active tenant employee profiles for the manual-request employee picker.
+     * Active employee profiles within the viewer's approved Site scope.
      * Guarded so a pre-migration read serves an empty list.
      *
      * @return array<int, array{id: int, name: string}>
      */
-    private function employeeOptions(int $tenantId): array
+    private function employeeOptions(User $user): array
     {
         if (! Schema::hasTable('hr_employee_profiles')) {
             return [];
         }
 
-        return HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
+        return $this->provisioningAccess->selectableProfiles($user)
             ->with('user:id,name')
             ->orderBy('id')
             ->get()
@@ -530,7 +509,7 @@ class ItProvisioningController extends Controller
 
     /**
      * §H one action over many provisioning requests: assign to an agent, or
-     * fulfil. Foreign-tenant ids silently drop out of the tenant-scoped fetch;
+     * fulfil. Inaccessible ids silently drop out of the canonical scoped fetch;
      * settled requests (done/cancelled) are skipped rather than mutated — the
      * flash reports both as "unchanged". One event row per actual change with
      * `via=bulk`; fulfil completes each linked onboarding task through the same
@@ -540,27 +519,16 @@ class ItProvisioningController extends Controller
     public function bulkProvisioning(BulkProvisioningActionRequest $request)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $validated = $request->validated();
         $action = (string) $validated['action'];
 
         $assignee = null;
         if ($action === 'assign') {
-            $assignee = User::query()->find((int) $validated['assigned_to_user_id']);
-            // Same foreign-tenant guard as assign/storeProvisioning: reject a
-            // recipient whose HR profile sits in a different organisation.
-            $inOtherTenant = $assignee && HrEmployeeProfile::query()
-                ->where('user_id', $assignee->id)
-                ->whereNotNull('tenant_id')
-                ->where('tenant_id', '!=', $tenantId)
-                ->exists();
-            if ($inOtherTenant) {
-                return redirect()->back()->with('error', 'That colleague is in a different organisation.');
-            }
+            $assignee = User::query()->whereNotNull('approved_at')->find((int) $validated['assigned_to_user_id']);
+            abort_unless($assignee && ItStaffDirectory::agents()->contains('id', $assignee->id), 403);
         }
 
-        $requests = ItProvisioningRequest::query()
-            ->forTenant($tenantId)
+        $requests = $this->provisioningAccess->applyRequestScope(ItProvisioningRequest::query(), $user)
             ->with('onboardingTask')
             ->whereIn('id', $validated['ids'])
             ->get();
@@ -587,6 +555,9 @@ class ItProvisioningController extends Controller
 
     private function bulkAssignProvisioning(ItProvisioningRequest $provisioning, ?User $assignee, User $actor): bool
     {
+        if (! $assignee || ! $this->provisioningAccess->canAssignAgentForRequest($assignee, $provisioning)) {
+            return false;
+        }
         if (in_array($provisioning->status, ['done', 'cancelled'], true)) {
             return false; // settled requests keep their history
         }
@@ -629,7 +600,7 @@ class ItProvisioningController extends Controller
 
     /**
      * §H provisioning-queue CSV export — the current filtered view (status /
-     * type / assignee), all matching rows (not just the page), tenant-scoped.
+     * type / assignee), all matching rows (not just the page), Site-scoped.
      * Any agent (it.view) can export what the queue shows them; every cell
      * goes through the base Controller's `putCsv()` so a formula-injection
      * payload in a user-controlled field (item, employee name, external ref)
@@ -639,14 +610,12 @@ class ItProvisioningController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('it.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $status = $this->cleanFilter($request->query('status'), ItProvisioningRequest::STATUSES);
         $type = $this->cleanFilter($request->query('type'), ItProvisioningRequest::TYPES);
         $assignee = is_numeric($request->query('assignee')) ? (int) $request->query('assignee') : null;
 
-        $rows = ItProvisioningRequest::query()
-            ->forTenant($tenantId)
+        $rows = $this->provisioningAccess->applyRequestScope(ItProvisioningRequest::query(), $user)
             ->with([
                 'employeeProfile:id,user_id,position_title,position_role',
                 'employeeProfile.user:id,name',
@@ -697,7 +666,6 @@ class ItProvisioningController extends Controller
         $user = $request->user();
         abort_unless((bool) $user, 403);
         $this->authorize('create', ItTicket::class);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $isAgent = $user->canDo('it.manage');
 
@@ -707,30 +675,21 @@ class ItProvisioningController extends Controller
             'category' => ['required', Rule::in(ItTicket::CATEGORIES)],
             'priority' => ['required', Rule::in(ItTicket::PRIORITIES)],
             'work_type' => ['nullable', Rule::in(['incident', 'service_request', 'security_request'])],
-            'it_service_id' => ['nullable', 'integer', Rule::exists('it_services', 'id')->where('tenant_id', $tenantId)],
-            'site_id' => ['nullable', 'integer', Rule::exists('sites', 'id')->where('tenant_id', $tenantId)],
+            'it_service_id' => ['nullable', 'integer', 'exists:it_services,id'],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'is_organisation_wide' => ['nullable', 'boolean'],
             // §N2 agent triage fields — dropped for self-service requesters below.
             'subcategory' => ['nullable', 'string', 'max:255'],
             // On-behalf-of: an agent logs a ticket for the person who actually
             // hit the problem; the receipt then goes to them, not the agent.
-            'requester_user_id' => [
-                'nullable', 'integer', 'exists:users,id',
-                $this->rejectForeignTenantRecipient($tenantId),
-            ],
-            'assigned_to_user_id' => [
-                'nullable', 'integer', 'exists:users,id',
-                $this->rejectForeignTenantRecipient($tenantId),
-            ],
+            'requester_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'assigned_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'asset_id' => ['nullable', 'integer', 'exists:assets,id'],
             'watchers' => ['nullable', 'array'],
             'watchers.*' => ['integer', 'exists:users,id'],
             // §H convert/link: an agent can raise a ticket straight off a
             // provisioning request (the new laptop arrived broken).
-            'provisioning_request_id' => [
-                'nullable', 'integer',
-                Rule::exists('it_provisioning_requests', 'id')->where('tenant_id', $tenantId),
-            ],
+            'provisioning_request_id' => ['nullable', 'integer', 'exists:it_provisioning_requests,id'],
             ...$this->itAttachmentRules(),
         ]);
 
@@ -759,12 +718,41 @@ class ItProvisioningController extends Controller
                 'site_id' => 'Choose an active approved Site for this ticket.',
             ]);
         }
+        $requester = User::query()->whereNotNull('approved_at')->find($requesterId);
+        abort_unless($requester && $this->staffMemberMatchesScope($requester, $siteId, $isOrganisationWide), 403);
+
+        if ($assigneeId !== null) {
+            $assignee = User::query()->whereNotNull('approved_at')->find((int) $assigneeId);
+            abort_unless($assignee && $this->agentMatchesScope($assignee, $siteId, $isOrganisationWide), 403);
+        }
+        if ($serviceId !== null) {
+            abort_unless(ItService::query()->whereKey($serviceId)->where('is_active', true)->exists(), 403);
+        }
+        if ($assetId !== null) {
+            abort_unless($this->assetIsAvailable((int) $assetId, $siteId, $isOrganisationWide), 403);
+        }
+        if ($provisioningRequestId !== null) {
+            $provisioning = ItProvisioningRequest::query()->find((int) $provisioningRequestId);
+            abort_unless($provisioning
+                && $this->provisioningAccess->canView($user, $provisioning)
+                && $this->provisioningAccess->siteIdFor($provisioning) === $siteId,
+                403);
+        }
         $watcherIds = $isAgent && ! empty($validated['watchers'])
             ? array_values(array_unique(array_map('intval', $validated['watchers'])))
             : [];
+        if ($watcherIds !== []) {
+            $validWatcherCount = User::query()
+                ->whereKey($watcherIds)
+                ->whereNotNull('approved_at')
+                ->get()
+                ->filter(fn (User $watcher): bool => $this->staffMemberMatchesScope($watcher, $siteId, $isOrganisationWide))
+                ->count();
+            abort_unless($validWatcherCount === count($watcherIds), 403);
+        }
 
         $ticket = ItTicket::createWithReference([
-            'tenant_id' => $tenantId,
+            'tenant_id' => LegacyStorageContext::id(),
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
             'requester_user_id' => $requesterId,
@@ -785,7 +773,7 @@ class ItProvisioningController extends Controller
             'status' => $assigneeId ? 'in_progress' : 'open',
         ]);
 
-        // Every ticket gets SLA targets from the tenant policy (or the §G
+        // Every ticket gets SLA targets from the application policy (or the §G
         // defaults) the moment it exists — the clock starts at creation.
         $ticket->stampSlaDueDates();
         $ticket->save();
@@ -812,7 +800,7 @@ class ItProvisioningController extends Controller
             $this->emailDeliveries->send($requester, new TicketCreatedNotification($ticket, 'receipt'));
         }
         if ($ticket->priority === 'urgent') {
-            $agents = ItStaffDirectory::agents($tenantId)
+            $agents = ItStaffDirectory::agentsForTicket($ticket)
                 ->reject(fn (User $agent) => $agent->id === $user->id);
             $this->emailDeliveries->send($agents, new TicketCreatedNotification($ticket, 'urgent_alert'));
         }
@@ -828,8 +816,6 @@ class ItProvisioningController extends Controller
         abort_unless($user && $user->canDo('it.manage'), 403);
         abort_unless($this->workAccess->canWork($user, $ticket), 404);
         $this->authorize('update', $ticket);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
         $validated = $request->validate([
             'status' => ['sometimes', Rule::in(ItTicket::STATUSES)],
@@ -837,12 +823,9 @@ class ItProvisioningController extends Controller
             'category' => ['sometimes', Rule::in(ItTicket::CATEGORIES)],
             'subcategory' => ['sometimes', 'nullable', 'string', 'max:255'],
             'asset_id' => ['sometimes', 'nullable', 'integer', 'exists:assets,id'],
-            'site_id' => ['sometimes', 'nullable', 'integer', Rule::exists('sites', 'id')->where('tenant_id', $tenantId)],
+            'site_id' => ['sometimes', 'nullable', 'integer', 'exists:sites,id'],
             'is_organisation_wide' => ['sometimes', 'boolean'],
-            'assigned_to_user_id' => [
-                'sometimes', 'nullable', 'integer', 'exists:users,id',
-                $this->rejectForeignTenantRecipient($tenantId),
-            ],
+            'assigned_to_user_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'waiting_reason' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'waiting_party' => ['sometimes', 'nullable', Rule::in(['requester', 'vendor', 'approver', 'team', 'change', 'other'])],
             'next_action' => ['sometimes', 'nullable', 'string', 'max:2000'],
@@ -852,6 +835,8 @@ class ItProvisioningController extends Controller
 
         $siteWasSupplied = array_key_exists('site_id', $validated);
         $wideWasSupplied = array_key_exists('is_organisation_wide', $validated);
+        $prospectiveSiteId = $ticket->site_id !== null ? (int) $ticket->site_id : null;
+        $prospectiveWide = (bool) $ticket->is_organisation_wide;
         if ($siteWasSupplied || $wideWasSupplied) {
             if ($validated['is_organisation_wide'] ?? false) {
                 if (! $siteWasSupplied || $validated['site_id'] !== null) {
@@ -879,6 +864,18 @@ class ItProvisioningController extends Controller
             );
         }
 
+        if (array_key_exists('assigned_to_user_id', $validated) && $validated['assigned_to_user_id'] !== null) {
+            $assignee = User::query()->whereNotNull('approved_at')->find((int) $validated['assigned_to_user_id']);
+            abort_unless($assignee && $this->agentMatchesScope($assignee, $prospectiveSiteId, $prospectiveWide), 403);
+        }
+        if (array_key_exists('asset_id', $validated) && $validated['asset_id'] !== null) {
+            abort_unless($this->assetIsAvailable(
+                (int) $validated['asset_id'],
+                $prospectiveSiteId,
+                $prospectiveWide,
+            ), 403);
+        }
+
         $original = $ticket->only(['status', 'priority', 'assigned_to_user_id']);
         $targetStatus = $validated['status'] ?? null;
 
@@ -901,7 +898,6 @@ class ItProvisioningController extends Controller
                 $ticket = $this->transitionService->transition(
                     $ticket,
                     new ItTransitionInput(
-                        tenantId: $tenantId,
                         actor: $user,
                         to: $targetState,
                         reason: $validated['waiting_reason']
@@ -967,19 +963,16 @@ class ItProvisioningController extends Controller
         $user = $request->user();
         abort_unless($this->workAccess->canWork($user, $ticket), 404);
         abort_unless($user->can('resolve', $ticket), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
         if (in_array($ticket->status, ['resolved', 'closed'], true)) {
             return redirect()->back()->with('error', 'This ticket is already resolved.');
         }
 
         try {
-            $ticket = DB::transaction(function () use ($ticket, $request, $user, $tenantId): ItTicket {
+            $ticket = DB::transaction(function () use ($ticket, $request, $user): ItTicket {
                 $transitioned = $this->transitionService->transition(
                     $ticket,
                     new ItTransitionInput(
-                        tenantId: $tenantId,
                         actor: $user,
                         to: ItWorkflowState::Resolved,
                         reason: 'Technician resolution',
@@ -992,7 +985,7 @@ class ItProvisioningController extends Controller
                 // The resolution note is the final PUBLIC reply — "what fixed
                 // it" always lands on the record, visible to the requester.
                 $transitioned->comments()->create([
-                    'tenant_id' => $transitioned->tenant_id,
+                    'tenant_id' => LegacyStorageContext::id(),
                     'author_user_id' => $user->id,
                     'body' => $request->validated('note'),
                     'is_internal' => false,
@@ -1093,7 +1086,7 @@ class ItProvisioningController extends Controller
     }
 
     /** @param array<string, mixed> $filters */
-    private function requestPage(int $tenantId, array $filters)
+    private function requestPage(array $filters, User $user)
     {
         // House rule: guard new-table reads so a request racing the deploy's
         // migration step renders an empty queue instead of a 500.
@@ -1101,8 +1094,7 @@ class ItProvisioningController extends Controller
             return null;
         }
 
-        return ItProvisioningRequest::query()
-            ->forTenant($tenantId)
+        return $this->provisioningAccess->applyRequestScope(ItProvisioningRequest::query(), $user)
             ->with([
                 'employeeProfile:id,user_id,position_title,position_role',
                 'employeeProfile.user:id,name',
@@ -1170,14 +1162,13 @@ class ItProvisioningController extends Controller
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function provisioningWorkflows(int $tenantId): array
+    private function provisioningWorkflows(User $user): array
     {
         if (! Schema::hasTable('it_provisioning_workflows')) {
             return [];
         }
 
-        return ItProvisioningWorkflow::query()
-            ->forTenant($tenantId)
+        return $this->provisioningAccess->applyWorkflowScope(ItProvisioningWorkflow::query(), $user)
             ->with(['employeeProfile:id,user_id,position_title', 'employeeProfile.user:id,name', 'template:id,name'])
             ->withCount([
                 'requests',
@@ -1208,7 +1199,7 @@ class ItProvisioningController extends Controller
     }
 
     /** @param array<string, mixed> $filters */
-    private function ticketPage(int $tenantId, array $filters, User $user)
+    private function ticketPage(array $filters, User $user)
     {
         if (! Schema::hasTable('it_tickets')) {
             return null;
@@ -1290,7 +1281,7 @@ class ItProvisioningController extends Controller
      * assignee identity beyond a name, mirroring what a helpdesk shows the
      * person who raised the ticket.
      */
-    private function myTicketRows(int $tenantId, User $user): array
+    private function myTicketRows(User $user): array
     {
         if (! Schema::hasTable('it_tickets')) {
             return [];
@@ -1332,7 +1323,7 @@ class ItProvisioningController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function summary(int $tenantId, User $user, bool $isAgent): array
+    private function summary(User $user, bool $isAgent): array
     {
         $ticketsReady = Schema::hasTable('it_tickets');
         $requestsReady = Schema::hasTable('it_provisioning_requests');
@@ -1388,8 +1379,7 @@ class ItProvisioningController extends Controller
             : null;
 
         $requests = $requestsReady
-            ? ItProvisioningRequest::query()
-                ->forTenant($tenantId)
+            ? $this->provisioningAccess->applyRequestScope(ItProvisioningRequest::query(), $user)
                 ->selectRaw(
                     "SUM(status = 'pending') AS pending,
                      SUM(status = 'in_progress') AS in_progress,
@@ -1448,14 +1438,14 @@ class ItProvisioningController extends Controller
 
     /**
      * §F1 Overview payload (agents): the avg-first-response KPI plus the four
-     * "needs attention" lanes — short, capped, tenant-scoped lists that each
+     * "needs attention" lanes — short, capped, Site-scoped lists that each
      * deep-link into the filtered queue. The KPI *counts* come from the
      * summary; this adds the one metric the summary can't cheaply carry and
      * the lane contents. Guarded so a pre-migration read renders an empty board.
      *
      * @return array<string, mixed>
      */
-    private function overview(int $tenantId, User $user): array
+    private function overview(User $user): array
     {
         $empty = [
             'avg_first_response_mins' => null,
@@ -1548,26 +1538,25 @@ class ItProvisioningController extends Controller
                 'normal' => (int) ($byPriority->normal ?? 0),
                 'low' => (int) ($byPriority->low ?? 0),
             ],
-            'recent_activity' => $this->recentActivity($tenantId, $user),
+            'recent_activity' => $this->recentActivity($user),
         ];
     }
 
     /**
-     * §F1 recent-activity feed — the latest ticket events across the tenant,
+     * §F1 recent-activity feed — the latest visible ticket events,
      * humanised on the client. Ticket subjects only (each row deep-links to a
      * ticket); provisioning events stay on their own request rows. `subject`
      * is loaded via the morph so a deleted ticket drops out rather than 500s.
      *
      * @return array<int, array<string, mixed>>
      */
-    private function recentActivity(int $tenantId, User $user): array
+    private function recentActivity(User $user): array
     {
         if (! Schema::hasTable('it_ticket_events')) {
             return [];
         }
 
         return ItTicketEvent::query()
-            ->where('tenant_id', $tenantId)
             ->where('subject_type', 'it_ticket')
             ->whereHasMorph('subject', [ItTicket::class], fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user))
             ->with(['actor:id,name', 'subject'])
@@ -1596,14 +1585,13 @@ class ItProvisioningController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
-    private function kbArticles(int $tenantId): array
+    private function kbArticles(): array
     {
         if (! Schema::hasTable('it_kb_articles')) {
             return [];
         }
 
         return ItKbArticle::query()
-            ->forTenant($tenantId)
             ->with(['author:id,name', 'owner:id,name', 'service:id,name'])
             ->orderByDesc('updated_at')
             ->limit(200)
@@ -1643,23 +1631,15 @@ class ItProvisioningController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
-    private function kbPublished(int $tenantId, User $user): array
+    private function kbPublished(User $user): array
     {
         if (! Schema::hasTable('it_kb_articles')) {
             return [];
         }
 
-        $profile = HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->where('user_id', $user->id)
-            ->first(['primary_site_id', 'secondary_site_ids']);
-        $userSiteIds = array_values(array_filter([
-            $profile?->primary_site_id,
-            ...($profile?->secondary_site_ids ?? []),
-        ]));
+        $userSiteIds = $this->workAccess->approvedSiteIds($user);
 
         return ItKbArticle::query()
-            ->forTenant($tenantId)
             ->published()
             ->whereIn('audience', ['all_staff', 'specific_sites'])
             ->with('service:id,name')
@@ -1701,5 +1681,49 @@ class ItProvisioningController extends Controller
         }
 
         return checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1]) ? $value : null;
+    }
+
+    private function staffMemberMatchesScope(User $staff, ?int $siteId, bool $isOrganisationWide): bool
+    {
+        if ($staff->approved_at === null
+            || $staff->hasRole('client')
+            || $staff->hasRole('next_of_kin')
+            || in_array($staff->role, ['client', 'next_of_kin'], true)) {
+            return false;
+        }
+
+        if ($isOrganisationWide) {
+            return $siteId === null;
+        }
+
+        return $siteId !== null
+            && in_array($siteId, $this->workAccess->approvedSiteIds($staff), true);
+    }
+
+    private function agentMatchesScope(User $agent, ?int $siteId, bool $isOrganisationWide): bool
+    {
+        if (! ItStaffDirectory::agents()->contains('id', $agent->id)) {
+            return false;
+        }
+        if ($isOrganisationWide) {
+            return $siteId === null && $agent->canDo('it.organisationWide');
+        }
+
+        return $this->staffMemberMatchesScope($agent, $siteId, false);
+    }
+
+    private function assetIsAvailable(int $assetId, ?int $siteId, bool $isOrganisationWide): bool
+    {
+        $asset = Asset::query()
+            ->whereKey($assetId)
+            ->where('status', 'active')
+            ->first();
+        if (! $asset) {
+            return false;
+        }
+
+        return $isOrganisationWide
+            ? $siteId === null
+            : $siteId !== null && (int) $asset->site_id === $siteId;
     }
 }

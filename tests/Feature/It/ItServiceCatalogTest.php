@@ -6,17 +6,17 @@ use App\Models\ItCatalogSubmission;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItTicket;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Notifications\It\TicketCreatedNotification;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Notification;
 
-function catalogUser(string $role, int $tenantId = 1): User
+function catalogUser(string $role): User
 {
     $user = User::factory()->create([
         'role' => $role,
         'approved_at' => now(),
-        'organization_id' => $tenantId,
     ]);
     $user->roles()->syncWithoutDetaching([
         Role::query()->where('name', $role)->first()->id,
@@ -55,19 +55,43 @@ function catalogSchema(): array
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->worker = catalogUser('support_worker');
     $this->agent = catalogUser('hr');
+    $this->workerProfile = HrEmployeeProfile::factory()->create([
+        'user_id' => $this->worker->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+        'created_by' => $this->agent->id,
+        'updated_by' => $this->agent->id,
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->agent->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+        'created_by' => $this->agent->id,
+        'updated_by' => $this->agent->id,
+    ]);
 });
 
-test('published catalogue discovery is tenant scoped and strips internal fields for requesters', function () {
+test('published catalogue discovery is application-wide and strips internal fields for requesters', function () {
     ItCatalogItem::factory()->create([
         'tenant_id' => 1,
         'name' => 'Request Microsoft 365 access',
         'slug' => 'request-microsoft-365-access',
+        'sort_order' => 10,
         'form_schema' => catalogSchema(),
     ]);
     ItCatalogItem::factory()->unpublished()->create(['tenant_id' => 1, 'name' => 'Draft request']);
-    ItCatalogItem::factory()->create(['tenant_id' => 2, 'name' => 'Other tenant request']);
+    ItCatalogItem::factory()->create([
+        'tenant_id' => 1,
+        'name' => 'Request a desk phone',
+        'sort_order' => 20,
+    ]);
 
     $this->actingAs($this->worker)
         ->getJson('/it/catalog?q=microsoft')
@@ -85,7 +109,7 @@ test('published catalogue discovery is tenant scoped and strips internal fields 
     $this->actingAs($this->worker)
         ->get('/it')
         ->assertInertia(fn ($page) => $page
-            ->has('catalogItems', 1)
+            ->has('catalogItems', 2)
             ->where('catalogItems.0.name', 'Request Microsoft 365 access')
             ->has('kbPublished'));
 });
@@ -200,10 +224,7 @@ test('security catalogue intake creates a security request in the shared ticket 
 });
 
 test('provisioning catalogue intake creates the canonical provisioning record and timeline only', function () {
-    $profile = HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
-        'user_id' => $this->worker->id,
-    ]);
+    $profile = $this->workerProfile;
     $item = ItCatalogItem::factory()->provisioning()->create([
         'name' => 'Request a replacement laptop',
         'provisioning_type' => 'equipment',
@@ -230,9 +251,9 @@ test('provisioning catalogue intake creates the canonical provisioning record an
         ->and($submission->result->is($provisioning))->toBeTrue();
 });
 
-test('a requester cannot submit an unpublished or foreign tenant catalogue item', function () {
+test('a requester cannot submit an unpublished or internal-only catalogue item', function () {
     $draft = ItCatalogItem::factory()->unpublished()->create(['tenant_id' => 1]);
-    $foreign = ItCatalogItem::factory()->create(['tenant_id' => 2]);
+    $internal = ItCatalogItem::factory()->create(['tenant_id' => 1, 'internal_only' => true]);
     $payload = [
         'schema_version' => 1,
         'idempotency_key' => 'blocked',
@@ -243,6 +264,6 @@ test('a requester cannot submit an unpublished or foreign tenant catalogue item'
         ->post("/it/catalog/{$draft->id}/submissions", $payload)
         ->assertNotFound();
     $this->actingAs($this->worker)
-        ->post("/it/catalog/{$foreign->id}/submissions", $payload)
+        ->post("/it/catalog/{$internal->id}/submissions", $payload)
         ->assertNotFound();
 });

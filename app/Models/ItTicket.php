@@ -129,20 +129,19 @@ class ItTicket extends Model
     {
         // Every ticket gets a human-facing reference (IT-000123) — filled
         // here so factories and secondary write paths never miss it. The
-        // tenant-unique index is the backstop; createWithReference() adds
+        // legacy composite index is the current backstop; createWithReference() adds
         // the retry for genuinely concurrent creates.
         static::creating(function (self $ticket) {
             if (! $ticket->reference) {
-                $ticket->reference = static::nextReference((int) ($ticket->tenant_id ?? 0));
+                $ticket->reference = static::nextReference();
             }
         });
     }
 
-    /** Next per-tenant sequence value, based on the highest stamped so far. */
-    public static function nextReference(int $tenantId): string
+    /** Next application sequence value, based on the highest stamped so far. */
+    public static function nextReference(): string
     {
         $max = (int) static::query()
-            ->forTenant($tenantId)
             ->whereNotNull('reference')
             ->selectRaw('MAX(CAST(SUBSTRING(reference, 4) AS UNSIGNED)) AS seq')
             ->value('seq');
@@ -340,22 +339,19 @@ class ItTicket extends Model
     /* ------------------------------------------------------------------ */
 
     /**
-     * Stamp/restamp the SLA due dates from the tenant policy for the
+     * Stamp/restamp the SLA due dates from the application policy for the
      * ticket's CURRENT priority, anchored at creation — a priority change
      * re-targets the same clock, it doesn't restart it. Mutates without
      * saving; callers persist.
      */
     public function stampSlaDueDates(): void
     {
-        [$firstResponseMinutes, $resolutionMinutes] = ItSlaPolicy::minutesFor(
-            (int) $this->tenant_id,
-            (string) $this->priority,
-        );
+        [$firstResponseMinutes, $resolutionMinutes] = ItSlaPolicy::minutesFor((string) $this->priority);
 
-        $calendar = ItSlaPolicy::calendarFor((int) $this->tenant_id, (string) $this->priority);
+        $calendar = ItSlaPolicy::calendarFor((string) $this->priority);
         $anchor = $this->created_at ?? now();
 
-        // Working-time targets when the tenant set a business-hours calendar;
+        // Working-time targets when the application has a business-hours calendar;
         // a null calendar keeps the continuous 24/7 clock (unchanged). ->utc()
         // so a worker-timezone result stores as the correct instant.
         $this->first_response_due_at = BusinessHours::addWorkingMinutes($anchor, $firstResponseMinutes, $calendar)->utc();

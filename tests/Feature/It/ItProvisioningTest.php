@@ -8,12 +8,13 @@ use App\Domain\Hr\Services\OnboardingService;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItTicket;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
-function itProfile(): HrEmployeeProfile
+function itProfile(Site $site, ?User $user = null, bool $current = false): HrEmployeeProfile
 {
-    $user = User::factory()->create();
+    $user ??= User::factory()->create();
 
     return HrEmployeeProfile::query()->create([
         'tenant_id' => 1,
@@ -23,7 +24,8 @@ function itProfile(): HrEmployeeProfile
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
-        'start_date' => now()->addDays(10)->toDateString(),
+        'primary_site_id' => $site->id,
+        'start_date' => ($current ? now()->subDays(10) : now()->addDays(10))->toDateString(),
         'is_active' => true,
     ]);
 }
@@ -41,12 +43,25 @@ function itChecklist(HrEmployeeProfile $profile): HrOnboardingChecklist
     ]);
 }
 
+function itProvisioningAgent(Site $site): User
+{
+    $user = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    $user->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'hr')->firstOrFail()->id,
+    ]);
+    itProfile($site, $user, true);
+
+    return $user;
+}
+
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
     ]);
+    itProfile($this->site, $this->hr, true);
     $this->svc = app(OnboardingService::class);
 });
 
@@ -106,7 +121,7 @@ test('generating a checklist raises provisioning requests for non-equipment IT t
         ],
     ]);
 
-    $profile = itProfile();
+    $profile = itProfile($this->site);
     $checklist = $this->svc->generateChecklist($profile, $this->hr->id);
 
     $requests = ItProvisioningRequest::query()
@@ -142,7 +157,7 @@ test('generating a checklist raises provisioning requests for non-equipment IT t
 });
 
 test('fulfilling a request records the outcome and completes the linked onboarding task', function () {
-    $profile = itProfile();
+    $profile = itProfile($this->site);
     $checklist = itChecklist($profile);
     $task = HrOnboardingTask::query()->create([
         'checklist_id' => $checklist->id,
@@ -186,6 +201,37 @@ test('fulfilling a request records the outcome and completes the linked onboardi
     expect($request->fresh()->external_ref)->toBe('M365-0042');
 });
 
+test('provisioning lists and direct actions conceal inaccessible Sites', function () {
+    $localProfile = itProfile($this->site);
+    $local = ItProvisioningRequest::query()->create([
+        'tenant_id' => 1,
+        'employee_profile_id' => $localProfile->id,
+        'type' => 'account',
+        'item' => 'Local email',
+        'status' => 'pending',
+    ]);
+    $remoteSite = Site::factory()->create();
+    $remoteProfile = itProfile($remoteSite);
+    $remote = ItProvisioningRequest::query()->create([
+        'tenant_id' => 1,
+        'employee_profile_id' => $remoteProfile->id,
+        'type' => 'account',
+        'item' => 'Remote email',
+        'status' => 'pending',
+    ]);
+
+    $this->actingAs($this->hr)
+        ->get('/it?tab=provisioning')
+        ->assertInertia(fn ($page) => $page
+            ->where('requests.data.0.id', $local->id)
+            ->has('requests.data', 1));
+
+    $this->actingAs($this->hr)
+        ->post("/it/provisioning/{$remote->id}/fulfil", ['notes' => 'Forged request'])
+        ->assertNotFound();
+    expect($remote->fresh()->status)->toBe('pending');
+});
+
 test('tickets can be created and resolved from the helpdesk queue', function () {
     $this->actingAs($this->hr)
         ->post('/it/tickets', [
@@ -193,6 +239,7 @@ test('tickets can be created and resolved from the helpdesk queue', function () 
             'description' => 'Kyocera in the office is not responding.',
             'category' => 'hardware',
             'priority' => 'high',
+            'site_id' => $this->site->id,
         ])
         ->assertRedirect();
 
@@ -227,8 +274,8 @@ test('tickets can be created and resolved from the helpdesk queue', function () 
 });
 
 test('provisioning assign, fulfil and cancel each write an activity event', function () {
-    $profile = itProfile();
-    $agent = User::factory()->create();
+    $profile = itProfile($this->site);
+    $agent = itProvisioningAgent($this->site);
 
     $request = ItProvisioningRequest::query()->create([
         'tenant_id' => 1,
@@ -268,8 +315,8 @@ test('provisioning assign, fulfil and cancel each write an activity event', func
 });
 
 test('an agent raises a manual provisioning request; requesters cannot', function () {
-    $profile = itProfile();
-    $agent = User::factory()->create();
+    $profile = itProfile($this->site);
+    $agent = itProvisioningAgent($this->site);
 
     // Assigned manual request → in_progress, with a `created` event.
     $this->actingAs($this->hr)
@@ -307,6 +354,7 @@ test('an agent raises a manual provisioning request; requesters cannot', functio
     $worker->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'support_worker')->first()->id,
     ]);
+    itProfile($this->site, $worker, true);
     $this->actingAs($worker)
         ->post('/it/provisioning', [
             'employee_profile_id' => $profile->id,
@@ -318,7 +366,7 @@ test('an agent raises a manual provisioning request; requesters cannot', functio
 });
 
 test('an agent raises a ticket linked to a provisioning request; requesters cannot link', function () {
-    $profile = itProfile();
+    $profile = itProfile($this->site);
     $req = ItProvisioningRequest::query()->create([
         'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
@@ -333,6 +381,7 @@ test('an agent raises a ticket linked to a provisioning request; requesters cann
             'title' => 'Laptop arrived cracked',
             'category' => 'hardware',
             'priority' => 'high',
+            'site_id' => $this->site->id,
             'provisioning_request_id' => $req->id,
         ])
         ->assertRedirect();
@@ -347,6 +396,7 @@ test('an agent raises a ticket linked to a provisioning request; requesters cann
     $worker->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'support_worker')->first()->id,
     ]);
+    itProfile($this->site, $worker, true);
     $this->actingAs($worker)
         ->post('/it/tickets', [
             'title' => 'Requester link attempt',
@@ -359,7 +409,7 @@ test('an agent raises a ticket linked to a provisioning request; requesters cann
 });
 
 test('an agent exports the provisioning queue as CSV; requesters cannot', function () {
-    $profile = itProfile();
+    $profile = itProfile($this->site);
     ItProvisioningRequest::query()->create([
         'tenant_id' => 1, 'employee_profile_id' => $profile->id,
         'type' => 'account', 'item' => 'Email account', 'status' => 'pending', 'priority' => 'high',
@@ -369,10 +419,12 @@ test('an agent exports the provisioning queue as CSV; requesters cannot', functi
         'tenant_id' => 1, 'employee_profile_id' => $profile->id,
         'type' => 'other', 'item' => '=cmd|calc', 'status' => 'pending',
     ]);
-    // A foreign-tenant row never leaks into the export.
+    // A request from an inaccessible Site never leaks into the export.
+    $remoteSite = Site::factory()->create();
+    $remoteProfile = itProfile($remoteSite);
     ItProvisioningRequest::query()->create([
-        'tenant_id' => 2, 'employee_profile_id' => $profile->id,
-        'type' => 'account', 'item' => 'Foreign-tenant secret', 'status' => 'pending',
+        'tenant_id' => 1, 'employee_profile_id' => $remoteProfile->id,
+        'type' => 'account', 'item' => 'Remote Site secret', 'status' => 'pending',
     ]);
 
     $response = $this->actingAs($this->hr)->get('/it/provisioning/export');
@@ -385,8 +437,8 @@ test('an agent exports the provisioning queue as CSV; requesters cannot', functi
     // Formula-injection guard: the leading `=` is prefixed with an apostrophe.
     expect($csv)->toContain("'=cmd|calc");
     expect($csv)->not->toContain(',=cmd|calc');
-    // Tenant scope holds.
-    expect($csv)->not->toContain('Foreign-tenant secret');
+    // Site scope holds.
+    expect($csv)->not->toContain('Remote Site secret');
 
     // Self-service requesters (no it.view) cannot export the agent queue.
     $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
@@ -397,7 +449,7 @@ test('an agent exports the provisioning queue as CSV; requesters cannot', functi
 });
 
 test('the provisioning export respects the status filter', function () {
-    $profile = itProfile();
+    $profile = itProfile($this->site);
     ItProvisioningRequest::query()->create([
         'tenant_id' => 1, 'employee_profile_id' => $profile->id,
         'type' => 'account', 'item' => 'Pending item', 'status' => 'pending',

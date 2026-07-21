@@ -83,7 +83,6 @@ function apiBoundaryIdentity(User $actor, array $overrides = []): array
 {
     return app(ItServiceIdentityCredentialService::class)->create(
         $actor,
-        1,
         [
             'name' => 'Scoped native monitoring intake',
             'description' => 'Focused API boundary test identity.',
@@ -502,7 +501,6 @@ test('comment and transition services reauthorize the locked canonical ticket be
         $credential['identity'],
         $staleTransitionTicket,
         new ItTransitionInput(
-            tenantId: (int) $staleTransitionTicket->tenant_id,
             actor: $this->actor,
             to: ItWorkflowState::InProgress,
             reason: 'Must not transition.',
@@ -559,7 +557,7 @@ test('identity setup cannot borrow another execution accounts wider Sites or exc
         ->post('/it/setup/api-identities', $payload)
         ->assertSessionHasErrors(['allowed_site_ids.0', 'abilities']);
 
-    expect(fn () => app(ItServiceIdentityCredentialService::class)->create($this->actor, 1, [
+    expect(fn () => app(ItServiceIdentityCredentialService::class)->create($this->actor, [
         ...$payload,
         'allowed_fields' => [
             'create' => $payload['create_fields'],

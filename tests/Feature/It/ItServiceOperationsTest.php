@@ -41,12 +41,11 @@ use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 
-function serviceOperationsUser(string $role = 'hr', int $tenantId = 1): User
+function serviceOperationsUser(string $role = 'hr'): User
 {
     $user = User::factory()->create([
         'role' => $role,
         'approved_at' => now(),
-        'organization_id' => $tenantId,
     ]);
     $user->roles()->syncWithoutDetaching([
         Role::query()->where('name', $role)->first()->id,
@@ -55,13 +54,16 @@ function serviceOperationsUser(string $role = 'hr', int $tenantId = 1): User
     return $user;
 }
 
-function serviceOperationsAssignSite(User $user): Site
+function serviceOperationsAssignSite(User $user, ?Site $site = null): Site
 {
-    $site = Site::factory()->create();
+    $site ??= Site::factory()->create();
     HrEmployeeProfile::factory()->create([
         'user_id' => $user->id,
         'primary_site_id' => $site->id,
         'secondary_site_ids' => [],
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
         'created_by' => $user->id,
         'updated_by' => $user->id,
     ]);
@@ -137,6 +139,8 @@ test('knowledge follows review publish and retire lifecycle with ownership scope
     $site = Site::factory()->create(['tenant_id' => 1]);
     $service = ItService::factory()->create(['tenant_id' => 1]);
     $owner = serviceOperationsUser();
+    serviceOperationsAssignSite($this->manager, $site);
+    serviceOperationsAssignSite($owner, $site);
     HrEmployeeProfile::factory()->create([
         'tenant_id' => 1,
         'user_id' => $this->worker->id,
@@ -331,7 +335,7 @@ test('provisioning cancellation mail is visible and can be retried safely', func
         ]);
 
     $deliveries->recordProviderStatus($delivery->notification_uuid, 'failed', 'Provider unavailable.');
-    $retry = $deliveries->retry($delivery, $this->manager, 1);
+    $retry = $deliveries->retry($delivery, $this->manager);
 
     expect($delivery->fresh()->status)->toBe('retried')
         ->and($retry->it_provisioning_request_id)->toBe($provisioning->id)
@@ -434,14 +438,14 @@ test('every IT mail type creates a visible delivery and can be retried safely', 
 
     foreach (ItEmailDelivery::query()->get() as $delivery) {
         $deliveries->recordProviderStatus($delivery->notification_uuid, 'failed', 'Provider unavailable.');
-        $deliveries->retry($delivery, $this->manager, 1);
+        $deliveries->retry($delivery, $this->manager);
     }
     expect(ItEmailDelivery::query()->count())->toBe(14)
         ->and(ItEmailDelivery::query()->where('status', 'retried')->count())->toBe(7)
         ->and(ItEmailDelivery::query()->where('status', 'queued')->count())->toBe(7);
 });
 
-test('the authenticated delivery callback records bounces without exposing another tenant', function () {
+test('the authenticated delivery callback records ordered bounces without exposing other deliveries', function () {
     config(['it.outbound_mail.status_secret' => 'delivery-secret']);
     $delivery = ItEmailDelivery::factory()->create(['tenant_id' => 1, 'status' => 'queued']);
 
@@ -640,7 +644,7 @@ test('backlog age buckets are half open and never double count boundaries', func
         ->and($data['over_30_days']['count'])->toBe(0);
 });
 
-test('setup shows a tenant-safe operations audit for channels automations and configuration gaps', function () {
+test('setup shows an access-safe operations audit for channels automations and configuration gaps', function () {
     $site = serviceOperationsAssignSite($this->manager);
     $ticket = ItTicket::factory()->create(['tenant_id' => 1, 'site_id' => $site->id]);
     ItEmailDelivery::factory()->create([

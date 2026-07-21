@@ -3,9 +3,11 @@
 namespace App\Domain\It\Services;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\ItMajorIncident;
 use App\Models\ItQueue;
 use App\Models\ItTeam;
 use App\Models\ItTicket;
+use App\Models\ItTicketLink;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -96,6 +98,44 @@ final class ItWorkAccessService
         return $canonical !== null
             && $user->canDo('it.manage')
             && $this->staffCanAccess($user, $canonical);
+    }
+
+    /**
+     * The audience-safe major-incident status feed is also available to a
+     * requester named on a canonically linked affected incident. This grants
+     * no access to the major-incident workspace or its internal updates.
+     */
+    public function canViewMajorIncidentStatus(User $user, ItMajorIncident $majorIncident): bool
+    {
+        $ticketId = ItMajorIncident::query()
+            ->whereKey($majorIncident->getKey())
+            ->value('ticket_id');
+        if (! is_numeric($ticketId)) {
+            return false;
+        }
+
+        $ticket = ItTicket::query()->find((int) $ticketId);
+        if (! $ticket) {
+            return false;
+        }
+        if ($this->canView($user, $ticket)) {
+            return true;
+        }
+
+        $incidentIds = ItTicketLink::query()
+            ->where('ticket_id', $ticket->id)
+            ->where('relationship', 'related_incident')
+            ->where('linkable_type', (new ItTicket)->getMorphClass())
+            ->pluck('linkable_id');
+
+        return ItTicket::query()
+            ->whereKey($incidentIds)
+            ->where('work_type', 'incident')
+            ->where(function (Builder $participant) use ($user): void {
+                $participant->where('requester_user_id', $user->id)
+                    ->orWhere('requested_for_user_id', $user->id);
+            })
+            ->exists();
     }
 
     /**

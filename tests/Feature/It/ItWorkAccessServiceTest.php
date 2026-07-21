@@ -343,7 +343,7 @@ test('ticket and child policies delegate direct reads and writes to the canonica
         ->and(Gate::forUser($unrelatedAgent)->allows('decide', $approval))->toBeFalse();
 });
 
-test('merge requires canonical work access to both source and target without tenant equality', function () {
+test('merge requires canonical work access to both source and target regardless of legacy storage equality', function () {
     $site = Site::factory()->create();
     $otherSite = Site::factory()->create();
     $agent = itWorkAccessActor(['it.manage']);

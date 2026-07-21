@@ -135,7 +135,7 @@ export interface SlaPolicyRow {
 
 export type SlaPolicyGrid = Record<string, SlaPolicyRow>;
 
-/** The tenant's business-hours calendar, flattened to the editor's single-window view. */
+/** The application's business-hours calendar, flattened to the editor's single-window view. */
 export interface SlaCalendar {
     enabled: boolean;
     open_time: string;
@@ -144,7 +144,7 @@ export interface SlaCalendar {
     holiday_dates: string[];
 }
 
-/** A tenant employee profile, for the manual provisioning-request picker. */
+/** An access-approved employee profile for the manual provisioning-request picker. */
 export interface EmployeeOption {
     id: number;
     name: string;
@@ -2563,7 +2563,9 @@ function KbArticleDialog({
                                     !contentValid
                                 }
                             >
-                                {form.processing ? 'Saving…' : savedState.action}
+                                {form.processing
+                                    ? 'Saving…'
+                                    : savedState.action}
                             </Button>
                         </>
                     ) : (
@@ -2820,10 +2822,7 @@ function KbArticleDialog({
                                     )?.label
                                 }
                             />
-                            <ReviewRow
-                                label="Lifecycle status"
-                                value="Draft"
-                            />
+                            <ReviewRow label="Lifecycle status" value="Draft" />
                         </ReviewCard>
                         <ReviewCard
                             icon={Users}

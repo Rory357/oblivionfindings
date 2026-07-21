@@ -58,7 +58,6 @@ class ItApiWorkItemController extends Controller
                 $identity,
                 $ticket,
                 new ItTransitionInput(
-                    tenantId: (int) $ticket->tenant_id,
                     actor: $identity->actor,
                     to: ItWorkflowState::from((string) $data['to']),
                     reason: $data['reason'] ?? null,

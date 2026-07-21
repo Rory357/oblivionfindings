@@ -20,7 +20,7 @@ beforeEach(function () {
     $this->hr = kbUser('hr');
 });
 
-test('an agent creates a KB article with a tenant-unique slug', function () {
+test('an agent creates a KB article with an application-unique slug', function () {
     $this->actingAs($this->hr)->post('/it/kb', [
         'title' => 'Reset your password',
         'category' => 'account',
@@ -79,10 +79,10 @@ test('agents edit articles and use the governed publish lifecycle while the slug
         ->and($article->fresh()->slug)->toBe($slug);
 });
 
-test('KB authoring is agent-only and tenant-scoped', function () {
+test('KB authoring is agent-only and application-wide', function () {
     $worker = kbUser('support_worker');
     $mine = ItKbArticle::factory()->create(['tenant_id' => 1]);
-    $foreign = ItKbArticle::factory()->create(['tenant_id' => 2]);
+    $shared = ItKbArticle::factory()->create(['tenant_id' => 2]);
 
     // Self-service requesters (no it.manage) cannot author, edit or delete.
     $this->actingAs($worker)->post('/it/kb', [
@@ -91,14 +91,14 @@ test('KB authoring is agent-only and tenant-scoped', function () {
     $this->actingAs($worker)->patch("/it/kb/{$mine->id}", ['title' => 'Nope'])->assertForbidden();
     $this->actingAs($worker)->delete("/it/kb/{$mine->id}")->assertForbidden();
 
-    // An agent cannot reach a foreign-tenant article — 404, not 403, so the
-    // guard never leaks that the article exists in another organisation.
-    $this->actingAs($this->hr)->patch("/it/kb/{$foreign->id}", ['title' => 'Foreign edit'])->assertNotFound();
-    $this->actingAs($this->hr)->post("/it/kb/{$foreign->id}/submit-review")->assertNotFound();
-    $this->actingAs($this->hr)->delete("/it/kb/{$foreign->id}")->assertNotFound();
-    expect($foreign->fresh()->status)->toBe('draft'); // untouched
+    // Legacy storage markers never partition the single application library.
+    $this->actingAs($this->hr)->patch("/it/kb/{$shared->id}", ['title' => 'Shared guidance'])->assertRedirect();
+    $this->actingAs($this->hr)->post("/it/kb/{$shared->id}/submit-review")->assertRedirect();
+    expect($shared->fresh()->status)->toBe('in_review');
+    $this->actingAs($this->hr)->delete("/it/kb/{$shared->id}")->assertRedirect();
+    expect(ItKbArticle::query()->find($shared->id))->toBeNull();
 
-    // The agent deletes their own tenant's article.
+    // The agent can also delete the other application article.
     $this->actingAs($this->hr)->delete("/it/kb/{$mine->id}")->assertRedirect();
     expect(ItKbArticle::query()->find($mine->id))->toBeNull();
 });

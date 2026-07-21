@@ -9,6 +9,7 @@ use App\Models\ItProvisioningRequest;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\User;
+use App\Support\LegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -19,24 +20,29 @@ class ItCatalogSubmissionService
 {
     public function __construct(
         private readonly ItTicketRoutingService $routingService,
+        private readonly ItWorkAccessService $workAccess,
+        private readonly ItProvisioningAccessService $provisioningAccess,
     ) {}
 
     /**
      * @param  array<string, mixed>  $input
      * @return array{submission: ItCatalogSubmission, result: Model, created: bool}
      */
-    public function submit(ItCatalogItem $catalogItem, User $actor, int $tenantId, array $input): array
+    public function submit(ItCatalogItem $catalogItem, User $actor, array $input): array
     {
-        return DB::transaction(function () use ($catalogItem, $actor, $tenantId, $input): array {
+        return DB::transaction(function () use ($catalogItem, $actor, $input): array {
             $item = ItCatalogItem::query()
                 ->whereKey($catalogItem->id)
-                ->where('tenant_id', $tenantId)
                 ->where('is_published', true)
                 ->lockForUpdate()
                 ->firstOrFail();
+            if ($item->internal_only && ! $actor->canDo('it.manage')) {
+                throw ValidationException::withMessages([
+                    'catalog_item' => 'This request is available only to IT staff.',
+                ]);
+            }
 
             $existing = ItCatalogSubmission::query()
-                ->where('tenant_id', $tenantId)
                 ->where('requester_user_id', $actor->id)
                 ->where('idempotency_key', (string) $input['idempotency_key'])
                 ->first();
@@ -66,15 +72,15 @@ class ItCatalogSubmissionService
                 $actor->canDo('it.manage'),
             );
             $result = match ($item->outcome_type) {
-                'service_request', 'security_request' => $this->createTicket($item, $actor, $tenantId, $values),
-                'provisioning' => $this->createProvisioning($item, $actor, $tenantId, $values),
+                'service_request', 'security_request' => $this->createTicket($item, $actor, $values),
+                'provisioning' => $this->createProvisioning($item, $actor, $values),
                 default => throw ValidationException::withMessages([
                     'catalog_item' => 'This catalogue item has an unsupported outcome.',
                 ]),
             };
 
             $submission = ItCatalogSubmission::query()->create([
-                'tenant_id' => $tenantId,
+                'tenant_id' => LegacyStorageContext::id(),
                 'catalog_item_id' => $item->id,
                 'requester_user_id' => $actor->id,
                 'schema_version' => $item->form_schema_version,
@@ -166,15 +172,30 @@ class ItCatalogSubmissionService
     /**
      * @param  array<string, mixed>  $values
      */
-    private function createTicket(ItCatalogItem $item, User $actor, int $tenantId, array $values): ItTicket
+    private function createTicket(ItCatalogItem $item, User $actor, array $values): ItTicket
     {
+        $siteId = $this->workAccess->defaultSiteId($actor);
+        if (! $this->workAccess->canAssignScope($actor, $siteId, false)) {
+            throw ValidationException::withMessages([
+                'catalog_item' => 'An active approved Site is required before this request can be submitted.',
+            ]);
+        }
+        if ($item->it_service_id !== null
+            && ! $item->service()->where('is_active', true)->exists()) {
+            throw ValidationException::withMessages([
+                'catalog_item' => 'The service for this request is not currently available.',
+            ]);
+        }
+
         $ticket = ItTicket::createWithReference([
-            'tenant_id' => $tenantId,
+            'tenant_id' => LegacyStorageContext::id(),
             'title' => $item->name,
             'description' => $this->description($item, $values),
             'requester_user_id' => $actor->id,
             'requested_for_user_id' => $actor->id,
             'it_service_id' => $item->it_service_id,
+            'site_id' => $siteId,
+            'is_organisation_wide' => false,
             'category' => $item->category,
             'priority' => $item->default_priority,
             'impact' => 'individual',
@@ -207,23 +228,22 @@ class ItCatalogSubmissionService
     /**
      * @param  array<string, mixed>  $values
      */
-    private function createProvisioning(ItCatalogItem $item, User $actor, int $tenantId, array $values): ItProvisioningRequest
+    private function createProvisioning(ItCatalogItem $item, User $actor, array $values): ItProvisioningRequest
     {
         $profileQuery = HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
             ->where('is_active', true);
         $profile = isset($values['employee_profile_id'])
             ? $profileQuery->whereKey((int) $values['employee_profile_id'])->first()
             : $profileQuery->where('user_id', $actor->id)->first();
 
-        if (! $profile) {
+        if (! $profile || ! $this->provisioningAccess->canRequestForProfile($actor, $profile)) {
             throw ValidationException::withMessages([
-                'values.employee_profile_id' => 'Choose an active employee profile in this organisation.',
+                'values.employee_profile_id' => 'Choose an active employee profile within your approved Site scope.',
             ]);
         }
 
         $provisioning = ItProvisioningRequest::query()->create([
-            'tenant_id' => $tenantId,
+            'tenant_id' => LegacyStorageContext::id(),
             'employee_profile_id' => $profile->id,
             'type' => $item->provisioning_type ?: 'other',
             'item' => $item->name,

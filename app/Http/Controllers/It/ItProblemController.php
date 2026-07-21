@@ -6,7 +6,6 @@ use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\Services\ItProblemService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\It\StoreItProblemRequest;
 use App\Http\Requests\It\TransitionItProblemRequest;
 use App\Http\Requests\It\UpdateItProblemRequest;
@@ -21,8 +20,6 @@ use Inertia\Inertia;
 
 class ItProblemController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         private readonly ItProblemService $problemService,
         private readonly ItWorkAccessService $workAccess,
@@ -43,7 +40,7 @@ class ItProblemController extends Controller
 
         $problems = ItProblem::query()
             ->whereHas('ticket', fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user))
-            ->with('ticket:id,tenant_id,reference,title,priority,status,workflow_state,next_action,updated_at')
+            ->with('ticket:id,reference,title,priority,status,workflow_state,next_action,updated_at')
             ->when($state !== '', fn ($query) => $query->whereHas('ticket', fn ($ticket) => $ticket->where('workflow_state', $state)))
             ->when($from !== '', fn ($query) => $query->whereDate('created_at', '>=', $from))
             ->when($to !== '', fn ($query) => $query->whereDate('created_at', '<=', $to))
@@ -77,11 +74,10 @@ class ItProblemController extends Controller
     {
         $this->authorize('create', ItProblem::class);
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $data = $this->creationData($user, $request->validated());
 
         try {
-            $problem = $this->problemService->create($user, $tenantId, $data);
+            $problem = $this->problemService->create($user, $data);
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -153,10 +149,8 @@ class ItProblemController extends Controller
         $problem->loadMissing('ticket');
         abort_unless($problem->ticket && $this->workAccess->canWork($user, $problem->ticket), 404);
         $this->authorize('update', $problem);
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
-
         try {
-            $this->problemService->update($problem, $request->user(), $tenantId, $request->validated());
+            $this->problemService->update($problem, $request->user(), $request->validated());
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -170,14 +164,12 @@ class ItProblemController extends Controller
         $problem->loadMissing('ticket');
         abort_unless($problem->ticket && $this->workAccess->canWork($user, $problem->ticket), 404);
         $this->authorize('update', $problem);
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
         $data = $request->validated();
 
         try {
             $this->problemService->transition(
                 $problem,
                 $request->user(),
-                $tenantId,
                 ItWorkflowState::from((string) $data['workflow_state']),
                 (string) $data['reason'],
                 $data['resolution_code'] ?? null,

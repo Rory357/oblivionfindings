@@ -12,7 +12,6 @@ use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\It\Services\ItWorkTransitionService;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Controllers\It\Concerns\BuildsItOptions;
 use App\Http\Controllers\It\Concerns\StoresItAttachments;
 use App\Http\Requests\It\BulkTicketActionRequest;
@@ -32,6 +31,7 @@ use App\Notifications\It\TicketApprovalNotification;
 use App\Notifications\It\TicketAssignedNotification;
 use App\Notifications\It\TicketReopenedNotification;
 use App\Notifications\It\TicketRepliedNotification;
+use App\Support\LegacyStorageContext;
 use DomainException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -45,7 +45,7 @@ use Inertia\Inertia;
  */
 class ItTicketController extends Controller
 {
-    use BuildsItOptions, ResolvesHrTenant, ServesPrivateAttachments, StoresItAttachments;
+    use BuildsItOptions, ServesPrivateAttachments, StoresItAttachments;
 
     public function __construct(
         private readonly ItTicketContextPresenter $contextPresenter,
@@ -74,8 +74,6 @@ class ItTicketController extends Controller
         $user = $request->user();
         abort_unless($this->workAccess->canView($user, $ticket), 404);
         $this->authorize('view', $ticket);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
         $isAgent = $user->canDo('it.view') || $user->canDo('it.manage');
         $canManage = $this->workAccess->canWork($user, $ticket);
@@ -218,14 +216,14 @@ class ItTicketController extends Controller
             'comments' => $comments,
             'events' => $events,
             'linked_context' => $this->contextPresenter->present($ticket, $user),
-            'assignees' => $canManage ? $this->tenantUserOptions($tenantId) : [],
+            'assignees' => $canManage ? $this->staffUserOptions($user, $ticket) : [],
             // Rail picker over the canonical (fleet-)assets register — never
             // a parallel IT register. Agents only.
-            'assetOptions' => $canManage ? $this->assetOptions() : [],
+            'assetOptions' => $canManage ? $this->assetOptions($user, $ticket) : [],
             // §I composer deflection: published articles an agent can reference
             // as they type a reply. Agents (it.view) only — requesters already
             // met the KB at raise time and their payload stays lean.
-            'kbSuggestions' => $isAgent ? $this->kbSuggestions($tenantId) : [],
+            'kbSuggestions' => $isAgent ? $this->kbSuggestions() : [],
             // §P-S2 merge picker: recent live tickets an agent can fold this one
             // into. Agents only; excludes self and already-merged tickets.
             'mergeTargets' => $canManage
@@ -272,15 +270,12 @@ class ItTicketController extends Controller
         if ($request->boolean('is_internal')) {
             abort_unless($this->workAccess->canWork($user, $ticket), 403);
         }
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
-
         $isInternal = $request->boolean('is_internal');
         $isAgentSide = $user->canDo('it.manage');
         $isRequester = (int) $ticket->requester_user_id === (int) $user->id;
 
         $comment = $ticket->comments()->create([
-            'tenant_id' => $ticket->tenant_id,
+            'tenant_id' => LegacyStorageContext::id(),
             'author_user_id' => $user->id,
             'body' => $request->validated('body'),
             'is_internal' => $isInternal,
@@ -303,7 +298,6 @@ class ItTicketController extends Controller
             $ticket = $this->transitionService->transition(
                 $ticket,
                 new ItTransitionInput(
-                    tenantId: $tenantId,
                     actor: $user,
                     to: ItWorkflowState::InProgress,
                     reason: 'Requester replied',
@@ -372,15 +366,12 @@ class ItTicketController extends Controller
         $user = $request->user();
         abort_unless($this->workAccess->canWork($user, $ticket), 404);
         abort_unless($user->can('update', $ticket), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
         $validated = $request->validated();
 
         try {
             $this->transitionService->transition(
                 $ticket,
                 new ItTransitionInput(
-                    tenantId: $tenantId,
                     actor: $user,
                     to: ItWorkflowState::from((string) $validated['workflow_state']),
                     reason: $validated['reason'] ?? null,
@@ -404,9 +395,6 @@ class ItTicketController extends Controller
         $user = $request->user();
         abort_unless($user && $this->workAccess->canWork($user, $ticket), 404);
         abort_unless($user && $user->can('close', $ticket), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
-
         if ($ticket->status === 'closed') {
             return redirect()->back()->with('error', 'This ticket is already closed.');
         }
@@ -415,7 +403,6 @@ class ItTicketController extends Controller
             $this->transitionService->transition(
                 $ticket,
                 new ItTransitionInput(
-                    tenantId: $tenantId,
                     actor: $user,
                     to: ItWorkflowState::Closed,
                     reason: 'Closed by technician',
@@ -438,9 +425,6 @@ class ItTicketController extends Controller
         $user = $request->user();
         abort_unless($this->workAccess->canView($user, $ticket), 404);
         $this->authorize('reopen', $ticket);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
-
         if ($ticket->isMerged()) {
             return redirect()->back()->with('error', 'This ticket was merged into another — reopen the survivor instead.');
         }
@@ -453,7 +437,6 @@ class ItTicketController extends Controller
             $ticket = $this->transitionService->transition(
                 $ticket,
                 new ItTransitionInput(
-                    tenantId: $tenantId,
                     actor: $user,
                     to: ItWorkflowState::Submitted,
                     reason: 'Work reopened',
@@ -536,11 +519,8 @@ class ItTicketController extends Controller
         $user = $request->user();
         abort_unless($this->workAccess->canWork($user, $ticket), 404);
         abort_unless($user->can('requestApproval', $ticket), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
-
         $approval = $ticket->approvals()->create([
-            'tenant_id' => $ticket->tenant_id,
+            'tenant_id' => LegacyStorageContext::id(),
             'requested_by' => $user->id,
             'status' => 'pending',
             'reason' => $request->validated('reason'),
@@ -549,7 +529,8 @@ class ItTicketController extends Controller
         ItTicketEvent::record($ticket, 'approval_requested', $user->id, ['approval_id' => $approval->id]);
 
         // Every agent who could sign off, except the one who asked.
-        $approvers = ItStaffDirectory::agents($tenantId)->reject(fn (User $u) => $u->id === $user->id);
+        $approvers = ItStaffDirectory::agentsForTicket($ticket)
+            ->reject(fn (User $u) => $u->id === $user->id);
         if ($approvers->isNotEmpty()) {
             $this->emailDeliveries->send($approvers, new TicketApprovalNotification($ticket, 'requested'));
         }
@@ -600,9 +581,6 @@ class ItTicketController extends Controller
         $user = $request->user();
         abort_unless($this->workAccess->canView($user, $ticket), 404);
         abort_unless($user->can('csat', $ticket), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
-
         $firstTime = $ticket->csat_submitted_at === null;
         $ticket->csat_score = (int) $request->validated('score');
         $ticket->csat_comment = $request->validated('comment') ?: null;
@@ -623,9 +601,6 @@ class ItTicketController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $this->workAccess->canWork($user, $ticket), 404);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
-
         $attached = $ticket->watchers()->syncWithoutDetaching([$user->id]);
         if (! empty($attached['attached'])) {
             ItTicketEvent::record($ticket, 'watcher_added', $user->id, ['user_id' => $user->id]);
@@ -638,9 +613,6 @@ class ItTicketController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $this->workAccess->canWork($user, $ticket), 404);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
-
         if ($ticket->watchers()->detach($user->id)) {
             ItTicketEvent::record($ticket, 'watcher_removed', $user->id, ['user_id' => $user->id]);
         }
@@ -655,30 +627,22 @@ class ItTicketController extends Controller
     /**
      * One action over many tickets: assign, set priority (restamps the SLA
      * clock), set a working status (waiting transitions bank the pause), or
-     * close. Foreign-tenant ids silently drop out of the tenant-scoped
-     * fetch; settled tickets are skipped rather than mutated — the flash
+     * close. Inaccessible IDs silently drop out of the canonical work-access
+     * query; settled tickets are skipped rather than mutated — the flash
      * reports both as "unchanged". One event row per actual change, same
      * payload shape as the single-ticket routes.
      */
     public function bulk(BulkTicketActionRequest $request)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $validated = $request->validated();
         $action = (string) $validated['action'];
 
         $assignee = null;
         if ($action === 'assign' && ! empty($validated['assigned_to_user_id'])) {
             $assignee = User::query()->find((int) $validated['assigned_to_user_id']);
-            // Same foreign-tenant guard as every other assignment here: reject a
-            // recipient whose HR profile sits in a different organisation.
-            $inOtherTenant = $assignee && HrEmployeeProfile::query()
-                ->where('user_id', $assignee->id)
-                ->whereNotNull('tenant_id')
-                ->where('tenant_id', '!=', $tenantId)
-                ->exists();
-            if ($inOtherTenant) {
-                return redirect()->back()->with('error', 'That colleague is in a different organisation.');
+            if (! $assignee || ! ItStaffDirectory::agents()->contains('id', $assignee->id)) {
+                return redirect()->back()->with('error', 'Choose a current IT technician.');
             }
         }
 
@@ -713,6 +677,9 @@ class ItTicketController extends Controller
     {
         if (! in_array($ticket->status, ItTicket::OPEN_STATUSES, true)) {
             return false; // settled tickets keep their history
+        }
+        if ($assignee && ! $this->workAccess->canWork($assignee, $ticket)) {
+            return false;
         }
         $newId = $assignee?->id;
         if ((int) $ticket->assigned_to_user_id === (int) $newId) {
@@ -774,7 +741,6 @@ class ItTicketController extends Controller
             $this->transitionService->transition(
                 $ticket,
                 new ItTransitionInput(
-                    tenantId: (int) $ticket->tenant_id,
                     actor: $actor,
                     to: $target,
                     reason: $status === 'waiting' ? 'Waiting on requester' : 'Bulk status update',
@@ -799,7 +765,6 @@ class ItTicketController extends Controller
             $this->transitionService->transition(
                 $ticket,
                 new ItTransitionInput(
-                    tenantId: (int) $ticket->tenant_id,
                     actor: $actor,
                     to: ItWorkflowState::Closed,
                     reason: 'Bulk close',

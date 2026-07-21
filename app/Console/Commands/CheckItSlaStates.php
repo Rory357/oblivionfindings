@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Domain\It\ItStaffDirectory;
 use App\Domain\It\Services\ItEmailDeliveryService;
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Models\ItSlaPolicy;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
@@ -13,7 +14,6 @@ use App\Support\It\BusinessHours;
 use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 
 /**
  * §G scheduler, run hourly: re-derives every open ticket's SLA state from
@@ -38,17 +38,14 @@ class CheckItSlaStates extends Command
     /** Minutes an urgent ticket may sit unassigned before admins hear. */
     private const UNASSIGNED_URGENT_MINUTES = 30;
 
-    /** @var array<int, Collection<int, User>> */
-    private array $agentsByTenant = [];
-
-    /** @var array<int, Collection<int, User>> */
-    private array $adminsByTenant = [];
-
     private ItEmailDeliveryService $emailDeliveries;
 
-    public function handle(ItEmailDeliveryService $emailDeliveries): int
+    private ItWorkAccessService $workAccess;
+
+    public function handle(ItEmailDeliveryService $emailDeliveries, ItWorkAccessService $workAccess): int
     {
         $this->emailDeliveries = $emailDeliveries;
+        $this->workAccess = $workAccess;
         $now = now();
         $atRisk = $breached = $escalated = 0;
 
@@ -151,7 +148,7 @@ class CheckItSlaStates extends Command
         // shift); without one it stays wall-clock seconds — the unchanged
         // 24/7 path. Timestamp/working-minute arithmetic on purpose: Carbon
         // diff signs have bitten this codebase before.
-        $calendar = ItSlaPolicy::calendarFor((int) $ticket->tenant_id, (string) $ticket->priority);
+        $calendar = ItSlaPolicy::calendarFor((string) $ticket->priority);
         if ($calendar !== null) {
             $window = BusinessHours::workingMinutesBetween($ticket->created_at, $due, $calendar);
             $remaining = BusinessHours::workingMinutesBetween($now, $due, $calendar);
@@ -178,7 +175,7 @@ class CheckItSlaStates extends Command
             $recipients->push($ticket->assignee);
         }
         if ($state === 'breached') {
-            $recipients = $recipients->merge($this->agents((int) $ticket->tenant_id));
+            $recipients = $recipients->merge(ItStaffDirectory::agentsForTicket($ticket));
         }
 
         $recipients = $recipients->unique('id');
@@ -222,23 +219,13 @@ class CheckItSlaStates extends Command
             'unassigned_minutes' => (int) floor(($now->getTimestamp() - $unassignedSince->getTimestamp()) / 60),
         ]);
 
-        $admins = $this->admins((int) $ticket->tenant_id);
+        $admins = ItStaffDirectory::admins()
+            ->filter(fn (User $admin): bool => $this->workAccess->canWork($admin, $ticket))
+            ->values();
         if ($admins->isNotEmpty()) {
             $this->emailDeliveries->send($admins, new TicketSlaNotification($ticket, 'escalation'));
         }
 
         return true;
-    }
-
-    /** @return Collection<int, User> */
-    private function agents(int $tenantId)
-    {
-        return $this->agentsByTenant[$tenantId] ??= ItStaffDirectory::agents($tenantId);
-    }
-
-    /** @return Collection<int, User> */
-    private function admins(int $tenantId)
-    {
-        return $this->adminsByTenant[$tenantId] ??= ItStaffDirectory::admins($tenantId);
     }
 }

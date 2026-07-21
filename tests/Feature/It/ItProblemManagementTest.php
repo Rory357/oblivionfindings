@@ -1,31 +1,55 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\ItProblem;
 use App\Models\ItTicket;
 use App\Models\ItTicketApproval;
 use App\Models\ItWorkTask;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
-function problemUser(string $role, int $tenantId = 1): User
+function problemUser(string $role, ?Site $site = null): User
 {
     $user = User::factory()->create([
         'role' => $role,
         'approved_at' => now(),
-        'organization_id' => $tenantId,
     ]);
     $user->roles()->syncWithoutDetaching([
         Role::query()->where('name', $role)->first()->id,
     ]);
 
+    if ($site) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+    }
+
     return $user;
+}
+
+/** @param array<string, mixed> $attributes */
+function problemAtSite(Site $site, array $attributes = []): ItProblem
+{
+    $problem = ItProblem::factory()->create($attributes);
+    $problem->ticket()->update(['site_id' => $site->id]);
+
+    return $problem->refresh();
 }
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
-    $this->agent = problemUser('hr');
-    $this->requester = problemUser('support_worker');
+    $this->site = Site::factory()->create();
+    $this->agent = problemUser('hr', $this->site);
+    $this->requester = problemUser('support_worker', $this->site);
 });
 
 test('an agent creates and finds a canonical investigating problem record', function () {
@@ -58,7 +82,7 @@ test('an agent creates and finds a canonical investigating problem record', func
 });
 
 test('root cause workaround and corrective action govern known error resolution and closure', function () {
-    $problem = ItProblem::factory()->create();
+    $problem = problemAtSite($this->site);
 
     $this->actingAs($this->agent)
         ->post("/it/problems/{$problem->id}/transitions", [
@@ -106,13 +130,13 @@ test('root cause workaround and corrective action govern known error resolution 
 });
 
 test('affected incidents and the permanent fix change receive reciprocal typed links', function () {
-    $problem = ItProblem::factory()->create([
+    $problem = problemAtSite($this->site, [
         'workaround' => 'Reconnect through the secondary gateway.',
     ]);
-    $incidentOne = ItTicket::factory()->create(['tenant_id' => 1, 'work_type' => 'incident']);
-    $incidentTwo = ItTicket::factory()->create(['tenant_id' => 1, 'work_type' => 'incident']);
+    $incidentOne = ItTicket::factory()->create(['site_id' => $this->site->id, 'work_type' => 'incident']);
+    $incidentTwo = ItTicket::factory()->create(['site_id' => $this->site->id, 'work_type' => 'incident']);
     $change = ItTicket::factory()->create([
-        'tenant_id' => 1,
+        'site_id' => $this->site->id,
         'work_type' => 'change',
         'workflow_state' => 'draft',
     ]);
@@ -144,7 +168,7 @@ test('affected incidents and the permanent fix change receive reciprocal typed l
 });
 
 test('the problem workspace projects the shared ticket conversation tasks approvals and timeline', function () {
-    $problem = ItProblem::factory()->create();
+    $problem = problemAtSite($this->site);
     $problem->ticket->comments()->create([
         'tenant_id' => 1,
         'author_user_id' => $this->agent->id,
@@ -171,20 +195,21 @@ test('the problem workspace projects the shared ticket conversation tasks approv
             ->where('ticket.events_count', $problem->ticket->events()->count()));
 });
 
-test('problem management is agent only tenant concealed and rejects invalid linked work types', function () {
-    $problem = ItProblem::factory()->create(['tenant_id' => 1]);
+test('problem management is agent only site concealed and rejects invalid linked work types', function () {
+    $problem = problemAtSite($this->site);
 
     $this->actingAs($this->requester)->get('/it/problems')->assertForbidden();
     $this->actingAs($this->requester)
         ->patch("/it/problems/{$problem->id}", ['root_cause' => 'Injected'])
         ->assertForbidden();
 
-    $foreignAgent = problemUser('hr', 2);
-    $this->actingAs($foreignAgent)
+    $otherSite = Site::factory()->create();
+    $remoteSiteAgent = problemUser('hr', $otherSite);
+    $this->actingAs($remoteSiteAgent)
         ->get("/it/problems/{$problem->id}")
         ->assertNotFound();
 
-    $serviceRequest = ItTicket::factory()->create(['tenant_id' => 1, 'work_type' => 'service_request']);
+    $serviceRequest = ItTicket::factory()->create(['site_id' => $this->site->id, 'work_type' => 'service_request']);
     $this->actingAs($this->agent)
         ->patch("/it/problems/{$problem->id}", ['incident_ids' => [$serviceRequest->id]])
         ->assertRedirect()

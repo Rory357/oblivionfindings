@@ -6,7 +6,6 @@ use App\Domain\It\ItStaffDirectory;
 use App\Domain\It\Services\ItCatalogSubmissionService;
 use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\It\StoreCatalogRequest;
 use App\Models\ItCatalogItem;
 use App\Models\ItTicket;
@@ -16,8 +15,6 @@ use Illuminate\Http\Request;
 
 class ItCatalogController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         private readonly ItCatalogSubmissionService $submissionService,
         private readonly ItEmailDeliveryService $emailDeliveries,
@@ -27,12 +24,10 @@ class ItCatalogController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $includeInternal = $user->canDo('it.manage');
         $search = trim((string) $request->query('q', ''));
 
         $items = ItCatalogItem::query()
-            ->forTenant($tenantId)
             ->published()
             ->when(! $includeInternal, fn ($query) => $query->where('internal_only', false))
             ->when($search !== '', function ($query) use ($search) {
@@ -54,20 +49,18 @@ class ItCatalogController extends Controller
     public function store(StoreCatalogRequest $request, int $catalogItem)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $item = ItCatalogItem::query()
-            ->forTenant($tenantId)
             ->published()
             ->when(! $user->canDo('it.manage'), fn ($query) => $query->where('internal_only', false))
             ->findOrFail($catalogItem);
 
-        $outcome = $this->submissionService->submit($item, $user, $tenantId, $request->validated());
+        $outcome = $this->submissionService->submit($item, $user, $request->validated());
         $result = $outcome['result'];
 
         if ($outcome['created'] && $result instanceof ItTicket) {
             $this->emailDeliveries->send($user, new TicketCreatedNotification($result, 'receipt'));
             if ($result->priority === 'urgent') {
-                $agents = ItStaffDirectory::agents($tenantId)
+                $agents = ItStaffDirectory::agentsForTicket($result)
                     ->reject(fn (User $agent) => $agent->id === $user->id);
                 $this->emailDeliveries->send($agents, new TicketCreatedNotification($result, 'urgent_alert'));
             }

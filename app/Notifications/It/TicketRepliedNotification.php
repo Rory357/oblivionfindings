@@ -28,7 +28,6 @@ class TicketRepliedNotification extends Notification implements ShouldQueue, Tra
     public function itEmailDeliveryContext(): array
     {
         return [
-            'tenant_id' => (int) $this->ticket->tenant_id,
             'ticket_id' => (int) $this->ticket->id,
             'comment_id' => $this->commentId,
             'audience' => $this->audience,

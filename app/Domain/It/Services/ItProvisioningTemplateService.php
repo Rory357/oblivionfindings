@@ -3,22 +3,28 @@
 namespace App\Domain\It\Services;
 
 use App\Models\ItProvisioningTemplate;
+use App\Models\ItTeam;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Support\LegacyStorageContext;
 use DomainException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 final class ItProvisioningTemplateService
 {
-    /** @param array<string, mixed> $data */
-    public function create(User $actor, int $tenantId, array $data): ItProvisioningTemplate
-    {
-        $this->guard($actor, $tenantId);
+    public function __construct(private readonly ItWorkAccessService $workAccess) {}
 
-        return DB::transaction(function () use ($actor, $tenantId, $data): ItProvisioningTemplate {
+    /** @param array<string, mixed> $data */
+    public function create(User $actor, array $data): ItProvisioningTemplate
+    {
+        $this->guard($actor);
+        $this->guardData($actor, $data);
+
+        return DB::transaction(function () use ($actor, $data): ItProvisioningTemplate {
             $template = ItProvisioningTemplate::query()->create([
-                'tenant_id' => $tenantId,
+                'tenant_id' => LegacyStorageContext::id(),
                 'created_by_user_id' => $actor->id,
                 'updated_by_user_id' => $actor->id,
                 ...Arr::only($data, [
@@ -28,7 +34,7 @@ final class ItProvisioningTemplateService
             ]);
             $this->replaceTasks($template, $data['tasks']);
             AuditLogger::logOrFail('it.provisioning.template.created', $template, [
-                'organization_id' => $tenantId,
+                'application_scope' => 'single_installation',
                 'actor_id' => $actor->id,
                 'lifecycle_type' => $template->lifecycle_type,
                 'task_count' => count($data['tasks']),
@@ -39,14 +45,16 @@ final class ItProvisioningTemplateService
     }
 
     /** @param array<string, mixed> $data */
-    public function update(ItProvisioningTemplate $template, User $actor, int $tenantId, array $data): ItProvisioningTemplate
+    public function update(ItProvisioningTemplate $template, User $actor, array $data): ItProvisioningTemplate
     {
-        $this->guard($actor, $tenantId);
-        if ((int) $template->tenant_id !== $tenantId) {
-            throw new DomainException('That provisioning template belongs to another organisation.');
-        }
+        $this->guard($actor);
+        $this->guardData($actor, $data);
 
-        return DB::transaction(function () use ($template, $actor, $tenantId, $data): ItProvisioningTemplate {
+        return DB::transaction(function () use ($template, $actor, $data): ItProvisioningTemplate {
+            $template = ItProvisioningTemplate::query()
+                ->whereKey($template->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
             $template->update([
                 'updated_by_user_id' => $actor->id,
                 ...Arr::only($data, [
@@ -56,7 +64,7 @@ final class ItProvisioningTemplateService
             ]);
             $this->replaceTasks($template, $data['tasks']);
             AuditLogger::logOrFail('it.provisioning.template.updated', $template, [
-                'organization_id' => $tenantId,
+                'application_scope' => 'single_installation',
                 'actor_id' => $actor->id,
                 'lifecycle_type' => $template->lifecycle_type,
                 'task_count' => count($data['tasks']),
@@ -80,11 +88,39 @@ final class ItProvisioningTemplateService
         }
     }
 
-    private function guard(User $actor, int $tenantId): void
+    private function guard(User $actor): void
     {
-        if (! $actor->canDo('it.manage')
-            || ($actor->organization_id !== null && (int) $actor->organization_id !== $tenantId)) {
+        if ($actor->approved_at === null || ! $actor->canDo('it.manage')) {
             throw new DomainException('You are not allowed to manage provisioning templates.');
+        }
+    }
+
+    /** @param array<string, mixed> $data */
+    private function guardData(User $actor, array $data): void
+    {
+        $siteId = is_numeric($data['site_id'] ?? null) ? (int) $data['site_id'] : null;
+        if ($siteId !== null) {
+            $siteIsOperational = Site::query()
+                ->whereKey($siteId)
+                ->where('is_active', true)
+                ->where('archived', false)
+                ->whereNull('archived_at')
+                ->exists();
+            if (! $siteIsOperational
+                || (! $actor->canDo('it.organisationWide')
+                    && ! in_array($siteId, $this->workAccess->approvedSiteIds($actor), true))) {
+                throw new DomainException('Provisioning templates can only use an approved active Site.');
+            }
+        }
+
+        $teamIds = collect((array) ($data['tasks'] ?? []))
+            ->pluck('responsible_team_id')
+            ->filter(fn (mixed $id): bool => is_numeric($id))
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique();
+        if ($teamIds->isNotEmpty()
+            && ItTeam::query()->whereKey($teamIds)->where('is_active', true)->count() !== $teamIds->count()) {
+            throw new DomainException('Provisioning tasks can only use active IT teams.');
         }
     }
 }

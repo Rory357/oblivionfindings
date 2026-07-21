@@ -4,6 +4,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItTicket;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
@@ -17,9 +18,9 @@ function itReportsUser(string $role): User
     return $user;
 }
 
-function reportsProfile(): HrEmployeeProfile
+function reportsProfile(Site $site, ?User $user = null): HrEmployeeProfile
 {
-    $user = User::factory()->create();
+    $user ??= User::factory()->create();
 
     return HrEmployeeProfile::query()->create([
         'tenant_id' => 1,
@@ -29,22 +30,26 @@ function reportsProfile(): HrEmployeeProfile
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
-        'start_date' => now()->addDays(10)->toDateString(),
+        'primary_site_id' => $site->id,
+        'start_date' => now()->subDays(10)->toDateString(),
         'is_active' => true,
     ]);
 }
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->agent = itReportsUser('hr');            // it.view + it.manage
     $this->worker = itReportsUser('support_worker'); // it.request only
+    reportsProfile($this->site, $this->agent);
+    reportsProfile($this->site, $this->worker);
 });
 
-test('reports are agent-only and a young tenant gets a zeroed, well-formed report', function () {
+test('reports are agent-only and an empty installation gets a zeroed well-formed report', function () {
     // A self-service requester (no it.view) is refused the analytics endpoint.
     $this->actingAs($this->worker)->getJson('/it/reports/data')->assertForbidden();
 
-    // An agent on an empty tenant gets zeros/nulls, never a 500.
+    // An agent with no visible work gets zeros/nulls, never a 500.
     $json = $this->actingAs($this->agent)->getJson('/it/reports/data')->assertOk()->json();
 
     expect($json['kpis']['open'])->toBe(0);
@@ -61,6 +66,7 @@ test('reports are agent-only and a young tenant gets a zeroed, well-formed repor
 test('the report aggregates tickets and provisioning across the range', function () {
     $mk = fn (array $attrs) => ItTicket::factory()->create(array_merge([
         'tenant_id' => 1,
+        'site_id' => $this->site->id,
         'requester_user_id' => $this->worker->id,
         'category' => 'hardware',
     ], $attrs));
@@ -85,7 +91,7 @@ test('the report aggregates tickets and provisioning across the range', function
     ]);
 
     // Provisioning: 2 pending raised + 1 done fulfilled 2 days after raising.
-    $profile = reportsProfile();
+    $profile = reportsProfile($this->site);
     ItProvisioningRequest::query()->create(['tenant_id' => 1, 'employee_profile_id' => $profile->id, 'type' => 'account', 'item' => 'Email', 'status' => 'pending']);
     ItProvisioningRequest::query()->create(['tenant_id' => 1, 'employee_profile_id' => $profile->id, 'type' => 'access', 'item' => 'VPN', 'status' => 'pending']);
     $done = ItProvisioningRequest::query()->create(['tenant_id' => 1, 'employee_profile_id' => $profile->id, 'type' => 'account', 'item' => 'AD', 'status' => 'done']);
@@ -138,6 +144,7 @@ test('per-card CSV export is agent-only, correct and injection-guarded', functio
     $evil->forceFill(['name' => '=cmd|calc'])->save();
     ItTicket::factory()->create([
         'tenant_id' => 1,
+        'site_id' => $this->site->id,
         'requester_user_id' => $evil->id,
         'status' => 'open',
         'priority' => 'high',

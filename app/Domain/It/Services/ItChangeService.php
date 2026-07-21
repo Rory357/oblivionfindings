@@ -12,6 +12,7 @@ use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\LegacyStorageContext;
 use DomainException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
@@ -29,15 +30,25 @@ class ItChangeService
     public function __construct(
         private readonly ItWorkTransitionService $transitionService,
         private readonly ItTicketLinkService $linkService,
+        private readonly ItWorkAccessService $workAccess,
     ) {}
 
     /** @param array<string, mixed> $data */
-    public function create(User $actor, int $tenantId, array $data): ItChange
+    public function create(User $actor, array $data): ItChange
     {
-        return DB::transaction(function () use ($actor, $tenantId, $data): ItChange {
+        return DB::transaction(function () use ($actor, $data): ItChange {
+            if (! $this->workAccess->canAssignScope(
+                $actor,
+                $data['site_id'] ?? null,
+                (bool) ($data['is_organisation_wide'] ?? false),
+            )) {
+                throw new DomainException('Choose an approved Site or authorised organisation-wide scope.');
+            }
+
+            $storageContextId = LegacyStorageContext::id();
             $requiresApproval = $this->dataNeedsApproval($data);
             $ticket = ItTicket::createWithReference([
-                'tenant_id' => $tenantId,
+                'tenant_id' => $storageContextId,
                 'title' => $data['title'],
                 'description' => $data['description'] ?? null,
                 'requester_user_id' => $actor->id,
@@ -62,7 +73,7 @@ class ItChangeService
             ]);
 
             $change = ItChange::query()->create([
-                'tenant_id' => $tenantId,
+                'tenant_id' => $storageContextId,
                 'ticket_id' => $ticket->id,
                 ...Arr::only($data, self::PROFILE_FIELDS),
                 'created_by_user_id' => $actor->id,
@@ -75,10 +86,10 @@ class ItChangeService
     }
 
     /** @param array<string, mixed> $data */
-    public function update(ItChange $change, User $actor, int $tenantId, array $data): ItChange
+    public function update(ItChange $change, User $actor, array $data): ItChange
     {
-        return DB::transaction(function () use ($change, $actor, $tenantId, $data): ItChange {
-            $change = $this->lockedChange($change, $actor, $tenantId);
+        return DB::transaction(function () use ($change, $actor, $data): ItChange {
+            $change = $this->lockedChange($change, $actor);
             $ticket = $change->ticket()->lockForUpdate()->firstOrFail();
 
             $governanceFields = array_intersect(array_keys($data), ['change_type', 'risk_level', 'is_restricted']);
@@ -118,7 +129,6 @@ class ItChangeService
     public function transition(
         ItChange $change,
         User $actor,
-        int $tenantId,
         ItWorkflowState $state,
         string $reason,
         ?string $resolutionCode = null,
@@ -127,18 +137,16 @@ class ItChangeService
         return DB::transaction(function () use (
             $change,
             $actor,
-            $tenantId,
             $state,
             $reason,
             $resolutionCode,
             $resolutionSummary,
         ): ItChange {
-            $change = $this->lockedChange($change, $actor, $tenantId);
+            $change = $this->lockedChange($change, $actor);
             $ticket = $change->ticket;
             $this->guardTransition($change, $actor, $state);
 
             $this->transitionService->transition($ticket, new ItTransitionInput(
-                tenantId: $tenantId,
                 actor: $actor,
                 to: $state,
                 reason: $reason,
@@ -234,18 +242,19 @@ class ItChangeService
         }
     }
 
-    private function lockedChange(ItChange $change, User $actor, int $tenantId): ItChange
+    private function lockedChange(ItChange $change, User $actor): ItChange
     {
-        if (! $actor->canDo('it.manage')) {
-            throw new DomainException('You are not allowed to manage IT changes.');
-        }
-
-        return ItChange::query()
+        $locked = ItChange::query()
             ->whereKey($change->id)
-            ->where('tenant_id', $tenantId)
             ->with('ticket')
             ->lockForUpdate()
             ->firstOrFail();
+
+        if (! $locked->ticket || ! $this->workAccess->canWork($actor, $locked->ticket)) {
+            throw new DomainException('You are not allowed to manage IT changes.');
+        }
+
+        return $locked;
     }
 
     /** @param array<string, mixed> $data */
@@ -320,7 +329,7 @@ class ItChangeService
             ->get()
             ->keyBy('id');
         if ($targets->count() !== count(array_unique($ids))) {
-            throw new DomainException('Every related work item must have the expected type in this organisation.');
+            throw new DomainException('Every related work item must have the expected work type.');
         }
 
         $existing = $source->links()

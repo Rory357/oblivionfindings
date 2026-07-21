@@ -1,7 +1,9 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\ItTicket;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -25,55 +27,71 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->agent = itMergeUser('hr');              // holds it.manage
     $this->worker = itMergeUser('support_worker'); // it.request only
+    $this->site = Site::factory()->create();
+    foreach ([$this->agent, $this->worker] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+    }
 });
 
+function mergeTicket(array $overrides = []): ItTicket
+{
+    return ItTicket::factory()->create([
+        'site_id' => test()->site->id,
+        ...$overrides,
+    ]);
+}
+
 test('an agent may merge two distinct live tickets', function () {
-    $source = ItTicket::factory()->create(['tenant_id' => 1, 'status' => 'open']);
-    $target = ItTicket::factory()->create(['tenant_id' => 1, 'status' => 'open']);
+    $source = mergeTicket(['status' => 'open']);
+    $target = mergeTicket(['status' => 'open']);
 
     expect($this->agent->can('merge', [$source, $target]))->toBeTrue();
 });
 
 test('a requester cannot merge tickets', function () {
-    $source = ItTicket::factory()->create(['tenant_id' => 1, 'status' => 'open']);
-    $target = ItTicket::factory()->create(['tenant_id' => 1, 'status' => 'open']);
+    $source = mergeTicket(['status' => 'open']);
+    $target = mergeTicket(['status' => 'open']);
 
     expect($this->worker->can('merge', [$source, $target]))->toBeFalse();
 });
 
 test('a ticket cannot be merged into itself', function () {
-    $ticket = ItTicket::factory()->create(['tenant_id' => 1, 'status' => 'open']);
+    $ticket = mergeTicket(['status' => 'open']);
 
     expect($this->agent->can('merge', [$ticket, $ticket]))->toBeFalse();
 });
 
 test('an already-merged source cannot be merged again', function () {
-    $target = ItTicket::factory()->create(['tenant_id' => 1, 'status' => 'open']);
-    $source = ItTicket::factory()->create([
-        'tenant_id' => 1,
+    $target = mergeTicket(['status' => 'open']);
+    $source = mergeTicket([
         'status' => 'closed',
         'merged_into_ticket_id' => $target->id,
         'merged_at' => now(),
     ]);
-    $other = ItTicket::factory()->create(['tenant_id' => 1, 'status' => 'open']);
+    $other = mergeTicket(['status' => 'open']);
 
     expect($this->agent->can('merge', [$source, $other]))->toBeFalse();
 });
 
 test('a closed target cannot receive a merge', function () {
-    $source = ItTicket::factory()->create(['tenant_id' => 1, 'status' => 'open']);
-    $target = ItTicket::factory()->create(['tenant_id' => 1, 'status' => 'closed']);
+    $source = mergeTicket(['status' => 'open']);
+    $target = mergeTicket(['status' => 'closed']);
 
     expect($this->agent->can('merge', [$source, $target]))->toBeFalse();
 });
 
 test('merging folds the conversation and watchers onto the survivor and closes the source', function () {
-    $source = ItTicket::factory()->create([
-        'tenant_id' => 1,
+    $source = mergeTicket([
         'status' => 'open',
         'requester_user_id' => $this->worker->id,
     ]);
-    $target = ItTicket::factory()->create(['tenant_id' => 1, 'status' => 'open']);
+    $target = mergeTicket(['status' => 'open']);
 
     $source->comments()->create([
         'tenant_id' => 1,
@@ -103,9 +121,8 @@ test('merging folds the conversation and watchers onto the survivor and closes t
 });
 
 test('a merged source cannot be reopened', function () {
-    $target = ItTicket::factory()->create(['tenant_id' => 1, 'status' => 'open']);
-    $source = ItTicket::factory()->create([
-        'tenant_id' => 1,
+    $target = mergeTicket(['status' => 'open']);
+    $source = mergeTicket([
         'status' => 'closed',
         'merged_into_ticket_id' => $target->id,
         'merged_at' => now(),
@@ -121,15 +138,13 @@ test('a merged source cannot be reopened', function () {
 });
 
 test('the workspace offers live merge targets to agents but not requesters', function () {
-    $me = ItTicket::factory()->create([
-        'tenant_id' => 1,
+    $me = mergeTicket([
         'status' => 'open',
         'requester_user_id' => $this->worker->id,
     ]);
-    $candidate = ItTicket::factory()->create(['tenant_id' => 1, 'status' => 'open']);
+    $candidate = mergeTicket(['status' => 'open']);
     // A closed-away merged ticket must never be offered as a target.
-    ItTicket::factory()->create([
-        'tenant_id' => 1,
+    mergeTicket([
         'status' => 'closed',
         'merged_into_ticket_id' => $candidate->id,
         'merged_at' => now(),

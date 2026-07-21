@@ -34,7 +34,6 @@ class ItMajorIncidentPolicy
 
     public function viewStatus(User $user, ItMajorIncident $majorIncident): bool
     {
-        return $majorIncident->ticket !== null
-            && $this->access->canView($user, $majorIncident->ticket);
+        return $this->access->canViewMajorIncidentStatus($user, $majorIncident);
     }
 }

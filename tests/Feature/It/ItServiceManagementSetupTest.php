@@ -1,20 +1,21 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AuditLog;
 use App\Models\ItQueue;
 use App\Models\ItService;
 use App\Models\ItTeam;
 use App\Models\ItTicket;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
-function serviceManagementSetupUser(string $role = 'hr', int $tenantId = 1): User
+function serviceManagementSetupUser(string $role = 'hr'): User
 {
     $user = User::factory()->create([
         'role' => $role,
         'approved_at' => now(),
-        'organization_id' => $tenantId,
     ]);
     $user->roles()->syncWithoutDetaching([
         Role::query()->where('name', $role)->first()->id,
@@ -23,12 +24,29 @@ function serviceManagementSetupUser(string $role = 'hr', int $tenantId = 1): Use
     return $user;
 }
 
+function serviceManagementAssignSite(User $user, Site $site): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+        'created_by' => $user->id,
+        'updated_by' => $user->id,
+    ]);
+}
+
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->manager = serviceManagementSetupUser();
     $this->member = serviceManagementSetupUser();
     $this->assignee = serviceManagementSetupUser();
     $this->requester = serviceManagementSetupUser('support_worker');
+    foreach ([$this->manager, $this->member, $this->assignee, $this->requester] as $user) {
+        serviceManagementAssignSite($user, $this->site);
+    }
 });
 
 test('IT pages share the approved grouped navigation while preserving existing deep links', function () {
@@ -62,7 +80,7 @@ test('IT pages share the approved grouped navigation while preserving existing d
             ->where('itNavigation.0.label', 'Service Desk'));
 });
 
-test('agents configure tenant teams membership roles services and queue routing with audit', function () {
+test('agents configure application teams membership roles services and queue routing with audit', function () {
     $this->actingAs($this->manager)
         ->post('/it/setup/teams', [
             'name' => 'Network operations',
@@ -162,6 +180,7 @@ test('ticket intake applies the highest priority matching queue service owner te
             'priority' => 'urgent',
             'work_type' => 'incident',
             'it_service_id' => $service->id,
+            'site_id' => $this->site->id,
         ])
         ->assertRedirect()
         ->assertSessionDoesntHaveErrors();
@@ -175,12 +194,22 @@ test('ticket intake applies the highest priority matching queue service owner te
         ->and($ticket->events()->where('type', 'routing_applied')->exists())->toBeTrue();
 });
 
-test('setup exposes workload counts and keeps all configuration tenant concealed', function () {
+test('setup exposes Site-scoped workload counts and keeps configuration application-wide', function () {
     $team = ItTeam::factory()->create(['tenant_id' => 1]);
     $queue = ItQueue::factory()->create(['tenant_id' => 1, 'team_id' => $team->id]);
     $service = ItService::factory()->create(['tenant_id' => 1]);
     ItTicket::factory()->count(2)->create([
         'tenant_id' => 1,
+        'site_id' => $this->site->id,
+        'team_id' => $team->id,
+        'queue_id' => $queue->id,
+        'it_service_id' => $service->id,
+        'status' => 'open',
+    ]);
+    $remoteSite = Site::factory()->create();
+    ItTicket::factory()->create([
+        'tenant_id' => 1,
+        'site_id' => $remoteSite->id,
         'team_id' => $team->id,
         'queue_id' => $queue->id,
         'it_service_id' => $service->id,
@@ -198,17 +227,20 @@ test('setup exposes workload counts and keeps all configuration tenant concealed
 
     $this->actingAs($this->requester)->get('/it/setup')->assertForbidden();
 
-    $foreignAgent = serviceManagementSetupUser('hr', 2);
-    $this->actingAs($foreignAgent)
-        ->patch("/it/setup/teams/{$team->id}", ['name' => 'Foreign rename'])
-        ->assertNotFound();
+    $remoteManager = serviceManagementSetupUser('hr');
+    serviceManagementAssignSite($remoteManager, $remoteSite);
+    $this->actingAs($remoteManager)
+        ->patch("/it/setup/teams/{$team->id}", ['name' => 'Shared service desk'])
+        ->assertRedirect()
+        ->assertSessionDoesntHaveErrors();
+    expect($team->fresh()->name)->toBe('Shared service desk');
 
-    $foreignService = ItService::factory()->create(['tenant_id' => 2]);
+    $archivedSite = Site::factory()->create(['is_active' => false, 'archived' => true, 'archived_at' => now()]);
     $this->actingAs($this->manager)
         ->post('/it/setup/queues', [
             'key' => 'invalid',
             'name' => 'Invalid queue',
-            'service_ids' => [$foreignService->id],
+            'site_ids' => [$archivedSite->id],
         ])
-        ->assertSessionHasErrors('service_ids.0');
+        ->assertSessionHasErrors('site_ids.0');
 });

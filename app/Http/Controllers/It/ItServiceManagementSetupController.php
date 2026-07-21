@@ -10,7 +10,6 @@ use App\Domain\It\Services\ItServiceIdentityCredentialService;
 use App\Domain\It\Services\ItServiceManagementSetupService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\It\SaveItQueueRequest;
 use App\Http\Requests\It\SaveItServiceRequest;
 use App\Http\Requests\It\SaveItTeamRequest;
@@ -37,8 +36,6 @@ use Inertia\Inertia;
 
 class ItServiceManagementSetupController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         private readonly ItServiceManagementSetupService $setupService,
         private readonly ItServiceIdentityCredentialService $identityCredentials,
@@ -51,18 +48,22 @@ class ItServiceManagementSetupController extends Controller
     public function index(Request $request)
     {
         $this->authorize('viewAny', ItTeam::class);
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        $user = $request->user();
+        $approvedSiteIds = $this->workAccess->approvedSiteIds($user);
         $automationPeriod = $request->validate([
             'automation_from' => ['nullable', 'date_format:Y-m-d'],
             'automation_to' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
         $teams = ItTeam::query()
-            ->forTenant($tenantId)
             ->with(['manager:id,name', 'members:id,name'])
             ->withCount([
-                'tickets as open_tickets_count' => fn ($query) => $query->whereIn('status', ItTicket::OPEN_STATUSES),
-                'tasks as open_tasks_count' => fn ($query) => $query->whereIn('status', ['pending', 'in_progress', 'blocked']),
+                'tickets as open_tickets_count' => fn ($query) => $this->workAccess
+                    ->applyViewScope($query, $user)
+                    ->whereIn('status', ItTicket::OPEN_STATUSES),
+                'tasks as open_tasks_count' => fn ($query) => $query
+                    ->whereHas('ticket', fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user))
+                    ->whereIn('status', ['pending', 'in_progress', 'blocked']),
                 'queues', 'members',
             ])
             ->orderBy('name')
@@ -87,12 +88,11 @@ class ItServiceManagementSetupController extends Controller
             ])->values();
 
         $queues = ItQueue::query()
-            ->forTenant($tenantId)
             ->with('team:id,name')
             ->withCount([
-                'tickets as open_tickets_count' => fn ($query) => $query->whereIn('status', ItTicket::OPEN_STATUSES),
-                'tickets as unassigned_count' => fn ($query) => $query->whereIn('status', ItTicket::OPEN_STATUSES)->whereNull('assigned_to_user_id'),
-                'tickets as sla_risk_count' => fn ($query) => $query->whereIn('status', ItTicket::OPEN_STATUSES)->whereIn('sla_state', ['at_risk', 'breached']),
+                'tickets as open_tickets_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereIn('status', ItTicket::OPEN_STATUSES),
+                'tickets as unassigned_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereIn('status', ItTicket::OPEN_STATUSES)->whereNull('assigned_to_user_id'),
+                'tickets as sla_risk_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereIn('status', ItTicket::OPEN_STATUSES)->whereIn('sla_state', ['at_risk', 'breached']),
             ])
             ->orderBy('name')
             ->get()
@@ -112,11 +112,10 @@ class ItServiceManagementSetupController extends Controller
             ])->values();
 
         $services = ItService::query()
-            ->forTenant($tenantId)
             ->with('owner:id,name')
             ->withCount([
-                'tickets as open_tickets_count' => fn ($query) => $query->whereIn('status', ItTicket::OPEN_STATUSES),
-                'tickets as sla_risk_count' => fn ($query) => $query->whereIn('status', ItTicket::OPEN_STATUSES)->whereIn('sla_state', ['at_risk', 'breached']),
+                'tickets as open_tickets_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereIn('status', ItTicket::OPEN_STATUSES),
+                'tickets as sla_risk_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereIn('status', ItTicket::OPEN_STATUSES)->whereIn('sla_state', ['at_risk', 'breached']),
             ])
             ->orderBy('name')
             ->get()
@@ -136,12 +135,11 @@ class ItServiceManagementSetupController extends Controller
             ])->values();
 
         $apiIdentities = ItServiceIdentity::query()
-            ->forTenant($tenantId)
             ->with(['actor:id,name', 'creator:id,name'])
             ->latest('id')
             ->get()
             ->filter(fn (ItServiceIdentity $identity): bool => $this->identityCredentials
-                ->canManage($request->user(), $identity, $tenantId))
+                ->canManage($user, $identity))
             ->map(fn (ItServiceIdentity $identity) => [
                 'id' => $identity->id,
                 'public_id' => $identity->public_id,
@@ -163,7 +161,14 @@ class ItServiceManagementSetupController extends Controller
             ])->values();
 
         $provisioningTemplates = ItProvisioningTemplate::query()
-            ->forTenant($tenantId)
+            ->when(! $user->canDo('it.organisationWide'), function ($templates) use ($approvedSiteIds): void {
+                $templates->where(function ($visible) use ($approvedSiteIds): void {
+                    $visible->whereNull('site_id');
+                    if ($approvedSiteIds !== []) {
+                        $visible->orWhereIn('site_id', $approvedSiteIds);
+                    }
+                });
+            })
             ->with(['site:id,name', 'tasks.responsibleTeam:id,name'])
             ->orderBy('lifecycle_type')
             ->orderByDesc('selection_priority')
@@ -205,7 +210,6 @@ class ItServiceManagementSetupController extends Controller
 
         $deliveryRows = Schema::hasTable('it_email_deliveries')
             ? $this->emailDeliveries->visibleQuery($request->user())
-                ->forTenant($tenantId)
                 ->with([
                     'ticket:id,reference,title',
                     'provisioningRequest:id,item',
@@ -218,16 +222,14 @@ class ItServiceManagementSetupController extends Controller
             : collect();
         $failedDeliveryCount = Schema::hasTable('it_email_deliveries')
             ? $this->emailDeliveries->visibleQuery($request->user())
-                ->forTenant($tenantId)
                 ->whereIn('status', ['failed', 'bounced'])
                 ->count()
             : 0;
         $automationDefinitions = Schema::hasTable('it_automation_runs')
-            ? $this->automationCatalog->definitions($tenantId)
+            ? $this->automationCatalog->definitions()
             : [];
         $automationRuns = Schema::hasTable('it_automation_runs')
             ? ItAutomationRun::query()
-                ->forTenantOrSystem($tenantId)
                 ->when($automationPeriod['automation_from'] ?? null, fn ($query, $from) => $query->whereDate('started_at', '>=', $from))
                 ->when($automationPeriod['automation_to'] ?? null, fn ($query, $to) => $query->whereDate('started_at', '<=', $to))
                 ->latest('id')
@@ -235,13 +237,13 @@ class ItServiceManagementSetupController extends Controller
                 ->get()
             : collect();
         $catalogItems = Schema::hasTable('it_catalog_items')
-            ? ItCatalogItem::query()->forTenant($tenantId)->get()
+            ? ItCatalogItem::query()->get()
             : collect();
         $mailboxes = Schema::hasTable('it_mailbox_connections')
-            ? ItMailboxConnection::query()->where('tenant_id', $tenantId)->get()
+            ? ItMailboxConnection::query()->get()
             : collect();
         $apiErrors = Schema::hasTable('it_api_requests')
-            ? ItApiRequest::query()->forTenant($tenantId)->where('response_status', '>=', 400)->count()
+            ? ItApiRequest::query()->where('response_status', '>=', 400)->count()
             : 0;
 
         $operationsAudit = [
@@ -280,7 +282,7 @@ class ItServiceManagementSetupController extends Controller
             ],
             'slas' => [
                 'custom_policies' => Schema::hasTable('it_sla_policies')
-                    ? ItSlaPolicy::query()->where('tenant_id', $tenantId)->count()
+                    ? ItSlaPolicy::query()->count()
                     : 0,
                 'effective_priorities' => count(ItSlaPolicy::DEFAULTS),
             ],
@@ -334,18 +336,28 @@ class ItServiceManagementSetupController extends Controller
                 'runtime_ms' => $run->runtime_ms,
                 'error_summary' => $run->error_summary,
             ])->values(),
-            'agents' => $this->identityCredentials->delegableExecutionAccounts($request->user(), $tenantId)
+            'agents' => $this->identityCredentials->delegableExecutionAccounts($user)
                 ->sortBy('name')
                 ->map(fn (User $user) => $this->userOption($user))
                 ->values(),
             'sites' => Site::query()
-                ->where('tenant_id', $tenantId)
-                ->whereKey($this->workAccess->approvedSiteIds($request->user()))
+                ->whereKey($approvedSiteIds)
                 ->where('is_active', true)
+                ->where('archived', false)
+                ->whereNull('archived_at')
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'positionRoles' => HrEmployeeProfile::query()
-                ->where('tenant_id', $tenantId)
+                ->where(function ($visible) use ($user, $approvedSiteIds): void {
+                    if ($approvedSiteIds !== []) {
+                        $visible->whereIn('primary_site_id', $approvedSiteIds);
+                    } else {
+                        $visible->whereRaw('1 = 0');
+                    }
+                    if ($user->canDo('it.organisationWide')) {
+                        $visible->orWhereNull('primary_site_id');
+                    }
+                })
                 ->whereNotNull('position_role')
                 ->where('position_role', '!=', '')
                 ->distinct()
@@ -360,56 +372,55 @@ class ItServiceManagementSetupController extends Controller
     {
         $this->authorize('create', ItTeam::class);
 
-        return $this->run($request, fn (int $tenantId) => $this->setupService
-            ->createTeam($request->user(), $tenantId, $request->validated()), 'Team created.');
+        return $this->run(fn () => $this->setupService
+            ->createTeam($request->user(), $request->validated()), 'Team created.');
     }
 
     public function updateTeam(SaveItTeamRequest $request, ItTeam $team)
     {
         $this->authorize('update', $team);
 
-        return $this->run($request, fn (int $tenantId) => $this->setupService
-            ->updateTeam($team, $request->user(), $tenantId, $request->validated()), 'Team updated.');
+        return $this->run(fn () => $this->setupService
+            ->updateTeam($team, $request->user(), $request->validated()), 'Team updated.');
     }
 
     public function storeQueue(SaveItQueueRequest $request)
     {
         $this->authorize('create', ItQueue::class);
 
-        return $this->run($request, fn (int $tenantId) => $this->setupService
-            ->createQueue($request->user(), $tenantId, $request->validated()), 'Queue created.');
+        return $this->run(fn () => $this->setupService
+            ->createQueue($request->user(), $request->validated()), 'Queue created.');
     }
 
     public function updateQueue(SaveItQueueRequest $request, ItQueue $queue)
     {
         $this->authorize('update', $queue);
 
-        return $this->run($request, fn (int $tenantId) => $this->setupService
-            ->updateQueue($queue, $request->user(), $tenantId, $request->validated()), 'Queue updated.');
+        return $this->run(fn () => $this->setupService
+            ->updateQueue($queue, $request->user(), $request->validated()), 'Queue updated.');
     }
 
     public function storeService(SaveItServiceRequest $request)
     {
         $this->authorize('create', ItService::class);
 
-        return $this->run($request, fn (int $tenantId) => $this->setupService
-            ->createService($request->user(), $tenantId, $request->validated()), 'Service created.');
+        return $this->run(fn () => $this->setupService
+            ->createService($request->user(), $request->validated()), 'Service created.');
     }
 
     public function updateService(SaveItServiceRequest $request, ItService $service)
     {
         $this->authorize('update', $service);
 
-        return $this->run($request, fn (int $tenantId) => $this->setupService
-            ->updateService($service, $request->user(), $tenantId, $request->validated()), 'Service updated.');
+        return $this->run(fn () => $this->setupService
+            ->updateService($service, $request->user(), $request->validated()), 'Service updated.');
     }
 
     public function storeIdentity(StoreItServiceIdentityRequest $request)
     {
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
         try {
             $data = $request->validated();
-            $credential = $this->identityCredentials->create($request->user(), $tenantId, [
+            $credential = $this->identityCredentials->create($request->user(), [
                 ...$data,
                 'allowed_fields' => [
                     'create' => array_values($data['create_fields']),
@@ -431,9 +442,8 @@ class ItServiceManagementSetupController extends Controller
 
     public function revokeIdentity(Request $request, ItServiceIdentity $identity)
     {
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
         try {
-            $this->identityCredentials->revoke($identity, $request->user(), $tenantId);
+            $this->identityCredentials->revoke($identity, $request->user());
         } catch (DomainException) {
             abort(404);
         }
@@ -443,9 +453,8 @@ class ItServiceManagementSetupController extends Controller
 
     public function storeProvisioningTemplate(StoreItProvisioningTemplateRequest $request)
     {
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
         try {
-            $this->provisioningTemplates->create($request->user(), $tenantId, $request->validated());
+            $this->provisioningTemplates->create($request->user(), $request->validated());
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -458,13 +467,10 @@ class ItServiceManagementSetupController extends Controller
         StoreItProvisioningTemplateRequest $request,
         ItProvisioningTemplate $template,
     ) {
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
-        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
         try {
             $this->provisioningTemplates->update(
                 $template,
                 $request->user(),
-                $tenantId,
                 $request->validated(),
             );
         } catch (DomainException $exception) {
@@ -490,12 +496,11 @@ class ItServiceManagementSetupController extends Controller
         return redirect()->back()->with('success', 'Email queued for another delivery attempt.');
     }
 
-    /** @param callable(int): mixed $action */
-    private function run(Request $request, callable $action, string $success)
+    /** @param callable(): mixed $action */
+    private function run(callable $action, string $success)
     {
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
         try {
-            $action($tenantId);
+            $action();
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }

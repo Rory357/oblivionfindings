@@ -73,24 +73,24 @@ it('provides the shared service management persistence contract', function () {
         ]))->toBeTrue();
 });
 
-it('relates tenant scoped teams queues services tasks and ticket ownership', function () {
+it('relates application-owned teams queues services tasks and canonical ticket ownership', function () {
     $manager = User::factory()->create();
     $member = User::factory()->create();
     $requester = User::factory()->create();
     $requestedFor = User::factory()->create();
-    $site = Site::factory()->create(['tenant_id' => 42]);
+    $site = Site::factory()->create(['tenant_id' => 1]);
     $team = ItTeam::factory()->create([
-        'tenant_id' => 42,
+        'tenant_id' => 1,
         'manager_user_id' => $manager->id,
     ]);
     $team->members()->attach($member->id, ['role' => 'member']);
-    $queue = ItQueue::factory()->for($team, 'team')->create(['tenant_id' => 42]);
+    $queue = ItQueue::factory()->for($team, 'team')->create(['tenant_id' => 1]);
     $service = ItService::factory()->create([
-        'tenant_id' => 42,
+        'tenant_id' => 1,
         'owner_user_id' => $manager->id,
     ]);
     $ticket = ItTicket::factory()->create([
-        'tenant_id' => 42,
+        'tenant_id' => 1,
         'requester_user_id' => $requester->id,
         'requested_for_user_id' => $requestedFor->id,
         'owner_user_id' => $manager->id,
@@ -106,12 +106,12 @@ it('relates tenant scoped teams queues services tasks and ticket ownership', fun
         'due_at' => now()->addDay(),
     ]);
     $parentTask = ItWorkTask::factory()->for($ticket, 'ticket')->create([
-        'tenant_id' => 42,
+        'tenant_id' => 1,
         'team_id' => $team->id,
         'is_required' => true,
     ]);
     $childTask = ItWorkTask::factory()->for($ticket, 'ticket')->create([
-        'tenant_id' => 42,
+        'tenant_id' => 1,
         'parent_task_id' => $parentTask->id,
         'assigned_to_user_id' => $member->id,
     ]);
@@ -131,9 +131,7 @@ it('relates tenant scoped teams queues services tasks and ticket ownership', fun
         ->and($ticket->due_at)->not->toBeNull()
         ->and($ticket->tasks()->count())->toBe(2)
         ->and($childTask->parent->is($parentTask))->toBeTrue()
-        ->and($parentTask->children()->sole()->is($childTask))->toBeTrue()
-        ->and(ItTeam::forTenant(42)->sole()->is($team))->toBeTrue()
-        ->and(ItTeam::forTenant(7)->doesntExist())->toBeTrue();
+        ->and($parentTask->children()->sole()->is($childTask))->toBeTrue();
 });
 
 it('retains existing work types and declares the new governed relationships', function () {

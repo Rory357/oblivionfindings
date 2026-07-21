@@ -34,17 +34,16 @@ class UpdateKbArticleRequest extends FormRequest
             'site_scope' => ['nullable', 'array', 'max:100', 'required_if:audience,specific_sites'],
             'site_scope.*' => [
                 'integer',
-                Rule::exists('sites', 'id')->where(fn ($query) => $query->where('tenant_id', $this->user()?->organization_id)),
+                Rule::exists('sites', 'id')->where(fn ($query) => $query
+                    ->where('is_active', true)
+                    ->where('archived', false)
+                    ->whereNull('archived_at')),
             ],
-            'owner_user_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('users', 'id')->where(fn ($query) => $query->where('organization_id', $this->user()?->organization_id)),
-            ],
+            'owner_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'related_service_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('it_services', 'id')->where(fn ($query) => $query->where('tenant_id', $this->user()?->organization_id)),
+                Rule::exists('it_services', 'id')->where(fn ($query) => $query->where('is_active', true)),
             ],
             'review_due_at' => ['nullable', 'date'],
         ];

@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\DB;
 
 final class ItWorkTransitionService
 {
+    public function __construct(
+        private readonly ItWorkAccessService $workAccess,
+    ) {}
+
     /**
      * Allowed type-specific state changes. Shared legacy routes are adapted
      * separately so existing deep links remain compatible while every write
@@ -98,10 +102,6 @@ final class ItWorkTransitionService
         return DB::transaction(function () use ($ticket, $input): ItTicket {
             $locked = ItTicket::query()->whereKey($ticket->getKey())->lockForUpdate()->firstOrFail();
 
-            if ((int) $locked->tenant_id !== $input->tenantId) {
-                throw new DomainException('A work transition must stay in the same tenant.');
-            }
-
             $from = $this->currentState($locked);
             $to = $input->to->value;
 
@@ -174,10 +174,6 @@ final class ItWorkTransitionService
 
     private function authorizeActor(ItTicket $ticket, ItTransitionInput $input, string $from): void
     {
-        if ($input->actor->canDo('it.manage')) {
-            return;
-        }
-
         $requesterReply = $input->source === 'requester_reply'
             && (int) $ticket->requester_user_id === (int) $input->actor->id
             && $from === ItWorkflowState::Waiting->value
@@ -186,7 +182,9 @@ final class ItWorkTransitionService
         $requesterReopen = in_array($input->source, ['reopen', 'legacy_reopen'], true)
             && $input->actor->can('reopen', $ticket);
 
-        if (! $requesterReply && ! $requesterReopen) {
+        if (! $requesterReply
+            && ! $requesterReopen
+            && ! $this->workAccess->canWork($input->actor, $ticket)) {
             throw new DomainException('The actor is not allowed to transition this work item.');
         }
     }

@@ -34,7 +34,6 @@ class TicketSlaNotification extends Notification implements ShouldQueue, TracksI
         };
 
         return [
-            'tenant_id' => (int) $this->ticket->tenant_id,
             'ticket_id' => (int) $this->ticket->id,
             'type' => 'ticket_sla',
             'subject' => $subject,

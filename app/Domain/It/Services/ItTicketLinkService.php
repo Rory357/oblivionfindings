@@ -14,6 +14,7 @@ use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
 use App\Services\UserSiteAccessService;
+use App\Support\LegacyStorageContext;
 use DomainException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -286,7 +287,7 @@ final class ItTicketLinkService
             'linkable_type' => $target->getMorphClass(),
             'linkable_id' => $target->getKey(),
         ], [
-            'tenant_id' => $ticket->tenant_id,
+            'tenant_id' => LegacyStorageContext::id(),
             'context' => $context,
             'created_by_user_id' => $actorUserId,
         ]);
@@ -304,7 +305,7 @@ final class ItTicketLinkService
             'linkable_type' => $target->getMorphClass(),
             'linkable_id' => $target->getKey(),
         ], [
-            'tenant_id' => $ticket->tenant_id,
+            'tenant_id' => LegacyStorageContext::id(),
             'context' => $context,
             'created_by_user_id' => null,
         ]);

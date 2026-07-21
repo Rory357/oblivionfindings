@@ -2,7 +2,7 @@
  * it.reports.data (never full tables) and renders the KPI row, the created-vs-
  * resolved trend, priority/category donuts, SLA/CSAT readouts and the people +
  * provisioning panels. A range picker drives the from/to params; skeletons
- * while loading; a taught empty state for a young tenant. Colours are design
+ * while loading; a taught empty state for a young service. Colours are design
  * tokens only (no raw hex). */
 import { Button } from '@/components/ui/button';
 import axios from 'axios';

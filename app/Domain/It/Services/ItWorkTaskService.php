@@ -2,12 +2,13 @@
 
 namespace App\Domain\It\Services;
 
-use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\ItStaffDirectory;
 use App\Models\ItTeam;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\ItWorkTask;
 use App\Models\User;
+use App\Support\LegacyStorageContext;
 use DomainException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
@@ -15,12 +16,16 @@ use Illuminate\Support\Facades\DB;
 
 class ItWorkTaskService
 {
+    public function __construct(
+        private readonly ItWorkAccessService $workAccess,
+    ) {}
+
     /** @param array<string, mixed> $data */
-    public function create(ItTicket $ticket, User $actor, int $tenantId, array $data): ItWorkTask
+    public function create(ItTicket $ticket, User $actor, array $data): ItWorkTask
     {
-        return DB::transaction(function () use ($ticket, $actor, $tenantId, $data): ItWorkTask {
-            $ticket = $this->lockedTicket($ticket, $actor, $tenantId);
-            $this->guardAssignment($data, $tenantId);
+        return DB::transaction(function () use ($ticket, $actor, $data): ItWorkTask {
+            $ticket = $this->lockedTicket($ticket, $actor);
+            $this->guardAssignment($data, $ticket);
             $dependencies = $this->dependencies($ticket, (array) ($data['dependency_ids'] ?? []));
             $sortOrder = array_key_exists('sort_order', $data)
                 ? (int) $data['sort_order']
@@ -28,7 +33,7 @@ class ItWorkTaskService
 
             $task = $ticket->tasks()->create([
                 ...Arr::except($data, ['dependency_ids']),
-                'tenant_id' => $tenantId,
+                'tenant_id' => LegacyStorageContext::id(),
                 'status' => 'pending',
                 'is_required' => (bool) ($data['is_required'] ?? true),
                 'evidence_required' => (bool) ($data['evidence_required'] ?? false),
@@ -48,16 +53,16 @@ class ItWorkTaskService
     }
 
     /** @param array<string, mixed> $data */
-    public function update(ItTicket $ticket, ItWorkTask $task, User $actor, int $tenantId, array $data): ItWorkTask
+    public function update(ItTicket $ticket, ItWorkTask $task, User $actor, array $data): ItWorkTask
     {
-        return DB::transaction(function () use ($ticket, $task, $actor, $tenantId, $data): ItWorkTask {
-            $ticket = $this->lockedTicket($ticket, $actor, $tenantId);
-            $task = $this->lockedTask($ticket, $task, $tenantId);
+        return DB::transaction(function () use ($ticket, $task, $actor, $data): ItWorkTask {
+            $ticket = $this->lockedTicket($ticket, $actor);
+            $task = $this->lockedTask($ticket, $task);
             if ($task->status === 'completed') {
                 throw new DomainException('Reopen a completed task before changing it.');
             }
 
-            $this->guardAssignment($data, $tenantId);
+            $this->guardAssignment($data, $ticket);
             $dependencyChanged = array_key_exists('dependency_ids', $data);
             $dependencies = $dependencyChanged
                 ? $this->dependencies($ticket, (array) $data['dependency_ids'], $task)
@@ -89,11 +94,11 @@ class ItWorkTaskService
     }
 
     /** @param array<string, mixed> $data */
-    public function complete(ItTicket $ticket, ItWorkTask $task, User $actor, int $tenantId, array $data): ItWorkTask
+    public function complete(ItTicket $ticket, ItWorkTask $task, User $actor, array $data): ItWorkTask
     {
-        return DB::transaction(function () use ($ticket, $task, $actor, $tenantId, $data): ItWorkTask {
-            $ticket = $this->lockedTicket($ticket, $actor, $tenantId);
-            $task = $this->lockedTask($ticket, $task, $tenantId);
+        return DB::transaction(function () use ($ticket, $task, $actor, $data): ItWorkTask {
+            $ticket = $this->lockedTicket($ticket, $actor);
+            $task = $this->lockedTask($ticket, $task);
             if ($task->status === 'completed') {
                 throw new DomainException('This task is already completed.');
             }
@@ -127,11 +132,11 @@ class ItWorkTaskService
         });
     }
 
-    public function reopen(ItTicket $ticket, ItWorkTask $task, User $actor, int $tenantId, string $reason): ItWorkTask
+    public function reopen(ItTicket $ticket, ItWorkTask $task, User $actor, string $reason): ItWorkTask
     {
-        return DB::transaction(function () use ($ticket, $task, $actor, $tenantId, $reason): ItWorkTask {
-            $ticket = $this->lockedTicket($ticket, $actor, $tenantId);
-            $task = $this->lockedTask($ticket, $task, $tenantId);
+        return DB::transaction(function () use ($ticket, $task, $actor, $reason): ItWorkTask {
+            $ticket = $this->lockedTicket($ticket, $actor);
+            $task = $this->lockedTask($ticket, $task);
             if ($task->status !== 'completed') {
                 throw new DomainException('Only a completed task can be reopened.');
             }
@@ -154,24 +159,24 @@ class ItWorkTaskService
         });
     }
 
-    private function lockedTicket(ItTicket $ticket, User $actor, int $tenantId): ItTicket
+    private function lockedTicket(ItTicket $ticket, User $actor): ItTicket
     {
-        if (! $actor->canDo('it.manage')) {
+        $locked = ItTicket::query()
+            ->whereKey($ticket->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        if (! $this->workAccess->canWork($actor, $locked)) {
             throw new DomainException('You are not allowed to manage IT work tasks.');
         }
 
-        return ItTicket::query()
-            ->whereKey($ticket->id)
-            ->where('tenant_id', $tenantId)
-            ->lockForUpdate()
-            ->firstOrFail();
+        return $locked;
     }
 
-    private function lockedTask(ItTicket $ticket, ItWorkTask $task, int $tenantId): ItWorkTask
+    private function lockedTask(ItTicket $ticket, ItWorkTask $task): ItWorkTask
     {
         $scoped = ItWorkTask::query()
             ->whereKey($task->id)
-            ->where('tenant_id', $tenantId)
             ->where('ticket_id', $ticket->id)
             ->lockForUpdate()
             ->first();
@@ -183,27 +188,22 @@ class ItWorkTaskService
     }
 
     /** @param array<string, mixed> $data */
-    private function guardAssignment(array $data, int $tenantId): void
+    private function guardAssignment(array $data, ItTicket $ticket): void
     {
         if (array_key_exists('team_id', $data) && $data['team_id'] !== null
-            && ! ItTeam::query()->whereKey($data['team_id'])->where('tenant_id', $tenantId)->exists()) {
-            throw new DomainException('That IT team belongs to a different organisation.');
+            && ! ItTeam::query()->whereKey($data['team_id'])->where('is_active', true)->exists()) {
+            throw new DomainException('Choose a current IT team.');
         }
 
         if (! array_key_exists('assigned_to_user_id', $data) || $data['assigned_to_user_id'] === null) {
             return;
         }
 
-        $user = User::query()->find((int) $data['assigned_to_user_id']);
-        $foreignOrganization = $user?->organization_id !== null
-            && (int) $user->organization_id !== $tenantId;
-        $foreignProfile = HrEmployeeProfile::query()
-            ->where('user_id', $data['assigned_to_user_id'])
-            ->whereNotNull('tenant_id')
-            ->where('tenant_id', '!=', $tenantId)
-            ->exists();
-        if (! $user || $foreignOrganization || $foreignProfile) {
-            throw new DomainException('That assignee belongs to a different organisation.');
+        if (! ItStaffDirectory::agentsForTicket($ticket)->contains(
+            'id',
+            (int) $data['assigned_to_user_id'],
+        )) {
+            throw new DomainException('Choose a current IT technician with access to this Site.');
         }
     }
 
@@ -215,7 +215,6 @@ class ItWorkTaskService
     {
         $ids = array_values(array_unique(array_map('intval', $ids)));
         $dependencies = ItWorkTask::query()
-            ->where('tenant_id', $ticket->tenant_id)
             ->where('ticket_id', $ticket->id)
             ->whereIn('id', $ids)
             ->get();

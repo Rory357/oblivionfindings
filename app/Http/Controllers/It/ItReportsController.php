@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\It;
 
+use App\Domain\It\Services\ItProvisioningAccessService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\ItAutomationRun;
 use App\Models\ItChange;
 use App\Models\ItMajorIncident;
@@ -24,27 +24,27 @@ use Illuminate\Support\Facades\Schema;
  * endpoint (never full tables to the client): point-in-time state (open by
  * priority/category, agent workload, KPI counts) plus flow metrics over a
  * date range (created/resolved trend, SLA compliance, response/resolution
- * times, CSAT, provisioning throughput). Tenant-scoped; Schema-guarded so a
+ * times, CSAT, provisioning throughput). Access-scoped; Schema-guarded so a
  * pre-migration read returns a zeroed report rather than 500ing.
  */
 class ItReportsController extends Controller
 {
-    use ResolvesHrTenant;
-
-    public function __construct(private readonly ItWorkAccessService $workAccess) {}
+    public function __construct(
+        private readonly ItWorkAccessService $workAccess,
+        private readonly ItProvisioningAccessService $provisioningAccess,
+    ) {}
 
     /** Agent-only (route gated `permission:it.view`); read-only analytics. */
     public function data(Request $request)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         [$from, $to] = $this->range($request);
 
-        return response()->json($this->report($tenantId, $from, $to, $user));
+        return response()->json($this->report($from, $to, $user));
     }
 
     /**
-     * Per-card CSV export (§L) — the same tenant-scoped, range-bound datasets
+     * Per-card CSV export (§L) — the same access-scoped, range-bound datasets
      * the Reports tab charts, streamed as a download. Every cell goes through
      * the base Controller's putCsv() so a formula-injection payload in a
      * user-controlled field (a requester or assignee name) can never execute
@@ -53,11 +53,10 @@ class ItReportsController extends Controller
     public function export(Request $request)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         [$from, $to] = $this->range($request);
         $card = is_string($request->query('card')) ? $request->query('card') : 'trend';
 
-        [$filename, $headers, $rows] = $this->exportCard($tenantId, $from, $to, $card, $user);
+        [$filename, $headers, $rows] = $this->exportCard($from, $to, $card, $user);
 
         return response()->streamDownload(function () use ($headers, $rows) {
             $out = fopen('php://output', 'w');
@@ -75,7 +74,7 @@ class ItReportsController extends Controller
      *
      * @return array{0: string, 1: array<int, string>, 2: array<int, array<int, string|int|float>>}
      */
-    private function exportCard(int $tenantId, Carbon $from, Carbon $to, string $card, User $user): array
+    private function exportCard(Carbon $from, Carbon $to, string $card, User $user): array
     {
         $ready = Schema::hasTable('it_tickets');
         $reqReady = Schema::hasTable('it_provisioning_requests');
@@ -87,7 +86,7 @@ class ItReportsController extends Controller
                 ['Metric', 'Value'],
                 $this->summaryRows(
                     $ready ? $this->kpis($from, $to, $user) : $this->emptyKpis(),
-                    $reqReady ? $this->provisioning($tenantId, $from, $to) : $this->emptyProvisioning(),
+                    $reqReady ? $this->provisioning($from, $to, $user) : $this->emptyProvisioning(),
                 ),
             ],
             'by_priority' => [
@@ -177,7 +176,7 @@ class ItReportsController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function report(int $tenantId, Carbon $from, Carbon $to, User $user): array
+    private function report(Carbon $from, Carbon $to, User $user): array
     {
         $ticketsReady = Schema::hasTable('it_tickets');
         $requestsReady = Schema::hasTable('it_provisioning_requests');
@@ -194,7 +193,7 @@ class ItReportsController extends Controller
             'by_category' => $ticketsReady ? $this->openBy('category', ItTicket::CATEGORIES, $user) : [],
             'top_requesters' => $ticketsReady ? $this->topRequesters($from, $to, $user) : [],
             'agent_workload' => $ticketsReady ? $this->agentWorkload($user) : [],
-            'provisioning' => $requestsReady ? $this->provisioning($tenantId, $from, $to) : $this->emptyProvisioning(),
+            'provisioning' => $requestsReady ? $this->provisioning($from, $to, $user) : $this->emptyProvisioning(),
             'backlog_age' => $ticketsReady ? $this->backlogAge($user) : $this->emptyBacklogAge(),
             'reopen_rate' => $ticketsReady ? $this->reopenRate($from, $to, $user) : $this->emptyRate(),
             'first_contact_resolution' => $ticketsReady ? $this->firstContactResolution($from, $to, $user) : $this->emptyRate(),
@@ -202,9 +201,9 @@ class ItReportsController extends Controller
             'major_incidents' => Schema::hasTable('it_major_incidents') ? $this->majorIncidents($from, $to, $user) : ['declared' => 0, 'restored' => 0, 'open' => 0],
             'change_success' => Schema::hasTable('it_changes') ? $this->changeSuccess($from, $to, $user) : ['successful' => 0, 'failed' => 0, 'inconclusive' => 0],
             'recurring_problems' => Schema::hasTable('it_problems') ? $this->problemOutcomes($from, $to, $user) : ['total' => 0, 'known_errors' => 0, 'root_causes' => 0],
-            'automation_outcomes' => Schema::hasTable('it_automation_runs') ? $this->automationOutcomes($tenantId, $from, $to) : ['succeeded' => 0, 'failed' => 0, 'skipped' => 0],
-            'service_reliability' => Schema::hasTable('it_services') ? $this->serviceReliability($tenantId, $from, $to, $user) : [],
-            'device_reliability' => Schema::hasTable('it_ticket_links') ? $this->deviceReliability($tenantId, $from, $to, $user) : ['affected_devices' => 0, 'open_incidents' => 0, 'recovered' => 0],
+            'automation_outcomes' => Schema::hasTable('it_automation_runs') ? $this->automationOutcomes($from, $to) : ['succeeded' => 0, 'failed' => 0, 'skipped' => 0],
+            'service_reliability' => Schema::hasTable('it_services') ? $this->serviceReliability($from, $to, $user) : [],
+            'device_reliability' => Schema::hasTable('it_ticket_links') ? $this->deviceReliability($from, $to, $user) : ['affected_devices' => 0, 'open_incidents' => 0, 'recovered' => 0],
             'quality' => $ticketsReady ? $this->qualityGaps($user) : [],
         ];
     }
@@ -340,10 +339,9 @@ class ItReportsController extends Controller
     }
 
     /** @return array<string, int|string> */
-    private function automationOutcomes(int $tenantId, Carbon $from, Carbon $to): array
+    private function automationOutcomes(Carbon $from, Carbon $to): array
     {
         $counts = ItAutomationRun::query()
-            ->forTenantOrSystem($tenantId)
             ->whereBetween('started_at', [$from, $to])
             ->selectRaw('status, COUNT(*) AS aggregate')
             ->groupBy('status')
@@ -362,10 +360,9 @@ class ItReportsController extends Controller
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function serviceReliability(int $tenantId, Carbon $from, Carbon $to, User $user): array
+    private function serviceReliability(Carbon $from, Carbon $to, User $user): array
     {
         return ItService::query()
-            ->forTenant($tenantId)
             ->withCount([
                 'tickets as ticket_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereBetween('created_at', [$from, $to]),
                 'tickets as open_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereIn('status', ItTicket::OPEN_STATUSES),
@@ -392,10 +389,9 @@ class ItReportsController extends Controller
     }
 
     /** @return array<string, int|string> */
-    private function deviceReliability(int $tenantId, Carbon $from, Carbon $to, User $user): array
+    private function deviceReliability(Carbon $from, Carbon $to, User $user): array
     {
         $query = ItTicketLink::query()
-            ->forTenant($tenantId)
             ->where('linkable_type', 'security_device')
             ->where('relationship', 'affected_device')
             ->whereHas('ticket', fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user)->whereBetween('created_at', [$from, $to]));
@@ -588,15 +584,15 @@ class ItReportsController extends Controller
      *
      * @return array{raised: int, fulfilled: int, avg_days: float|null}
      */
-    private function provisioning(int $tenantId, Carbon $from, Carbon $to): array
+    private function provisioning(Carbon $from, Carbon $to, User $user): array
     {
-        $raised = ItProvisioningRequest::query()
-            ->forTenant($tenantId)
+        $raised = $this->provisioningAccess
+            ->applyRequestScope(ItProvisioningRequest::query(), $user)
             ->whereBetween('created_at', [$from, $to])
             ->count();
 
-        $fulfilled = fn () => ItProvisioningRequest::query()
-            ->forTenant($tenantId)
+        $fulfilled = fn () => $this->provisioningAccess
+            ->applyRequestScope(ItProvisioningRequest::query(), $user)
             ->where('status', 'done')
             ->whereBetween('fulfilled_at', [$from, $to]);
 

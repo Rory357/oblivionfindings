@@ -26,7 +26,6 @@ use Illuminate\Support\Facades\Schema;
 function jmlManager(): User
 {
     $user = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
@@ -39,7 +38,8 @@ function jmlManager(): User
 
 function jmlProfile(?Site $site = null, array $overrides = []): HrEmployeeProfile
 {
-    $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $site ??= test()->site;
+    $user = User::factory()->create(['approved_at' => now()]);
 
     return HrEmployeeProfile::query()->create([
         'tenant_id' => 1,
@@ -56,6 +56,35 @@ function jmlProfile(?Site $site = null, array $overrides = []): HrEmployeeProfil
         'is_active' => true,
         'primary_site_id' => $site?->id,
         ...$overrides,
+    ]);
+}
+
+function jmlAssignSite(User $user, Site $site): void
+{
+    $profile = HrEmployeeProfile::query()->where('user_id', $user->id)->first();
+    if ($profile) {
+        if ((int) $profile->primary_site_id !== (int) $site->id) {
+            $profile->update([
+                'secondary_site_ids' => collect($profile->secondary_site_ids ?? [])
+                    ->push($site->id)
+                    ->map(fn (mixed $id): int => (int) $id)
+                    ->unique()
+                    ->values()
+                    ->all(),
+            ]);
+        }
+
+        return;
+    }
+
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+        'created_by' => $user->id,
+        'updated_by' => $user->id,
     ]);
 }
 
@@ -102,7 +131,9 @@ function jmlTemplate(string $lifecycle, array $tasks, array $overrides = []): It
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->manager = jmlManager();
+    jmlAssignSite($this->manager, $this->site);
     $this->service = app(ItProvisioningWorkflowService::class);
 });
 
@@ -421,6 +452,7 @@ test('a failed fulfilment is explicit and marks the workflow partially failed wi
 
 test('leaver launch creates reversal work and canonical asset and device recovery without duplicating ownership', function () {
     $site = Site::factory()->create(['tenant_id' => 1]);
+    jmlAssignSite($this->manager, $site);
     $profile = jmlProfile($site);
     jmlTemplate('leaver', [
         [
@@ -491,7 +523,7 @@ test('leaver launch creates reversal work and canonical asset and device recover
         ->and(DeviceAssignment::query()->where('device_id', $device->id)->count())->toBe(1);
 });
 
-test('template administration is tenant scoped and the IT workspace exposes JML progress', function () {
+test('template administration is application-wide and the IT workspace exposes JML progress', function () {
     $team = ItTeam::factory()->create(['tenant_id' => 1]);
 
     $this->actingAs($this->manager)
@@ -529,7 +561,7 @@ test('template administration is tenant scoped and the IT workspace exposes JML 
         ->and($template->tasks->first()->responsible_team_id)->toBe($team->id);
 
     $profile = jmlProfile();
-    $this->service->launch(
+    $workflow = $this->service->launch(
         $profile, 'joiner', 'manual', 777, 'manual:777', $this->manager->id,
     );
 
@@ -550,17 +582,26 @@ test('template administration is tenant scoped and the IT workspace exposes JML 
             ->has('provisioningTemplates', 1)
             ->where('provisioningTemplates.0.tasks.0.task_key', 'account'));
 
-    $otherManager = User::factory()->create([
-        'organization_id' => 2,
-        'role' => 'hr',
-        'approved_at' => now(),
-    ]);
-    $otherManager->roles()->syncWithoutDetaching([
-        Role::query()->where('name', 'hr')->firstOrFail()->id,
-    ]);
+    $otherManager = jmlManager();
 
     $this->actingAs($otherManager)
         ->get('/it/setup')
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->has('provisioningTemplates', 0));
+        ->assertInertia(fn ($page) => $page->has('provisioningTemplates', 1));
+
+    $team->members()->attach($otherManager->id, ['role' => 'member']);
+    $request = $workflow->requests()->sole();
+
+    $this->actingAs($otherManager)
+        ->post("/it/provisioning/{$request->id}/assign", [
+            'assigned_to_user_id' => $otherManager->id,
+        ])
+        ->assertSessionHas('success');
+
+    $this->actingAs($otherManager)
+        ->get('/it?tab=provisioning')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('provisioningWorkflows', 1)
+            ->where('provisioningWorkflows.0.id', $workflow->id));
 });

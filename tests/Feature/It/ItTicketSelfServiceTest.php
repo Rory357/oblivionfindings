@@ -1,7 +1,9 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\ItTicket;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Notifications\It\TicketCreatedNotification;
 use Database\Seeders\RbacSeeder;
@@ -21,6 +23,16 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->hr = itSelfServiceUser('hr');
     $this->worker = itSelfServiceUser('support_worker');
+    $this->site = Site::factory()->create();
+    foreach ([$this->hr, $this->worker] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+    }
 });
 
 test('raising a ticket sends the requester a receipt with the reference only', function () {
@@ -92,6 +104,7 @@ test('urgent tickets alert the it.manage agents but never the actor', function (
             'title' => 'Server room UPS beeping',
             'category' => 'other',
             'priority' => 'urgent',
+            'site_id' => $this->site->id,
         ])
         ->assertRedirect();
 

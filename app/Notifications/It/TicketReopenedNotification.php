@@ -24,7 +24,6 @@ class TicketReopenedNotification extends Notification implements ShouldQueue, Tr
     public function itEmailDeliveryContext(): array
     {
         return [
-            'tenant_id' => (int) $this->ticket->tenant_id,
             'ticket_id' => (int) $this->ticket->id,
             'type' => 'ticket_reopened',
             'subject' => "Reopened — {$this->ticket->reference} {$this->ticket->title}",

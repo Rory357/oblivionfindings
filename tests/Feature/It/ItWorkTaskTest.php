@@ -5,40 +5,52 @@ use App\Models\ItTeam;
 use App\Models\ItTicket;
 use App\Models\ItWorkTask;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
-function workTaskUser(string $role, int $tenantId = 1): User
+function workTaskUser(string $role, ?Site $site = null): User
 {
     $user = User::factory()->create([
         'role' => $role,
         'approved_at' => now(),
-        'organization_id' => $tenantId,
+        'organization_id' => 1,
     ]);
     $user->roles()->syncWithoutDetaching([
         Role::query()->where('name', $role)->first()->id,
     ]);
+
+    if ($site) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+    }
 
     return $user;
 }
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
-    $this->agent = workTaskUser('hr');
+    $this->site = Site::factory()->create();
+    $this->agent = workTaskUser('hr', $this->site);
     $this->requester = workTaskUser('support_worker');
     $this->ticket = ItTicket::factory()->create([
-        'tenant_id' => 1,
+        'tenant_id' => 202,
+        'site_id' => $this->site->id,
         'requester_user_id' => $this->requester->id,
     ]);
 });
 
 test('agents create ordered required and optional tasks with dependencies and assignments', function () {
     $team = ItTeam::factory()->create(['tenant_id' => 1]);
-    $assignee = User::factory()->create(['organization_id' => 1]);
-    HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
-        'user_id' => $assignee->id,
-    ]);
+    $assignee = workTaskUser('hr', $this->site);
 
     $this->actingAs($this->agent)
         ->post("/it/tickets/{$this->ticket->id}/tasks", [
@@ -178,17 +190,18 @@ test('task updates and reopening are governed and recorded on the ticket timelin
         ->and($this->ticket->events()->where('type', 'work_task_reopened')->count())->toBe(1);
 });
 
-test('task routes reject requesters foreign tenants and cross-ticket dependencies', function () {
+test('task routes reject requesters other Site technicians and cross-ticket dependencies', function () {
     $this->actingAs($this->requester)
         ->post("/it/tickets/{$this->ticket->id}/tasks", ['title' => 'Injected'])
         ->assertForbidden();
 
-    $foreignAgent = workTaskUser('hr', 2);
-    $this->actingAs($foreignAgent)
-        ->post("/it/tickets/{$this->ticket->id}/tasks", ['title' => 'Foreign tenant task'])
+    $otherSite = Site::factory()->create();
+    $remoteAgent = workTaskUser('hr', $otherSite);
+    $this->actingAs($remoteAgent)
+        ->post("/it/tickets/{$this->ticket->id}/tasks", ['title' => 'Other Site task'])
         ->assertNotFound();
 
-    $otherTicket = ItTicket::factory()->create(['tenant_id' => 1]);
+    $otherTicket = ItTicket::factory()->create(['tenant_id' => 202, 'site_id' => $this->site->id]);
     $otherTask = ItWorkTask::factory()->create([
         'tenant_id' => 1,
         'ticket_id' => $otherTicket->id,
@@ -212,7 +225,7 @@ test('task routes reject requesters foreign tenants and cross-ticket dependencie
         ->assertSessionHas('error');
 
     expect(ItWorkTask::query()->where('title', 'Injected')->exists())->toBeFalse()
-        ->and(ItWorkTask::query()->where('title', 'Foreign tenant task')->exists())->toBeFalse()
+        ->and(ItWorkTask::query()->where('title', 'Other Site task')->exists())->toBeFalse()
         ->and(ItWorkTask::query()->where('title', 'Cross-ticket dependency')->exists())->toBeFalse()
         ->and($first->dependencies()->exists())->toBeFalse();
 });

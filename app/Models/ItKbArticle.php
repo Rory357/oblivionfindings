@@ -104,18 +104,17 @@ class ItKbArticle extends Model
     }
 
     /**
-     * A tenant-unique slug from a title, appending -2/-3/… on collision.
+     * An application-unique slug from a title, appending -2/-3/… on collision.
      * Pass $ignoreId when re-slugging an existing row so it doesn't clash
      * with itself.
      */
-    public static function uniqueSlug(int $tenantId, string $title, ?int $ignoreId = null): string
+    public static function uniqueSlug(string $title, ?int $ignoreId = null): string
     {
         $base = Str::slug($title) ?: 'article';
         $slug = $base;
         $n = 1;
 
         while (static::query()
-            ->where('tenant_id', $tenantId)
             ->where('slug', $slug)
             ->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId))
             ->exists()

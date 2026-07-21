@@ -13,6 +13,7 @@ class ItKbLifecycleService
     /** @param array<string, mixed> $data */
     public function update(ItKbArticle $article, User $actor, array $data): ItKbArticle
     {
+        $this->guard($article, $actor);
         $status = $data['status'] ?? null;
         $article->fill(Arr::except($data, ['status']));
         if ($status !== null && $status !== $article->status) {
@@ -21,7 +22,7 @@ class ItKbLifecycleService
         $article->save();
 
         AuditLogger::logOrFail('it.knowledge.updated', $article, [
-            'organization_id' => $article->tenant_id,
+            'application_scope' => 'single_installation',
             'changed_fields' => array_keys($article->getChanges()),
         ]);
 
@@ -52,11 +53,12 @@ class ItKbLifecycleService
 
     private function transitionAndAudit(ItKbArticle $article, User $actor, string $to): ItKbArticle
     {
+        $this->guard($article, $actor);
         $from = $article->status;
         $this->transition($article, $actor, $to);
         $article->save();
         AuditLogger::logOrFail("it.knowledge.{$to}", $article, [
-            'organization_id' => $article->tenant_id,
+            'application_scope' => 'single_installation',
             'from' => $from,
             'to' => $to,
         ]);
@@ -98,6 +100,15 @@ class ItKbLifecycleService
             $article->review_started_at = null;
             $article->published_at = null;
             $article->reviewed_by_user_id = null;
+        }
+    }
+
+    private function guard(ItKbArticle $article, User $actor): void
+    {
+        if ($actor->approved_at === null
+            || ! $actor->canDo('it.manage')
+            || ! ItKbArticle::query()->whereKey($article->getKey())->exists()) {
+            throw new DomainException('You are not allowed to manage this knowledge article.');
         }
     }
 }

@@ -13,6 +13,7 @@ use App\Models\ItProvisioningTemplateTask;
 use App\Models\ItProvisioningWorkflow;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Support\LegacyStorageContext;
 use Carbon\CarbonInterface;
 use DomainException;
 use Illuminate\Support\Carbon;
@@ -29,7 +30,6 @@ final class ItProvisioningWorkflowService
         }
 
         return ItProvisioningTemplate::query()
-            ->forTenant((int) $profile->tenant_id)
             ->active()
             ->where('lifecycle_type', $lifecycleType)
             ->where(fn ($query) => $query
@@ -72,7 +72,6 @@ final class ItProvisioningWorkflowService
         }
 
         $existing = ItProvisioningWorkflow::query()
-            ->forTenant((int) $profile->tenant_id)
             ->where('source_event_key', $sourceEventKey)
             ->first();
         if ($existing) {
@@ -98,7 +97,6 @@ final class ItProvisioningWorkflowService
             $template,
         ): ItProvisioningWorkflow {
             $locked = ItProvisioningWorkflow::query()
-                ->forTenant((int) $profile->tenant_id)
                 ->where('source_event_key', $sourceEventKey)
                 ->lockForUpdate()
                 ->first();
@@ -111,7 +109,7 @@ final class ItProvisioningWorkflowService
             $safeChanges = array_intersect_key($changes, array_flip(ItProvisioningTemplateTask::TRIGGER_FIELDS));
 
             $workflow = ItProvisioningWorkflow::query()->create([
-                'tenant_id' => $profile->tenant_id,
+                'tenant_id' => LegacyStorageContext::id(),
                 'employee_profile_id' => $profile->id,
                 'provisioning_template_id' => $template->id,
                 'lifecycle_type' => $lifecycleType,
@@ -167,7 +165,7 @@ final class ItProvisioningWorkflowService
             }
 
             AuditLogger::logOrFail('it.provisioning.workflow.created', $workflow, [
-                'organization_id' => $profile->tenant_id,
+                'application_scope' => 'single_installation',
                 'actor_id' => $actorId,
                 'lifecycle_type' => $lifecycleType,
                 'source_type' => $sourceType,
@@ -298,7 +296,7 @@ final class ItProvisioningWorkflowService
         array $changes,
     ): ItProvisioningRequest {
         return ItProvisioningRequest::query()->create([
-            'tenant_id' => $profile->tenant_id,
+            'tenant_id' => LegacyStorageContext::id(),
             'employee_profile_id' => $profile->id,
             'provisioning_workflow_id' => $workflow->id,
             'provisioning_template_task_id' => $task->id,
@@ -354,7 +352,7 @@ final class ItProvisioningWorkflowService
                 $workflow, $profile, $actorId, $effectiveAt, $stage, $sourceTaskId, $baseContext,
             ): void {
                 ItProvisioningRequest::query()->create([
-                    'tenant_id' => $profile->tenant_id,
+                    'tenant_id' => LegacyStorageContext::id(),
                     'employee_profile_id' => $profile->id,
                     'provisioning_workflow_id' => $workflow->id,
                     'offboarding_task_id' => $sourceTaskId,
@@ -396,7 +394,7 @@ final class ItProvisioningWorkflowService
                 $workflow, $profile, $actorId, $effectiveAt, $stage, $sourceTaskId, $baseContext,
             ): void {
                 ItProvisioningRequest::query()->create([
-                    'tenant_id' => $profile->tenant_id,
+                    'tenant_id' => LegacyStorageContext::id(),
                     'employee_profile_id' => $profile->id,
                     'provisioning_workflow_id' => $workflow->id,
                     'offboarding_task_id' => $sourceTaskId,

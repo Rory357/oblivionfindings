@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\Data\ItTransitionInput;
 use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\Services\ItWorkTransitionService;
@@ -7,13 +8,14 @@ use App\Models\ItTicket;
 use App\Models\ItTicketApproval;
 use App\Models\ItWorkTask;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-function itTransitionAgent(): User
+function itTransitionAgent(?Site $site = null): User
 {
     $user = User::factory()->create([
         'role' => 'hr',
@@ -23,6 +25,19 @@ function itTransitionAgent(): User
     $user->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->firstOrFail()->id,
     ]);
+
+    if ($site) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+    }
 
     return $user;
 }
@@ -38,8 +53,10 @@ it('applies an allowed lifecycle state for every canonical work type', function 
     string $expectedStatus,
     ?string $waitingParty,
 ) {
-    $agent = itTransitionAgent();
+    $site = Site::factory()->create();
+    $agent = itTransitionAgent($site);
     $ticket = ItTicket::factory()->create([
+        'site_id' => $site->id,
         'work_type' => $workType,
         'workflow_state' => $from,
         'status' => in_array($from, ['submitted', 'draft', 'declared'], true) ? 'open' : 'in_progress',
@@ -48,7 +65,6 @@ it('applies an allowed lifecycle state for every canonical work type', function 
     $result = app(ItWorkTransitionService::class)->transition(
         $ticket,
         new ItTransitionInput(
-            tenantId: 1,
             actor: $agent,
             to: ItWorkflowState::from($to),
             reason: $waitingParty ? 'Approval is required' : 'Work has started',
@@ -75,8 +91,10 @@ it('applies an allowed lifecycle state for every canonical work type', function 
 ]);
 
 it('rejects a lifecycle state that is not allowed for the work type', function () {
-    $agent = itTransitionAgent();
+    $site = Site::factory()->create();
+    $agent = itTransitionAgent($site);
     $ticket = ItTicket::factory()->create([
+        'site_id' => $site->id,
         'work_type' => 'incident',
         'workflow_state' => 'submitted',
     ]);
@@ -84,7 +102,6 @@ it('rejects a lifecycle state that is not allowed for the work type', function (
     expect(fn () => app(ItWorkTransitionService::class)->transition(
         $ticket,
         new ItTransitionInput(
-            tenantId: 1,
             actor: $agent,
             to: ItWorkflowState::Implementing,
         ),
@@ -95,8 +112,10 @@ it('rejects a lifecycle state that is not allowed for the work type', function (
 });
 
 it('requires a waiting party and reason before pausing work', function () {
-    $agent = itTransitionAgent();
+    $site = Site::factory()->create();
+    $agent = itTransitionAgent($site);
     $ticket = ItTicket::factory()->create([
+        'site_id' => $site->id,
         'work_type' => 'incident',
         'workflow_state' => 'in_progress',
         'status' => 'in_progress',
@@ -106,7 +125,6 @@ it('requires a waiting party and reason before pausing work', function () {
     expect(fn () => $service->transition(
         $ticket,
         new ItTransitionInput(
-            tenantId: 1,
             actor: $agent,
             to: ItWorkflowState::Waiting,
         ),
@@ -115,7 +133,6 @@ it('requires a waiting party and reason before pausing work', function () {
     $result = $service->transition(
         $ticket,
         new ItTransitionInput(
-            tenantId: 1,
             actor: $agent,
             to: ItWorkflowState::Waiting,
             reason: 'Vendor replacement is due tomorrow',
@@ -132,9 +149,11 @@ it('requires a waiting party and reason before pausing work', function () {
 });
 
 it('blocks settlement until approvals required tasks and resolution evidence are complete', function () {
-    $agent = itTransitionAgent();
+    $site = Site::factory()->create();
+    $agent = itTransitionAgent($site);
     $service = app(ItWorkTransitionService::class);
     $ticket = ItTicket::factory()->create([
+        'site_id' => $site->id,
         'work_type' => 'incident',
         'workflow_state' => 'in_progress',
         'status' => 'in_progress',
@@ -144,7 +163,6 @@ it('blocks settlement until approvals required tasks and resolution evidence are
     expect(fn () => $service->transition(
         $ticket,
         new ItTransitionInput(
-            tenantId: 1,
             actor: $agent,
             to: ItWorkflowState::Resolved,
             resolutionCode: 'restored',
@@ -169,7 +187,6 @@ it('blocks settlement until approvals required tasks and resolution evidence are
     expect(fn () => $service->transition(
         $ticket,
         new ItTransitionInput(
-            tenantId: 1,
             actor: $agent,
             to: ItWorkflowState::Resolved,
             resolutionCode: 'restored',
@@ -186,7 +203,6 @@ it('blocks settlement until approvals required tasks and resolution evidence are
     expect(fn () => $service->transition(
         $ticket,
         new ItTransitionInput(
-            tenantId: 1,
             actor: $agent,
             to: ItWorkflowState::Resolved,
         ),
@@ -195,7 +211,6 @@ it('blocks settlement until approvals required tasks and resolution evidence are
     $result = $service->transition(
         $ticket,
         new ItTransitionInput(
-            tenantId: 1,
             actor: $agent,
             to: ItWorkflowState::Resolved,
             resolutionCode: 'restored',
@@ -210,21 +225,39 @@ it('blocks settlement until approvals required tasks and resolution evidence are
         ->and($result->resolved_at)->not->toBeNull();
 });
 
-it('rejects a transition when the resolved tenant does not own the ticket', function () {
-    $agent = itTransitionAgent();
-    $ticket = ItTicket::factory()->create([
-        'tenant_id' => 2,
+it('authorizes the canonical Site independently of the legacy storage context', function () {
+    $site = Site::factory()->create();
+    $otherSite = Site::factory()->create();
+    $agent = itTransitionAgent($site);
+    $allowed = ItTicket::factory()->create([
+        'tenant_id' => 202,
+        'site_id' => $site->id,
+        'workflow_state' => 'submitted',
+    ]);
+    $denied = ItTicket::factory()->create([
+        'tenant_id' => 202,
+        'site_id' => $otherSite->id,
         'workflow_state' => 'submitted',
     ]);
 
-    expect(fn () => app(ItWorkTransitionService::class)->transition(
-        $ticket,
+    $result = app(ItWorkTransitionService::class)->transition(
+        $allowed,
         new ItTransitionInput(
-            tenantId: 1,
             actor: $agent,
             to: ItWorkflowState::Triaged,
         ),
-    ))->toThrow(DomainException::class, 'same tenant');
+    );
+
+    expect($result->workflow_state)->toBe('triaged');
+    expect(fn () => app(ItWorkTransitionService::class)->transition(
+        $denied,
+        new ItTransitionInput(
+            actor: $agent,
+            to: ItWorkflowState::Triaged,
+        ),
+    ))->toThrow(DomainException::class, 'not allowed');
+
+    expect($denied->fresh()->workflow_state)->toBe('submitted');
 });
 
 it('allows an owning requester reply to resume waiting work without manage permission', function () {
@@ -242,7 +275,6 @@ it('allows an owning requester reply to resume waiting work without manage permi
     $result = app(ItWorkTransitionService::class)->transition(
         $ticket,
         new ItTransitionInput(
-            tenantId: 1,
             actor: $requester,
             to: ItWorkflowState::InProgress,
             reason: 'Requester replied',
@@ -259,8 +291,10 @@ it('allows an owning requester reply to resume waiting work without manage permi
 });
 
 it('exposes the governed transition through the existing ticket authorization boundary', function () {
-    $agent = itTransitionAgent();
+    $site = Site::factory()->create();
+    $agent = itTransitionAgent($site);
     $ticket = ItTicket::factory()->create([
+        'site_id' => $site->id,
         'work_type' => 'incident',
         'workflow_state' => 'submitted',
     ]);

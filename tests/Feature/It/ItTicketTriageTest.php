@@ -1,8 +1,10 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\ItTicket;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Notifications\It\TicketCreatedNotification;
 use Database\Seeders\RbacSeeder;
@@ -22,14 +24,38 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->hr = triageUser('hr');
     $this->worker = triageUser('support_worker');
+    $this->site = Site::factory()->create();
+    foreach ([$this->hr, $this->worker] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+    }
 });
+
+function assignTriageUserToSite(User $user, Site $site): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+    ]);
+}
 
 test('an agent logs a ticket on behalf of a colleague with full triage', function () {
     Notification::fake();
     $colleague = User::factory()->create();
-    $assignee = User::factory()->create();
+    $assignee = triageUser('hr');
     $watcher = User::factory()->create();
-    $asset = Asset::factory()->create(['status' => 'active']);
+    foreach ([$colleague, $assignee, $watcher] as $user) {
+        assignTriageUserToSite($user, $this->site);
+    }
+    $asset = Asset::factory()->forSite($this->site)->create(['status' => 'active']);
 
     $this->actingAs($this->hr)->post('/it/tickets', [
         'title' => 'Hoist controller unresponsive',
@@ -37,6 +63,7 @@ test('an agent logs a ticket on behalf of a colleague with full triage', functio
         'category' => 'hardware',
         'subcategory' => 'Mobility equipment',
         'priority' => 'high',
+        'site_id' => $this->site->id,
         'requester_user_id' => $colleague->id,
         'assigned_to_user_id' => $assignee->id,
         'asset_id' => $asset->id,

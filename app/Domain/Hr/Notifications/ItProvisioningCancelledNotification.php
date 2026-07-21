@@ -28,7 +28,6 @@ class ItProvisioningCancelledNotification extends Notification implements Should
     public function itEmailDeliveryContext(): array
     {
         return [
-            'tenant_id' => (int) $this->provisioning->tenant_id,
             'provisioning_request_id' => (int) $this->provisioning->id,
             'type' => 'it_provisioning_cancelled',
             'subject' => "IT request cancelled — “{$this->provisioning->item}”",

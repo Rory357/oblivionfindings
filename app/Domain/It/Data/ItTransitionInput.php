@@ -8,7 +8,6 @@ use App\Models\User;
 final readonly class ItTransitionInput
 {
     public function __construct(
-        public int $tenantId,
         public User $actor,
         public ItWorkflowState $to,
         public ?string $reason = null,

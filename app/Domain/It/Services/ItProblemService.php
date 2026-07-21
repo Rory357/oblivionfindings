@@ -8,6 +8,7 @@ use App\Models\ItProblem;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\User;
+use App\Support\LegacyStorageContext;
 use DomainException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -17,14 +18,24 @@ class ItProblemService
     public function __construct(
         private readonly ItWorkTransitionService $transitionService,
         private readonly ItTicketLinkService $linkService,
+        private readonly ItWorkAccessService $workAccess,
     ) {}
 
     /** @param array<string, mixed> $data */
-    public function create(User $actor, int $tenantId, array $data): ItProblem
+    public function create(User $actor, array $data): ItProblem
     {
-        return DB::transaction(function () use ($actor, $tenantId, $data): ItProblem {
+        return DB::transaction(function () use ($actor, $data): ItProblem {
+            if (! $this->workAccess->canAssignScope(
+                $actor,
+                $data['site_id'] ?? null,
+                (bool) ($data['is_organisation_wide'] ?? false),
+            )) {
+                throw new DomainException('Choose an approved Site or authorised organisation-wide scope.');
+            }
+
+            $storageContextId = LegacyStorageContext::id();
             $ticket = ItTicket::createWithReference([
-                'tenant_id' => $tenantId,
+                'tenant_id' => $storageContextId,
                 'title' => $data['title'],
                 'description' => $data['description'] ?? null,
                 'requester_user_id' => $actor->id,
@@ -45,7 +56,7 @@ class ItProblemService
             ItTicketEvent::record($ticket, 'created', $actor->id, ['source' => 'problem_management']);
 
             $problem = ItProblem::query()->create([
-                'tenant_id' => $tenantId,
+                'tenant_id' => $storageContextId,
                 'ticket_id' => $ticket->id,
                 ...Arr::only($data, ['impact_summary', 'root_cause', 'workaround', 'corrective_action']),
                 'created_by_user_id' => $actor->id,
@@ -54,7 +65,6 @@ class ItProblemService
             $this->syncLinks($problem, $actor, $data);
 
             $this->transitionService->transition($ticket, new ItTransitionInput(
-                tenantId: $tenantId,
                 actor: $actor,
                 to: ItWorkflowState::Investigating,
                 reason: 'Problem investigation opened',
@@ -66,10 +76,10 @@ class ItProblemService
     }
 
     /** @param array<string, mixed> $data */
-    public function update(ItProblem $problem, User $actor, int $tenantId, array $data): ItProblem
+    public function update(ItProblem $problem, User $actor, array $data): ItProblem
     {
-        return DB::transaction(function () use ($problem, $actor, $tenantId, $data): ItProblem {
-            $problem = $this->lockedProblem($problem, $actor, $tenantId);
+        return DB::transaction(function () use ($problem, $actor, $data): ItProblem {
+            $problem = $this->lockedProblem($problem, $actor);
             $ticket = $problem->ticket()->lockForUpdate()->firstOrFail();
             $this->validateLinkTargets($ticket, $data);
 
@@ -101,7 +111,6 @@ class ItProblemService
     public function transition(
         ItProblem $problem,
         User $actor,
-        int $tenantId,
         ItWorkflowState $state,
         string $reason,
         ?string $resolutionCode = null,
@@ -110,13 +119,12 @@ class ItProblemService
         return DB::transaction(function () use (
             $problem,
             $actor,
-            $tenantId,
             $state,
             $reason,
             $resolutionCode,
             $resolutionSummary,
         ): ItProblem {
-            $problem = $this->lockedProblem($problem, $actor, $tenantId);
+            $problem = $this->lockedProblem($problem, $actor);
             if ($state === ItWorkflowState::KnownError
                 && (blank($problem->root_cause) || blank($problem->workaround))) {
                 throw new DomainException('Root cause and workaround are required before publishing a known error.');
@@ -127,7 +135,6 @@ class ItProblemService
             }
 
             $this->transitionService->transition($problem->ticket, new ItTransitionInput(
-                tenantId: $tenantId,
                 actor: $actor,
                 to: $state,
                 reason: $reason,
@@ -146,18 +153,19 @@ class ItProblemService
         });
     }
 
-    private function lockedProblem(ItProblem $problem, User $actor, int $tenantId): ItProblem
+    private function lockedProblem(ItProblem $problem, User $actor): ItProblem
     {
-        if (! $actor->canDo('it.manage')) {
-            throw new DomainException('You are not allowed to manage IT problems.');
-        }
-
-        return ItProblem::query()
+        $locked = ItProblem::query()
             ->whereKey($problem->id)
-            ->where('tenant_id', $tenantId)
             ->with('ticket')
             ->lockForUpdate()
             ->firstOrFail();
+
+        if (! $locked->ticket || ! $this->workAccess->canWork($actor, $locked->ticket)) {
+            throw new DomainException('You are not allowed to manage IT problems.');
+        }
+
+        return $locked;
     }
 
     /** @param array<string, mixed> $data */
@@ -169,7 +177,7 @@ class ItProblemService
                 ->whereIn('work_type', ['incident', 'major_incident'])
                 ->count();
             if ($count !== count(array_unique((array) $data['incident_ids']))) {
-                throw new DomainException('Every affected incident must be an incident in this organisation.');
+                throw new DomainException('Every affected record must be an incident.');
             }
         }
         if (! empty($data['permanent_fix_change_id'])
@@ -177,7 +185,7 @@ class ItProblemService
                 ->whereKey($data['permanent_fix_change_id'])
                 ->where('work_type', 'change')
                 ->exists()) {
-            throw new DomainException('The permanent fix must be a change in this organisation.');
+            throw new DomainException('The permanent fix must be a change record.');
         }
     }
 

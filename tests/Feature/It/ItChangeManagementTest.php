@@ -1,6 +1,8 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\ControlRoomAlert;
 use App\Models\ItChange;
 use App\Models\ItService;
@@ -11,27 +13,56 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Database\Seeders\SecurityDevicesPermissionsSeeder;
 
-function changeUser(string $role, int $tenantId = 1): User
+function changeUser(string $role, ?Site $site = null): User
 {
     $user = User::factory()->create([
         'role' => $role,
         'approved_at' => now(),
-        'organization_id' => $tenantId,
     ]);
     $user->roles()->syncWithoutDetaching([
         Role::query()->where('name', $role)->first()->id,
     ]);
 
+    if ($site) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+    }
+
     return $user;
+}
+
+/** @param array<string, mixed> $attributes */
+function changeAtSite(string $type, Site $site, array $attributes = []): ItChange
+{
+    $factory = match ($type) {
+        'standard' => ItChange::factory()->standard(),
+        'emergency' => ItChange::factory()->emergency(),
+        default => ItChange::factory()->normal(),
+    };
+    $change = $factory->create($attributes);
+    $change->ticket()->update(['site_id' => $site->id]);
+
+    return $change->refresh();
 }
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
-    $this->agent = changeUser('hr');
-    $this->approver = changeUser('hr');
-    $this->validator = changeUser('hr');
-    $this->requester = changeUser('support_worker');
+    $this->seed(SecurityDevicesPermissionsSeeder::class);
+    $this->site = Site::factory()->create();
+    $this->agent = changeUser('provider_manager', $this->site);
+    $this->approver = changeUser('provider_manager', $this->site);
+    $this->validator = changeUser('provider_manager', $this->site);
+    $this->requester = changeUser('support_worker', $this->site);
 });
 
 test('agents create and find canonical standard normal and emergency changes', function (string $type, bool $requiresApproval) {
@@ -69,7 +100,7 @@ test('agents create and find canonical standard normal and emergency changes', f
 ]);
 
 test('a standard change follows assessed scheduled implemented validated reviewed and closed states', function () {
-    $change = ItChange::factory()->standard()->create();
+    $change = changeAtSite('standard', $this->site);
 
     $this->actingAs($this->agent)
         ->patch("/it/changes/{$change->id}", [
@@ -139,7 +170,7 @@ test('a standard change follows assessed scheduled implemented validated reviewe
 });
 
 test('normal high risk and restricted changes require approval and independent validation', function () {
-    $change = ItChange::factory()->normal()->create([
+    $change = changeAtSite('normal', $this->site, [
         'risk_level' => 'critical',
         'is_restricted' => true,
         'implementation_plan' => 'Rotate privileged identity provider keys.',
@@ -218,7 +249,7 @@ test('normal high risk and restricted changes require approval and independent v
 });
 
 test('emergency changes still need approval and failed implementations can be backed out and reviewed', function () {
-    $change = ItChange::factory()->emergency()->create([
+    $change = changeAtSite('emergency', $this->site, [
         'implementation_plan' => 'Apply vendor mitigation immediately.',
         'validation_plan' => 'Confirm exploit traffic is blocked.',
         'backout_plan' => 'Remove mitigation and restore previous policy.',
@@ -258,14 +289,22 @@ test('emergency changes still need approval and failed implementations can be ba
         ->and($change->reviewed_at)->not->toBeNull();
 });
 
-test('affected services sites devices alerts incidents and problems use tenant safe typed links', function () {
-    $change = ItChange::factory()->standard()->create();
+test('affected services Sites devices alerts incidents and problems use canonically scoped typed links', function () {
+    $change = changeAtSite('standard', $this->site);
     $service = ItService::factory()->create();
-    $site = Site::factory()->create();
+    $site = $this->site;
     $device = Device::factory()->itInfrastructure()->create();
+    DeviceAssignment::query()->create([
+        'device_id' => $device->id,
+        'assignable_type' => DeviceAssignment::TARGET_SITE,
+        'assignable_id' => $site->id,
+        'assignment_type' => 'permanent',
+        'assigned_at' => now(),
+        'assigned_by_user_id' => $this->agent->id,
+    ]);
     $alert = ControlRoomAlert::factory()->create(['site_id' => $site->id]);
-    $incident = ItTicket::factory()->create(['tenant_id' => 1, 'work_type' => 'incident']);
-    $problem = ItTicket::factory()->create(['tenant_id' => 1, 'work_type' => 'problem']);
+    $incident = ItTicket::factory()->create(['site_id' => $site->id, 'work_type' => 'incident']);
+    $problem = ItTicket::factory()->create(['site_id' => $site->id, 'work_type' => 'problem']);
 
     $this->actingAs($this->agent)
         ->patch("/it/changes/{$change->id}", [
@@ -312,15 +351,15 @@ test('affected services sites devices alerts incidents and problems use tenant s
             ->has('links.incidents', 1)
             ->has('links.problems', 1));
 
-    $foreignService = ItService::factory()->create(['tenant_id' => 2]);
+    $inactiveService = ItService::factory()->create(['is_active' => false]);
     $this->actingAs($this->agent)
-        ->patch("/it/changes/{$change->id}", ['service_ids' => [$foreignService->id]])
+        ->patch("/it/changes/{$change->id}", ['service_ids' => [$inactiveService->id]])
         ->assertRedirect()
         ->assertSessionHas('error');
 });
 
-test('the change workspace reuses shared ticket work and is agent only tenant concealed', function () {
-    $change = ItChange::factory()->normal()->create();
+test('the change workspace reuses shared ticket work and is agent only site concealed', function () {
+    $change = changeAtSite('normal', $this->site);
     $change->ticket->comments()->create([
         'tenant_id' => 1,
         'author_user_id' => $this->agent->id,
@@ -343,8 +382,9 @@ test('the change workspace reuses shared ticket work and is agent only tenant co
         ->patch("/it/changes/{$change->id}", ['risk_level' => 'low'])
         ->assertForbidden();
 
-    $foreignAgent = changeUser('hr', 2);
-    $this->actingAs($foreignAgent)
+    $otherSite = Site::factory()->create();
+    $remoteSiteAgent = changeUser('provider_manager', $otherSite);
+    $this->actingAs($remoteSiteAgent)
         ->get("/it/changes/{$change->id}")
         ->assertNotFound();
 });

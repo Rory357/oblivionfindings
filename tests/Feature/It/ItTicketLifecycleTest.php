@@ -1,7 +1,9 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\ItTicket;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Notifications\It\TicketReopenedNotification;
 use App\Notifications\It\TicketResolvedNotification;
@@ -22,12 +24,41 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->hr = itLifecycleUser('hr');
     $this->worker = itLifecycleUser('support_worker');
+    $this->site = Site::factory()->create();
+    foreach ([$this->hr, $this->worker] as $user) {
+        assignLifecycleUserToSite($user, $this->site);
+    }
 });
+
+function assignLifecycleUserToSite(User $user, Site $site): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+    ]);
+}
+
+function lifecycleTicket(array $overrides = [], bool $resolved = false): ItTicket
+{
+    $factory = ItTicket::factory();
+    if ($resolved) {
+        $factory = $factory->resolved();
+    }
+
+    return $factory->create([
+        'site_id' => test()->site->id,
+        ...$overrides,
+    ]);
+}
 
 test('resolving requires a note and posts it as the final public reply', function () {
     Notification::fake();
     $watcher = itLifecycleUser('hr');
-    $ticket = ItTicket::factory()->create([
+    assignLifecycleUserToSite($watcher, $this->site);
+    $ticket = lifecycleTicket([
         'requester_user_id' => $this->worker->id,
         'status' => 'in_progress',
     ]);
@@ -74,7 +105,8 @@ test('resolving requires a note and posts it as the final public reply', functio
 test('the notify toggle silences the requester but never the watchers', function () {
     Notification::fake();
     $watcher = itLifecycleUser('hr');
-    $ticket = ItTicket::factory()->create(['requester_user_id' => $this->worker->id]);
+    assignLifecycleUserToSite($watcher, $this->site);
+    $ticket = lifecycleTicket(['requester_user_id' => $this->worker->id]);
     $ticket->watchers()->attach($watcher->id);
 
     $this->actingAs($this->hr)
@@ -89,7 +121,7 @@ test('the notify toggle silences the requester but never the watchers', function
 });
 
 test('resolving inside the resolution target marks the SLA met', function () {
-    $ticket = ItTicket::factory()->create([
+    $ticket = lifecycleTicket([
         'requester_user_id' => $this->worker->id,
         'resolution_due_at' => now()->addHours(4),
     ]);
@@ -104,10 +136,11 @@ test('resolving inside the resolution target marks the SLA met', function () {
 test('close stamps closed_at and reopen brings the ticket back with a bump', function () {
     Notification::fake();
     $assignee = itLifecycleUser('hr');
-    $ticket = ItTicket::factory()->resolved()->create([
+    assignLifecycleUserToSite($assignee, $this->site);
+    $ticket = lifecycleTicket([
         'requester_user_id' => $this->worker->id,
         'assigned_to_user_id' => $assignee->id,
-    ]);
+    ], resolved: true);
 
     $this->actingAs($this->hr)
         ->post("/it/tickets/{$ticket->id}/close")
@@ -131,12 +164,12 @@ test('close stamps closed_at and reopen brings the ticket back with a bump', fun
 });
 
 test('requesters can reopen within seven days, not after', function () {
-    $inside = ItTicket::factory()->create([
+    $inside = lifecycleTicket([
         'requester_user_id' => $this->worker->id,
         'status' => 'resolved',
         'resolved_at' => now()->subDays(3),
     ]);
-    $outside = ItTicket::factory()->create([
+    $outside = lifecycleTicket([
         'requester_user_id' => $this->worker->id,
         'status' => 'resolved',
         'resolved_at' => now()->subDays(9),
@@ -155,12 +188,12 @@ test('requesters can reopen within seven days, not after', function () {
 });
 
 test('the auto-close command sweeps tickets past the reopen window', function () {
-    $stale = ItTicket::factory()->create([
+    $stale = lifecycleTicket([
         'requester_user_id' => $this->worker->id,
         'status' => 'resolved',
         'resolved_at' => now()->subDays(8),
     ]);
-    $fresh = ItTicket::factory()->create([
+    $fresh = lifecycleTicket([
         'requester_user_id' => $this->worker->id,
         'status' => 'resolved',
         'resolved_at' => now()->subDays(2),

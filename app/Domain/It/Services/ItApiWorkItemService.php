@@ -12,6 +12,7 @@ use App\Models\ItTicketComment;
 use App\Models\ItTicketEvent;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Support\LegacyStorageContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Arr;
@@ -186,7 +187,7 @@ final class ItApiWorkItemService
             }
 
             $ticket = ItTicket::createWithReference([
-                'tenant_id' => $identity->tenant_id,
+                'tenant_id' => LegacyStorageContext::id(),
                 'requester_user_id' => $actor->id,
                 'requested_for_user_id' => $actor->id,
                 'source' => 'system',
@@ -208,7 +209,7 @@ final class ItApiWorkItemService
             $ticket = $this->routingService->route($ticket, $actor->id);
 
             AuditLogger::logOrFail('it.api.work_item.created', $ticket, [
-                'organization_id' => $identity->tenant_id,
+                'application_scope' => 'single_installation',
                 'actor_id' => $actor->id,
                 'service_identity_id' => $identity->id,
             ]);
@@ -232,7 +233,7 @@ final class ItApiWorkItemService
             }
 
             $comment = ItTicketComment::query()->create([
-                'tenant_id' => $identity->tenant_id,
+                'tenant_id' => LegacyStorageContext::id(),
                 'ticket_id' => $authorized->id,
                 'author_user_id' => $identity->actor_user_id,
                 'body' => $body,
@@ -243,7 +244,7 @@ final class ItApiWorkItemService
                 'service_identity_id' => $identity->id,
             ]);
             AuditLogger::logOrFail('it.api.comment.created', $authorized, [
-                'organization_id' => $identity->tenant_id,
+                'application_scope' => 'single_installation',
                 'actor_id' => $identity->actor_user_id,
                 'service_identity_id' => $identity->id,
                 'comment_id' => $comment->id,
@@ -269,7 +270,7 @@ final class ItApiWorkItemService
 
             $transitioned = $this->transitionService->transition($authorized, $input);
             AuditLogger::logOrFail('it.api.transition.completed', $transitioned, [
-                'organization_id' => $identity->tenant_id,
+                'application_scope' => 'single_installation',
                 'actor_id' => $identity->actor_user_id,
                 'service_identity_id' => $identity->id,
                 'to_workflow_state' => $input->to->value,

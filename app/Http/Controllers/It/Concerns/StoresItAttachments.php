@@ -6,6 +6,7 @@ use App\Models\ItAttachment;
 use App\Models\ItTicket;
 use App\Models\ItTicketComment;
 use App\Models\User;
+use App\Support\LegacyStorageContext;
 use Illuminate\Http\UploadedFile;
 
 /**
@@ -46,7 +47,7 @@ trait StoresItAttachments
             $path = $file->store('it_attachments', ItAttachment::DISK);
 
             $parent->attachments()->create([
-                'tenant_id' => $parent->tenant_id,
+                'tenant_id' => LegacyStorageContext::id(),
                 'path' => $path,
                 'original_name' => $file->getClientOriginalName(),
                 'mime' => $file->getClientMimeType(),

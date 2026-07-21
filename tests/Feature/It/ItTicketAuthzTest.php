@@ -1,7 +1,9 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\ItTicket;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Gate;
@@ -20,6 +22,16 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->hr = itAuthzUser('hr');
     $this->worker = itAuthzUser('support_worker');
+    $this->site = Site::factory()->create();
+    foreach ([$this->hr, $this->worker] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+    }
 });
 
 test('a support worker can raise a ticket but the triage fields are ignored', function () {
@@ -49,6 +61,7 @@ test('agents can still log-and-triage with an assignee in one step', function ()
             'title' => 'New starter laptop imaging',
             'category' => 'hardware',
             'priority' => 'normal',
+            'site_id' => $this->site->id,
             'assigned_to_user_id' => $this->hr->id,
         ])
         ->assertRedirect()
@@ -62,6 +75,7 @@ test('agents can still log-and-triage with an assignee in one step', function ()
 test('a requester sees only their own tickets in the payload', function () {
     $mine = ItTicket::query()->create([
         'tenant_id' => 1,
+        'site_id' => $this->site->id,
         'title' => 'My broken headset',
         'requester_user_id' => $this->worker->id,
         'category' => 'hardware',
@@ -70,6 +84,7 @@ test('a requester sees only their own tickets in the payload', function () {
     ]);
     ItTicket::query()->create([
         'tenant_id' => 1,
+        'site_id' => $this->site->id,
         'title' => 'Someone else’s VPN issue',
         'requester_user_id' => $this->hr->id,
         'category' => 'network',
@@ -101,6 +116,7 @@ test('a requester sees only their own tickets in the payload', function () {
 test('requesters cannot work the queue or the provisioning routes', function () {
     $ticket = ItTicket::query()->create([
         'tenant_id' => 1,
+        'site_id' => $this->site->id,
         'title' => 'Queue ticket',
         'requester_user_id' => $this->worker->id,
         'category' => 'other',
@@ -120,6 +136,7 @@ test('requesters cannot work the queue or the provisioning routes', function () 
 test('the ticket policy scopes view, reopen and delete correctly', function () {
     $ticket = ItTicket::query()->create([
         'tenant_id' => 1,
+        'site_id' => $this->site->id,
         'title' => 'Policy ticket',
         'requester_user_id' => $this->worker->id,
         'category' => 'other',
@@ -145,6 +162,13 @@ test('the ticket policy scopes view, reopen and delete correctly', function () {
 
     // delete: admins only — even it.manage holders are refused.
     $admin = itAuthzUser('admin');
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $admin->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+    ]);
     expect(Gate::forUser($this->hr)->allows('delete', $ticket))->toBeFalse();
     expect(Gate::forUser($admin)->allows('delete', $ticket))->toBeTrue();
 });

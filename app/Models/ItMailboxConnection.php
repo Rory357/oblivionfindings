@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Org-level OAuth connection to the IT support mailbox (email-to-ticket, E3).
+ * Application-level OAuth connection to the IT support mailbox (email-to-ticket, E3).
  * Mirrors {@see CalendarSyncConnection}: implements {@see CalendarOAuthToken}
  * so it drives MicrosoftGraphService / GoogleCalendarService interchangeably —
  * the mailbox poller pulls unread mail with the same token machinery the

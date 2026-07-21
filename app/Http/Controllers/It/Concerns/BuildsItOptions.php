@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers\It\Concerns;
 
-use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\ItStaffDirectory;
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Models\Asset;
 use App\Models\ItKbArticle;
+use App\Models\ItTicket;
+use App\Models\User;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -12,19 +15,18 @@ use Illuminate\Support\Facades\Schema;
  */
 trait BuildsItOptions
 {
-    /** Active tenant staff usable as request/ticket assignees (IT owners). */
-    protected function tenantUserOptions(int $tenantId): array
+    /** Current IT agents who share an approved Site or can work the ticket. */
+    protected function staffUserOptions(User $viewer, ?ItTicket $ticket = null): array
     {
-        return HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->with('user:id,name')
-            ->get()
-            ->map(fn (HrEmployeeProfile $p) => [
-                'id' => $p->user_id,
-                'name' => $p->user?->name,
+        $agents = $ticket
+            ? ItStaffDirectory::agentsForTicket($ticket)
+            : ItStaffDirectory::agentsForSharedSites($viewer);
+
+        return $agents
+            ->map(fn (User $agent) => [
+                'id' => $agent->id,
+                'name' => $agent->name,
             ])
-            ->filter(fn ($u) => $u['id'] && $u['name'])
             ->unique('id')
             ->sortBy('name')
             ->values()
@@ -37,11 +39,27 @@ trait BuildsItOptions
      *
      * @return array<int, array{id: int, name: string, tag: string|null}>
      */
-    protected function assetOptions(): array
+    protected function assetOptions(User $viewer, ?ItTicket $ticket = null): array
     {
-        return Asset::query()
+        $query = Asset::query()
             ->where('status', 'active')
-            ->orderBy('name')
+            ->when(
+                $ticket?->site_id !== null,
+                fn ($assets) => $assets->where('site_id', $ticket->site_id),
+                function ($assets) use ($viewer): void {
+                    if ($viewer->canDo('it.organisationWide')) {
+                        return;
+                    }
+
+                    $siteIds = app(ItWorkAccessService::class)->approvedSiteIds($viewer);
+                    $siteIds === []
+                        ? $assets->whereRaw('1 = 0')
+                        : $assets->whereIn('site_id', $siteIds);
+                },
+            )
+            ->orderBy('name');
+
+        return $query
             ->limit(200)
             ->get(['id', 'name', 'asset_tag'])
             ->map(fn (Asset $a) => ['id' => $a->id, 'name' => $a->name, 'tag' => $a->asset_tag])
@@ -53,18 +71,17 @@ trait BuildsItOptions
      * §I published knowledge-base titles for the ticket-workspace composer's
      * "Suggest from Knowledge" — lean (no body, never client detail) so an
      * agent replying can reference the guide that fixes it. Published only,
-     * tenant-scoped; Schema-guarded so a pre-migration render stays empty.
+     * globally catalogued; Schema-guarded so a pre-migration render stays empty.
      *
      * @return array<int, array{id: int, title: string, category: string}>
      */
-    protected function kbSuggestions(int $tenantId): array
+    protected function kbSuggestions(): array
     {
         if (! Schema::hasTable('it_kb_articles')) {
             return [];
         }
 
         return ItKbArticle::query()
-            ->forTenant($tenantId)
             ->published()
             ->orderByDesc('updated_at')
             ->limit(100)

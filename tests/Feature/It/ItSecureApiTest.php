@@ -15,12 +15,11 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
 
-function secureApiUser(string $role = 'hr', int $tenantId = 1): User
+function secureApiUser(string $role = 'hr'): User
 {
     $user = User::factory()->create([
         'role' => $role,
         'approved_at' => now(),
-        'organization_id' => $tenantId,
     ]);
     $user->roles()->syncWithoutDetaching([
         Role::query()->where('name', $role)->firstOrFail()->id,
@@ -37,7 +36,6 @@ function secureApiIdentity(User $actor, array $overrides = []): array
 {
     return app(ItServiceIdentityCredentialService::class)->create(
         $actor,
-        (int) $actor->organization_id,
         [
             'name' => 'Monitoring connector',
             'description' => 'Creates and follows approved monitoring work.',

@@ -15,6 +15,7 @@ use App\Notifications\It\TicketRepliedNotification;
 use App\Notifications\It\TicketResolvedNotification;
 use App\Notifications\It\TicketSlaNotification;
 use App\Services\AuditLogger;
+use App\Support\LegacyStorageContext;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use DomainException;
@@ -219,7 +220,6 @@ class ItEmailDeliveryService
     public function retry(
         ItEmailDelivery $delivery,
         User $actor,
-        ?int $legacyStorageContextId = null,
     ): ItEmailDelivery {
         $retry = DB::transaction(function () use ($delivery, $actor): ItEmailDelivery {
             $original = ItEmailDelivery::query()
@@ -250,7 +250,7 @@ class ItEmailDeliveryService
             }
 
             $retry = ItEmailDelivery::query()->create([
-                'tenant_id' => $original->tenant_id,
+                'tenant_id' => LegacyStorageContext::id(),
                 'notification_uuid' => (string) Str::uuid(),
                 'retry_of_delivery_id' => $original->id,
                 'it_ticket_id' => $original->it_ticket_id,
@@ -372,7 +372,7 @@ class ItEmailDeliveryService
                 'recipient_user_id' => $recipient->id,
             ],
             [
-                'tenant_id' => $context['tenant_id'],
+                'tenant_id' => LegacyStorageContext::id(),
                 'it_ticket_id' => $context['ticket_id'] ?? null,
                 'it_provisioning_request_id' => $context['provisioning_request_id'] ?? null,
                 'it_ticket_comment_id' => $context['comment_id'] ?? null,

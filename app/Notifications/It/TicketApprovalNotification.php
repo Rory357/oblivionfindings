@@ -33,7 +33,6 @@ class TicketApprovalNotification extends Notification implements ShouldQueue, Tr
         };
 
         return [
-            'tenant_id' => (int) $this->ticket->tenant_id,
             'ticket_id' => (int) $this->ticket->id,
             'type' => 'ticket_approval',
             'subject' => $subject,

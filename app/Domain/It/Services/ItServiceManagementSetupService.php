@@ -6,26 +6,31 @@ use App\Domain\It\ItStaffDirectory;
 use App\Models\ItQueue;
 use App\Models\ItService;
 use App\Models\ItTeam;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Support\LegacyStorageContext;
 use DomainException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 final class ItServiceManagementSetupService
 {
+    public function __construct(private readonly ItWorkAccessService $workAccess) {}
+
     /** @param array<string, mixed> $data */
-    public function createTeam(User $actor, int $tenantId, array $data): ItTeam
+    public function createTeam(User $actor, array $data): ItTeam
     {
-        return DB::transaction(function () use ($tenantId, $data): ItTeam {
-            $this->guardAgents($tenantId, $this->teamUserIds($data));
+        return DB::transaction(function () use ($actor, $data): ItTeam {
+            $this->guardActor($actor);
+            $this->guardAgents($this->teamUserIds($data));
             $team = ItTeam::query()->create([
-                'tenant_id' => $tenantId,
+                'tenant_id' => LegacyStorageContext::id(),
                 ...Arr::only($data, ['manager_user_id', 'name', 'description', 'is_active']),
             ]);
             $this->syncMembers($team, (array) ($data['members'] ?? []));
             AuditLogger::logOrFail('it.setup.team.created', $team, [
-                'organization_id' => $tenantId,
+                'application_scope' => 'single_installation',
                 'member_count' => count((array) ($data['members'] ?? [])),
             ]);
 
@@ -34,18 +39,18 @@ final class ItServiceManagementSetupService
     }
 
     /** @param array<string, mixed> $data */
-    public function updateTeam(ItTeam $team, User $actor, int $tenantId, array $data): ItTeam
+    public function updateTeam(ItTeam $team, User $actor, array $data): ItTeam
     {
-        return DB::transaction(function () use ($team, $actor, $tenantId, $data): ItTeam {
-            $team = $this->lockedTeam($team, $actor, $tenantId);
-            $this->guardAgents($tenantId, $this->teamUserIds($data));
+        return DB::transaction(function () use ($team, $actor, $data): ItTeam {
+            $team = $this->lockedTeam($team, $actor);
+            $this->guardAgents($this->teamUserIds($data));
             $before = $team->only(['manager_user_id', 'name', 'description', 'is_active']);
             $team->fill(Arr::only($data, ['manager_user_id', 'name', 'description', 'is_active']))->save();
             if (array_key_exists('members', $data)) {
                 $this->syncMembers($team, (array) $data['members']);
             }
             AuditLogger::logOrFail('it.setup.team.updated', $team, [
-                'organization_id' => $tenantId,
+                'application_scope' => 'single_installation',
                 'before' => $before,
                 'changed_fields' => array_keys($team->getChanges()),
             ]);
@@ -55,17 +60,19 @@ final class ItServiceManagementSetupService
     }
 
     /** @param array<string, mixed> $data */
-    public function createQueue(User $actor, int $tenantId, array $data): ItQueue
+    public function createQueue(User $actor, array $data): ItQueue
     {
-        return DB::transaction(function () use ($tenantId, $data): ItQueue {
-            $this->guardQueueDefaults($tenantId, $data);
+        return DB::transaction(function () use ($actor, $data): ItQueue {
+            $this->guardActor($actor);
+            $this->guardQueueDefaults($actor, $data);
+            $this->guardRoutingScope($actor, $data);
             $queue = ItQueue::query()->create([
-                'tenant_id' => $tenantId,
+                'tenant_id' => LegacyStorageContext::id(),
                 ...Arr::only($data, ['team_id', 'key', 'name', 'description', 'is_active']),
                 'filter_rules' => $this->filterRules($data),
             ]);
             AuditLogger::logOrFail('it.setup.queue.created', $queue, [
-                'organization_id' => $tenantId,
+                'application_scope' => 'single_installation',
                 'routing_fields' => array_keys(array_filter($queue->filter_rules ?? [], fn ($value) => $value !== [] && $value !== null)),
             ]);
 
@@ -74,16 +81,19 @@ final class ItServiceManagementSetupService
     }
 
     /** @param array<string, mixed> $data */
-    public function updateQueue(ItQueue $queue, User $actor, int $tenantId, array $data): ItQueue
+    public function updateQueue(ItQueue $queue, User $actor, array $data): ItQueue
     {
-        return DB::transaction(function () use ($queue, $actor, $tenantId, $data): ItQueue {
-            $queue = $this->lockedQueue($queue, $actor, $tenantId);
-            $this->guardQueueDefaults($tenantId, [
+        return DB::transaction(function () use ($queue, $actor, $data): ItQueue {
+            $queue = $this->lockedQueue($queue, $actor);
+            $this->guardQueueDefaults($actor, [
                 'team_id' => $data['team_id'] ?? $queue->team_id,
                 'default_assignee_user_id' => array_key_exists('default_assignee_user_id', $data)
                     ? $data['default_assignee_user_id']
                     : ($queue->filter_rules['default_assignee_user_id'] ?? null),
             ]);
+            if (array_key_exists('site_ids', $data)) {
+                $this->guardRoutingScope($actor, $data);
+            }
             $before = $queue->only(['team_id', 'key', 'name', 'description', 'filter_rules', 'is_active']);
             $queue->fill(Arr::only($data, ['team_id', 'key', 'name', 'description', 'is_active']));
             if ($this->hasRoutingData($data)) {
@@ -94,7 +104,7 @@ final class ItServiceManagementSetupService
             }
             $queue->save();
             AuditLogger::logOrFail('it.setup.queue.updated', $queue, [
-                'organization_id' => $tenantId,
+                'application_scope' => 'single_installation',
                 'before' => $before,
                 'changed_fields' => array_keys($queue->getChanges()),
             ]);
@@ -104,16 +114,17 @@ final class ItServiceManagementSetupService
     }
 
     /** @param array<string, mixed> $data */
-    public function createService(User $actor, int $tenantId, array $data): ItService
+    public function createService(User $actor, array $data): ItService
     {
-        return DB::transaction(function () use ($tenantId, $data): ItService {
-            $this->guardAgents($tenantId, array_filter([$data['owner_user_id'] ?? null]));
+        return DB::transaction(function () use ($actor, $data): ItService {
+            $this->guardActor($actor);
+            $this->guardAgents(array_filter([$data['owner_user_id'] ?? null]));
             $service = ItService::query()->create([
-                'tenant_id' => $tenantId,
+                'tenant_id' => LegacyStorageContext::id(),
                 ...Arr::only($data, ['owner_user_id', 'key', 'name', 'description', 'status', 'criticality', 'is_active']),
             ]);
             AuditLogger::logOrFail('it.setup.service.created', $service, [
-                'organization_id' => $tenantId,
+                'application_scope' => 'single_installation',
                 'owner_user_id' => $service->owner_user_id,
             ]);
 
@@ -122,17 +133,17 @@ final class ItServiceManagementSetupService
     }
 
     /** @param array<string, mixed> $data */
-    public function updateService(ItService $service, User $actor, int $tenantId, array $data): ItService
+    public function updateService(ItService $service, User $actor, array $data): ItService
     {
-        return DB::transaction(function () use ($service, $actor, $tenantId, $data): ItService {
-            $service = $this->lockedService($service, $actor, $tenantId);
+        return DB::transaction(function () use ($service, $actor, $data): ItService {
+            $service = $this->lockedService($service, $actor);
             if (array_key_exists('owner_user_id', $data)) {
-                $this->guardAgents($tenantId, array_filter([$data['owner_user_id']]));
+                $this->guardAgents(array_filter([$data['owner_user_id']]));
             }
             $before = $service->only(['owner_user_id', 'key', 'name', 'description', 'status', 'criticality', 'is_active']);
             $service->fill(Arr::only($data, ['owner_user_id', 'key', 'name', 'description', 'status', 'criticality', 'is_active']))->save();
             AuditLogger::logOrFail('it.setup.service.updated', $service, [
-                'organization_id' => $tenantId,
+                'application_scope' => 'single_installation',
                 'before' => $before,
                 'changed_fields' => array_keys($service->getChanges()),
             ]);
@@ -141,25 +152,25 @@ final class ItServiceManagementSetupService
         });
     }
 
-    private function lockedTeam(ItTeam $team, User $actor, int $tenantId): ItTeam
+    private function lockedTeam(ItTeam $team, User $actor): ItTeam
     {
         $this->guardActor($actor);
 
-        return ItTeam::query()->whereKey($team->id)->where('tenant_id', $tenantId)->lockForUpdate()->firstOrFail();
+        return ItTeam::query()->whereKey($team->id)->lockForUpdate()->firstOrFail();
     }
 
-    private function lockedQueue(ItQueue $queue, User $actor, int $tenantId): ItQueue
+    private function lockedQueue(ItQueue $queue, User $actor): ItQueue
     {
         $this->guardActor($actor);
 
-        return ItQueue::query()->whereKey($queue->id)->where('tenant_id', $tenantId)->lockForUpdate()->firstOrFail();
+        return ItQueue::query()->whereKey($queue->id)->lockForUpdate()->firstOrFail();
     }
 
-    private function lockedService(ItService $service, User $actor, int $tenantId): ItService
+    private function lockedService(ItService $service, User $actor): ItService
     {
         $this->guardActor($actor);
 
-        return ItService::query()->whereKey($service->id)->where('tenant_id', $tenantId)->lockForUpdate()->firstOrFail();
+        return ItService::query()->whereKey($service->id)->lockForUpdate()->firstOrFail();
     }
 
     private function guardActor(User $actor): void
@@ -170,15 +181,15 @@ final class ItServiceManagementSetupService
     }
 
     /** @param array<int, mixed> $userIds */
-    private function guardAgents(int $tenantId, array $userIds): void
+    private function guardAgents(array $userIds): void
     {
         $ids = array_values(array_unique(array_map('intval', $userIds)));
         if ($ids === []) {
             return;
         }
-        $agents = ItStaffDirectory::agents($tenantId)->pluck('id')->map(fn ($id) => (int) $id);
+        $agents = ItStaffDirectory::agents()->pluck('id')->map(fn ($id) => (int) $id);
         if (collect($ids)->diff($agents)->isNotEmpty()) {
-            throw new DomainException('Team managers, members, owners, and default assignees must be IT agents in this organisation.');
+            throw new DomainException('Team managers, members, owners, and default assignees must be current IT agents.');
         }
     }
 
@@ -202,20 +213,44 @@ final class ItServiceManagementSetupService
     }
 
     /** @param array<string, mixed> $data */
-    private function guardQueueDefaults(int $tenantId, array $data): void
+    private function guardQueueDefaults(User $actor, array $data): void
     {
         $teamId = ! empty($data['team_id']) ? (int) $data['team_id'] : null;
         $assigneeId = ! empty($data['default_assignee_user_id']) ? (int) $data['default_assignee_user_id'] : null;
         if ($assigneeId === null) {
             return;
         }
-        $this->guardAgents($tenantId, [$assigneeId]);
+        $this->guardAgents([$assigneeId]);
         if ($teamId !== null && ! ItTeam::query()
             ->whereKey($teamId)
-            ->where('tenant_id', $tenantId)
             ->whereHas('members', fn ($query) => $query->whereKey($assigneeId))
             ->exists()) {
             throw new DomainException('The default assignee must be a member of the queue team.');
+        }
+    }
+
+    /** @param array<string, mixed> $data */
+    private function guardRoutingScope(User $actor, array $data): void
+    {
+        $siteIds = array_values(array_unique(array_map('intval', (array) ($data['site_ids'] ?? []))));
+        if ($siteIds === []) {
+            return;
+        }
+
+        $operational = Site::query()
+            ->whereKey($siteIds)
+            ->where('is_active', true)
+            ->where('archived', false)
+            ->whereNull('archived_at')
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id);
+        if ($operational->count() !== count($siteIds)) {
+            throw new DomainException('Routing can only use active Sites.');
+        }
+
+        if (! $actor->canDo('it.organisationWide')
+            && collect($siteIds)->diff($this->workAccess->approvedSiteIds($actor))->isNotEmpty()) {
+            throw new DomainException('Routing can only use Sites in your approved Site access.');
         }
     }
 

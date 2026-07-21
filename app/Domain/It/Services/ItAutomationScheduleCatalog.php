@@ -88,18 +88,16 @@ class ItAutomationScheduleCatalog
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function definitions(?int $tenantId = null): array
+    public function definitions(): array
     {
         return collect(self::DEFINITIONS)
-            ->map(function (array $definition) use ($tenantId): array {
+            ->map(function (array $definition): array {
                 $latest = null;
                 if (Schema::hasTable('it_automation_runs')) {
-                    $latestQuery = ItAutomationRun::query()
-                        ->where('automation_key', $definition['key']);
-                    $tenantId === null
-                        ? $latestQuery->whereNull('tenant_id')
-                        : $latestQuery->forTenantOrSystem($tenantId);
-                    $latest = $latestQuery->latest('id')->first();
+                    $latest = ItAutomationRun::query()
+                        ->where('automation_key', $definition['key'])
+                        ->latest('id')
+                        ->first();
                 }
 
                 $nextRun = (new CronExpression($definition['expression']))

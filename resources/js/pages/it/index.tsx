@@ -208,7 +208,7 @@ interface Props {
     provisioningWorkflows?: ProvisioningWorkflowRow[];
     tickets?: Paginated<TicketRow> | null;
     assignees?: AssigneeOption[];
-    /** Tenant employee profiles for the manual provisioning-request picker. */
+    /** Access-approved employee profiles for the manual provisioning-request picker. */
     employeeOptions?: EmployeeOption[];
     /** Active assets register entries for the Log & triage asset-link picker. */
     assetOptions?: AssetOption[];
@@ -220,7 +220,7 @@ interface Props {
     overview?: OverviewPayload;
     /** Effective SLA grid — present only for admins (the policy editor). */
     slaPolicies?: SlaPolicyGrid | null;
-    /** The tenant business-hours calendar for the SLA editor (admins). */
+    /** The application business-hours calendar for the SLA editor (admins). */
     slaCalendar?: SlaCalendar | null;
     /** The viewer's own tickets — present for anyone with it.request. */
     myTickets: MyTicketRow[];
@@ -664,7 +664,7 @@ export default function ItIndex({
         );
     });
 
-    /** Open the reader and count the read (server guards published + tenant). */
+    /** Open the reader and count the read (server guards publication and access). */
     const openArticle = (a: KbPublishedRow) => {
         setReaderArticle(a);
         router.post(

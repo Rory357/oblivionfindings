@@ -5,6 +5,7 @@ use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Models\ItProvisioningRequest;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
@@ -18,9 +19,9 @@ function provBulkUser(string $role): User
     return $user;
 }
 
-function provBulkProfile(): HrEmployeeProfile
+function provBulkProfile(Site $site, ?User $user = null, bool $current = false): HrEmployeeProfile
 {
-    $user = User::factory()->create();
+    $user ??= User::factory()->create();
 
     return HrEmployeeProfile::query()->create([
         'tenant_id' => 1,
@@ -30,20 +31,25 @@ function provBulkProfile(): HrEmployeeProfile
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
-        'start_date' => now()->addDays(10)->toDateString(),
+        'primary_site_id' => $site->id,
+        'start_date' => ($current ? now()->subDays(10) : now()->addDays(10))->toDateString(),
         'is_active' => true,
     ]);
 }
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->hr = provBulkUser('hr');
     $this->agent = provBulkUser('provider_manager');
     $this->worker = provBulkUser('support_worker');
+    provBulkProfile($this->site, $this->hr, true);
+    provBulkProfile($this->site, $this->agent, true);
+    provBulkProfile($this->site, $this->worker, true);
 });
 
 test('bulk assign moves pending requests to in progress and records an event', function () {
-    $profile = provBulkProfile();
+    $profile = provBulkProfile($this->site);
     $pendingA = ItProvisioningRequest::query()->create([
         'tenant_id' => 1, 'employee_profile_id' => $profile->id,
         'type' => 'account', 'item' => 'Email account', 'status' => 'pending',
@@ -86,7 +92,7 @@ test('bulk assign moves pending requests to in progress and records an event', f
 });
 
 test('bulk fulfil marks requests done and completes the linked onboarding task', function () {
-    $profile = provBulkProfile();
+    $profile = provBulkProfile($this->site);
     $checklist = HrOnboardingChecklist::query()->create([
         'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
@@ -142,15 +148,17 @@ test('bulk fulfil marks requests done and completes the linked onboarding task',
     expect($cancelled->refresh()->status)->toBe('cancelled');
 });
 
-test('provisioning bulk is agent-only and tenant-scoped', function () {
-    $profile = provBulkProfile();
+test('provisioning bulk is agent-only and Site-scoped', function () {
+    $profile = provBulkProfile($this->site);
     $mine = ItProvisioningRequest::query()->create([
         'tenant_id' => 1, 'employee_profile_id' => $profile->id,
         'type' => 'account', 'item' => 'Email', 'status' => 'pending',
     ]);
-    $foreign = ItProvisioningRequest::query()->create([
-        'tenant_id' => 2, 'employee_profile_id' => $profile->id,
-        'type' => 'account', 'item' => 'Foreign email', 'status' => 'pending',
+    $remoteSite = Site::factory()->create();
+    $remoteProfile = provBulkProfile($remoteSite);
+    $remote = ItProvisioningRequest::query()->create([
+        'tenant_id' => 1, 'employee_profile_id' => $remoteProfile->id,
+        'type' => 'account', 'item' => 'Remote Site email', 'status' => 'pending',
     ]);
 
     // Self-service requesters (no it.manage) cannot bulk-act.
@@ -160,14 +168,14 @@ test('provisioning bulk is agent-only and tenant-scoped', function () {
         'assigned_to_user_id' => $this->agent->id,
     ])->assertForbidden();
 
-    // A foreign-tenant id silently drops out of the tenant-scoped fetch.
+    // An inaccessible Site id silently drops out of the canonical fetch.
     $this->actingAs($this->hr)->post('/it/provisioning/bulk', [
-        'ids' => [$mine->id, $foreign->id],
+        'ids' => [$mine->id, $remote->id],
         'action' => 'assign',
         'assigned_to_user_id' => $this->agent->id,
     ])->assertSessionHas('success', '1 request(s) assigned · 1 unchanged.');
 
     expect($mine->refresh()->status)->toBe('in_progress');
-    expect($foreign->refresh()->status)->toBe('pending'); // other tenant untouched
-    expect($foreign->assigned_to_user_id)->toBeNull();
+    expect($remote->refresh()->status)->toBe('pending');
+    expect($remote->assigned_to_user_id)->toBeNull();
 });

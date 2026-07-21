@@ -19,6 +19,7 @@ final class ItProvisioningRequestLifecycleService
     public function __construct(
         private readonly OnboardingService $onboardingService,
         private readonly DeviceAssignmentService $deviceAssignments,
+        private readonly ItProvisioningAccessService $access,
     ) {}
 
     public function approve(ItProvisioningRequest $request, User $actor, ?string $decisionNote = null): ItProvisioningRequest
@@ -41,7 +42,7 @@ final class ItProvisioningRequestLifecycleService
                 'decision_note' => $decisionNote,
             ]));
             AuditLogger::logOrFail('it.provisioning.request.approved', $request, [
-                'organization_id' => $request->tenant_id,
+                'application_scope' => 'single_installation',
                 'actor_id' => $actor->id,
                 'workflow_id' => $request->provisioning_workflow_id,
             ]);
@@ -98,7 +99,7 @@ final class ItProvisioningRequestLifecycleService
                 'action' => $request->action,
             ], fn ($value) => $value !== null));
             AuditLogger::logOrFail('it.provisioning.request.fulfilled', $request, [
-                'organization_id' => $request->tenant_id,
+                'application_scope' => 'single_installation',
                 'actor_id' => $actor->id,
                 'workflow_id' => $request->provisioning_workflow_id,
                 'action' => $request->action,
@@ -126,7 +127,7 @@ final class ItProvisioningRequestLifecycleService
             $this->reconcileWorkflow($request->workflow);
             ItTicketEvent::record($request, 'failed', $actor->id, ['reason' => trim($reason)]);
             AuditLogger::logOrFail('it.provisioning.request.failed', $request, [
-                'organization_id' => $request->tenant_id,
+                'application_scope' => 'single_installation',
                 'actor_id' => $actor->id,
                 'workflow_id' => $request->provisioning_workflow_id,
                 'reason' => trim($reason),
@@ -208,8 +209,7 @@ final class ItProvisioningRequestLifecycleService
 
     private function guard(ItProvisioningRequest $request, User $actor): void
     {
-        if (($actor->organization_id !== null && (int) $actor->organization_id !== (int) $request->tenant_id)
-            || ! $actor->canDo('it.manage')) {
+        if (! $this->access->canManage($actor, $request)) {
             throw new DomainException('You are not allowed to manage this provisioning request.');
         }
     }
