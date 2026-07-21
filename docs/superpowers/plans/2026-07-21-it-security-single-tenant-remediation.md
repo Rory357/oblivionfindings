@@ -78,6 +78,8 @@ The read-only command reports, without mutation:
 
 Commit the report as evidence. No normalization occurs in this task.
 
+Task 1 uses an exact path, rule, count, and line-independent normalized bounded statement-context fingerprint baseline for known active debt. The initial baseline contains 476 path-rule entries representing 3,083 matched occurrences. A green gate proves only that no new, moved, or equal-count semantically replaced tenant behavior was introduced; it does not prove remediation is complete. The legacy storage allowlist is separately limited to exact model storage declarations.
+
 ## Task 2: Add explicit IT site, team, sensitivity, and organisation-wide access
 
 **Create/modify:**
@@ -210,6 +212,8 @@ Update at minimum:
 
 Run focused domain suites, the complete IT/Security/Monitoring backend matrix, frontend tests, TypeScript, ESLint, client build, SSR build, migration/collision verification, route/schedule checks, architecture gates, and standard/compact desktop browser acceptance. No mobile acceptance is required.
 
+Task 9 must reduce the Task 1 active-debt baseline to an empty list. The final architecture gate must then pass as an absolute zero-active-tenant-behavior gate; retaining the Task 1 baseline is not acceptable completion evidence.
+
 ## Optional Task 10: Remove legacy columns
 
 Only after a repository-wide dependency audit, data backup/restore rehearsal, and separate approval, remove obsolete legacy columns and indexes in child-to-parent order. This optional schema simplification is not required to prove single-tenant behavior; Tasks 1–9 are required.
@@ -218,7 +222,7 @@ Only after a repository-wide dependency audit, data backup/restore rehearsal, an
 
 | Task | Status | Evidence |
 | --- | --- | --- |
-| 1. Boundary gate and collision report | Pending | Architecture test and committed read-only report |
+| 1. Boundary gate and collision report | Pending | Awaiting final independent approval and parent commit of the 476 path-rule no-regression baseline and redacted local development audit report |
 | 2. IT access kernel | Pending | Site/team/sensitivity/organisation-wide policy matrix |
 | 3. High-risk IT ingress and context | Pending | Email/API/context/monitoring/link direct-object tests |
 | 4. Remaining IT refactor | Pending | IT controller/service/regression matrix |
