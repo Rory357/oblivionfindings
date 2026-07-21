@@ -316,15 +316,26 @@ git commit -m "feat(monitoring): add durable signed message controls"
 - Create: `app/Domain/Monitoring/Services/MonitoringOutboxPublisher.php`
 - Create: `app/Domain/Monitoring/Services/MonitoringEnvelopeConsumer.php`
 - Create: `app/Domain/Monitoring/Services/MonitoringReplayService.php`
+- Create: `app/Domain/Monitoring/Services/MonitoringDeliveryRecoveryService.php`
 - Create: `app/Domain/Monitoring/Contracts/RuntimeEnvelopeHandler.php`
 - Create: `app/Domain/Monitoring/Services/RuntimeEnvelopeHandlerRegistry.php`
 - Create: `app/Domain/Monitoring/Handlers/ObservationEnvelopeHandler.php`
+- Create: `app/Domain/Monitoring/Database/MonitoringOutboxBuilder.php`
+- Create: `app/Domain/Monitoring/Database/MonitoringDeadLetterBuilder.php`
 - Create: `app/Domain/Monitoring/Jobs/PublishMonitoringOutbox.php`
 - Create: `app/Domain/Monitoring/Jobs/ConsumeMonitoringEnvelope.php`
+- Create: `app/Domain/Monitoring/Jobs/ReplayMonitoringDeadLetter.php`
+- Create: `app/Console/Commands/MonitoringRecoverDelivery.php`
 - Create: `app/Console/Commands/MonitoringReplayDeadLetter.php`
+- Create: `database/migrations/2026_07_21_100002_add_replay_intent_to_monitoring_dead_letters.php`
+- Modify: `app/Domain/Monitoring/Models/MonitoringOutbox.php`
+- Modify: `app/Domain/Monitoring/Models/MonitoringDeadLetter.php`
+- Modify: `app/Domain/Monitoring/Services/RuntimeEnvelopeCodec.php`
+- Modify: `config/monitoring.php`
+- Modify: `routes/console.php`
 - Create: `tests/Feature/Monitoring/MonitoringDeliveryTest.php`
 
-- [ ] **Step 1: Write failing duplicate, gap, poison, and replay tests**
+- [x] **Step 1: Write failing duplicate, gap, poison, and replay tests**
 
 ```php
 it('processes once and parks sequence gaps without advancing the checkpoint', function () {
@@ -339,7 +350,7 @@ it('processes once and parks sequence gaps without advancing the checkpoint', fu
     app(MonitoringEnvelopeConsumer::class)->consume('observation-projector', $one);
     app(MonitoringEnvelopeConsumer::class)->consume('observation-projector', $three);
 
-    expect(MonitoringInbox::count())->toBe(1)
+    expect(MonitoringInbox::count())->toBe(2)
         ->and(MonitoringConsumerCheckpoint::firstOrFail()->last_sequence)->toBe(1)
         ->and(MonitoringConsumerCheckpoint::firstOrFail()->gap_from)->toBe(2)
         ->and(MonitoringDeadLetter::where('reason_code', 'sequence_gap')->count())->toBe(1);
@@ -348,15 +359,17 @@ it('processes once and parks sequence gaps without advancing the checkpoint', fu
 
 Add cases for duplicate message ID, duplicate idempotency key, unsupported version, invalid signature, handler exception retry exhaustion, replay after the missing sequence arrives, and permission denial when replaying a letter for an unapproved site or restricted device.
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `php artisan test tests/Feature/Monitoring/MonitoringDeliveryTest.php`
 
 Expected: FAIL because publisher, consumer, jobs, and replay service do not exist.
 
-- [ ] **Step 3: Implement transactional publish and ordered consume**
+- [x] **Step 3: Implement transactional publish and ordered consume**
 
-`MonitoringOutboxPublisher::stage()` must allocate `sequence = max(source sequence) + 1` under a source-scoped advisory lock, write the signed envelope in the same transaction as its domain change, and dispatch `PublishMonitoringOutbox` after commit. The publisher sends rows to Redis using the configured queue for the envelope type, marks only acknowledged rows as published, and retries with exponential backoff.
+`MonitoringOutboxPublisher::stage()` allocates `sequence = max(source sequence) + 1` under a source-scoped shared Redis lock and writes the signed envelope in the same transaction as its domain change. A repeated source/idempotency key returns the existing row only when stream, type, source, key, and codec-canonical payload bytes match; it never reruns the domain change. Outbox delivery identity and exact signed bytes are immutable through ordinary and bulk Eloquent paths, and publish verifies the decoded message ID, source, sequence, and idempotency key against the durable row before queueing the consumer.
+
+Immediate queue dispatch and the scheduled `monitoring:recover-delivery` pass use the same bounded lease-and-token claims. The every-minute recovery pass claims expired unpublished outbox rows and pending replay intents under row locks with `SKIP LOCKED` where supported. A process crash or queue outage therefore leaves durable recoverable work; stale jobs with replaced tokens no-op, acknowledged publishes alone set `published_at`, and finite job retries retain bounded safe failure text.
 
 `MonitoringEnvelopeConsumer::consume()` must execute this order inside one transaction:
 
@@ -395,28 +408,32 @@ $inbox->forceFill(['processed_at' => now()])->save();
 $checkpoint->forceFill(['last_sequence' => $envelope->sequence, 'gap_from' => null, 'gap_to' => null])->save();
 ```
 
-Use stable reason codes `invalid_signature`, `unsupported_version`, `sequence_gap`, `scope_violation`, `site_scope_violation`, `handler_failed`, and `payload_invalid`. Redact payloads before logging; the permission-scoped DLQ record retains the signed envelope.
+Use stable reason codes `invalid_signature`, `unsupported_version`, `sequence_gap`, `scope_violation`, `site_scope_violation`, `handler_failed`, and `payload_invalid`. Redact payloads before logging; the permission-scoped DLQ record retains the signed envelope. Exact DLQ bytes receive a deterministic evidence fingerprint and site-aware dedupe key. Database uniqueness plus insert-or-ignore and exact conflict verification make poison and failed-hook delivery race-safe, while model and custom-builder guards keep every retained evidence field immutable. Semantic payload errors are classified as `payload_invalid`, and an exhausted stale duplicate cannot park `handler_failed` after the exact inbox item has already completed.
 
-- [ ] **Step 4: Add audited replay and discard commands**
+- [x] **Step 4: Add audited replay and discard commands**
 
-`MonitoringReplayService::replay(User $actor, MonitoringDeadLetter $letter)` must verify runtime-operate permission plus access to every referenced site and protected canonical target through `SecurityDevicesAccessService`, increment `replay_count`, preserve original `message_id`, `occurred_at`, and sequence, and enqueue the original signed envelope. `discard()` records actor, reason, and resolution time but never deletes the letter.
+`MonitoringReplayService::replay(User $actor, MonitoringDeadLetter $letter)` verifies runtime-operate permission plus current access to every referenced site and protected canonical target through `SecurityDevicesAccessService`. It persists an audited replay intent before dispatch, preserves the original signed bytes, and uses a generation token so stale jobs cannot claim a newer request. Successful consume, replay count, resolution actor/reason, intent clearing, and replay audit commit atomically. Queue or handler failure retains a recoverable pending intent; an authorised replacement operator can take over an orphaned or access-revoked request with a separate audit. `discard()` records actor, reason, and resolution time but never deletes the letter and cannot race a pending replay.
 
-Run: `php artisan monitoring:replay-dead-letter 15 --reason="missing sequence restored"`
+Observation handlers require the signed monitor/device/site context to agree with the canonical active device assignment and trusted routing site. Collector-bound monitors require the exact canonical collector UUID and collector site; direct monitors reject injected collector identity.
+
+Run: `php artisan monitoring:replay-dead-letter 15 --actor=7 --reason="missing sequence restored"`
 
 Expected during the test fixture: exit 0, one replay audit entry, and the checkpoint advances only after sequence 2 is consumed before sequence 3.
 
-- [ ] **Step 5: Run the delivery suite**
+- [x] **Step 5: Run the delivery suite**
 
 Run: `php artisan test tests/Feature/Monitoring/MonitoringDeliveryTest.php`
 
 Expected: all delivery, retry, ordering, gap, poison, DLQ, and replay cases pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add app/Domain/Monitoring/Contracts/RuntimeEnvelopeHandler.php app/Domain/Monitoring/Services/RuntimeEnvelopeHandlerRegistry.php app/Domain/Monitoring/Handlers/ObservationEnvelopeHandler.php app/Domain/Monitoring/Services/MonitoringOutboxPublisher.php app/Domain/Monitoring/Services/MonitoringEnvelopeConsumer.php app/Domain/Monitoring/Services/MonitoringReplayService.php app/Domain/Monitoring/Jobs/PublishMonitoringOutbox.php app/Domain/Monitoring/Jobs/ConsumeMonitoringEnvelope.php app/Console/Commands/MonitoringReplayDeadLetter.php tests/Feature/Monitoring/MonitoringDeliveryTest.php
 git commit -m "feat(monitoring): make runtime delivery replayable"
 ```
+
+**Task 3 evidence (2026-07-21):** committed locally as `a18d7a0ea`. Fresh delivery migrations passed. The focused delivery suite passed 29 tests / 188 assertions, and the combined Task 2-3 persistence, schema, single-tenant architecture, and Monitoring unit gate passed 75 tests / 529 assertions. The every-minute recovery schedule contract, PHP syntax, Pint, Composer validation/platform checks, diff checks, and forbidden tenant/mobile term scan passed. Independent final review approved the crash recovery, generation-token replay, exact evidence immutability, payload classification, collector/site binding, and signed substitution protections. No push or deployment was performed.
 
 ## Task 4: Enforce site, network, target, DNS, and SSRF egress boundaries
 
