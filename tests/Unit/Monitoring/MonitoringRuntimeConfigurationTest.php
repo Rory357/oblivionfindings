@@ -1,7 +1,16 @@
 <?php
 
+use App\Domain\Monitoring\Contracts\ApprovedProbeScopeProvider;
 use App\Domain\Monitoring\Contracts\CommandDispatchPort;
+use App\Domain\Monitoring\Contracts\DnsResolver;
+use App\Domain\Monitoring\Contracts\ProbeScopeResolver;
+use App\Domain\Monitoring\Data\ProbeTarget;
+use App\Domain\Monitoring\Exceptions\EgressDenied;
+use App\Domain\Monitoring\Services\CanonicalProbeScopeResolver;
+use App\Domain\Monitoring\Services\EgressPolicy;
+use App\Domain\Monitoring\Services\RejectingApprovedProbeScopeProvider;
 use App\Domain\Monitoring\Services\RejectingCommandDispatchPort;
+use App\Domain\Monitoring\Services\RejectingDnsResolver;
 use Illuminate\Foundation\Testing\TestCase;
 
 uses(TestCase::class);
@@ -46,12 +55,22 @@ it('defines runtime contract egress and retention defaults', function () {
             'connect_timeout_seconds' => 5,
             'response_timeout_seconds' => 15,
             'max_response_bytes' => 1048576,
-            'deny_cidrs' => ['0.0.0.0/8', '127.0.0.0/8', '169.254.0.0/16', '224.0.0.0/4', '::/128', '::1/128', 'fe80::/10', 'ff00::/8'],
+            'deny_cidrs' => ['0.0.0.0/8', '127.0.0.0/8', '100.100.100.200/32', '169.254.0.0/16', '224.0.0.0/4', '240.0.0.0/4', '::/128', '::1/128', 'fe80::/10', 'fd00:ec2::254/128', 'ff00::/8'],
         ])->and(config('monitoring.retention'))->toBe([
             'raw_days' => 14,
             'hourly_days' => 180,
             'daily_days' => 1825,
         ]);
+});
+
+it('binds probe egress to canonical scope and rejecting network dependencies by default', function () {
+    expect(app(ApprovedProbeScopeProvider::class))->toBeInstanceOf(RejectingApprovedProbeScopeProvider::class)
+        ->and(app(DnsResolver::class))->toBeInstanceOf(RejectingDnsResolver::class)
+        ->and(app(ProbeScopeResolver::class))->toBeInstanceOf(CanonicalProbeScopeResolver::class)
+        ->and(app(EgressPolicy::class))->toBeInstanceOf(EgressPolicy::class);
+
+    expect(fn () => app(EgressPolicy::class)->authorise(9, 81, ProbeTarget::tcp('10.44.1.8', 443)))
+        ->toThrow(EgressDenied::class);
 });
 
 it('fails closed when the signing key ring is absent or invalid', function (string $encodedKeyRing) {

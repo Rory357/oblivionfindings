@@ -124,7 +124,7 @@ return [
         'connect_timeout_seconds' => 5,
         'response_timeout_seconds' => 15,
         'max_response_bytes' => 1048576,
-        'deny_cidrs' => ['0.0.0.0/8', '127.0.0.0/8', '169.254.0.0/16', '224.0.0.0/4', '::/128', '::1/128', 'fe80::/10', 'ff00::/8'],
+        'deny_cidrs' => ['0.0.0.0/8', '127.0.0.0/8', '100.100.100.200/32', '169.254.0.0/16', '224.0.0.0/4', '240.0.0.0/4', '::/128', '::1/128', 'fe80::/10', 'fd00:ec2::254/128', 'ff00::/8'],
     ],
     'retention' => ['raw_days' => 14, 'hourly_days' => 180, 'daily_days' => 1825],
 ];
@@ -445,34 +445,34 @@ git commit -m "feat(monitoring): make runtime delivery replayable"
 - Create: `app/Domain/Monitoring/Services/EgressPolicy.php`
 - Create: `tests/Unit/Monitoring/EgressPolicyTest.php`
 
-- [ ] **Step 1: Write failing allow/deny and DNS-rebinding tests**
+- [x] **Step 1: Write failing allow/deny and DNS-rebinding tests**
 
 ```php
-it('allows only every resolved address inside the approved site network scope', function () {
-    $scope = probeScope(siteId: 9, cidrs: ['10.44.0.0/16']);
-    $resolver = fakeResolver([
+it('allows only every resolved address inside the canonical site and device scope', function () {
+    $dns = fakeResolver([
         'switch.site.example' => ['10.44.8.10'],
         'rebind.site.example' => ['10.44.8.11', '169.254.169.254'],
     ]);
-    $policy = new EgressPolicy(new CidrMatcher, $resolver, config('monitoring.egress'));
+    $scopes = fakeCanonicalScopeResolver(siteId: 9, deviceId: 81, cidrs: ['10.44.0.0/16']);
+    $policy = new EgressPolicy(new CidrMatcher, $dns, $scopes, config('monitoring.egress'));
 
-    expect($policy->authorise($scope, ProbeTarget::tcp('switch.site.example', 443))->addresses)->toBe(['10.44.8.10']);
-    expect(fn () => $policy->authorise($scope, ProbeTarget::http('http://rebind.site.example/status')))
+    expect($policy->authorise(9, 81, ProbeTarget::tcp('switch.site.example', 443))->addresses)->toBe(['10.44.8.10']);
+    expect(fn () => $policy->authorise(9, 81, ProbeTarget::http('http://rebind.site.example/status')))
         ->toThrow(EgressDenied::class, 'resolved address outside scope');
-    expect(fn () => $policy->authorise($scope, ProbeTarget::http('http://user:pass@switch.site.example/')))
+    expect(fn () => $policy->authorise(9, 81, ProbeTarget::http('http://user:pass@switch.site.example/')))
         ->toThrow(EgressDenied::class, 'userinfo is forbidden');
 });
 ```
 
 Add tests for site mismatch, device ownership mismatch, an unapproved network, loopback, link-local metadata, multicast, IPv4-in-IPv6, an empty DNS answer, CIDR boundary addresses, ports outside the scope allowlist, redirect to a denied host, response-size cap, and timeout cap.
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `php artisan test tests/Unit/Monitoring/EgressPolicyTest.php`
 
 Expected: FAIL because the target and egress policy classes do not exist.
 
-- [ ] **Step 3: Implement fail-closed egress authorisation**
+- [x] **Step 3: Implement fail-closed egress authorisation**
 
 ```php
 final readonly class ProbeTarget
@@ -506,7 +506,9 @@ final readonly class ProbeTarget
 
 Resolve A and AAAA records once, require every address to be inside an approved discovery-scope CIDR and outside the global deny list, carry the approved address set into the adapter, pin connections to that set, and re-authorise every redirect. Never let an adapter perform a second unverified hostname lookup.
 
-- [ ] **Step 4: Run the policy tests**
+The implementation must resolve canonical scope from active Device assignments rather than accepting a caller-built `ProbeScope`. All assignment evidence must collapse to exactly one active Site, including room, active client, current staff, and active vehicle category/site/home/client evidence. CIDR/port authority comes from a trusted `ApprovedProbeScopeProvider`; both that provider and DNS use rejecting production defaults until their owning later tasks bind real implementations. Only `EgressPolicy` may mint the private-construction `AuthorizedProbeTarget` carrying the pinned address set and caps. Reject credential-bearing URL query names so reusable secrets cannot enter the transport target. This task performs no probe network I/O; Task 5 owns adapter execution.
+
+- [x] **Step 4: Run the policy tests**
 
 Run: `php artisan test tests/Unit/Monitoring/EgressPolicyTest.php`
 
@@ -518,6 +520,10 @@ Expected: all boundary and rebinding cases pass.
 git add app/Domain/Monitoring/Data/ProbeTarget.php app/Domain/Monitoring/Exceptions/EgressDenied.php app/Domain/Monitoring/Services/CidrMatcher.php app/Domain/Monitoring/Services/EgressPolicy.php tests/Unit/Monitoring/EgressPolicyTest.php
 git commit -m "feat(monitoring): enforce probe egress scope"
 ```
+
+**Task 4 verification evidence (2026-07-21, pending parent-inspected commit):** The implementation now resolves active Device assignments through canonical Site, room, active client, current staff, and active vehicle category/site/home/client evidence; every current assignment must collapse to exactly one active Site before a trusted scope provider is consulted. Future assignments and staff profiles, inactive or missing targets, conflicting vehicle/client Sites, forged provider results, and raw resolver/provider errors fail closed. `ApprovedProbeScopeProvider` and `DnsResolver` have rejecting defaults. `EgressPolicy` validates configuration before DNS, resolves once, approves every address, denies special-use plus AWS and Alibaba metadata endpoints, enforces IPv4/IPv6 and mapped-address CIDRs, ports, network/broadcast rules, redirects, HTTPS downgrade, and transport caps, and is the only construction path for the immutable pinned-address target. Credential-like query names, including compact/camel, encoded, double-encoded, nested, and over-encoded variants, are rejected without retaining the value. No adapter or probe network I/O was added; Task 5 remains open.
+
+The final deterministic regression passed 83 Monitoring unit/architecture tests with 2,813 assertions and 76 compatible Monitoring feature tests with 442 assertions (159 tests / 3,255 assertions total). The broad prebuilt feature run passed 78 tests and had one unrelated failure in `MonitoringRecoveryPipelineTest`: the disposable SQLite fixture lacks newer IT/Control Room columns and the MySQL-only `last_insert_id` allocator, so its observer intentionally catches the database error and leaves the alert open. The native isolated-MySQL gate produced no output and stalled in the repository test harness; only its exact PHP processes were terminated. Task-owned Pint, PHP syntax, Composer strict validation/platform requirements, diff checks, and forbidden single-tenant/mobile/network-I/O scans passed. Independent review approved the final current-assignment, vehicle, secret-query, resolver-error, metadata, DNS, CIDR, redirect, construction, and rejecting-default boundaries.
 
 ## Task 5: Run direct ICMP, TCP, DNS, HTTP, and TLS checks on the checks queue
 

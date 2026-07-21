@@ -197,6 +197,16 @@ The platform supports capability-driven adapters for:
 
 SNMPv1/v2c can be enabled only as a recorded compatibility exception with restricted scope and migration visibility. Default setup guides users toward SNMPv3.
 
+#### 6.2.1 Probe authorisation boundary
+
+Every direct probe begins with an immutable requested target plus explicit canonical Site and Device IDs. A canonical resolver must independently prove that the active Device has current assignment evidence resolving to exactly one active, non-archived Site before any network authority is requested. Site, room, active client, current staff profile, and active vehicle assignments are supported; vehicle evidence includes the canonical vehicle category relation and linked-client Site. Zero, missing, future, inactive, or conflicting evidence fails closed.
+
+Approved CIDRs, ports, and tighter transport limits come from a separate trusted discovery-scope provider. Until the persisted discovery-scope owner is implemented, that provider and DNS resolution are both bound to rejecting defaults. This makes a missing integration non-operational rather than broadening scope.
+
+The egress policy resolves a hostname once, requires every A/AAAA result to pass both the global special-use/metadata deny list and the exact approved Site scope, then issues a private-construction authorised target containing the pinned numeric address set and bounded connect, response, and body limits. Only the egress policy may mint that transport target. Every redirect repeats full authorisation, HTTPS cannot downgrade, and adapters may not perform an unverified second lookup. URLs carrying credential-like query parameters are rejected; later credentialed adapters receive ephemeral leases or secret references, never reusable URL credentials.
+
+This boundary authorises transport only. ICMP, TCP, DNS, HTTP, TLS, and other adapter execution remains owned by the runtime implementation tasks and is not implied by the authorisation contract.
+
 ### 6.3 Discovery and identity matching
 
 Discovery combines IP ranges, known seeds, ARP and forwarding data, LLDP/CDP, provider inventories, cloud APIs, and collector-local visibility. It proposes matches using serial number, hardware ID, MAC address, provider ID, certificate identity, hostname, address history, and device fingerprint.

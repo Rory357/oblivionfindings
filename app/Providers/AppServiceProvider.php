@@ -6,11 +6,19 @@ use App\Domain\Finance\Events\JournalPosted;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Monitoring\Contracts\ApprovedProbeScopeProvider;
 use App\Domain\Monitoring\Contracts\CommandDispatchPort;
+use App\Domain\Monitoring\Contracts\DnsResolver;
 use App\Domain\Monitoring\Contracts\EnvelopeSigner;
+use App\Domain\Monitoring\Contracts\ProbeScopeResolver;
 use App\Domain\Monitoring\Enums\RuntimeMessageType;
 use App\Domain\Monitoring\Handlers\ObservationEnvelopeHandler;
+use App\Domain\Monitoring\Services\CanonicalProbeScopeResolver;
+use App\Domain\Monitoring\Services\CidrMatcher;
+use App\Domain\Monitoring\Services\EgressPolicy;
+use App\Domain\Monitoring\Services\RejectingApprovedProbeScopeProvider;
 use App\Domain\Monitoring\Services\RejectingCommandDispatchPort;
+use App\Domain\Monitoring\Services\RejectingDnsResolver;
 use App\Domain\Monitoring\Services\RuntimeEnvelopeHandlerRegistry;
 use App\Domain\Monitoring\Services\SodiumEnvelopeSigner;
 use App\Domain\Roadmap\Events\InitiativeScored;
@@ -135,8 +143,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(ApprovedProbeScopeProvider::class, RejectingApprovedProbeScopeProvider::class);
         $this->app->bind(CommandDispatchPort::class, RejectingCommandDispatchPort::class);
+        $this->app->bind(DnsResolver::class, RejectingDnsResolver::class);
         $this->app->bind(EnvelopeSigner::class, SodiumEnvelopeSigner::class);
+        $this->app->bind(ProbeScopeResolver::class, CanonicalProbeScopeResolver::class);
+        $this->app->singleton(EgressPolicy::class, fn ($app) => new EgressPolicy(
+            $app->make(CidrMatcher::class),
+            $app->make(DnsResolver::class),
+            $app->make(ProbeScopeResolver::class),
+            config('monitoring.egress'),
+        ));
         $this->app->singleton(RuntimeEnvelopeHandlerRegistry::class, fn ($app) => new RuntimeEnvelopeHandlerRegistry([
             RuntimeMessageType::Observation->value => $app->make(ObservationEnvelopeHandler::class),
         ]));
