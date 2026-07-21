@@ -1,6 +1,6 @@
 # IT, Security & Devices, and Monitoring Single-Tenant Remediation Plan
 
-> **Status:** In progress; Tasks 1-4 are complete and Task 5 is next.
+> **Status:** In progress; Tasks 1-6 are complete and Task 7 is next.
 >
 > **Product boundary:** Oblivion Findings is one application for one operating organisation across all configured sites. Site access, canonical record ownership, role/capability, direct-object denial, and privacy policy are the security boundaries. A legacy `tenant_id` or `organization_id` column is storage compatibility only and must never decide access.
 >
@@ -142,6 +142,8 @@ Replace `ItTransitionInput::$tenantId`, tenant-shaped email context, and tenant-
 
 ## Task 5: Replace Security & Devices tenant access with canonical visibility
 
+**Status: Completed in `401db9b58`.** Security & Devices visibility, counts, options, exports, direct-object access, and mutations now use canonical Site, Room, Client, staff, vehicle/Asset, Device, assignment, inventory-stock, and privacy evidence. Integration administration no longer grants all-device visibility; unassigned stock and all-Sites operation require separate explicit permissions. Client Profile device, tracker, location, and geofence paths now fail closed on mixed, ambiguous, inactive, or wrong-Site provenance.
+
 Refactor `SecurityDevicesAccessService`, `ResolvesDeviceTenant`, `DeviceRegistryService`, `DeviceGroupAutoRuleService`, Device/Profile/Discovery/Estate/Facilities/Healthcare/Tracking/Network/Monitoring/Settings presenters, controller queries, exports, and mutations.
 
 Required tests use one organisation with allowed and denied Sites, hidden Clients/staff/assets, inaccessible Rooms, unassigned stock, ambiguous assignments, site-limited users, inventory managers, integration managers, and explicit all-sites operators. Prove:
@@ -157,6 +159,8 @@ Required tests use one organisation with allowed and denied Sites, hidden Client
 Do not remove tenant filters until each caller uses the canonical replacement.
 
 ## Task 6: Rename and govern provider connections as single-application resources
+
+**Status: Completed in `401db9b58`.** Runtime provider ownership now uses a global application-level `IntegrationProviderConnection`, while credentials, mappings, capabilities, sync state, and projections remain bounded to approved Sites. Provider webhooks, UniFi/Milesight/Queclink discovery and health jobs, canonical device resolution, Queclink audit evidence, Device/Asset history, and secret-safe frontend contracts were independently reviewed and approved. The global provider-connection uniqueness constraint from Task 8 was safely pulled forward with collision preflight.
 
 Replace tenant-wide provider terminology and behavior in UniFi, Milesight, Queclink, integration services, controllers, presenters, and frontend contracts:
 
@@ -230,8 +234,8 @@ Only after a repository-wide dependency audit, data backup/restore rehearsal, an
 | 2. IT access kernel | Completed | Commit `a1696b8c3`; independently approved Site/team/sensitivity/explicit organisation-wide boundary; pre-validation direct-object concealment across ticket, child, approval, merge, and nested-task routes; 18 focused tests / 196 assertions plus parent gate 24 tests / 242 assertions; ratchet reduced to 472 path-rule entries / 2,935 occurrences |
 | 3. High-risk IT ingress and context | Completed | Commit `5f54c8a0d`; independent review approved with no Critical/Important findings; 78 affected tests / 770 assertions; architecture gate 6 tests / 31 assertions and ratchet reduced to 458 path-rule entries / 2,877 occurrences; TypeScript, targeted ESLint/Prettier, Pint, 36-file PHP syntax and diff checks; client and SSR production builds |
 | 4. Remaining IT refactor | Completed | Commit `d215bb060`; all ten IT controllers plus catalogue, routing, lifecycle, provisioning, setup, email, reporting, work transition, Problems, Changes, Major Incidents, tasks, queues, teams, services, and KB use canonical access or application-wide configuration; full IT suite 304 tests / 3,039 assertions; architecture gate 6 / 31 with ratchet reduced to 350 entries / 2,078 occurrences; TypeScript, targeted ESLint/Prettier, Pint, 98-file PHP syntax and diff checks, client build at 4,993 modules, and SSR build at 1,645 modules |
-| 5. Security & Devices access refactor | Pending | Site/privacy/count/export/mutation matrix |
-| 6. Provider connection refactor | Pending | Secret/capability/Site mapping tests and UI contracts |
+| 5. Security & Devices access refactor | Completed | Commit `401db9b58`; canonical Site/Room/Client/staff/vehicle/Asset/Device visibility with privacy, direct-object, count, option, export, mutation, unassigned-stock, and explicit all-Sites coverage; Client Profile tracker/location/geofence provenance hardened; independent review approved |
+| 6. Provider connection refactor | Completed | Commit `401db9b58`; global application provider identity with Site-scoped credentials/mappings/capabilities/sync/projections; canonical UniFi/Milesight/Queclink device resolution, global webhook idempotency, write-only secrets, canonical Queclink audit/history, and collision-preflight uniqueness; consolidated 105 tests / 1,076 assertions plus fresh Client Profile 14 / 301, frontend 4 files / 20 tests, TypeScript, Pint, 85-file PHP syntax, diff, client 4,993-module and SSR 1,645-module builds; independent review approved |
 | 7. Monitoring foundation refactor | Pending | Global collector/profile and canonical Device/Site tests |
 | 8. Data and global identity migration | Pending | Collision resolution, migration, uniqueness, and query-plan evidence |
 | 9. Fixtures/docs/full acceptance | Pending | Architecture, backend, frontend, build, and desktop browser gates |
