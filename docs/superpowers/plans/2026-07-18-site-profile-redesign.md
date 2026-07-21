@@ -635,11 +635,11 @@ Run: `git add resources/js/pages/sites docs/evidence/site-profile-redesign && gi
 - Create: `docs/site-profile-redesign-post-audit.md`
 - Modify: `docs/superpowers/plans/2026-07-18-site-profile-redesign.md`
 
-- [ ] **Step 1: Audit frontend, backend, ownership, and performance after implementation**
+- [x] **Step 1: Audit frontend, backend, ownership, and performance after implementation**
 
 The audit records: shipped architecture; removed duplicates; canonical workflow map; authorization/tenant findings; payload and query evidence; indexes added or deliberately omitted; automated/build/browser proof; and remaining improvements ranked by severity, user impact, engineering effort, owner, and recommended next action. Separate implemented/verified work from unresolved acceptance gaps.
 
-- [ ] **Step 2: Run fresh verification from a clean prompt**
+- [x] **Step 2: Run fresh verification from a clean prompt**
 
 Run: `git status --short`
 
@@ -657,14 +657,14 @@ Run: `git diff --check`
 
 Expected: all exit 0; the worktree contains only the audit/plan updates intended for the final commit.
 
-- [ ] **Step 3: Mark this plan truthfully**
+- [x] **Step 3: Mark this plan truthfully**
 
 Check only completed tasks. Add exact command results and browser evidence paths to the audit. Leave any blocked acceptance item unchecked and explain its blocker.
 
-- [ ] **Step 4: Commit the closeout artifacts**
+- [x] **Step 4: Commit the closeout artifacts**
 
 Run: `git add docs/site-profile-redesign-post-audit.md docs/superpowers/plans/2026-07-18-site-profile-redesign.md docs/evidence/site-profile-redesign && git diff --cached --check && git commit -m "docs(sites): close site profile redesign audit"`
 
-- [ ] **Step 5: Report the branch as implementation-complete, not integrated**
+- [x] **Step 5: Report the branch as implementation-complete, not integrated**
 
 Report branch/HEAD, commits, exact test/build counts, browser variants, files containing evidence, duplicates removed, remaining ranked improvements, and whether merge/push/deploy were requested. Do not merge, push, or deploy without separate user authorization.
