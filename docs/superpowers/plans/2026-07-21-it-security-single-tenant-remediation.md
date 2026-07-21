@@ -1,6 +1,6 @@
 # IT, Security & Devices, and Monitoring Single-Tenant Remediation Plan
 
-> **Status:** In progress; Tasks 1-6 are complete and Task 7 is next.
+> **Status:** In progress; Tasks 1-7 are complete and Task 8 is next.
 >
 > **Product boundary:** Oblivion Findings is one application for one operating organisation across all configured sites. Site access, canonical record ownership, role/capability, direct-object denial, and privacy policy are the security boundaries. A legacy `tenant_id` or `organization_id` column is storage compatibility only and must never decide access.
 >
@@ -175,6 +175,8 @@ Update active UI copy such as “Tenant scope” and “tenant-wide.” Secret v
 
 ## Task 7: Remove active tenant behavior from native Monitoring foundations
 
+**Status: Completed in `cfb078645`.** Monitoring collectors and profiles now have global application identities, while every monitor and observation is resolved through its canonical Device, Site, and optional collector. Observation provenance is derived and immutable across normal, quiet, and bulk Eloquent paths. The forward migration uses an expand/reconcile/contract sequence: provenance columns remain nullable during the compatibility release, existing rows are backfilled only from canonical relationships, and the explicit `monitoring:reconcile-observation-provenance` command fails closed until no gap remains. A later `NOT NULL` contract migration is intentionally deferred until this migration is deployed, old workers are drained and restarted, reconciliation reports zero gaps, and an observation period confirms all writers are current.
+
 Remove `scopeForTenant` and active tenant propagation from `Monitor`, `MonitoringCollector`, `MonitoringProfile`, `MonitorObservation`, factories, presenters, listeners, and tests. Collectors are globally identified and Site-scoped. Profiles are globally named unless an explicit Site override is designed. Monitors derive scope from their canonical Device and optional collector Site. Observations inherit immutable monitor/device/site evidence, not a tenant partition.
 
 Add a forward migration after collision evidence:
@@ -236,7 +238,7 @@ Only after a repository-wide dependency audit, data backup/restore rehearsal, an
 | 4. Remaining IT refactor | Completed | Commit `d215bb060`; all ten IT controllers plus catalogue, routing, lifecycle, provisioning, setup, email, reporting, work transition, Problems, Changes, Major Incidents, tasks, queues, teams, services, and KB use canonical access or application-wide configuration; full IT suite 304 tests / 3,039 assertions; architecture gate 6 / 31 with ratchet reduced to 350 entries / 2,078 occurrences; TypeScript, targeted ESLint/Prettier, Pint, 98-file PHP syntax and diff checks, client build at 4,993 modules, and SSR build at 1,645 modules |
 | 5. Security & Devices access refactor | Completed | Commit `401db9b58`; canonical Site/Room/Client/staff/vehicle/Asset/Device visibility with privacy, direct-object, count, option, export, mutation, unassigned-stock, and explicit all-Sites coverage; Client Profile tracker/location/geofence provenance hardened; independent review approved |
 | 6. Provider connection refactor | Completed | Commit `401db9b58`; global application provider identity with Site-scoped credentials/mappings/capabilities/sync/projections; canonical UniFi/Milesight/Queclink device resolution, global webhook idempotency, write-only secrets, canonical Queclink audit/history, and collision-preflight uniqueness; consolidated 105 tests / 1,076 assertions plus fresh Client Profile 14 / 301, frontend 4 files / 20 tests, TypeScript, Pint, 85-file PHP syntax, diff, client 4,993-module and SSR 1,645-module builds; independent review approved |
-| 7. Monitoring foundation refactor | Pending | Global collector/profile and canonical Device/Site tests |
+| 7. Monitoring foundation refactor | Completed | Commit `cfb078645`; global collector/profile identity with collision preflight, canonical Device/Site/collector enforcement, immutable observation provenance, nullable zero-downtime expansion plus explicit fail-closed reconciliation, soft-delete and collision coverage; broad matrix 134 passing tests / 1,234 assertions with the sole stale offline-call expectation corrected by a fresh 9-test / 56-assertion resolver run, and Device Profile fresh at 8 / 145; architecture gate 7 / 269 with ratchet reduced to 229 path-rule entries / 1,185 occurrences; TypeScript, Pint, 34-file PHP syntax, diff, client 4,993-module and SSR 1,645-module builds; independent review approved |
 | 8. Data and global identity migration | Pending | Collision resolution, migration, uniqueness, and query-plan evidence |
 | 9. Fixtures/docs/full acceptance | Pending | Architecture, backend, frontend, build, and desktop browser gates |
 | 10. Legacy column removal | Optional | Separate approval and dependency/restore evidence |
