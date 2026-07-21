@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\It;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
-use App\Domain\It\ItStaffDirectory;
 use App\Domain\It\Services\ItAutomationScheduleCatalog;
 use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItProvisioningTemplateService;
 use App\Domain\It\Services\ItServiceIdentityCredentialService;
 use App\Domain\It\Services\ItServiceManagementSetupService;
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\It\SaveItQueueRequest;
@@ -45,6 +45,7 @@ class ItServiceManagementSetupController extends Controller
         private readonly ItProvisioningTemplateService $provisioningTemplates,
         private readonly ItAutomationScheduleCatalog $automationCatalog,
         private readonly ItEmailDeliveryService $emailDeliveries,
+        private readonly ItWorkAccessService $workAccess,
     ) {}
 
     public function index(Request $request)
@@ -139,6 +140,8 @@ class ItServiceManagementSetupController extends Controller
             ->with(['actor:id,name', 'creator:id,name'])
             ->latest('id')
             ->get()
+            ->filter(fn (ItServiceIdentity $identity): bool => $this->identityCredentials
+                ->canManage($request->user(), $identity, $tenantId))
             ->map(fn (ItServiceIdentity $identity) => [
                 'id' => $identity->id,
                 'public_id' => $identity->public_id,
@@ -201,7 +204,7 @@ class ItServiceManagementSetupController extends Controller
             ])->values();
 
         $deliveryRows = Schema::hasTable('it_email_deliveries')
-            ? ItEmailDelivery::query()
+            ? $this->emailDeliveries->visibleQuery($request->user())
                 ->forTenant($tenantId)
                 ->with([
                     'ticket:id,reference,title',
@@ -214,7 +217,7 @@ class ItServiceManagementSetupController extends Controller
                 ->get()
             : collect();
         $failedDeliveryCount = Schema::hasTable('it_email_deliveries')
-            ? ItEmailDelivery::query()
+            ? $this->emailDeliveries->visibleQuery($request->user())
                 ->forTenant($tenantId)
                 ->whereIn('status', ['failed', 'bounced'])
                 ->count()
@@ -331,12 +334,13 @@ class ItServiceManagementSetupController extends Controller
                 'runtime_ms' => $run->runtime_ms,
                 'error_summary' => $run->error_summary,
             ])->values(),
-            'agents' => ItStaffDirectory::agents($tenantId)
+            'agents' => $this->identityCredentials->delegableExecutionAccounts($request->user(), $tenantId)
                 ->sortBy('name')
                 ->map(fn (User $user) => $this->userOption($user))
                 ->values(),
             'sites' => Site::query()
                 ->where('tenant_id', $tenantId)
+                ->whereKey($this->workAccess->approvedSiteIds($request->user()))
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name']),
@@ -428,7 +432,11 @@ class ItServiceManagementSetupController extends Controller
     public function revokeIdentity(Request $request, ItServiceIdentity $identity)
     {
         $tenantId = $this->resolveHrTenantIdForUser($request->user());
-        $this->identityCredentials->revoke($identity, $request->user(), $tenantId);
+        try {
+            $this->identityCredentials->revoke($identity, $request->user(), $tenantId);
+        } catch (DomainException) {
+            abort(404);
+        }
 
         return redirect()->route('it.setup.index')->with('success', 'API identity revoked.');
     }
@@ -469,9 +477,12 @@ class ItServiceManagementSetupController extends Controller
 
     public function retryEmailDelivery(Request $request, ItEmailDelivery $delivery)
     {
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        abort_unless(
+            $this->emailDeliveries->canRetryDelivery($delivery, $request->user()),
+            404,
+        );
         try {
-            $this->emailDeliveries->retry($delivery, $request->user(), $tenantId);
+            $this->emailDeliveries->retry($delivery, $request->user());
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }

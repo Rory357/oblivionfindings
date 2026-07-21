@@ -1,16 +1,47 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\InboundEmailIngestor;
 use App\Http\Controllers\It\ItInboundEmailController;
 use App\Http\Requests\It\IngestInboundEmailRequest;
 use App\Models\ItInboundEmail;
 use App\Models\ItTicket;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 
 /*
  * §P-S4 (S11) — the email-in ingestion log + `email` source. The webhook,
  * parser and reply-threading land in S12.
  */
+
+function itInboundRequestSender(string $email): User
+{
+    $site = Site::factory()->create();
+    $sender = User::factory()->create(['email' => $email, 'organization_id' => 1]);
+    $permission = Permission::query()->firstOrCreate(
+        ['key' => 'it.request'],
+        ['description' => 'Create IT requests', 'group' => 'it', 'module' => 'Operations'],
+    );
+    $role = Role::query()->create([
+        'name' => 'inbound-requester-'.str()->uuid(),
+        'label' => 'Inbound requester',
+        'level' => 10,
+        'type' => 'custom',
+    ]);
+    $role->permissions()->attach($permission);
+    $sender->roles()->attach($role);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $sender->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'created_by' => $sender->id,
+        'updated_by' => $sender->id,
+    ]);
+
+    return $sender;
+}
 
 test('email is a recognised ticket source', function () {
     expect(ItTicket::SOURCES)->toContain('email');
@@ -83,7 +114,7 @@ test('the webhook is inert when no secret is configured', function () {
 
 test('a known sender opens a new ticket by email', function () {
     config(['it.inbound_mail.secret' => 'top-secret']);
-    $sender = User::factory()->create(['email' => 'worker@example.test', 'organization_id' => 1]);
+    $sender = itInboundRequestSender('worker@example.test');
 
     $this->postJson('/api/it/email/inbound', [
         'from' => 'worker@example.test',
@@ -108,6 +139,7 @@ test('a reply carrying a ticket reference threads onto that ticket', function ()
         'from' => 'worker@example.test',
         'subject' => "Re: {$ticket->reference} still broken",
         'text' => 'Any update?',
+        'message_id' => '<reply-a@mail>',
     ], ['X-IT-Inbound-Secret' => 'top-secret'])->assertOk();
 
     expect($ticket->comments()->where('body', 'Any update?')->exists())->toBeTrue();
@@ -123,6 +155,7 @@ test('the ingestor can be driven directly — the poller contract (E1)', functio
         'from' => 'worker@example.test',
         'subject' => "Re: {$ticket->reference}",
         'text' => 'Direct call, no HTTP.',
+        'message_id' => '<poller-a@mail>',
     ]);
 
     expect($inbound->status)->toBe('processed');
@@ -130,15 +163,20 @@ test('the ingestor can be driven directly — the poller contract (E1)', functio
     expect($ticket->comments()->where('body', 'Direct call, no HTTP.')->exists())->toBeTrue();
 });
 
-test('an unknown sender is logged unmatched and never auto-ticketed', function () {
+test('an unknown sender is quarantined and never auto-ticketed', function () {
     config(['it.inbound_mail.secret' => 'top-secret']);
 
     $this->postJson('/api/it/email/inbound', [
         'from' => 'stranger@example.test',
         'subject' => 'Help',
         'text' => 'I am not staff.',
+        'message_id' => '<unknown-a@mail>',
     ], ['X-IT-Inbound-Secret' => 'top-secret'])->assertOk();
 
-    expect(ItInboundEmail::query()->where('from_email', 'stranger@example.test')->where('status', 'unmatched')->exists())->toBeTrue();
+    $inbound = ItInboundEmail::query()->where('from_email', 'stranger@example.test')->firstOrFail();
+    expect($inbound->status)->toBe('quarantined')
+        ->and($inbound->quarantine_reason)->toBe('sender_unknown')
+        ->and($inbound->subject)->toBeNull()
+        ->and($inbound->body_preview)->toBeNull();
     expect(ItTicket::query()->count())->toBe(0);
 });

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\It\Api;
 
 use App\Domain\It\Enums\ItWorkflowState;
+use App\Domain\It\Services\ItApiWorkItemService;
 use App\Models\ItServiceIdentity;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -16,7 +17,22 @@ class TransitionItApiWorkItemRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return $this->attributes->get('it_service_identity') instanceof ItServiceIdentity;
+        $identity = $this->attributes->get('it_service_identity');
+        $ticketId = $this->route('workItem');
+        if (! $identity instanceof ItServiceIdentity || ! is_numeric($ticketId)) {
+            return false;
+        }
+
+        $ticket = app(ItApiWorkItemService::class)->authorizedTicket(
+            $identity,
+            (int) $ticketId,
+            'work:transition',
+            true,
+        );
+        abort_unless($ticket, 404);
+        $this->attributes->set('it_api_ticket', $ticket);
+
+        return true;
     }
 
     /** @return array<string, mixed> */

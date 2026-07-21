@@ -2,27 +2,48 @@
 
 namespace App\Domain\It\Presenters;
 
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
 use App\Models\ItTicketLink;
 use App\Models\ItWorkTask;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use BackedEnum;
+use Illuminate\Support\Facades\Gate;
 
 final class ItTicketContextPresenter
 {
+    public function __construct(
+        private readonly ItWorkAccessService $workAccess,
+        private readonly SecurityDevicesAccessService $deviceAccess,
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     /**
      * @return array{devices: array<int, array<string, mixed>>, alerts: array<int, array<string, mixed>>, tasks: array<int, array<string, mixed>>, problems: array<int, array<string, mixed>>, changes: array<int, array<string, mixed>>, major_incidents: array<int, array<string, mixed>>}
      */
     public function present(ItTicket $ticket, User $viewer): array
     {
+        if (! $this->workAccess->canView($viewer, $ticket)) {
+            return [
+                'devices' => [],
+                'alerts' => [],
+                'tasks' => [],
+                'problems' => [],
+                'changes' => [],
+                'major_incidents' => [],
+            ];
+        }
+
         $ticket->loadMissing('links.linkable');
 
         $devices = $ticket->links
             ->filter(fn (ItTicketLink $link): bool => $link->relationship === 'affected_device'
                 && $link->linkable instanceof Device
-                && $this->canViewDevice($ticket, $link->linkable, $viewer))
+                && $this->canViewDevice($link->linkable, $viewer))
             ->map(fn (ItTicketLink $link): array => $this->presentDevice($link->linkable))
             ->values()
             ->all();
@@ -30,7 +51,7 @@ final class ItTicketContextPresenter
         $alerts = $ticket->links
             ->filter(fn (ItTicketLink $link): bool => $link->relationship === 'source_alert'
                 && $link->linkable instanceof ControlRoomAlert
-                && $this->canViewAlert($ticket, $link->linkable, $viewer))
+                && $this->canViewAlert($link->linkable, $viewer))
             ->map(fn (ItTicketLink $link): array => $this->presentAlert($link->linkable))
             ->values()
             ->all();
@@ -48,15 +69,11 @@ final class ItTicketContextPresenter
     /** @return array<int, array<string, mixed>> */
     private function presentMajorIncidents(ItTicket $ticket, User $viewer): array
     {
-        if (! $viewer->canDo('it.view')) {
-            return [];
-        }
-
         return $ticket->links
             ->filter(fn (ItTicketLink $link): bool => $link->relationship === 'major_incident_member'
                 && $link->linkable instanceof ItTicket
-                && (int) $link->linkable->tenant_id === (int) $ticket->tenant_id
-                && $link->linkable->work_type === 'major_incident')
+                && $link->linkable->work_type === 'major_incident'
+                && Gate::forUser($viewer)->allows('view', $link->linkable))
             ->map(function (ItTicketLink $link): ?array {
                 $majorIncidentTicket = $link->linkable;
                 $majorIncidentTicket->loadMissing('majorIncidentProfile');
@@ -86,15 +103,11 @@ final class ItTicketContextPresenter
     /** @return array<int, array<string, mixed>> */
     private function presentChanges(ItTicket $ticket, User $viewer): array
     {
-        if (! $viewer->canDo('it.view')) {
-            return [];
-        }
-
         return $ticket->links
             ->filter(fn (ItTicketLink $link): bool => $link->relationship === 'related_change'
                 && $link->linkable instanceof ItTicket
-                && (int) $link->linkable->tenant_id === (int) $ticket->tenant_id
-                && $link->linkable->work_type === 'change')
+                && $link->linkable->work_type === 'change'
+                && Gate::forUser($viewer)->allows('view', $link->linkable))
             ->map(function (ItTicketLink $link): ?array {
                 $changeTicket = $link->linkable;
                 $changeTicket->loadMissing('changeProfile');
@@ -124,15 +137,11 @@ final class ItTicketContextPresenter
     /** @return array<int, array<string, mixed>> */
     private function presentProblems(ItTicket $ticket, User $viewer): array
     {
-        if (! $viewer->canDo('it.view')) {
-            return [];
-        }
-
         return $ticket->links
             ->filter(fn (ItTicketLink $link): bool => $link->relationship === 'related_problem'
                 && $link->linkable instanceof ItTicket
-                && (int) $link->linkable->tenant_id === (int) $ticket->tenant_id
-                && $link->linkable->work_type === 'problem')
+                && $link->linkable->work_type === 'problem'
+                && Gate::forUser($viewer)->allows('view', $link->linkable))
             ->map(function (ItTicketLink $link): ?array {
                 $problemTicket = $link->linkable;
                 $problemTicket->loadMissing('problemProfile');
@@ -160,13 +169,10 @@ final class ItTicketContextPresenter
     /** @return array<int, array<string, mixed>> */
     private function presentTasks(ItTicket $ticket, User $viewer): array
     {
-        if (! $viewer->canDo('it.view')) {
-            return [];
-        }
-
         return $ticket->tasks()
             ->with(['dependencies:id,title,status', 'team:id,name', 'assignee:id,name', 'completedBy:id,name'])
             ->get()
+            ->filter(fn (ItWorkTask $task): bool => Gate::forUser($viewer)->allows('view', $task))
             ->map(fn (ItWorkTask $task): array => [
                 'id' => $task->id,
                 'title' => $task->title,
@@ -197,26 +203,24 @@ final class ItTicketContextPresenter
             ->all();
     }
 
-    private function canViewDevice(ItTicket $ticket, Device $device, User $viewer): bool
+    private function canViewDevice(Device $device, User $viewer): bool
     {
         return $viewer->canDo('securityDevices.devices.view')
-            && (int) $device->tenant_id === (int) $ticket->tenant_id;
+            && $this->deviceAccess->visibleDevices($viewer)
+                ->whereKey($device->getKey())
+                ->exists();
     }
 
-    private function canViewAlert(ItTicket $ticket, ControlRoomAlert $alert, User $viewer): bool
+    private function canViewAlert(ControlRoomAlert $alert, User $viewer): bool
     {
-        if (! $viewer->canDo('controlRoom.viewAny')) {
+        if (! $viewer->canDo('controlRoom.alerts.view')) {
             return false;
         }
 
-        $alert->loadMissing(['site:id,tenant_id', 'device.canonicalDevice:id,tenant_id']);
-        $tenantId = is_numeric($alert->site?->tenant_id)
-            ? (int) $alert->site->tenant_id
-            : (is_numeric($alert->device?->canonicalDevice?->tenant_id)
-                ? (int) $alert->device->canonicalDevice->tenant_id
-                : null);
+        $query = ControlRoomAlert::query()->whereKey($alert->getKey());
+        $this->siteAccess->applyAlertScope($query, $viewer);
 
-        return $tenantId !== null && $tenantId === (int) $ticket->tenant_id;
+        return $query->exists();
     }
 
     /** @return array<string, mixed> */

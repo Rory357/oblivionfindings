@@ -95,6 +95,7 @@ class DeviceEventObserver
                 'received_at' => now(),
                 'tenant_id' => $event->tenant_id ?? null,
                 'device_id' => $controlRoomDevice?->id,
+                'site_id' => $controlRoomDevice?->site_id,
             ];
 
             $signal = $this->processor->ingest($payload);

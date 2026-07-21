@@ -165,7 +165,6 @@ class ItProblemService
     {
         if (array_key_exists('incident_ids', $data)) {
             $count = ItTicket::query()
-                ->forTenant((int) $problemTicket->tenant_id)
                 ->whereIn('id', (array) $data['incident_ids'])
                 ->whereIn('work_type', ['incident', 'major_incident'])
                 ->count();
@@ -175,7 +174,6 @@ class ItProblemService
         }
         if (! empty($data['permanent_fix_change_id'])
             && ! ItTicket::query()
-                ->forTenant((int) $problemTicket->tenant_id)
                 ->whereKey($data['permanent_fix_change_id'])
                 ->where('work_type', 'change')
                 ->exists()) {
@@ -227,9 +225,11 @@ class ItProblemService
         foreach ($existing as $link) {
             if (! in_array((int) $link->linkable_id, $targetIds, true)) {
                 $target = ItTicket::query()->find($link->linkable_id);
-                $link->delete();
                 if ($target) {
-                    $this->linkService->unlink($target, $source, $reciprocalRelationship);
+                    $this->linkService->unlink($source, $target, $relationship, $actor->id);
+                    $this->linkService->unlink($target, $source, $reciprocalRelationship, $actor->id);
+                } else {
+                    throw new DomainException('A related work item no longer exists.');
                 }
             }
         }

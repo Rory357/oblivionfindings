@@ -65,6 +65,8 @@ const ABILITIES = [
     ['work:read', 'Read safe status and context'],
     ['work:comment', 'Append public evidence or comments'],
     ['work:transition', 'Send lifecycle status callbacks'],
+    ['work:sensitive', 'Access explicitly sensitive work'],
+    ['work:organisation-wide', 'Access explicit organisation-wide work'],
 ] as const;
 const WORK_TYPES = [
     ['incident', 'Incidents'],
@@ -81,6 +83,7 @@ const CREATE_FIELDS = [
     ['urgency', 'Urgency'],
     ['work_type', 'Work type'],
     ['site_id', 'Site link'],
+    ['is_organisation_wide', 'Organisation-wide scope marker'],
     ['it_service_id', 'Service link'],
     ['asset_id', 'Asset link'],
 ] as const;
@@ -90,6 +93,9 @@ const READ_FIELDS = [
     ['subcategory', 'Subcategory'],
     ['impact', 'Impact'],
     ['urgency', 'Urgency'],
+    ['site', 'Site context'],
+    ['service', 'Service context'],
+    ['asset', 'Asset context'],
     ['queue', 'Queue'],
     ['team', 'Team'],
     ['owner', 'Owner'],
@@ -113,7 +119,11 @@ export function ItApiIdentities({
         name: '',
         description: '',
         actor_user_id: String(agents[0]?.id ?? ''),
-        abilities: ABILITIES.map(([value]) => value) as string[],
+        abilities: ABILITIES.map(([value]) => value).filter(
+            (value) =>
+                value !== 'work:sensitive' &&
+                value !== 'work:organisation-wide',
+        ) as string[],
         allowed_work_types: ['incident'] as string[],
         allowed_site_ids: [] as number[],
         create_fields: [
@@ -327,7 +337,7 @@ export function ItApiIdentities({
                                 onChange={(value) =>
                                     form.setData('read_fields', value)
                                 }
-                                hint="Status, reference, title, priority and safe site/service/asset context are always returned."
+                                hint="Status, reference, title and priority are always returned. Linked context is returned only when selected and currently authorized."
                             />
 
                             <fieldset className="rounded-xl border border-border p-3 sm:col-span-2">
@@ -335,9 +345,10 @@ export function ItApiIdentities({
                                     Allowed sites
                                 </legend>
                                 <p className="mb-2 text-xs text-muted-foreground">
-                                    With no sites selected, this identity can
-                                    use only organisation-wide work without a
-                                    site link.
+                                    With no sites selected, this identity cannot
+                                    use Site-linked work. Explicit
+                                    organisation-wide work also needs its
+                                    separate operation and scope marker.
                                 </p>
                                 <div className="grid max-h-48 gap-1 overflow-y-auto sm:grid-cols-2">
                                     {sites.map((site) => (

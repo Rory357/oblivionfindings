@@ -282,11 +282,18 @@ class ItChangeService
             throw new DomainException('One or more linked operational records no longer exist.');
         }
 
-        $ticket->links()
+        $existing = $ticket->links()
             ->where('relationship', $relationship)
             ->where('linkable_type', (new $modelClass)->getMorphClass())
             ->whereNotIn('linkable_id', $ids === [] ? [-1] : $ids)
-            ->delete();
+            ->get();
+        foreach ($existing as $link) {
+            $target = $modelClass::query()->find($link->linkable_id);
+            if (! $target) {
+                throw new DomainException('A linked operational record no longer exists.');
+            }
+            $this->linkService->unlink($ticket, $target, $relationship, $actor->id);
+        }
 
         foreach ($targets as $target) {
             $this->linkService->link($ticket, $target, $relationship, [], $actor->id);
@@ -308,7 +315,6 @@ class ItChangeService
 
         $ids = array_map('intval', (array) $data[$key]);
         $targets = ItTicket::query()
-            ->forTenant((int) $source->tenant_id)
             ->whereIn('id', $ids)
             ->whereIn('work_type', $workTypes)
             ->get()
@@ -324,9 +330,11 @@ class ItChangeService
         foreach ($existing as $link) {
             if (! in_array((int) $link->linkable_id, $ids, true)) {
                 $target = ItTicket::query()->find($link->linkable_id);
-                $link->delete();
                 if ($target) {
-                    $this->linkService->unlink($target, $source, 'related_change');
+                    $this->linkService->unlink($source, $target, $relationship, $actor->id);
+                    $this->linkService->unlink($target, $source, 'related_change', $actor->id);
+                } else {
+                    throw new DomainException('A related work item no longer exists.');
                 }
             }
         }

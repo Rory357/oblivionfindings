@@ -18,6 +18,7 @@ use App\Services\AuditLogger;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use DomainException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Notifications\Events\NotificationFailed;
 use Illuminate\Notifications\Events\NotificationSending;
 use Illuminate\Notifications\Events\NotificationSent;
@@ -29,6 +30,8 @@ use Throwable;
 
 class ItEmailDeliveryService
 {
+    public function __construct(private readonly ItWorkAccessService $workAccess) {}
+
     /**
      * Queue one notification per recipient so provider callbacks have a stable,
      * unique delivery identity. The notification channel remains canonical.
@@ -162,15 +165,77 @@ class ItEmailDeliveryService
         });
     }
 
-    public function retry(ItEmailDelivery $delivery, User $actor, int $tenantId): ItEmailDelivery
+    public function canRetryDelivery(ItEmailDelivery $delivery, User $actor): bool
     {
-        $retry = DB::transaction(function () use ($delivery, $actor, $tenantId): ItEmailDelivery {
+        $canonical = ItEmailDelivery::query()
+            ->with(['ticket', 'provisioningRequest.employeeProfile', 'provisioningRequest.responsibleTeam'])
+            ->whereKey($delivery->getKey())
+            ->first();
+
+        return $canonical !== null && $this->actorCanRetryLoadedDelivery($canonical, $actor);
+    }
+
+    /** @return Builder<ItEmailDelivery> */
+    public function visibleQuery(User $actor): Builder
+    {
+        $approvedSiteIds = $this->workAccess->approvedSiteIds($actor);
+        $actorId = (int) $actor->id;
+
+        return ItEmailDelivery::query()->where(function (Builder $visible) use ($actor, $actorId, $approvedSiteIds): void {
+            $visible->whereHas('ticket', function (Builder $tickets) use ($actor): void {
+                $this->workAccess->applyViewScope($tickets, $actor);
+            })->orWhereHas('provisioningRequest', function (Builder $provisioning) use ($actorId, $approvedSiteIds): void {
+                $provisioning
+                    ->whereHas('employeeProfile', function (Builder $profiles): void {
+                        $profiles->where('is_active', true)
+                            ->where(fn (Builder $dates): Builder => $dates
+                                ->whereNull('start_date')
+                                ->orWhereDate('start_date', '<=', today()))
+                            ->where(fn (Builder $dates): Builder => $dates
+                                ->whereNull('end_date')
+                                ->orWhereDate('end_date', '>=', today()));
+                    })
+                    ->where(function (Builder $responsibility) use ($actorId, $approvedSiteIds): void {
+                        $responsibility->where('assigned_to_user_id', $actorId)
+                            ->orWhereHas('responsibleTeam', function (Builder $team) use ($actorId): void {
+                                $team->where('is_active', true)
+                                    ->where(function (Builder $membership) use ($actorId): void {
+                                        $membership->where('manager_user_id', $actorId)
+                                            ->orWhereHas('members', fn (Builder $members): Builder => $members->whereKey($actorId));
+                                    });
+                            });
+
+                        if ($approvedSiteIds !== []) {
+                            $responsibility->orWhereHas(
+                                'employeeProfile',
+                                fn (Builder $profile): Builder => $profile->whereIn('primary_site_id', $approvedSiteIds),
+                            );
+                        }
+                    });
+            });
+        });
+    }
+
+    public function retry(
+        ItEmailDelivery $delivery,
+        User $actor,
+        ?int $legacyStorageContextId = null,
+    ): ItEmailDelivery {
+        $retry = DB::transaction(function () use ($delivery, $actor): ItEmailDelivery {
             $original = ItEmailDelivery::query()
-                ->forTenant($tenantId)
-                ->with(['ticket', 'provisioningRequest', 'recipient', 'retryAttempt'])
+                ->with([
+                    'ticket',
+                    'provisioningRequest.employeeProfile',
+                    'provisioningRequest.responsibleTeam',
+                    'recipient',
+                    'retryAttempt',
+                ])
                 ->lockForUpdate()
                 ->whereKey($delivery->id)
                 ->firstOrFail();
+            if (! $this->actorCanRetryLoadedDelivery($original, $actor)) {
+                throw new DomainException('This email delivery is not accessible to the current actor.');
+            }
             if (! in_array($original->status, ['failed', 'bounced'], true)) {
                 throw new DomainException('Only failed or bounced email can be retried.');
             }
@@ -179,6 +244,9 @@ class ItEmailDeliveryService
             }
             if (! $original->recipient) {
                 throw new DomainException('The recipient is no longer available.');
+            }
+            if (! $this->recipientCanReceiveLoadedDelivery($original)) {
+                throw new DomainException('The recipient is no longer entitled to this email.');
             }
 
             $retry = ItEmailDelivery::query()->create([
@@ -203,8 +271,9 @@ class ItEmailDeliveryService
                 'last_retried_by_user_id' => $actor->id,
             ])->save();
             AuditLogger::logOrFail('it.email.delivery.retried', $retry, [
-                'organization_id' => $tenantId,
                 'ticket_id' => $original->it_ticket_id,
+                'site_id' => $original->ticket?->site_id
+                    ?? $original->provisioningRequest?->employeeProfile?->primary_site_id,
                 'retry_of_delivery_id' => $original->id,
                 'retry_count' => $retry->retry_count,
             ]);
@@ -213,6 +282,12 @@ class ItEmailDeliveryService
         });
 
         $retry->loadMissing(['ticket', 'provisioningRequest', 'recipient']);
+        if (! $this->recipientCanReceiveLoadedDelivery($retry)) {
+            $exception = new DomainException('The recipient is no longer entitled to this email.');
+            $this->markDispatchFailed($retry, $exception);
+
+            throw $exception;
+        }
         $notification = $this->notificationForRetry($retry);
         $notification->id = $retry->notification_uuid;
         try {
@@ -224,6 +299,65 @@ class ItEmailDeliveryService
         }
 
         return $retry->fresh();
+    }
+
+    private function actorCanRetryLoadedDelivery(ItEmailDelivery $delivery, User $actor): bool
+    {
+        if ($actor->approved_at === null || ! $actor->canDo('it.manage')) {
+            return false;
+        }
+
+        if ($delivery->ticket) {
+            return $this->workAccess->canWork($actor, $delivery->ticket);
+        }
+
+        $provisioning = $delivery->provisioningRequest;
+        if (! $provisioning) {
+            return false;
+        }
+
+        $profile = $provisioning->employeeProfile;
+        $currentProfile = $profile !== null
+            && $profile->is_active
+            && ($profile->start_date === null || $profile->start_date->lte(today()))
+            && ($profile->end_date === null || $profile->end_date->gte(today()));
+        if (! $currentProfile) {
+            return false;
+        }
+
+        if ((int) $provisioning->assigned_to_user_id === (int) $actor->id) {
+            return true;
+        }
+
+        $team = $provisioning->responsibleTeam;
+        if ($team?->is_active && (
+            (int) $team->manager_user_id === (int) $actor->id
+            || $team->members()->whereKey($actor->id)->exists()
+        )) {
+            return true;
+        }
+
+        return $profile->primary_site_id !== null
+            && in_array(
+                (int) $profile->primary_site_id,
+                $this->workAccess->approvedSiteIds($actor),
+                true,
+            );
+    }
+
+    private function recipientCanReceiveLoadedDelivery(ItEmailDelivery $delivery): bool
+    {
+        $recipient = $delivery->recipient;
+        if (! $recipient || $recipient->approved_at === null) {
+            return false;
+        }
+
+        if ($delivery->ticket) {
+            return $this->workAccess->canView($recipient, $delivery->ticket);
+        }
+
+        return $delivery->provisioningRequest !== null
+            && $this->actorCanRetryLoadedDelivery($delivery, $recipient);
     }
 
     private function createDelivery(

@@ -266,11 +266,18 @@ final class ItMajorIncidentService
         if ($targets->count() !== count($ids)) {
             throw new DomainException('One or more linked operational records no longer exist.');
         }
-        $ticket->links()
+        $existing = $ticket->links()
             ->where('relationship', $relationship)
             ->where('linkable_type', (new $modelClass)->getMorphClass())
             ->whereNotIn('linkable_id', $ids === [] ? [-1] : $ids)
-            ->delete();
+            ->get();
+        foreach ($existing as $link) {
+            $target = $modelClass::query()->find($link->linkable_id);
+            if (! $target) {
+                throw new DomainException('A linked operational record no longer exists.');
+            }
+            $this->linkService->unlink($ticket, $target, $relationship, $actor->id);
+        }
         foreach ($targets as $target) {
             $this->linkService->link($ticket, $target, $relationship, [], $actor->id);
         }
@@ -282,7 +289,17 @@ final class ItMajorIncidentService
         if (! array_key_exists('control_room_alert_id', $data)) {
             return;
         }
-        $ticket->links()->where('relationship', 'source_alert')->delete();
+        $existing = $ticket->links()
+            ->where('relationship', 'source_alert')
+            ->where('linkable_type', (new ControlRoomAlert)->getMorphClass())
+            ->get();
+        foreach ($existing as $link) {
+            $alert = ControlRoomAlert::query()->find($link->linkable_id);
+            if (! $alert) {
+                throw new DomainException('A linked Control Room alert no longer exists.');
+            }
+            $this->linkService->unlink($ticket, $alert, 'source_alert', $actor->id);
+        }
         if (! empty($data['control_room_alert_id'])) {
             $alert = ControlRoomAlert::query()->findOrFail((int) $data['control_room_alert_id']);
             $this->linkService->link($ticket, $alert, 'source_alert', ['canonical_owner' => 'control_room'], $actor->id);
@@ -297,7 +314,6 @@ final class ItMajorIncidentService
         }
         $ids = array_values(array_unique(array_map('intval', (array) $data['incident_ids'])));
         $incidents = ItTicket::query()
-            ->forTenant((int) $majorIncidentTicket->tenant_id)
             ->whereIn('id', $ids)
             ->where('work_type', 'incident')
             ->get()
@@ -314,9 +330,11 @@ final class ItMajorIncidentService
         foreach ($existing as $link) {
             if (! in_array((int) $link->linkable_id, $ids, true)) {
                 $incident = ItTicket::query()->find($link->linkable_id);
-                $link->delete();
                 if ($incident) {
-                    $this->linkService->unlink($incident, $majorIncidentTicket, 'major_incident_member');
+                    $this->linkService->unlink($majorIncidentTicket, $incident, 'related_incident', $actor->id);
+                    $this->linkService->unlink($incident, $majorIncidentTicket, 'major_incident_member', $actor->id);
+                } else {
+                    throw new DomainException('A related incident no longer exists.');
                 }
             }
         }
@@ -335,7 +353,6 @@ final class ItMajorIncidentService
             ->pluck('linkable_id');
 
         return ItTicket::query()
-            ->forTenant((int) $ticket->tenant_id)
             ->whereIn('id', $incidentIds)
             ->whereNotNull('requester_user_id')
             ->pluck('requester_user_id')

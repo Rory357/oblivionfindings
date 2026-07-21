@@ -132,8 +132,8 @@ class ItTicket extends Model
         // tenant-unique index is the backstop; createWithReference() adds
         // the retry for genuinely concurrent creates.
         static::creating(function (self $ticket) {
-            if (! $ticket->reference && $ticket->tenant_id) {
-                $ticket->reference = static::nextReference((int) $ticket->tenant_id);
+            if (! $ticket->reference) {
+                $ticket->reference = static::nextReference((int) ($ticket->tenant_id ?? 0));
             }
         });
     }

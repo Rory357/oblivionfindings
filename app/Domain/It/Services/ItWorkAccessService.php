@@ -126,6 +126,29 @@ final class ItWorkAccessService
     }
 
     /**
+     * Email ingress accepts staff replies only when responsibility is explicit;
+     * ordinary Site visibility is not enough to post through an unattended
+     * mailbox transport.
+     */
+    public function isResponsibleStaff(User $user, ItTicket $ticket): bool
+    {
+        $ticket = $this->canonicalTicket($ticket);
+        if (! $ticket) {
+            return false;
+        }
+
+        $userId = (int) $user->getKey();
+        if ($userId < 1) {
+            return false;
+        }
+
+        return (int) $ticket->assigned_to_user_id === $userId
+            || (int) $ticket->owner_user_id === $userId
+            || ($ticket->team_id !== null && $this->activeTeamIncludes((int) $ticket->team_id, $userId))
+            || ($ticket->queue_id !== null && $this->activeQueueIncludes((int) $ticket->queue_id, $userId));
+    }
+
+    /**
      * Apply the exact canView predicate to a ticket query.
      *
      * @param  Builder<ItTicket>  $query

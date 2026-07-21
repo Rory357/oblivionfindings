@@ -1,11 +1,14 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\Services\ItServiceIdentityCredentialService;
+use App\Models\Asset;
 use App\Models\AuditLog;
 use App\Models\ItApiRequest;
 use App\Models\ItServiceIdentity;
 use App\Models\ItTicket;
 use App\Models\ItTicketComment;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -68,24 +71,73 @@ function signedSecureApiHeaders(string $token, string $secret, string $path, arr
 {
     $timestamp = (string) now()->timestamp;
     $body = json_encode($payload, JSON_UNESCAPED_SLASHES);
+    $idempotencyKey = (string) fake()->uuid();
     $canonical = implode("\n", [
         $timestamp,
         'POST',
         $path,
+        $idempotencyKey,
         hash('sha256', (string) $body),
     ]);
 
     return secureApiHeaders($token, [
         'Content-Type' => 'application/json',
-        'Idempotency-Key' => (string) fake()->uuid(),
+        'Idempotency-Key' => $idempotencyKey,
         'X-OF-Timestamp' => $timestamp,
         'X-OF-Signature' => 'v1='.hash_hmac('sha256', $canonical, $secret),
     ]);
 }
 
+function secureApiAssignSite(User $user, Site $site): void
+{
+    $profile = HrEmployeeProfile::query()->where('user_id', $user->id)->first();
+    $attributes = [
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+        'updated_by' => $user->id,
+    ];
+
+    if ($profile) {
+        $profile->update($attributes);
+
+        return;
+    }
+
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'employee_number' => 'API-'.$user->id,
+        'work_email' => $user->email,
+        'created_by' => $user->id,
+        ...$attributes,
+    ]);
+}
+
+function secureApiGrant(User $user, string ...$keys): void
+{
+    $role = Role::query()->create([
+        'name' => 'secure-api-extra-'.str()->uuid(),
+        'label' => 'Secure API extra authority',
+        'level' => 50,
+        'type' => 'custom',
+    ]);
+    foreach ($keys as $key) {
+        $permission = Permission::query()->firstOrCreate(
+            ['key' => $key],
+            ['description' => $key, 'group' => 'it', 'module' => 'Operations'],
+        );
+        $role->permissions()->attach($permission);
+    }
+    $user->roles()->attach($role);
+}
+
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->manager = secureApiUser();
+    $this->defaultSite = Site::factory()->create();
+    secureApiAssignSite($this->manager, $this->defaultSite);
 });
 
 test('admins create opaque hashed service identities and see the reusable secret once', function () {
@@ -140,9 +192,10 @@ test('admins create opaque hashed service identities and see the reusable secret
         ->and(AuditLog::query()->where('action', 'it.api.identity.revoked')->exists())->toBeTrue();
 });
 
-test('scoped identities create and read only allowed tenant site work type and fields with minimal responses', function () {
-    $allowedSite = Site::factory()->create(['tenant_id' => 1]);
-    $foreignSite = Site::factory()->create(['tenant_id' => 2]);
+test('scoped identities create and read only allowed site work type and fields with minimal responses', function () {
+    $allowedSite = Site::factory()->create();
+    $hiddenSite = Site::factory()->create();
+    secureApiAssignSite($this->manager, $allowedSite);
     $credential = secureApiIdentity($this->manager, [
         'allowed_site_ids' => [$allowedSite->id],
     ]);
@@ -161,7 +214,8 @@ test('scoped identities create and read only allowed tenant site work type and f
 
     $response->assertCreated()
         ->assertJsonPath('data.title', 'WAN edge unreachable')
-        ->assertJsonPath('data.site_id', $allowedSite->id)
+        ->assertJsonMissingPath('data.site_id')
+        ->assertJsonMissingPath('data.context')
         ->assertJsonMissingPath('data.description')
         ->assertJsonMissingPath('data.internal_notes')
         ->assertJsonMissingPath('data.raw_device_config')
@@ -179,12 +233,12 @@ test('scoped identities create and read only allowed tenant site work type and f
         ->assertJsonMissingPath('data.description');
 
     $unapprovedType = ItTicket::factory()->create([
-        'tenant_id' => 1,
+        'site_id' => $allowedSite->id,
         'requester_user_id' => $this->manager->id,
         'work_type' => 'change',
     ]);
     $sensitive = ItTicket::factory()->create([
-        'tenant_id' => 1,
+        'site_id' => $allowedSite->id,
         'requester_user_id' => $this->manager->id,
         'work_type' => 'incident',
         'is_sensitive' => true,
@@ -196,30 +250,34 @@ test('scoped identities create and read only allowed tenant site work type and f
 
     $this->withHeaders(secureApiHeaders($credential['token'], ['Idempotency-Key' => (string) fake()->uuid()]))
         ->postJson('/api/v1/it/work-items', [
-            'title' => 'Foreign site attempt', 'category' => 'network', 'priority' => 'normal',
-            'work_type' => 'incident', 'site_id' => $foreignSite->id,
+            'title' => 'Unapproved site attempt', 'category' => 'network', 'priority' => 'normal',
+            'work_type' => 'incident', 'site_id' => $hiddenSite->id,
         ])->assertUnprocessable()->assertJsonValidationErrors('site_id');
 
     $this->withHeaders(secureApiHeaders($credential['token'], ['Idempotency-Key' => (string) fake()->uuid()]))
         ->postJson('/api/v1/it/work-items', [
             'title' => 'Unapproved change', 'category' => 'network', 'priority' => 'normal',
-            'work_type' => 'change',
+            'work_type' => 'change', 'site_id' => $allowedSite->id,
         ])->assertUnprocessable()->assertJsonValidationErrors('work_type');
 
     $this->withHeaders(secureApiHeaders($credential['token'], ['Idempotency-Key' => (string) fake()->uuid()]))
         ->postJson('/api/v1/it/work-items', [
             'title' => 'Unsafe payload', 'category' => 'network', 'priority' => 'normal',
-            'work_type' => 'incident', 'raw_device_config' => ['community' => 'private'],
+            'work_type' => 'incident', 'site_id' => $allowedSite->id,
+            'raw_device_config' => ['community' => 'private'],
         ])->assertUnprocessable()->assertJsonValidationErrors('raw_device_config');
 });
 
 test('idempotency replays the original result and rejects a conflicting payload', function () {
-    $credential = secureApiIdentity($this->manager);
+    $site = Site::factory()->create();
+    secureApiAssignSite($this->manager, $site);
+    $credential = secureApiIdentity($this->manager, ['allowed_site_ids' => [$site->id]]);
     $key = (string) fake()->uuid();
     $headers = secureApiHeaders($credential['token'], ['Idempotency-Key' => $key]);
     $payload = [
         'title' => 'DNS probe failed', 'description' => 'Resolver timeout.',
         'category' => 'network', 'priority' => 'normal', 'work_type' => 'incident',
+        'site_id' => $site->id,
     ];
 
     $first = $this->withHeaders($headers)->postJson('/api/v1/it/work-items', $payload);
@@ -243,10 +301,16 @@ test('idempotency replays the original result and rejects a conflicting payload'
 
 test('required request signatures reject missing invalid and stale signatures', function () {
     Carbon::setTestNow('2026-07-19 12:00:00');
-    $credential = secureApiIdentity($this->manager, ['require_signature' => true]);
+    $site = Site::factory()->create();
+    secureApiAssignSite($this->manager, $site);
+    $credential = secureApiIdentity($this->manager, [
+        'require_signature' => true,
+        'allowed_site_ids' => [$site->id],
+    ]);
     $payload = [
         'title' => 'Signed monitor event', 'category' => 'network',
         'priority' => 'high', 'work_type' => 'incident',
+        'site_id' => $site->id,
     ];
 
     $this->withHeaders(secureApiHeaders($credential['token'], ['Idempotency-Key' => (string) fake()->uuid()]))
@@ -301,9 +365,11 @@ test('revoked expired unprivileged and over-limit identities are denied', functi
 });
 
 test('service identities append public comments and transition through canonical lifecycle services with audit', function () {
-    $credential = secureApiIdentity($this->manager);
+    $site = Site::factory()->create();
+    secureApiAssignSite($this->manager, $site);
+    $credential = secureApiIdentity($this->manager, ['allowed_site_ids' => [$site->id]]);
     $ticket = ItTicket::factory()->create([
-        'tenant_id' => 1,
+        'site_id' => $site->id,
         'requester_user_id' => $this->manager->id,
         'work_type' => 'incident',
         'workflow_state' => 'submitted',
@@ -336,4 +402,140 @@ test('service identities append public comments and transition through canonical
         ->and(AuditLog::query()->where('action', 'it.api.comment.created')->exists())->toBeTrue()
         ->and(AuditLog::query()->where('action', 'it.api.transition.completed')->exists())->toBeTrue()
         ->and(AuditLog::query()->where('action', 'it.api.request')->count())->toBe(2);
+});
+
+test('service API reauthorizes execution account site sensitivity and explicit organisation wide scope before validation', function () {
+    $allowedSite = Site::factory()->create();
+    $hiddenSite = Site::factory()->create();
+    secureApiAssignSite($this->manager, $allowedSite);
+    $credential = secureApiIdentity($this->manager, [
+        'allowed_site_ids' => [$allowedSite->id],
+    ]);
+    $credential['identity']->update(['allowed_site_ids' => [$allowedSite->id, $hiddenSite->id]]);
+
+    $visible = ItTicket::factory()->create([
+        'site_id' => $allowedSite->id,
+        'work_type' => 'incident',
+    ]);
+    $hidden = ItTicket::factory()->create([
+        'site_id' => $hiddenSite->id,
+        'work_type' => 'incident',
+    ]);
+    $sensitive = ItTicket::factory()->create([
+        'site_id' => $allowedSite->id,
+        'work_type' => 'incident',
+        'is_sensitive' => true,
+    ]);
+    $accidentalNull = ItTicket::factory()->create([
+        'site_id' => null,
+        'is_organisation_wide' => false,
+        'work_type' => 'incident',
+    ]);
+    $organisationWide = ItTicket::factory()->create([
+        'site_id' => null,
+        'is_organisation_wide' => true,
+        'work_type' => 'incident',
+    ]);
+
+    $headers = secureApiHeaders($credential['token']);
+    $this->withHeaders($headers)->getJson("/api/v1/it/work-items/{$visible->id}")->assertOk();
+    foreach ([$hidden, $sensitive, $accidentalNull, $organisationWide] as $concealed) {
+        $this->withHeaders($headers)
+            ->getJson("/api/v1/it/work-items/{$concealed->id}")
+            ->assertNotFound();
+    }
+
+    foreach (['comments', 'transitions'] as $operation) {
+        $this->withHeaders(secureApiHeaders($credential['token'], [
+            'Idempotency-Key' => (string) fake()->uuid(),
+        ]))->postJson("/api/v1/it/work-items/{$hidden->id}/{$operation}", [])
+            ->assertNotFound()
+            ->assertJsonMissingValidationErrors(['body', 'to']);
+    }
+    expect($hidden->comments()->count())->toBe(0);
+
+    secureApiGrant($this->manager, 'it.viewSensitive', 'it.organisationWide');
+    $credential['identity']->update(['abilities' => [
+        ...$credential['identity']->abilities,
+        'work:sensitive',
+        'work:organisation-wide',
+    ]]);
+
+    $this->withHeaders($headers)->getJson("/api/v1/it/work-items/{$sensitive->id}")->assertOk();
+    $this->withHeaders($headers)->getJson("/api/v1/it/work-items/{$organisationWide->id}")->assertOk();
+    $this->withHeaders($headers)->getJson("/api/v1/it/work-items/{$accidentalNull->id}")->assertNotFound();
+});
+
+test('service API field policy and replay use current authority and bind signatures to the idempotency key', function () {
+    $site = Site::factory()->create();
+    $hiddenSite = Site::factory()->create();
+    secureApiAssignSite($this->manager, $site);
+    $hiddenAsset = Asset::factory()->create(['site_id' => $hiddenSite->id]);
+    $credential = secureApiIdentity($this->manager, [
+        'allowed_site_ids' => [$site->id],
+        'allowed_fields' => [
+            'create' => ['title', 'description', 'category', 'priority', 'work_type', 'site_id', 'asset_id'],
+            'read' => ['description', 'site', 'asset'],
+        ],
+    ]);
+    $credential['identity']->update(['allowed_site_ids' => [$site->id, $hiddenSite->id]]);
+    $key = (string) fake()->uuid();
+    $payload = [
+        'title' => 'Signed scoped incident',
+        'description' => 'Do not replay after read authority changes.',
+        'category' => 'network',
+        'priority' => 'high',
+        'work_type' => 'incident',
+        'site_id' => $site->id,
+    ];
+
+    $first = $this->withHeaders(secureApiHeaders($credential['token'], ['Idempotency-Key' => $key]))
+        ->postJson('/api/v1/it/work-items', $payload)
+        ->assertCreated()
+        ->assertJsonPath('data.description', $payload['description'])
+        ->assertJsonPath('data.context.site.id', $site->id)
+        ->assertJsonMissingPath('data.site_id');
+
+    $ticket = ItTicket::query()->findOrFail($first->json('data.id'));
+    $ticket->update(['asset_id' => $hiddenAsset->id]);
+    $credential['identity']->update(['allowed_fields' => [
+        'create' => $credential['identity']->allowed_fields['create'],
+        'read' => [],
+    ]]);
+
+    $this->withHeaders(secureApiHeaders($credential['token'], ['Idempotency-Key' => $key]))
+        ->postJson('/api/v1/it/work-items', $payload)
+        ->assertCreated()
+        ->assertHeader('X-Idempotent-Replay', 'true')
+        ->assertJsonMissingPath('data.description')
+        ->assertJsonMissingPath('data.context');
+
+    $credential['identity']->update(['abilities' => ['work:read']]);
+    $this->withHeaders(secureApiHeaders($credential['token'], ['Idempotency-Key' => $key]))
+        ->postJson('/api/v1/it/work-items', $payload)
+        ->assertForbidden()
+        ->assertJsonPath('code', 'ability_denied');
+
+    $credential['identity']->update(['abilities' => ['work:create', 'work:read']]);
+    $this->manager->hrEmployeeProfile()->update([
+        'primary_site_id' => $hiddenSite->id,
+        'secondary_site_ids' => [],
+    ]);
+    $this->withHeaders(secureApiHeaders($credential['token'], ['Idempotency-Key' => $key]))
+        ->postJson('/api/v1/it/work-items', $payload)
+        ->assertNotFound();
+
+    $signed = signedSecureApiHeaders(
+        $credential['token'],
+        $credential['secret'],
+        '/api/v1/it/work-items',
+        $payload,
+    );
+    $credential['identity']->update(['require_signature' => true]);
+    $capturedWithFreshKey = $signed;
+    $capturedWithFreshKey['Idempotency-Key'] = (string) fake()->uuid();
+    $this->withHeaders($capturedWithFreshKey)
+        ->postJson('/api/v1/it/work-items', $payload)
+        ->assertUnauthorized()
+        ->assertJsonPath('code', 'signature_invalid');
 });

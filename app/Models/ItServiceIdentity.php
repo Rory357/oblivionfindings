@@ -9,17 +9,24 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ItServiceIdentity extends Model
 {
-    public const ABILITIES = ['work:create', 'work:read', 'work:comment', 'work:transition'];
+    public const ABILITIES = [
+        'work:create',
+        'work:read',
+        'work:comment',
+        'work:transition',
+        'work:sensitive',
+        'work:organisation-wide',
+    ];
 
     public const CREATE_FIELDS = [
         'title', 'description', 'category', 'subcategory', 'priority', 'impact',
-        'urgency', 'work_type', 'site_id', 'it_service_id', 'asset_id',
+        'urgency', 'work_type', 'site_id', 'is_organisation_wide', 'it_service_id', 'asset_id',
     ];
 
     public const REQUIRED_CREATE_FIELDS = ['title', 'category', 'priority', 'work_type'];
 
     public const READ_FIELDS = [
-        'description', 'category', 'subcategory', 'impact', 'urgency',
+        'description', 'category', 'subcategory', 'impact', 'urgency', 'site', 'service', 'asset',
         'queue', 'team', 'owner', 'assignee', 'sla', 'resolution',
     ];
 
@@ -94,11 +101,18 @@ class ItServiceIdentity extends Model
 
     public function allowsSite(?int $siteId): bool
     {
-        if ($siteId === null) {
-            return true;
-        }
+        return $siteId !== null
+            && in_array($siteId, array_map('intval', $this->allowed_site_ids ?? []), true);
+    }
 
-        return in_array($siteId, array_map('intval', $this->allowed_site_ids ?? []), true);
+    public function allowsSensitiveWork(): bool
+    {
+        return $this->hasAbility('work:sensitive');
+    }
+
+    public function allowsOrganisationWideWork(): bool
+    {
+        return $this->hasAbility('work:organisation-wide');
     }
 
     public function allowsField(string $operation, string $field): bool

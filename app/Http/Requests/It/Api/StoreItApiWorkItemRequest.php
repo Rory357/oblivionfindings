@@ -3,6 +3,7 @@
 namespace App\Http\Requests\It\Api;
 
 use App\Domain\It\Services\ItApiFieldPolicy;
+use App\Domain\It\Services\ItApiWorkItemService;
 use App\Models\ItServiceIdentity;
 use App\Models\ItTicket;
 use Illuminate\Foundation\Http\FormRequest;
@@ -21,7 +22,7 @@ class StoreItApiWorkItemRequest extends FormRequest
     public function rules(): array
     {
         $identity = $this->identity();
-        $siteIds = array_map('intval', $identity->allowed_site_ids ?? []);
+        $siteIds = app(ItApiWorkItemService::class)->allowedSiteIds($identity);
 
         return [
             'title' => ['required', 'string', 'max:255'],
@@ -35,12 +36,17 @@ class StoreItApiWorkItemRequest extends FormRequest
             'site_id' => [
                 'nullable', 'integer',
                 Rule::exists('sites', 'id')->where(fn ($query) => $query
-                    ->where('tenant_id', $identity->tenant_id)
+                    ->where('is_active', true)
+                    ->where('archived', false)
+                    ->whereNull('archived_at')
                     ->whereIn('id', $siteIds)),
             ],
+            'is_organisation_wide' => ['nullable', 'boolean'],
             'it_service_id' => [
                 'nullable', 'integer',
-                Rule::exists('it_services', 'id')->where('tenant_id', $identity->tenant_id),
+                Rule::exists('it_services', 'id')->where(fn ($service) => $service
+                    ->where('is_active', true)
+                    ->where('status', '!=', 'retired')),
             ],
             'asset_id' => [
                 'nullable', 'integer',
@@ -61,6 +67,25 @@ class StoreItApiWorkItemRequest extends FormRequest
                         $validator->errors()->add($field, $message);
                     }
                 }
+            }
+
+            $siteId = $this->filled('site_id') ? (int) $this->input('site_id') : null;
+            $isOrganisationWide = $this->boolean('is_organisation_wide');
+            if ($siteId === null && ! $isOrganisationWide) {
+                $validator->errors()->add('site_id', 'Choose an approved Site or explicitly request organisation-wide work.');
+            }
+            if ($siteId !== null && $isOrganisationWide) {
+                $validator->errors()->add('is_organisation_wide', 'Organisation-wide work cannot also be linked to a Site.');
+            }
+
+            if (! $validator->errors()->hasAny([
+                'site_id', 'is_organisation_wide', 'work_type', 'it_service_id', 'asset_id',
+            ]) && ! app(ItApiWorkItemService::class)->canCreateWithScope(
+                $this->identity(),
+                $this->all(),
+            )) {
+                $field = $isOrganisationWide ? 'is_organisation_wide' : 'site_id';
+                $validator->errors()->add($field, 'This service identity cannot create work in that scope.');
             }
         }];
     }

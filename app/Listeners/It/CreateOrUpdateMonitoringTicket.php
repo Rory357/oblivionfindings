@@ -56,9 +56,16 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
 
         DB::transaction(function () use ($event, $alert): void {
             $lockedAlert = ControlRoomAlert::query()->lockForUpdate()->findOrFail($alert->id);
-            $ticket = $this->ticketForAlert($event->device, $lockedAlert);
+            $siteId = $this->links->canonicalMonitoringSiteId($event->device, $lockedAlert, true);
+            if ($siteId === null) {
+                return;
+            }
+            $ticket = $this->ticketForAlert($event->device, $lockedAlert, $siteId);
 
             if ($ticket) {
+                $this->links->linkMonitoringEvidence($ticket, $event->device, $lockedAlert, [
+                    'source' => 'oblivion_monitoring',
+                ]);
                 $ticket->forceFill([
                     'status_reason' => 'monitoring_outage',
                     'monitoring_recovered_at' => null,
@@ -72,7 +79,9 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             }
 
             $ticket = ItTicket::createWithReference([
-                'tenant_id' => $event->device->tenant_id,
+                'tenant_id' => 0,
+                'site_id' => $siteId,
+                'is_organisation_wide' => false,
                 'title' => Str::limit('Monitoring outage: '.$event->device->name, 255, ''),
                 'description' => $this->failureDescription($event),
                 'requester_user_id' => null,
@@ -81,7 +90,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
                 'source' => 'system',
                 'work_type' => 'incident',
                 'priority' => $this->ticketPriority($lockedAlert->severity),
-                'impact' => $lockedAlert->site_id ? 'site' : 'individual',
+                'impact' => 'site',
                 'urgency' => $this->ticketUrgency($lockedAlert->severity),
                 'status' => 'open',
                 'status_reason' => 'monitoring_outage',
@@ -90,10 +99,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             $ticket->stampSlaDueDates();
             $ticket->save();
 
-            $this->links->link($ticket, $event->device, 'affected_device', [
-                'source' => 'oblivion_monitoring',
-            ]);
-            $this->links->link($ticket, $lockedAlert, 'source_alert', [
+            $this->links->linkMonitoringEvidence($ticket, $event->device, $lockedAlert, [
                 'source' => 'oblivion_monitoring',
             ]);
 
@@ -104,16 +110,30 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
     private function handleRecovery(DeviceSignalPublished $event): void
     {
         DB::transaction(function () use ($event): void {
+            $siteId = $this->links->canonicalDeviceSiteId($event->device, true);
+            if ($siteId === null) {
+                return;
+            }
+
             $tickets = ItTicket::query()
-                ->forTenant((int) $event->device->tenant_id)
                 ->where('source', 'system')
                 ->where('work_type', 'incident')
+                ->where('site_id', $siteId)
+                ->where('is_organisation_wide', false)
                 ->whereIn('status', ItTicket::OPEN_STATUSES)
                 ->whereHas('links', function ($query) use ($event): void {
                     $query
                         ->where('relationship', 'affected_device')
                         ->where('linkable_type', $event->device->getMorphClass())
-                        ->where('linkable_id', $event->device->id);
+                        ->where('linkable_id', $event->device->id)
+                        ->where('context->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
+                        ->where('context->operation', ItTicketLinkService::MONITORING_OPERATION);
+                })
+                ->whereHas('events', function ($events): void {
+                    $events
+                        ->where('type', 'created_from_monitoring')
+                        ->where('payload->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
+                        ->where('payload->operation', ItTicketLinkService::MONITORING_OPERATION);
                 })
                 ->lockForUpdate()
                 ->get();
@@ -137,16 +157,37 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
         });
     }
 
-    private function ticketForAlert(Device $device, ControlRoomAlert $alert): ?ItTicket
+    private function ticketForAlert(Device $device, ControlRoomAlert $alert, int $siteId): ?ItTicket
     {
         return ItTicket::query()
-            ->forTenant((int) $device->tenant_id)
+            ->where('source', 'system')
+            ->where('work_type', 'incident')
+            ->whereIn('status', ItTicket::OPEN_STATUSES)
+            ->where('site_id', $siteId)
+            ->where('is_organisation_wide', false)
             ->whereHas('links', function ($query) use ($alert): void {
                 $query
                     ->where('relationship', 'source_alert')
                     ->where('linkable_type', $alert->getMorphClass())
-                    ->where('linkable_id', $alert->id);
+                    ->where('linkable_id', $alert->id)
+                    ->where('context->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
+                    ->where('context->operation', ItTicketLinkService::MONITORING_OPERATION);
             })
+            ->whereHas('links', function ($query) use ($device): void {
+                $query
+                    ->where('relationship', 'affected_device')
+                    ->where('linkable_type', $device->getMorphClass())
+                    ->where('linkable_id', $device->id)
+                    ->where('context->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
+                    ->where('context->operation', ItTicketLinkService::MONITORING_OPERATION);
+            })
+            ->whereHas('events', function ($events): void {
+                $events
+                    ->where('type', 'created_from_monitoring')
+                    ->where('payload->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
+                    ->where('payload->operation', ItTicketLinkService::MONITORING_OPERATION);
+            })
+            ->lockForUpdate()
             ->first();
     }
 
@@ -170,6 +211,8 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             'alert_id' => $alert->id,
             'severity' => $alert->severity,
             'message' => data_get($event->deviceEvent->payload, 'message'),
+            'system_principal' => ItTicketLinkService::MONITORING_PRINCIPAL,
+            'operation' => ItTicketLinkService::MONITORING_OPERATION,
         ];
     }
 

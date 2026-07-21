@@ -14,7 +14,9 @@ class ItApiWorkItemResource extends JsonResource
     {
         /** @var ItServiceIdentity $identity */
         $identity = $request->attributes->get('it_service_identity');
-        $readable = app(ItApiFieldPolicy::class)->readableFields($identity);
+        $fieldPolicy = app(ItApiFieldPolicy::class);
+        $readable = $fieldPolicy->readableFields($identity);
+        $context = $fieldPolicy->linkedContext($identity, $this->resource);
 
         return [
             'id' => $this->id,
@@ -24,17 +26,7 @@ class ItApiWorkItemResource extends JsonResource
             'status' => $this->status,
             'workflow_state' => $this->workflow_state,
             'priority' => $this->priority,
-            'site_id' => $this->site_id,
-            'it_service_id' => $this->it_service_id,
-            'context' => [
-                'site' => $this->site ? ['id' => $this->site->id, 'name' => $this->site->name] : null,
-                'service' => $this->service ? ['id' => $this->service->id, 'name' => $this->service->name] : null,
-                'asset' => $this->asset ? [
-                    'id' => $this->asset->id,
-                    'name' => $this->asset->name,
-                    'asset_tag' => $this->asset->asset_tag,
-                ] : null,
-            ],
+            'context' => $this->when($context !== [], $context),
             'description' => $this->when(in_array('description', $readable, true), $this->description),
             'category' => $this->when(in_array('category', $readable, true), $this->category),
             'subcategory' => $this->when(in_array('subcategory', $readable, true), $this->subcategory),

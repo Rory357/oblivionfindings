@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Domain\It\Services\ItApiWorkItemService;
 use App\Models\ItServiceIdentity;
 use Closure;
 use Illuminate\Cache\RateLimiter;
@@ -11,7 +12,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AuthenticateItServiceIdentity
 {
-    public function __construct(private readonly RateLimiter $limiter) {}
+    public function __construct(
+        private readonly RateLimiter $limiter,
+        private readonly ItApiWorkItemService $workItems,
+    ) {}
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -26,12 +30,8 @@ class AuthenticateItServiceIdentity
             return $this->deny('credential_invalid', 'A valid IT service credential is required.');
         }
 
-        $actor = $identity->actor;
-        if (! $identity->isActive()
-            || ! $actor
-            || $actor->approved_at === null
-            || (int) $actor->organization_id !== (int) $identity->tenant_id
-            || ! $actor->canDo('it.manage')) {
+        $actor = $this->workItems->executionAccount($identity);
+        if (! $actor) {
             return $this->deny('identity_inactive', 'This IT service identity is inactive.');
         }
 
@@ -87,6 +87,7 @@ class AuthenticateItServiceIdentity
             $timestamp,
             strtoupper($request->method()),
             '/'.$request->path(),
+            (string) $request->header('Idempotency-Key', ''),
             hash('sha256', $request->getContent()),
         ]);
         $expected = 'v1='.hash_hmac('sha256', $canonical, $secret);

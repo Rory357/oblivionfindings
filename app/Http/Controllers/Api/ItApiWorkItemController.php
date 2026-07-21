@@ -28,7 +28,7 @@ class ItApiWorkItemController extends Controller
 
     public function show(Request $request, int $workItem): ItApiWorkItemResource
     {
-        return new ItApiWorkItemResource($this->ticket($request, $workItem));
+        return new ItApiWorkItemResource($this->ticket($request, $workItem, 'work:read', false));
     }
 
     public function comment(StoreItApiCommentRequest $request, int $workItem)
@@ -36,7 +36,7 @@ class ItApiWorkItemController extends Controller
         $identity = $this->identity($request);
         $comment = $this->workItems->addPublicComment(
             $identity,
-            $this->ticket($request, $workItem),
+            $this->validatedTicket($request),
             (string) $request->validated('body'),
         );
 
@@ -51,13 +51,14 @@ class ItApiWorkItemController extends Controller
     public function transition(TransitionItApiWorkItemRequest $request, int $workItem)
     {
         $identity = $this->identity($request);
+        $ticket = $this->validatedTicket($request);
         $data = $request->validated();
         try {
             $ticket = $this->workItems->transition(
                 $identity,
-                $this->ticket($request, $workItem),
+                $ticket,
                 new ItTransitionInput(
-                    tenantId: (int) $identity->tenant_id,
+                    tenantId: (int) $ticket->tenant_id,
                     actor: $identity->actor,
                     to: ItWorkflowState::from((string) $data['to']),
                     reason: $data['reason'] ?? null,
@@ -86,22 +87,28 @@ class ItApiWorkItemController extends Controller
         return $identity;
     }
 
-    private function ticket(Request $request, int $id): ItTicket
-    {
-        $identity = $this->identity($request);
-        $siteIds = array_map('intval', $identity->allowed_site_ids ?? []);
+    private function ticket(
+        Request $request,
+        int $id,
+        string $ability,
+        bool $forWork,
+    ): ItTicket {
+        $ticket = $this->workItems->authorizedTicket(
+            $this->identity($request),
+            $id,
+            $ability,
+            $forWork,
+        );
+        abort_unless($ticket, 404);
 
-        return ItTicket::query()
-            ->forTenant((int) $identity->tenant_id)
-            ->where('is_sensitive', false)
-            ->whereIn('work_type', $identity->allowed_work_types ?? [])
-            ->where(function ($query) use ($siteIds): void {
-                $query->whereNull('site_id');
-                if ($siteIds !== []) {
-                    $query->orWhereIn('site_id', $siteIds);
-                }
-            })
-            ->with(['site:id,name', 'service:id,name', 'asset:id,name,asset_tag', 'queue:id,name', 'team:id,name', 'owner:id,name', 'assignee:id,name'])
-            ->findOrFail($id);
+        return $ticket;
+    }
+
+    private function validatedTicket(Request $request): ItTicket
+    {
+        $ticket = $request->attributes->get('it_api_ticket');
+        abort_unless($ticket instanceof ItTicket, 404);
+
+        return $ticket;
     }
 }
