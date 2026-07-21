@@ -4,6 +4,7 @@ namespace Tests\Feature\Sites;
 
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\SiteCalendarEvent;
 use App\Models\SiteHazard;
@@ -52,6 +53,47 @@ class SiteProfileAuthorizationTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('sites.show', $foreign))
             ->assertForbidden();
+    }
+
+    public function test_tenant_site_index_excludes_foreign_and_unscoped_sites(): void
+    {
+        $foreign = Site::factory()->create([
+            'tenant_id' => 2,
+            'name' => 'Foreign tenant sentinel',
+            'type' => 'house',
+        ]);
+        Site::factory()->create([
+            'tenant_id' => null,
+            'name' => 'Unscoped sentinel',
+            'type' => 'house',
+        ]);
+        $foreignUser = User::factory()->create([
+            'organization_id' => 2,
+            'name' => 'Foreign user sentinel',
+        ]);
+        $ownContext = ServiceContext::factory()->create([
+            'site_id' => $this->site->id,
+            'name' => 'Own service context',
+        ]);
+        $foreignContext = ServiceContext::factory()->create([
+            'site_id' => $foreign->id,
+            'name' => 'Foreign service context sentinel',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get(route('sites.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('sites/index')
+                ->has('sites', 1)
+                ->where('sites.0.id', $this->site->id)
+                ->where('summary.total', 1)
+                ->where('addSite.copyableSites', fn ($sites) => collect($sites)->pluck('id')->all() === [$this->site->id])
+                ->where('addSite.users', fn ($users) => collect($users)->contains('id', $this->admin->id)
+                    && ! collect($users)->contains('id', $foreignUser->id))
+                ->where('addSite.serviceContexts', fn ($contexts) => collect($contexts)->contains('id', $ownContext->id)
+                    && ! collect($contexts)->contains('id', $foreignContext->id))
+            );
     }
 
     public function test_tenant_user_cannot_open_an_unscoped_site_but_platform_admin_can(): void

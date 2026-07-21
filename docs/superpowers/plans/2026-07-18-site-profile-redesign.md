@@ -608,23 +608,23 @@ Run: `git add app resources routes tests database docs && git diff --cached --ch
 - Modify if evidence requires a fix: `resources/js/pages/sites/**`
 - Create evidence directory if absent: `docs/evidence/site-profile-redesign/`
 
-- [ ] **Step 1: Start the intended worktree host and prove its identity**
+- [x] **Step 1: Start the intended worktree host and prove its identity**
 
 Follow `oblivionfindings-frontline-browser-verification`. Confirm the served asset/content marker comes from this worktree before accepting screenshots. Record host, branch, HEAD, viewport, user/role, Site ID/type, and timestamp.
 
-- [ ] **Step 2: Verify representative variants**
+- [x] **Step 2: Verify representative variants**
 
 At 1440x900 verify a branded house, a day-service hub, a head office, a Site without `brand_colour`, and a restricted viewer. At a narrow viewport smoke-test hero wrapping, group rail scrolling, tab cards, focus, and touch targets.
 
-- [ ] **Step 3: Verify critical interactions**
+- [x] **Step 3: Verify critical interactions**
 
 Exercise grouped navigation, `/` search, pins after reload, `?tab=` deep links, readiness navigation, attention resolution, canonical Client create vs placement, compact Checklists link, canonical Finance/Vendor links, locked states, Escape handling, and partial-load retry. Capture console/network errors and confirm no credential secret appears in an Inertia response.
 
-- [ ] **Step 4: Fix only observed Site Profile defects and rerun their focused tests**
+- [x] **Step 4: Fix only observed Site Profile defects and rerun their focused tests**
 
 Use the systematic-debugging skill for every unexpected result. Save final screenshots and a concise evidence index under `docs/evidence/site-profile-redesign/`.
 
-- [ ] **Step 5: Commit evidence-backed fixes**
+- [x] **Step 5: Commit evidence-backed fixes**
 
 Run: `git add resources/js/pages/sites docs/evidence/site-profile-redesign && git diff --cached --check && git commit -m "fix(sites): close browser verification gaps"`
 

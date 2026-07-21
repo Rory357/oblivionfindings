@@ -24,6 +24,7 @@ use App\Services\NotificationService;
 use App\Services\Sites\SiteReadinessService;
 use App\Services\UserSiteAccessService;
 use App\Support\NzRegions;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -61,7 +62,7 @@ class SiteController extends Controller
             abort(403);
         }
 
-        $visibleSitesQuery = Site::query()
+        $visibleSitesQuery = $this->scopeSitesForUser(Site::query(), $user)
             ->whereIn('type', $allowedTypes)
             ->when($accessibleSiteIds !== [], fn ($q) => $q->whereIn('id', $accessibleSiteIds));
 
@@ -202,7 +203,7 @@ class SiteController extends Controller
         // Reference data for the Add Site modal (mounted on this index). Only
         // computed for users who can create sites; everyone else gets empties.
         $addSite = ($user?->canDo('sites.create') ?? false)
-            ? $this->addSiteReferenceData($allowedTypes, $accessibleSiteIds)
+            ? $this->addSiteReferenceData($user, $allowedTypes, $accessibleSiteIds)
             : $this->emptyAddSiteReferenceData();
 
         return inertia('sites/index', [
@@ -887,9 +888,12 @@ class SiteController extends Controller
      * @param  array<int, int>  $accessibleSiteIds
      * @return array<string, mixed>
      */
-    private function addSiteReferenceData(array $allowedTypes, array $accessibleSiteIds): array
+    private function addSiteReferenceData(User $user, array $allowedTypes, array $accessibleSiteIds): array
     {
-        $copyableSites = Site::query()
+        $isPlatformUser = $this->siteAccess()->isUnrestrictedPlatformUser($user);
+        $organizationId = $user->organization_id === null ? null : (int) $user->organization_id;
+
+        $copyableSites = $this->scopeSitesForUser(Site::query(), $user)
             ->whereIn('type', $allowedTypes)
             ->when($accessibleSiteIds !== [], fn ($q) => $q->whereIn('id', $accessibleSiteIds))
             ->where('archived', false)
@@ -927,6 +931,9 @@ class SiteController extends Controller
 
         $serviceContexts = ServiceContext::query()
             ->where('is_active', true)
+            ->when(! $isPlatformUser, fn (Builder $query) => $organizationId === null
+                ? $query->whereRaw('1 = 0')
+                : $query->forOrganization($organizationId))
             ->when($accessibleSiteIds !== [], fn ($q) => $q->whereIn('site_id', $accessibleSiteIds))
             ->orderBy('name')
             ->limit(200)
@@ -939,13 +946,32 @@ class SiteController extends Controller
             ->values();
 
         return [
-            'users' => User::select(['id', 'name'])->orderBy('name')->get(),
+            'users' => User::query()
+                ->when(! $isPlatformUser, fn (Builder $query) => $organizationId === null
+                    ? $query->whereRaw('1 = 0')
+                    : $query->where('organization_id', $organizationId))
+                ->select(['id', 'name'])
+                ->orderBy('name')
+                ->get(),
             'regionOptions' => NzRegions::REGIONS,
             'serviceContexts' => $serviceContexts,
             'copyableSites' => $copyableSites,
             'credentialCatalogue' => config('site_credentials.catalogue', []),
             'coverageRoleKeys' => config('site_credentials.coverage_role_keys', []),
         ];
+    }
+
+    private function scopeSitesForUser(Builder $query, ?User $user): Builder
+    {
+        if ($this->siteAccess()->isUnrestrictedPlatformUser($user)) {
+            return $query;
+        }
+
+        $organizationId = $user?->organization_id;
+
+        return $organizationId === null
+            ? $query->whereRaw('1 = 0')
+            : $query->where('tenant_id', (int) $organizationId);
     }
 
     /**

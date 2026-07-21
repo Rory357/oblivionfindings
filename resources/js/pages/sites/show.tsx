@@ -21,7 +21,7 @@ import {
     ShieldAlert,
     type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SiteProfileAssets } from './tabs/assets';
 import { SiteProfileCalendar } from './tabs/calendar';
 import { SiteProfileChecklists } from './tabs/checklists';
@@ -259,6 +259,38 @@ function initials(name: string): string {
         .join('');
 }
 
+type InertiaRequestException = {
+    config?: {
+        headers?: {
+            get?: (name: string) => unknown;
+            [name: string]: unknown;
+        };
+    };
+};
+
+function exceptionTargetsGroup(
+    exception: unknown,
+    dataGroup: SiteProfileDataGroup,
+): boolean {
+    const headers = (exception as InertiaRequestException)?.config?.headers;
+    if (!headers) return false;
+
+    const partialData =
+        (typeof headers.get === 'function'
+            ? headers.get('X-Inertia-Partial-Data')
+            : undefined) ??
+        headers['X-Inertia-Partial-Data'] ??
+        headers['x-inertia-partial-data'];
+
+    return (
+        typeof partialData === 'string' &&
+        partialData
+            .split(',')
+            .map((value) => value.trim())
+            .includes(dataGroup)
+    );
+}
+
 function stableHue(value: string): number {
     return [...value].reduce(
         (total, character) => (total * 31 + character.charCodeAt(0)) % 360,
@@ -291,6 +323,9 @@ export default function SiteShow(props: SiteProfileProps) {
     const [loadingGroups, setLoadingGroups] = useState<
         Partial<Record<SiteProfileDataGroup, boolean>>
     >({});
+    const loadingGroupsRef = useRef<
+        Partial<Record<SiteProfileDataGroup, boolean>>
+    >({});
     const [groupErrors, setGroupErrors] = useState<
         Partial<Record<SiteProfileDataGroup, boolean>>
     >({});
@@ -303,31 +338,54 @@ export default function SiteShow(props: SiteProfileProps) {
         (dataGroup: SiteProfileDataGroup, force = false) => {
             if (
                 (!force && props[dataGroup] !== undefined) ||
-                loadingGroups[dataGroup]
+                loadingGroupsRef.current[dataGroup]
             ) {
                 return;
             }
 
+            loadingGroupsRef.current[dataGroup] = true;
             setLoadingGroups((current) => ({ ...current, [dataGroup]: true }));
             setGroupErrors((current) => ({ ...current, [dataGroup]: false }));
+
+            const failGroupRequest = () =>
+                setGroupErrors((current) => ({
+                    ...current,
+                    [dataGroup]: true,
+                }));
+            const stopWatchingExceptions = router.on('exception', (event) => {
+                if (!exceptionTargetsGroup(event.detail.exception, dataGroup)) {
+                    return;
+                }
+
+                failGroupRequest();
+                stopWatchingExceptions();
+
+                // This request owns the visible error state, so suppress the
+                // otherwise-unhandled rejected promise after recording it.
+                return false;
+            });
 
             router.reload({
                 only: [dataGroup],
                 preserveState: true,
                 preserveScroll: true,
-                onError: () =>
-                    setGroupErrors((current) => ({
-                        ...current,
-                        [dataGroup]: true,
-                    })),
-                onFinish: () =>
+                onError: () => {
+                    stopWatchingExceptions();
+                    failGroupRequest();
+                },
+                onSuccess: stopWatchingExceptions,
+                onCancel: stopWatchingExceptions,
+                onFinish: () => {
+                    stopWatchingExceptions();
+                    loadingGroupsRef.current[dataGroup] = false;
                     setLoadingGroups((current) => ({
                         ...current,
                         [dataGroup]: false,
-                    })),
+                    }));
+                },
             });
         },
-        [loadingGroups, props],
+        [props],
     );
 
     const selectTab = useCallback(
@@ -415,7 +473,7 @@ export default function SiteShow(props: SiteProfileProps) {
                 hero={
                     <PageHero
                         category="sites"
-                        brandColour={site.brand_colour ?? undefined}
+                        brandColour={site.brand_colour || 'var(--primary)'}
                         backHref="/sites"
                         backLabel="All Sites"
                         icon={Building2}
