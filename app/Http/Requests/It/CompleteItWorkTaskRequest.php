@@ -2,12 +2,17 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CompleteItWorkTaskRequest extends FormRequest
 {
+    use ConcealsInaccessibleItWork;
+
     public function authorize(): bool
     {
+        $this->workableTaskOrNotFound();
+
         return (bool) $this->user()?->canDo('it.manage');
     }
 

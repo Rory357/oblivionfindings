@@ -417,6 +417,8 @@ class RbacSeeder extends Seeder
             ['key' => 'it.view', 'description' => 'View the IT & Provisioning queues', 'group' => 'it', 'module' => 'Operations'],
             ['key' => 'it.manage', 'description' => 'Work IT provisioning requests and helpdesk tickets', 'group' => 'it', 'module' => 'Operations'],
             ['key' => 'it.request', 'description' => 'Raise and track your own IT tickets', 'group' => 'it', 'module' => 'Operations'],
+            ['key' => 'it.organisationWide', 'description' => 'Access explicitly organisation-wide IT work', 'group' => 'it', 'module' => 'Operations'],
+            ['key' => 'it.viewSensitive', 'description' => 'Access sensitive IT work within an approved scope', 'group' => 'it', 'module' => 'Operations'],
 
             // Settings
             ['key' => 'settings.terminology.manage', 'description' => 'Manage UI terminology', 'group' => 'settings', 'module' => 'System'],

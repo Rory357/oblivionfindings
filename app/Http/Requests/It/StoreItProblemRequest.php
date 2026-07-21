@@ -21,6 +21,8 @@ class StoreItProblemRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:10000'],
             'category' => ['required', Rule::in(ItTicket::CATEGORIES)],
             'priority' => ['required', Rule::in(ItTicket::PRIORITIES)],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'is_organisation_wide' => ['nullable', 'boolean'],
             'impact_summary' => ['nullable', 'string', 'max:10000'],
             'root_cause' => ['nullable', 'string', 'max:20000'],
             'workaround' => ['nullable', 'string', 'max:20000'],

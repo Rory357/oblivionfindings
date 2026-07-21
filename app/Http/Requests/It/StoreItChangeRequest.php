@@ -22,6 +22,8 @@ class StoreItChangeRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:10000'],
             'category' => ['required', Rule::in(ItTicket::CATEGORIES)],
             'priority' => ['required', Rule::in(ItTicket::PRIORITIES)],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'is_organisation_wide' => ['nullable', 'boolean'],
             'change_type' => ['required', Rule::in(ItChange::TYPES)],
             'risk_level' => ['required', Rule::in(ItChange::RISK_LEVELS)],
             'is_restricted' => ['sometimes', 'boolean'],

@@ -11,6 +11,7 @@ use App\Domain\It\ItStaffDirectory;
 use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItProvisioningRequestLifecycleService;
 use App\Domain\It\Services\ItTicketRoutingService;
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\It\Services\ItWorkTransitionService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
@@ -38,6 +39,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 /**
@@ -56,6 +58,7 @@ class ItProvisioningController extends Controller
         private readonly ItTicketRoutingService $routingService,
         private readonly ItProvisioningRequestLifecycleService $provisioningLifecycle,
         private readonly ItEmailDeliveryService $emailDeliveries,
+        private readonly ItWorkAccessService $workAccess,
     ) {}
 
     /* ================================================================== */
@@ -65,7 +68,7 @@ class ItProvisioningController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $isAgent = $user && $user->canDo('it.view');
+        $isAgent = $user && ($user->canDo('it.view') || $user->canDo('it.manage'));
         $canRequest = $user && $user->canDo('it.request');
         abort_unless($isAgent || $canRequest, 403);
 
@@ -106,7 +109,7 @@ class ItProvisioningController extends Controller
         $agentProps = $isAgent ? [
             'requests' => $this->requestPage($tenantId, $filters),
             'provisioningWorkflows' => $this->provisioningWorkflows($tenantId),
-            'tickets' => $this->ticketPage($tenantId, $filters, $user->id),
+            'tickets' => $this->ticketPage($tenantId, $filters, $user),
             'assignees' => $this->tenantUserOptions($tenantId),
             'employeeOptions' => $this->employeeOptions($tenantId),
             'assetOptions' => $this->assetOptions(),
@@ -116,7 +119,7 @@ class ItProvisioningController extends Controller
             // editing them is admin-gated (can.edit_sla drives the editor button).
             'slaPolicies' => $this->slaPolicyGrid($tenantId),
             'slaCalendar' => $this->slaCalendar($tenantId),
-            'overview' => $this->overview($tenantId),
+            'overview' => $this->overview($tenantId, $user),
             'kbArticles' => $this->kbArticles($tenantId),
             'kbOptions' => [
                 'owners' => ItStaffDirectory::agents($tenantId)
@@ -124,8 +127,9 @@ class ItProvisioningController extends Controller
                     ->map(fn (User $agent) => ['id' => $agent->id, 'name' => $agent->name])
                     ->values(),
                 'sites' => Site::query()
-                    ->where('tenant_id', $tenantId)
+                    ->whereIn('id', $this->workAccess->approvedSiteIds($user))
                     ->where('is_active', true)
+                    ->where('archived', false)
                     ->orderBy('name')
                     ->get(['id', 'name']),
                 'services' => ItService::query()
@@ -138,7 +142,7 @@ class ItProvisioningController extends Controller
 
         return Inertia::render('it/index', [
             ...$agentProps,
-            'myTickets' => $canRequest ? $this->myTicketRows($tenantId, $user->id) : [],
+            'myTickets' => $canRequest ? $this->myTicketRows($tenantId, $user) : [],
             'catalogItems' => $canRequest ? ItCatalogItem::query()
                 ->forTenant($tenantId)
                 ->published()
@@ -152,7 +156,7 @@ class ItProvisioningController extends Controller
             // Requester KB browse (§I) — pure requesters only; agents browse the
             // full catalogue in their Knowledge tab.
             'kbPublished' => ($canRequest && ! $isAgent) ? $this->kbPublished($tenantId, $user) : [],
-            'summary' => $this->summary($tenantId, $user->id, $isAgent),
+            'summary' => $this->summary($tenantId, $user, $isAgent),
             'can' => [
                 'view' => $isAgent,
                 'manage' => $canManage,
@@ -705,6 +709,7 @@ class ItProvisioningController extends Controller
             'work_type' => ['nullable', Rule::in(['incident', 'service_request', 'security_request'])],
             'it_service_id' => ['nullable', 'integer', Rule::exists('it_services', 'id')->where('tenant_id', $tenantId)],
             'site_id' => ['nullable', 'integer', Rule::exists('sites', 'id')->where('tenant_id', $tenantId)],
+            'is_organisation_wide' => ['nullable', 'boolean'],
             // §N2 agent triage fields — dropped for self-service requesters below.
             'subcategory' => ['nullable', 'string', 'max:255'],
             // On-behalf-of: an agent logs a ticket for the person who actually
@@ -741,7 +746,19 @@ class ItProvisioningController extends Controller
         $assetId = $isAgent ? ($validated['asset_id'] ?? null) : null;
         $workType = $isAgent ? ($validated['work_type'] ?? 'incident') : 'incident';
         $serviceId = $isAgent ? ($validated['it_service_id'] ?? null) : null;
-        $siteId = $isAgent ? ($validated['site_id'] ?? null) : null;
+        $isOrganisationWide = $isAgent && (bool) ($validated['is_organisation_wide'] ?? false);
+        $siteId = $isAgent
+            ? (isset($validated['site_id']) ? (int) $validated['site_id'] : null)
+            : $this->workAccess->defaultSiteId($user);
+        if (! $this->workAccess->canAssignScope($user, $siteId, $isOrganisationWide)) {
+            if ($isAgent && (array_key_exists('site_id', $validated) || $isOrganisationWide)) {
+                abort(403);
+            }
+
+            throw ValidationException::withMessages([
+                'site_id' => 'Choose an active approved Site for this ticket.',
+            ]);
+        }
         $watcherIds = $isAgent && ! empty($validated['watchers'])
             ? array_values(array_unique(array_map('intval', $validated['watchers'])))
             : [];
@@ -755,6 +772,7 @@ class ItProvisioningController extends Controller
             'assigned_to_user_id' => $assigneeId,
             'asset_id' => $assetId,
             'site_id' => $siteId,
+            'is_organisation_wide' => $isOrganisationWide,
             'it_service_id' => $serviceId,
             'provisioning_request_id' => $provisioningRequestId,
             'category' => $validated['category'],
@@ -808,6 +826,7 @@ class ItProvisioningController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('it.manage'), 403);
+        abort_unless($this->workAccess->canWork($user, $ticket), 404);
         $this->authorize('update', $ticket);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
@@ -818,6 +837,8 @@ class ItProvisioningController extends Controller
             'category' => ['sometimes', Rule::in(ItTicket::CATEGORIES)],
             'subcategory' => ['sometimes', 'nullable', 'string', 'max:255'],
             'asset_id' => ['sometimes', 'nullable', 'integer', 'exists:assets,id'],
+            'site_id' => ['sometimes', 'nullable', 'integer', Rule::exists('sites', 'id')->where('tenant_id', $tenantId)],
+            'is_organisation_wide' => ['sometimes', 'boolean'],
             'assigned_to_user_id' => [
                 'sometimes', 'nullable', 'integer', 'exists:users,id',
                 $this->rejectForeignTenantRecipient($tenantId),
@@ -828,6 +849,35 @@ class ItProvisioningController extends Controller
             'resolution_code' => ['sometimes', 'nullable', 'string', 'max:100'],
             'resolution_summary' => ['sometimes', 'nullable', 'string', 'max:5000'],
         ]);
+
+        $siteWasSupplied = array_key_exists('site_id', $validated);
+        $wideWasSupplied = array_key_exists('is_organisation_wide', $validated);
+        if ($siteWasSupplied || $wideWasSupplied) {
+            if ($validated['is_organisation_wide'] ?? false) {
+                if (! $siteWasSupplied || $validated['site_id'] !== null) {
+                    throw ValidationException::withMessages([
+                        'site_id' => 'Organisation-wide tickets cannot also have a Site.',
+                    ]);
+                }
+            }
+
+            $prospectiveSiteId = $siteWasSupplied
+                ? ($validated['site_id'] !== null ? (int) $validated['site_id'] : null)
+                : ($ticket->site_id !== null ? (int) $ticket->site_id : null);
+            $prospectiveWide = $wideWasSupplied
+                ? (bool) $validated['is_organisation_wide']
+                : (bool) $ticket->is_organisation_wide;
+
+            if ($siteWasSupplied && $prospectiveSiteId !== null && ! $wideWasSupplied) {
+                $prospectiveWide = false;
+                $validated['is_organisation_wide'] = false;
+            }
+
+            abort_unless(
+                $this->workAccess->canAssignScope($user, $prospectiveSiteId, $prospectiveWide),
+                403,
+            );
+        }
 
         $original = $ticket->only(['status', 'priority', 'assigned_to_user_id']);
         $targetStatus = $validated['status'] ?? null;
@@ -915,6 +965,8 @@ class ItProvisioningController extends Controller
     public function resolveTicket(ResolveTicketRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
+        abort_unless($this->workAccess->canWork($user, $ticket), 404);
+        abort_unless($user->can('resolve', $ticket), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
@@ -1156,16 +1208,15 @@ class ItProvisioningController extends Controller
     }
 
     /** @param array<string, mixed> $filters */
-    private function ticketPage(int $tenantId, array $filters, int $userId)
+    private function ticketPage(int $tenantId, array $filters, User $user)
     {
         if (! Schema::hasTable('it_tickets')) {
             return null;
         }
 
-        $query = ItTicket::query()
-            ->forTenant($tenantId)
+        $query = $this->workAccess->applyViewScope(ItTicket::query(), $user)
             ->with(['requester:id,name', 'assignee:id,name'])
-            ->when($filters['view'], fn ($q, $view) => $this->applyTicketView($q, $view, $userId))
+            ->when($filters['view'], fn ($q, $view) => $this->applyTicketView($q, $view, (int) $user->id))
             ->when($filters['q'], fn ($q, $term) => $this->applyTicketSearch($q, $term))
             ->when($filters['ticket_status'], fn ($q, $status) => $q->where('status', $status))
             ->when($filters['ticket_priority'], fn ($q, $priority) => $q->where('priority', $priority))
@@ -1239,15 +1290,16 @@ class ItProvisioningController extends Controller
      * assignee identity beyond a name, mirroring what a helpdesk shows the
      * person who raised the ticket.
      */
-    private function myTicketRows(int $tenantId, int $userId): array
+    private function myTicketRows(int $tenantId, User $user): array
     {
         if (! Schema::hasTable('it_tickets')) {
             return [];
         }
 
-        return ItTicket::query()
-            ->forTenant($tenantId)
-            ->where('requester_user_id', $userId)
+        return $this->workAccess->applyViewScope(ItTicket::query(), $user)
+            ->where(fn ($participant) => $participant
+                ->where('requester_user_id', $user->id)
+                ->orWhere('requested_for_user_id', $user->id))
             ->with('assignee:id,name')
             ->orderByRaw("CASE status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'resolved' THEN 2 ELSE 3 END")
             ->orderByDesc('created_at')
@@ -1280,15 +1332,16 @@ class ItProvisioningController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function summary(int $tenantId, int $userId, bool $isAgent): array
+    private function summary(int $tenantId, User $user, bool $isAgent): array
     {
         $ticketsReady = Schema::hasTable('it_tickets');
         $requestsReady = Schema::hasTable('it_provisioning_requests');
 
         $my = $ticketsReady
-            ? ItTicket::query()
-                ->forTenant($tenantId)
-                ->where('requester_user_id', $userId)
+            ? $this->workAccess->applyViewScope(ItTicket::query(), $user)
+                ->where(fn ($participant) => $participant
+                    ->where('requester_user_id', $user->id)
+                    ->orWhere('requested_for_user_id', $user->id))
                 ->selectRaw(
                     "SUM(status IN ('open', 'in_progress', 'waiting')) AS open_count,
                      SUM(status = 'waiting') AS waiting,
@@ -1311,8 +1364,7 @@ class ItProvisioningController extends Controller
         }
 
         $tickets = $ticketsReady
-            ? ItTicket::query()
-                ->forTenant($tenantId)
+            ? $this->workAccess->applyViewScope(ItTicket::query(), $user)
                 ->selectRaw(
                     "SUM(status IN ('open', 'in_progress', 'waiting')) AS open_count,
                      SUM(status IN ('open', 'in_progress', 'waiting') AND assigned_to_user_id IS NULL) AS unassigned,
@@ -1330,7 +1382,7 @@ class ItProvisioningController extends Controller
                      SUM(status = 'resolved') AS status_resolved,
                      SUM(status = 'closed') AS status_closed,
                      SUM(status IN ('resolved', 'closed') AND resolved_at >= ? AND sla_state = 'met') AS met_30d",
-                    [$userId, now()->subDays(30), now()->subDays(7), now()->subDays(30)],
+                    [(int) $user->id, now()->subDays(30), now()->subDays(7), now()->subDays(30)],
                 )
                 ->first()
             : null;
@@ -1403,7 +1455,7 @@ class ItProvisioningController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function overview(int $tenantId): array
+    private function overview(int $tenantId, User $user): array
     {
         $empty = [
             'avg_first_response_mins' => null,
@@ -1418,13 +1470,11 @@ class ItProvisioningController extends Controller
             return $empty;
         }
 
-        $base = fn () => ItTicket::query()
-            ->forTenant($tenantId)
+        $base = fn () => $this->workAccess->applyViewScope(ItTicket::query(), $user)
             ->with(['requester:id,name', 'assignee:id,name']);
 
         // Avg minutes from raise to first agent reply, over replies in the last 30d.
-        $avg = ItTicket::query()
-            ->forTenant($tenantId)
+        $avg = $this->workAccess->applyViewScope(ItTicket::query(), $user)
             ->whereNotNull('first_responded_at')
             ->where('first_responded_at', '>=', now()->subDays(30))
             ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, first_responded_at)) AS mins')
@@ -1481,8 +1531,7 @@ class ItProvisioningController extends Controller
             ]);
 
         // Unassigned open tickets, split by priority (feeds the chip row).
-        $byPriority = ItTicket::query()
-            ->forTenant($tenantId)
+        $byPriority = $this->workAccess->applyViewScope(ItTicket::query(), $user)
             ->whereIn('status', ItTicket::OPEN_STATUSES)
             ->whereNull('assigned_to_user_id')
             ->selectRaw("SUM(priority = 'urgent') AS urgent, SUM(priority = 'high') AS high, SUM(priority = 'normal') AS normal, SUM(priority = 'low') AS low")
@@ -1499,7 +1548,7 @@ class ItProvisioningController extends Controller
                 'normal' => (int) ($byPriority->normal ?? 0),
                 'low' => (int) ($byPriority->low ?? 0),
             ],
-            'recent_activity' => $this->recentActivity($tenantId),
+            'recent_activity' => $this->recentActivity($tenantId, $user),
         ];
     }
 
@@ -1511,7 +1560,7 @@ class ItProvisioningController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
-    private function recentActivity(int $tenantId): array
+    private function recentActivity(int $tenantId, User $user): array
     {
         if (! Schema::hasTable('it_ticket_events')) {
             return [];
@@ -1520,6 +1569,7 @@ class ItProvisioningController extends Controller
         return ItTicketEvent::query()
             ->where('tenant_id', $tenantId)
             ->where('subject_type', 'it_ticket')
+            ->whereHasMorph('subject', [ItTicket::class], fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user))
             ->with(['actor:id,name', 'subject'])
             ->latest('created_at')
             ->limit(8)

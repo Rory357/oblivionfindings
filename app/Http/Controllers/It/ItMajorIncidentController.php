@@ -5,6 +5,7 @@ namespace App\Http\Controllers\It;
 use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\ItStaffDirectory;
 use App\Domain\It\Services\ItMajorIncidentService;
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\It\StoreItMajorIncidentRequest;
@@ -23,6 +24,7 @@ use DomainException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ItMajorIncidentController extends Controller
@@ -31,12 +33,14 @@ class ItMajorIncidentController extends Controller
 
     public function __construct(
         private readonly ItMajorIncidentService $majorIncidentService,
+        private readonly ItWorkAccessService $workAccess,
     ) {}
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', ItMajorIncident::class);
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $period = $request->validate([
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d'],
@@ -50,7 +54,7 @@ class ItMajorIncidentController extends Controller
         ];
 
         $majorIncidents = ItMajorIncident::query()
-            ->forTenant($tenantId)
+            ->whereHas('ticket', fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user))
             ->with([
                 'ticket:id,tenant_id,reference,title,priority,status,workflow_state,next_action,updated_at',
                 'commander:id,name',
@@ -84,10 +88,12 @@ class ItMajorIncidentController extends Controller
     public function store(StoreItMajorIncidentRequest $request)
     {
         $this->authorize('create', ItMajorIncident::class);
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $data = $this->creationData($user, $request->validated());
 
         try {
-            $majorIncident = $this->majorIncidentService->create($request->user(), $tenantId, $request->validated());
+            $majorIncident = $this->majorIncidentService->create($user, $tenantId, $data);
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -98,9 +104,11 @@ class ItMajorIncidentController extends Controller
 
     public function show(Request $request, ItMajorIncident $majorIncident)
     {
+        $user = $request->user();
+        $majorIncident->loadMissing('ticket');
+        abort_unless($majorIncident->ticket && $this->workAccess->canView($user, $majorIncident->ticket), 404);
         $this->authorize('view', $majorIncident);
         $tenantId = $this->resolveHrTenantIdForUser($request->user());
-        $this->assertHrTenantAccess($tenantId, $majorIncident->tenant_id);
         $majorIncident->load([
             'ticket', 'commander:id,name', 'communicationsLead:id,name',
             'updates.author:id,name',
@@ -147,17 +155,19 @@ class ItMajorIncidentController extends Controller
                 'published_at' => $update->published_at?->toIso8601String(),
                 'author' => $this->userOption($update->author),
             ])->values()->all(),
-            'links' => $this->presentLinks($links),
-            'options' => $this->options($tenantId, $majorIncident->ticket_id),
-            'can' => ['manage' => $request->user()->canDo('it.manage')],
+            'links' => $this->presentLinks($links, $user),
+            'options' => $this->options($tenantId, $majorIncident->ticket_id, $user),
+            'can' => ['manage' => $this->workAccess->canWork($user, $majorIncident->ticket)],
         ]);
     }
 
     public function update(UpdateItMajorIncidentRequest $request, ItMajorIncident $majorIncident)
     {
+        $user = $request->user();
+        $majorIncident->loadMissing('ticket');
+        abort_unless($majorIncident->ticket && $this->workAccess->canWork($user, $majorIncident->ticket), 404);
         $this->authorize('update', $majorIncident);
         $tenantId = $this->resolveHrTenantIdForUser($request->user());
-        $this->assertHrTenantAccess($tenantId, $majorIncident->tenant_id);
 
         try {
             $this->majorIncidentService->update($majorIncident, $request->user(), $tenantId, $request->validated());
@@ -170,9 +180,11 @@ class ItMajorIncidentController extends Controller
 
     public function storeUpdate(StoreItMajorIncidentUpdateRequest $request, ItMajorIncident $majorIncident)
     {
+        $user = $request->user();
+        $majorIncident->loadMissing('ticket');
+        abort_unless($majorIncident->ticket && $this->workAccess->canWork($user, $majorIncident->ticket), 404);
         $this->authorize('update', $majorIncident);
         $tenantId = $this->resolveHrTenantIdForUser($request->user());
-        $this->assertHrTenantAccess($tenantId, $majorIncident->tenant_id);
 
         try {
             $this->majorIncidentService->postUpdate($majorIncident, $request->user(), $tenantId, $request->validated());
@@ -185,9 +197,11 @@ class ItMajorIncidentController extends Controller
 
     public function transition(TransitionItMajorIncidentRequest $request, ItMajorIncident $majorIncident)
     {
+        $user = $request->user();
+        $majorIncident->loadMissing('ticket');
+        abort_unless($majorIncident->ticket && $this->workAccess->canWork($user, $majorIncident->ticket), 404);
         $this->authorize('update', $majorIncident);
         $tenantId = $this->resolveHrTenantIdForUser($request->user());
-        $this->assertHrTenantAccess($tenantId, $majorIncident->tenant_id);
         $data = $request->validated();
 
         try {
@@ -209,14 +223,11 @@ class ItMajorIncidentController extends Controller
 
     public function status(Request $request, ItMajorIncident $majorIncident)
     {
+        $user = $request->user();
+        $majorIncident->loadMissing('ticket');
+        abort_unless($majorIncident->ticket && $this->workAccess->canView($user, $majorIncident->ticket), 404);
         $this->authorize('viewStatus', $majorIncident);
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
-        $this->assertHrTenantAccess($tenantId, $majorIncident->tenant_id);
         $majorIncident->load('ticket');
-
-        if (! $request->user()->canDo('it.view') && ! $this->isAffectedRequester($majorIncident->ticket, $request->user())) {
-            abort(404);
-        }
 
         return response()->json([
             'reference' => $majorIncident->ticket->reference,
@@ -258,7 +269,7 @@ class ItMajorIncidentController extends Controller
     }
 
     /** @return array<string, array<int, array<string, mixed>>|array<string, mixed>|null> */
-    private function presentLinks(Collection $links): array
+    private function presentLinks(Collection $links, User $user): array
     {
         $values = ['services' => [], 'sites' => [], 'incidents' => [], 'alert' => null];
         foreach ($links as $link) {
@@ -271,7 +282,9 @@ class ItMajorIncidentController extends Controller
             } elseif ($link->relationship === 'affected_site' && $target instanceof Site) {
                 $values['sites'][] = ['id' => $target->id, 'name' => $target->name, 'city' => $target->city];
             } elseif ($link->relationship === 'related_incident' && $target instanceof ItTicket) {
-                $values['incidents'][] = $this->ticketOption($target);
+                if ($this->workAccess->canView($user, $target)) {
+                    $values['incidents'][] = $this->ticketOption($target);
+                }
             } elseif ($link->relationship === 'source_alert' && $target instanceof ControlRoomAlert) {
                 $values['alert'] = ['id' => $target->id, 'reference' => $target->reference_number, 'title' => $target->alert_type];
             }
@@ -281,15 +294,15 @@ class ItMajorIncidentController extends Controller
     }
 
     /** @return array<string, array<int, array<string, mixed>>> */
-    private function options(int $tenantId, int $majorIncidentTicketId): array
+    private function options(int $tenantId, int $majorIncidentTicketId, User $user): array
     {
         return [
             'agents' => $this->agentOptions($tenantId),
             'services' => ItService::query()->forTenant($tenantId)->where('is_active', true)->orderBy('name')->limit(100)->get()
                 ->map(fn (ItService $service) => ['id' => $service->id, 'name' => $service->name])->all(),
-            'sites' => Site::query()->where('tenant_id', $tenantId)->where('is_active', true)->orderBy('name')->limit(100)->get()
+            'sites' => Site::query()->whereIn('id', $this->workAccess->approvedSiteIds($user))->where('is_active', true)->where('archived', false)->orderBy('name')->limit(100)->get()
                 ->map(fn (Site $site) => ['id' => $site->id, 'name' => $site->name])->all(),
-            'incidents' => ItTicket::query()->forTenant($tenantId)->where('work_type', 'incident')->whereKeyNot($majorIncidentTicketId)->latest('id')->limit(100)->get()
+            'incidents' => $this->workAccess->applyViewScope(ItTicket::query(), $user)->where('work_type', 'incident')->whereKeyNot($majorIncidentTicketId)->latest('id')->limit(100)->get()
                 ->map(fn (ItTicket $ticket) => $this->ticketOption($ticket))->all(),
             'alerts' => ControlRoomAlert::query()
                 ->where(fn ($query) => $query
@@ -330,14 +343,36 @@ class ItMajorIncidentController extends Controller
         return $user ? ['id' => (int) $user->getKey(), 'name' => (string) $user->getAttribute('name')] : null;
     }
 
-    private function isAffectedRequester(ItTicket $majorIncidentTicket, User $user): bool
+    /** @param array<string, mixed> $data @return array<string, mixed> */
+    private function creationData(User $user, array $data): array
     {
-        return $majorIncidentTicket->links()
-            ->where('relationship', 'related_incident')
-            ->where('linkable_type', (new ItTicket)->getMorphClass())
-            ->whereHasMorph('linkable', [ItTicket::class], fn ($query) => $query
-                ->where('requester_user_id', $user->id)
-                ->where('tenant_id', $majorIncidentTicket->tenant_id))
-            ->exists();
+        $wide = (bool) ($data['is_organisation_wide'] ?? false);
+        $siteWasSupplied = array_key_exists('site_id', $data);
+        $siteId = $wide
+            ? null
+            : ($siteWasSupplied && $data['site_id'] !== null
+                ? (int) $data['site_id']
+                : $this->workAccess->defaultSiteId($user));
+
+        if ($wide && $siteWasSupplied && $data['site_id'] !== null) {
+            throw ValidationException::withMessages([
+                'site_id' => 'Organisation-wide work cannot also have a Site.',
+            ]);
+        }
+
+        if (! $this->workAccess->canAssignScope($user, $siteId, $wide)) {
+            if ($siteWasSupplied || $wide) {
+                abort(403);
+            }
+
+            throw ValidationException::withMessages([
+                'site_id' => 'Choose an active approved Site for this major incident.',
+            ]);
+        }
+
+        $data['site_id'] = $siteId;
+        $data['is_organisation_wide'] = $wide;
+
+        return $data;
     }
 }

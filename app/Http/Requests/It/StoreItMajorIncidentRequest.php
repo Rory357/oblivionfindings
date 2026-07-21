@@ -19,6 +19,7 @@ class StoreItMajorIncidentRequest extends FormRequest
         return [
             'title' => ['required', 'string', 'max:255'], 'description' => ['nullable', 'string', 'max:10000'],
             'category' => ['required', Rule::in(ItTicket::CATEGORIES)], 'priority' => ['required', Rule::in(ItTicket::PRIORITIES)],
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'], 'is_organisation_wide' => ['nullable', 'boolean'],
             'severity' => ['required', Rule::in(ItMajorIncident::SEVERITIES)], 'impact_summary' => ['required', 'string', 'max:10000'],
             'communications_lead_user_id' => ['nullable', 'integer', 'exists:users,id'], 'target_update_minutes' => ['required', 'integer', 'between:5,240'],
             'service_ids' => ['sometimes', 'array'], 'service_ids.*' => ['integer', 'distinct', 'exists:it_services,id'],

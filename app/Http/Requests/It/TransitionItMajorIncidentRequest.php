@@ -2,13 +2,18 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class TransitionItMajorIncidentRequest extends FormRequest
 {
+    use ConcealsInaccessibleItWork;
+
     public function authorize(): bool
     {
+        $this->workableMajorIncidentOrNotFound();
+
         return (bool) $this->user()?->canDo('it.manage');
     }
 

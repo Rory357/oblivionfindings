@@ -2,12 +2,17 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreItWorkTaskRequest extends FormRequest
 {
+    use ConcealsInaccessibleItWork;
+
     public function authorize(): bool
     {
+        $this->workableTicketOrNotFound();
+
         return (bool) $this->user()?->canDo('it.manage');
     }
 

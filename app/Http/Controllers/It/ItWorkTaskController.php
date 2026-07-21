@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\It;
 
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\It\Services\ItWorkTaskService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
@@ -19,11 +20,12 @@ class ItWorkTaskController extends Controller
 
     public function __construct(
         private readonly ItWorkTaskService $taskService,
+        private readonly ItWorkAccessService $workAccess,
     ) {}
 
     public function store(StoreItWorkTaskRequest $request, ItTicket $ticket)
     {
-        $tenantId = $this->tenant($request, $ticket);
+        $tenantId = $this->workContext($request, $ticket);
 
         try {
             $task = $this->taskService->create($ticket, $request->user(), $tenantId, $request->validated());
@@ -36,7 +38,7 @@ class ItWorkTaskController extends Controller
 
     public function update(UpdateItWorkTaskRequest $request, ItTicket $ticket, ItWorkTask $task)
     {
-        $tenantId = $this->tenant($request, $ticket);
+        $tenantId = $this->workContext($request, $ticket, $task);
 
         try {
             $this->taskService->update($ticket, $task, $request->user(), $tenantId, $request->validated());
@@ -49,7 +51,7 @@ class ItWorkTaskController extends Controller
 
     public function complete(CompleteItWorkTaskRequest $request, ItTicket $ticket, ItWorkTask $task)
     {
-        $tenantId = $this->tenant($request, $ticket);
+        $tenantId = $this->workContext($request, $ticket, $task);
 
         try {
             $this->taskService->complete($ticket, $task, $request->user(), $tenantId, $request->validated());
@@ -62,7 +64,7 @@ class ItWorkTaskController extends Controller
 
     public function reopen(ReopenItWorkTaskRequest $request, ItTicket $ticket, ItWorkTask $task)
     {
-        $tenantId = $this->tenant($request, $ticket);
+        $tenantId = $this->workContext($request, $ticket, $task);
 
         try {
             $this->taskService->reopen(
@@ -79,10 +81,14 @@ class ItWorkTaskController extends Controller
         return redirect()->back()->with('success', 'Task reopened.');
     }
 
-    private function tenant($request, ItTicket $ticket): int
+    private function workContext($request, ItTicket $ticket, ?ItWorkTask $task = null): int
     {
+        abort_unless($this->workAccess->canWork($request->user(), $ticket), 404);
+        if ($task !== null) {
+            abort_unless((int) $task->ticket_id === (int) $ticket->id, 404);
+        }
+
         $tenantId = $this->resolveHrTenantIdForUser($request->user());
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
         return $tenantId;
     }

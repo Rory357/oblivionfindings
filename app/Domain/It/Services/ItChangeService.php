@@ -44,6 +44,8 @@ class ItChangeService
                 'requested_for_user_id' => $actor->id,
                 'category' => $data['category'],
                 'priority' => $data['priority'],
+                'site_id' => $data['site_id'],
+                'is_organisation_wide' => $data['is_organisation_wide'],
                 'impact' => 'organization',
                 'urgency' => $data['priority'] === 'urgent' ? 'critical' : $data['priority'],
                 'work_type' => 'change',

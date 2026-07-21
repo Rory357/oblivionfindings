@@ -8,6 +8,7 @@ use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\ItStaffDirectory;
 use App\Domain\It\Presenters\ItTicketContextPresenter;
 use App\Domain\It\Services\ItEmailDeliveryService;
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\It\Services\ItWorkTransitionService;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
@@ -50,6 +51,7 @@ class ItTicketController extends Controller
         private readonly ItTicketContextPresenter $contextPresenter,
         private readonly ItWorkTransitionService $transitionService,
         private readonly ItEmailDeliveryService $emailDeliveries,
+        private readonly ItWorkAccessService $workAccess,
     ) {}
 
     public function show(Request $request, ItTicket $ticket)
@@ -70,12 +72,13 @@ class ItTicketController extends Controller
     private function showPayload(Request $request, ItTicket $ticket): array
     {
         $user = $request->user();
+        abort_unless($this->workAccess->canView($user, $ticket), 404);
         $this->authorize('view', $ticket);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
-        $isAgent = $user->canDo('it.view');
-        $canManage = $user->canDo('it.manage');
+        $isAgent = $user->canDo('it.view') || $user->canDo('it.manage');
+        $canManage = $this->workAccess->canWork($user, $ticket);
         $isRequester = (int) $ticket->requester_user_id === (int) $user->id;
 
         $ticket->load([
@@ -226,14 +229,15 @@ class ItTicketController extends Controller
             // §P-S2 merge picker: recent live tickets an agent can fold this one
             // into. Agents only; excludes self and already-merged tickets.
             'mergeTargets' => $canManage
-                ? ItTicket::query()
-                    ->forTenant($tenantId)
+                ? $this->workAccess->applyViewScope(ItTicket::query(), $user)
                     ->whereIn('status', ItTicket::OPEN_STATUSES)
                     ->whereNull('merged_into_ticket_id')
                     ->where('id', '!=', $ticket->id)
                     ->latest('id')
-                    ->limit(50)
+                    ->limit(100)
                     ->get(['id', 'reference', 'title', 'priority', 'status'])
+                    ->filter(fn (ItTicket $candidate) => $this->workAccess->canWork($user, $candidate))
+                    ->take(50)
                     ->map(fn (ItTicket $t) => [
                         'id' => $t->id,
                         'reference' => $t->reference,
@@ -263,6 +267,11 @@ class ItTicketController extends Controller
     public function storeComment(StoreTicketCommentRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
+        abort_unless($this->workAccess->canView($user, $ticket), 404);
+        abort_unless($user->can('comment', $ticket), 403);
+        if ($request->boolean('is_internal')) {
+            abort_unless($this->workAccess->canWork($user, $ticket), 403);
+        }
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
@@ -334,17 +343,16 @@ class ItTicketController extends Controller
     public function downloadAttachment(Request $request, ItAttachment $attachment)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, (int) $attachment->tenant_id);
-
         $parent = $attachment->attachable;
 
         if ($parent instanceof ItTicketComment) {
+            abort_unless($this->workAccess->canView($user, $parent->ticket), 404);
             $this->authorize('view', $parent->ticket);
             if ($parent->is_internal) {
-                abort_unless($user->canDo('it.manage'), 403);
+                abort_unless($this->workAccess->canWork($user, $parent->ticket), 404);
             }
         } elseif ($parent instanceof ItTicket) {
+            abort_unless($this->workAccess->canView($user, $parent), 404);
             $this->authorize('view', $parent);
         } else {
             // KB attachments arrive with the Knowledge tab; orphans 404.
@@ -362,6 +370,8 @@ class ItTicketController extends Controller
     public function transition(TransitionItWorkRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
+        abort_unless($this->workAccess->canWork($user, $ticket), 404);
+        abort_unless($user->can('update', $ticket), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
         $validated = $request->validated();
@@ -392,6 +402,7 @@ class ItTicketController extends Controller
     public function close(Request $request, ItTicket $ticket)
     {
         $user = $request->user();
+        abort_unless($user && $this->workAccess->canWork($user, $ticket), 404);
         abort_unless($user && $user->can('close', $ticket), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
@@ -425,6 +436,7 @@ class ItTicketController extends Controller
     public function reopen(Request $request, ItTicket $ticket)
     {
         $user = $request->user();
+        abort_unless($this->workAccess->canView($user, $ticket), 404);
         $this->authorize('reopen', $ticket);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
@@ -468,11 +480,14 @@ class ItTicketController extends Controller
     public function merge(MergeTicketRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
-
         $target = $request->targetTicket();
         abort_unless($target instanceof ItTicket, 404);
+        abort_unless(
+            $this->workAccess->canWork($user, $ticket)
+                && $this->workAccess->canWork($user, $target),
+            404,
+        );
+        abort_unless($user->can('merge', [$ticket, $target]), 403);
 
         DB::transaction(function () use ($ticket, $target, $user) {
             // The conversation continues on the survivor.
@@ -514,11 +529,13 @@ class ItTicketController extends Controller
     /**
      * Raise a sign-off request on a ticket whose category needs approval
      * (§P-S3). Notifies the other agents (never the requester) and logs it.
-     * Authorised by ItTicketPolicy@requestApproval (RequestApprovalRequest).
+     * Canonical access is concealed before ItTicketPolicy@requestApproval.
      */
     public function requestApproval(RequestApprovalRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
+        abort_unless($this->workAccess->canWork($user, $ticket), 404);
+        abort_unless($user->can('requestApproval', $ticket), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
@@ -548,8 +565,9 @@ class ItTicketController extends Controller
     public function decideApproval(DecideApprovalRequest $request, ItTicketApproval $approval)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $approval->tenant_id);
+        $ticket = $approval->ticket;
+        abort_unless($ticket && $this->workAccess->canWork($user, $ticket), 404);
+        abort_unless($user->can('decide', $approval), 403);
 
         $status = $request->validated('decision') === 'approve' ? 'approved' : 'rejected';
 
@@ -560,7 +578,6 @@ class ItTicketController extends Controller
             'decided_at' => now(),
         ])->save();
 
-        $ticket = $approval->ticket;
         ItTicketEvent::record($ticket, 'approval_'.$status, $user->id, ['approval_id' => $approval->id]);
 
         $requester = User::find($approval->requested_by);
@@ -575,11 +592,14 @@ class ItTicketController extends Controller
      * CSAT (§K): the requester rates the resolution 1–5 (+ optional comment).
      * One-shot in spirit — the `csat_submitted` event and stamp land on the
      * FIRST submission — but editable while the ticket is still resolved, so a
-     * re-rate silently updates the score. Authorisation is the FormRequest's.
+     * re-rate silently updates the score. Canonical access is concealed before
+     * the CSAT lifecycle policy runs.
      */
     public function csat(SubmitCsatRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
+        abort_unless($this->workAccess->canView($user, $ticket), 404);
+        abort_unless($user->can('csat', $ticket), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
@@ -602,7 +622,7 @@ class ItTicketController extends Controller
     public function watch(Request $request, ItTicket $ticket)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('it.manage'), 403);
+        abort_unless($user && $this->workAccess->canWork($user, $ticket), 404);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
@@ -617,7 +637,7 @@ class ItTicketController extends Controller
     public function unwatch(Request $request, ItTicket $ticket)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('it.manage'), 403);
+        abort_unless($user && $this->workAccess->canWork($user, $ticket), 404);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
@@ -662,10 +682,10 @@ class ItTicketController extends Controller
             }
         }
 
-        $tickets = ItTicket::query()
-            ->forTenant($tenantId)
+        $tickets = $this->workAccess->applyViewScope(ItTicket::query(), $user)
             ->whereIn('id', $validated['ids'])
-            ->get();
+            ->get()
+            ->filter(fn (ItTicket $ticket) => $this->workAccess->canWork($user, $ticket));
 
         $updated = 0;
         $skipped = count($validated['ids']) - $tickets->count();

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\It;
 
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\ItAutomationRun;
@@ -12,6 +13,8 @@ use App\Models\ItProvisioningRequest;
 use App\Models\ItService;
 use App\Models\ItTicket;
 use App\Models\ItTicketLink;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
@@ -28,13 +31,16 @@ class ItReportsController extends Controller
 {
     use ResolvesHrTenant;
 
+    public function __construct(private readonly ItWorkAccessService $workAccess) {}
+
     /** Agent-only (route gated `permission:it.view`); read-only analytics. */
     public function data(Request $request)
     {
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         [$from, $to] = $this->range($request);
 
-        return response()->json($this->report($tenantId, $from, $to));
+        return response()->json($this->report($tenantId, $from, $to, $user));
     }
 
     /**
@@ -46,11 +52,12 @@ class ItReportsController extends Controller
      */
     public function export(Request $request)
     {
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         [$from, $to] = $this->range($request);
         $card = is_string($request->query('card')) ? $request->query('card') : 'trend';
 
-        [$filename, $headers, $rows] = $this->exportCard($tenantId, $from, $to, $card);
+        [$filename, $headers, $rows] = $this->exportCard($tenantId, $from, $to, $card, $user);
 
         return response()->streamDownload(function () use ($headers, $rows) {
             $out = fopen('php://output', 'w');
@@ -68,7 +75,7 @@ class ItReportsController extends Controller
      *
      * @return array{0: string, 1: array<int, string>, 2: array<int, array<int, string|int|float>>}
      */
-    private function exportCard(int $tenantId, Carbon $from, Carbon $to, string $card): array
+    private function exportCard(int $tenantId, Carbon $from, Carbon $to, string $card, User $user): array
     {
         $ready = Schema::hasTable('it_tickets');
         $reqReady = Schema::hasTable('it_provisioning_requests');
@@ -79,34 +86,34 @@ class ItReportsController extends Controller
                 "it-report-summary_{$stamp}.csv",
                 ['Metric', 'Value'],
                 $this->summaryRows(
-                    $ready ? $this->kpis($tenantId, $from, $to) : $this->emptyKpis(),
+                    $ready ? $this->kpis($from, $to, $user) : $this->emptyKpis(),
                     $reqReady ? $this->provisioning($tenantId, $from, $to) : $this->emptyProvisioning(),
                 ),
             ],
             'by_priority' => [
                 "it-open-by-priority_{$stamp}.csv",
                 ['Priority', 'Open tickets'],
-                $ready ? array_map(fn ($r) => [ucfirst((string) $r['name']), $r['value']], $this->openBy($tenantId, 'priority', ItTicket::PRIORITIES)) : [],
+                $ready ? array_map(fn ($r) => [ucfirst((string) $r['name']), $r['value']], $this->openBy('priority', ItTicket::PRIORITIES, $user)) : [],
             ],
             'by_category' => [
                 "it-open-by-category_{$stamp}.csv",
                 ['Category', 'Open tickets'],
-                $ready ? array_map(fn ($r) => [ucfirst((string) $r['name']), $r['value']], $this->openBy($tenantId, 'category', ItTicket::CATEGORIES)) : [],
+                $ready ? array_map(fn ($r) => [ucfirst((string) $r['name']), $r['value']], $this->openBy('category', ItTicket::CATEGORIES, $user)) : [],
             ],
             'top_requesters' => [
                 "it-top-requesters_{$stamp}.csv",
                 ['Requester', 'Tickets raised'],
-                $ready ? array_map(fn ($r) => [$r['name'], $r['count']], $this->topRequesters($tenantId, $from, $to)) : [],
+                $ready ? array_map(fn ($r) => [$r['name'], $r['count']], $this->topRequesters($from, $to, $user)) : [],
             ],
             'agent_workload' => [
                 "it-agent-workload_{$stamp}.csv",
                 ['Assignee', 'Open tickets'],
-                $ready ? array_map(fn ($r) => [$r['name'], $r['open']], $this->agentWorkload($tenantId)) : [],
+                $ready ? array_map(fn ($r) => [$r['name'], $r['open']], $this->agentWorkload($user)) : [],
             ],
             default => [
                 "it-created-vs-resolved_{$stamp}.csv",
                 ['Date', 'Created', 'Resolved'],
-                $ready ? array_map(fn ($r) => [$r['date'], $r['created'], $r['resolved']], $this->trend($tenantId, $from, $to)) : [],
+                $ready ? array_map(fn ($r) => [$r['date'], $r['created'], $r['resolved']], $this->trend($from, $to, $user)) : [],
             ],
         };
     }
@@ -170,7 +177,7 @@ class ItReportsController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function report(int $tenantId, Carbon $from, Carbon $to): array
+    private function report(int $tenantId, Carbon $from, Carbon $to, User $user): array
     {
         $ticketsReady = Schema::hasTable('it_tickets');
         $requestsReady = Schema::hasTable('it_provisioning_requests');
@@ -181,31 +188,31 @@ class ItReportsController extends Controller
                 'to' => $to->toDateString(),
                 'days' => (int) abs($from->copy()->startOfDay()->diffInDays($to->copy()->startOfDay())) + 1,
             ],
-            'kpis' => $ticketsReady ? $this->kpis($tenantId, $from, $to) : $this->emptyKpis(),
-            'trend' => $ticketsReady ? $this->trend($tenantId, $from, $to) : [],
-            'by_priority' => $ticketsReady ? $this->openBy($tenantId, 'priority', ItTicket::PRIORITIES) : [],
-            'by_category' => $ticketsReady ? $this->openBy($tenantId, 'category', ItTicket::CATEGORIES) : [],
-            'top_requesters' => $ticketsReady ? $this->topRequesters($tenantId, $from, $to) : [],
-            'agent_workload' => $ticketsReady ? $this->agentWorkload($tenantId) : [],
+            'kpis' => $ticketsReady ? $this->kpis($from, $to, $user) : $this->emptyKpis(),
+            'trend' => $ticketsReady ? $this->trend($from, $to, $user) : [],
+            'by_priority' => $ticketsReady ? $this->openBy('priority', ItTicket::PRIORITIES, $user) : [],
+            'by_category' => $ticketsReady ? $this->openBy('category', ItTicket::CATEGORIES, $user) : [],
+            'top_requesters' => $ticketsReady ? $this->topRequesters($from, $to, $user) : [],
+            'agent_workload' => $ticketsReady ? $this->agentWorkload($user) : [],
             'provisioning' => $requestsReady ? $this->provisioning($tenantId, $from, $to) : $this->emptyProvisioning(),
-            'backlog_age' => $ticketsReady ? $this->backlogAge($tenantId) : $this->emptyBacklogAge(),
-            'reopen_rate' => $ticketsReady ? $this->reopenRate($tenantId, $from, $to) : $this->emptyRate(),
-            'first_contact_resolution' => $ticketsReady ? $this->firstContactResolution($tenantId, $from, $to) : $this->emptyRate(),
-            'channels' => $ticketsReady ? $this->channels($tenantId, $from, $to) : [],
-            'major_incidents' => Schema::hasTable('it_major_incidents') ? $this->majorIncidents($tenantId, $from, $to) : ['declared' => 0, 'restored' => 0, 'open' => 0],
-            'change_success' => Schema::hasTable('it_changes') ? $this->changeSuccess($tenantId, $from, $to) : ['successful' => 0, 'failed' => 0, 'inconclusive' => 0],
-            'recurring_problems' => Schema::hasTable('it_problems') ? $this->problemOutcomes($tenantId, $from, $to) : ['total' => 0, 'known_errors' => 0, 'root_causes' => 0],
+            'backlog_age' => $ticketsReady ? $this->backlogAge($user) : $this->emptyBacklogAge(),
+            'reopen_rate' => $ticketsReady ? $this->reopenRate($from, $to, $user) : $this->emptyRate(),
+            'first_contact_resolution' => $ticketsReady ? $this->firstContactResolution($from, $to, $user) : $this->emptyRate(),
+            'channels' => $ticketsReady ? $this->channels($from, $to, $user) : [],
+            'major_incidents' => Schema::hasTable('it_major_incidents') ? $this->majorIncidents($from, $to, $user) : ['declared' => 0, 'restored' => 0, 'open' => 0],
+            'change_success' => Schema::hasTable('it_changes') ? $this->changeSuccess($from, $to, $user) : ['successful' => 0, 'failed' => 0, 'inconclusive' => 0],
+            'recurring_problems' => Schema::hasTable('it_problems') ? $this->problemOutcomes($from, $to, $user) : ['total' => 0, 'known_errors' => 0, 'root_causes' => 0],
             'automation_outcomes' => Schema::hasTable('it_automation_runs') ? $this->automationOutcomes($tenantId, $from, $to) : ['succeeded' => 0, 'failed' => 0, 'skipped' => 0],
-            'service_reliability' => Schema::hasTable('it_services') ? $this->serviceReliability($tenantId, $from, $to) : [],
-            'device_reliability' => Schema::hasTable('it_ticket_links') ? $this->deviceReliability($tenantId, $from, $to) : ['affected_devices' => 0, 'open_incidents' => 0, 'recovered' => 0],
-            'quality' => $ticketsReady ? $this->qualityGaps($tenantId) : [],
+            'service_reliability' => Schema::hasTable('it_services') ? $this->serviceReliability($tenantId, $from, $to, $user) : [],
+            'device_reliability' => Schema::hasTable('it_ticket_links') ? $this->deviceReliability($tenantId, $from, $to, $user) : ['affected_devices' => 0, 'open_incidents' => 0, 'recovered' => 0],
+            'quality' => $ticketsReady ? $this->qualityGaps($user) : [],
         ];
     }
 
     /** @return array<string, array{count: int, href: string}> */
-    private function backlogAge(int $tenantId): array
+    private function backlogAge(User $user): array
     {
-        $base = fn () => ItTicket::query()->forTenant($tenantId)->whereIn('status', ItTicket::OPEN_STATUSES);
+        $base = fn () => $this->ticketQuery($user)->whereIn('status', ItTicket::OPEN_STATUSES);
         $now = now();
         $twoDays = $now->copy()->subDays(2);
         $sevenDays = $now->copy()->subDays(7);
@@ -220,9 +227,9 @@ class ItReportsController extends Controller
     }
 
     /** @return array<string, int|float|null|string> */
-    private function reopenRate(int $tenantId, Carbon $from, Carbon $to): array
+    private function reopenRate(Carbon $from, Carbon $to, User $user): array
     {
-        $resolved = ItTicket::query()->forTenant($tenantId)->whereBetween('resolved_at', [$from, $to]);
+        $resolved = $this->ticketQuery($user)->whereBetween('resolved_at', [$from, $to]);
         $total = (clone $resolved)->count();
         $reopened = (clone $resolved)->where('reopened_count', '>', 0)->count();
 
@@ -239,9 +246,9 @@ class ItReportsController extends Controller
     }
 
     /** @return array<string, int|float|null|string> */
-    private function firstContactResolution(int $tenantId, Carbon $from, Carbon $to): array
+    private function firstContactResolution(Carbon $from, Carbon $to, User $user): array
     {
-        $resolved = ItTicket::query()->forTenant($tenantId)->whereBetween('resolved_at', [$from, $to]);
+        $resolved = $this->ticketQuery($user)->whereBetween('resolved_at', [$from, $to]);
         $total = (clone $resolved)->count();
         $firstContact = (clone $resolved)->firstContactResolved()->count();
 
@@ -258,10 +265,9 @@ class ItReportsController extends Controller
     }
 
     /** @return array<string, array{count: int, href: string}> */
-    private function channels(int $tenantId, Carbon $from, Carbon $to): array
+    private function channels(Carbon $from, Carbon $to, User $user): array
     {
-        $counts = ItTicket::query()
-            ->forTenant($tenantId)
+        $counts = $this->ticketQuery($user)
             ->whereBetween('created_at', [$from, $to])
             ->selectRaw('source, COUNT(*) AS aggregate')
             ->groupBy('source')
@@ -280,9 +286,11 @@ class ItReportsController extends Controller
     }
 
     /** @return array<string, int|float|null|string> */
-    private function majorIncidents(int $tenantId, Carbon $from, Carbon $to): array
+    private function majorIncidents(Carbon $from, Carbon $to, User $user): array
     {
-        $query = ItMajorIncident::query()->forTenant($tenantId)->whereBetween('declared_at', [$from, $to]);
+        $query = ItMajorIncident::query()
+            ->whereHas('ticket', fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user))
+            ->whereBetween('declared_at', [$from, $to]);
         $declared = (clone $query)->count();
         $restored = (clone $query)->whereNotNull('restored_at')->count();
         $avg = (clone $query)->whereNotNull('restored_at')
@@ -299,9 +307,11 @@ class ItReportsController extends Controller
     }
 
     /** @return array<string, int|float|null|string> */
-    private function changeSuccess(int $tenantId, Carbon $from, Carbon $to): array
+    private function changeSuccess(Carbon $from, Carbon $to, User $user): array
     {
-        $query = ItChange::query()->forTenant($tenantId)->whereBetween('validated_at', [$from, $to]);
+        $query = ItChange::query()
+            ->whereHas('ticket', fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user))
+            ->whereBetween('validated_at', [$from, $to]);
         $counts = (clone $query)->selectRaw('validation_result, COUNT(*) AS aggregate')->groupBy('validation_result')->pluck('aggregate', 'validation_result');
         $measured = (int) $counts->sum();
 
@@ -315,9 +325,11 @@ class ItReportsController extends Controller
     }
 
     /** @return array<string, int|string> */
-    private function problemOutcomes(int $tenantId, Carbon $from, Carbon $to): array
+    private function problemOutcomes(Carbon $from, Carbon $to, User $user): array
     {
-        $query = ItProblem::query()->forTenant($tenantId)->whereBetween('created_at', [$from, $to]);
+        $query = ItProblem::query()
+            ->whereHas('ticket', fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user))
+            ->whereBetween('created_at', [$from, $to]);
 
         return [
             'total' => (clone $query)->count(),
@@ -350,14 +362,14 @@ class ItReportsController extends Controller
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function serviceReliability(int $tenantId, Carbon $from, Carbon $to): array
+    private function serviceReliability(int $tenantId, Carbon $from, Carbon $to, User $user): array
     {
         return ItService::query()
             ->forTenant($tenantId)
             ->withCount([
-                'tickets as ticket_count' => fn ($query) => $query->whereBetween('created_at', [$from, $to]),
-                'tickets as open_count' => fn ($query) => $query->whereIn('status', ItTicket::OPEN_STATUSES),
-                'tickets as sla_breach_count' => fn ($query) => $query->whereBetween('created_at', [$from, $to])->where('sla_state', 'breached'),
+                'tickets as ticket_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereBetween('created_at', [$from, $to]),
+                'tickets as open_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereIn('status', ItTicket::OPEN_STATUSES),
+                'tickets as sla_breach_count' => fn ($query) => $this->workAccess->applyViewScope($query, $user)->whereBetween('created_at', [$from, $to])->where('sla_state', 'breached'),
             ])
             ->orderByDesc('ticket_count')
             ->orderBy('name')
@@ -380,18 +392,18 @@ class ItReportsController extends Controller
     }
 
     /** @return array<string, int|string> */
-    private function deviceReliability(int $tenantId, Carbon $from, Carbon $to): array
+    private function deviceReliability(int $tenantId, Carbon $from, Carbon $to, User $user): array
     {
         $query = ItTicketLink::query()
             ->forTenant($tenantId)
             ->where('linkable_type', 'security_device')
             ->where('relationship', 'affected_device')
-            ->whereHas('ticket', fn ($ticket) => $ticket->whereBetween('created_at', [$from, $to]));
+            ->whereHas('ticket', fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user)->whereBetween('created_at', [$from, $to]));
 
         return [
             'affected_devices' => (clone $query)->distinct('linkable_id')->count('linkable_id'),
-            'open_incidents' => (clone $query)->whereHas('ticket', fn ($ticket) => $ticket->whereIn('status', ItTicket::OPEN_STATUSES))->count(),
-            'recovered' => (clone $query)->whereHas('ticket', fn ($ticket) => $ticket->whereNotNull('monitoring_recovered_at'))->count(),
+            'open_incidents' => (clone $query)->whereHas('ticket', fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user)->whereIn('status', ItTicket::OPEN_STATUSES))->count(),
+            'recovered' => (clone $query)->whereHas('ticket', fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user)->whereNotNull('monitoring_recovered_at'))->count(),
             'href' => $this->ticketHref([
                 'device_linked' => 1,
                 'from' => $from->toDateString(),
@@ -401,9 +413,9 @@ class ItReportsController extends Controller
     }
 
     /** @return array<string, array{count: int, href: string}> */
-    private function qualityGaps(int $tenantId): array
+    private function qualityGaps(User $user): array
     {
-        $base = fn () => ItTicket::query()->forTenant($tenantId)->whereIn('status', ItTicket::OPEN_STATUSES);
+        $base = fn () => $this->ticketQuery($user)->whereIn('status', ItTicket::OPEN_STATUSES);
 
         return [
             'missing_service' => ['count' => $base()->whereNull('it_service_id')->count(), 'href' => $this->ticketHref(['missing' => 'service', 'open_only' => 1])],
@@ -432,10 +444,9 @@ class ItReportsController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function kpis(int $tenantId, Carbon $from, Carbon $to): array
+    private function kpis(Carbon $from, Carbon $to, User $user): array
     {
-        $state = ItTicket::query()
-            ->forTenant($tenantId)
+        $state = $this->ticketQuery($user)
             ->selectRaw(
                 "SUM(status IN ('open','in_progress','waiting')) AS open_count,
                  SUM(status IN ('open','in_progress','waiting') AND assigned_to_user_id IS NULL) AS unassigned,
@@ -444,8 +455,7 @@ class ItReportsController extends Controller
             )
             ->first();
 
-        $resolvedInRange = fn () => ItTicket::query()
-            ->forTenant($tenantId)
+        $resolvedInRange = fn () => $this->ticketQuery($user)
             ->whereBetween('resolved_at', [$from, $to]);
 
         $resolvedCount = $resolvedInRange()->count();
@@ -455,8 +465,7 @@ class ItReportsController extends Controller
         $csatCount = $resolvedInRange()->whereNotNull('csat_submitted_at')->count();
         $csatAvg = $resolvedInRange()->whereNotNull('csat_submitted_at')->avg('csat_score');
 
-        $avgFirst = ItTicket::query()
-            ->forTenant($tenantId)
+        $avgFirst = $this->ticketQuery($user)
             ->whereBetween('first_responded_at', [$from, $to])
             ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, first_responded_at)) AS m')
             ->value('m');
@@ -485,17 +494,15 @@ class ItReportsController extends Controller
      *
      * @return array<int, array{date: string, created: int, resolved: int}>
      */
-    private function trend(int $tenantId, Carbon $from, Carbon $to): array
+    private function trend(Carbon $from, Carbon $to, User $user): array
     {
-        $created = ItTicket::query()
-            ->forTenant($tenantId)
+        $created = $this->ticketQuery($user)
             ->whereBetween('created_at', [$from, $to])
             ->selectRaw('DATE(created_at) AS d, COUNT(*) AS c')
             ->groupBy('d')
             ->pluck('c', 'd');
 
-        $resolved = ItTicket::query()
-            ->forTenant($tenantId)
+        $resolved = $this->ticketQuery($user)
             ->whereBetween('resolved_at', [$from, $to])
             ->selectRaw('DATE(resolved_at) AS d, COUNT(*) AS c')
             ->groupBy('d')
@@ -524,10 +531,9 @@ class ItReportsController extends Controller
      * @param  array<int, string>  $values
      * @return array<int, array{name: string, value: int}>
      */
-    private function openBy(int $tenantId, string $column, array $values): array
+    private function openBy(string $column, array $values, User $user): array
     {
-        $counts = ItTicket::query()
-            ->forTenant($tenantId)
+        $counts = $this->ticketQuery($user)
             ->whereIn('status', ItTicket::OPEN_STATUSES)
             ->selectRaw("{$column} AS k, COUNT(*) AS c")
             ->groupBy($column)
@@ -541,10 +547,9 @@ class ItReportsController extends Controller
      *
      * @return array<int, array{name: string, count: int}>
      */
-    private function topRequesters(int $tenantId, Carbon $from, Carbon $to): array
+    private function topRequesters(Carbon $from, Carbon $to, User $user): array
     {
-        return ItTicket::query()
-            ->forTenant($tenantId)
+        return $this->ticketQuery($user)
             ->whereBetween('created_at', [$from, $to])
             ->whereNotNull('requester_user_id')
             ->selectRaw('requester_user_id, COUNT(*) AS c')
@@ -562,10 +567,9 @@ class ItReportsController extends Controller
      *
      * @return array<int, array{name: string, open: int}>
      */
-    private function agentWorkload(int $tenantId): array
+    private function agentWorkload(User $user): array
     {
-        return ItTicket::query()
-            ->forTenant($tenantId)
+        return $this->ticketQuery($user)
             ->whereIn('status', ItTicket::OPEN_STATUSES)
             ->whereNotNull('assigned_to_user_id')
             ->selectRaw('assigned_to_user_id, COUNT(*) AS c')
@@ -639,5 +643,11 @@ class ItReportsController extends Controller
     private function emptyRate(): array
     {
         return ['resolved' => 0, 'reopened' => 0, 'rate' => null, 'href' => '/it?tab=tickets'];
+    }
+
+    /** @return Builder<ItTicket> */
+    private function ticketQuery(User $user): Builder
+    {
+        return $this->workAccess->applyViewScope(ItTicket::query(), $user);
     }
 }

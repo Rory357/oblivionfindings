@@ -3,7 +3,7 @@
 namespace App\Http\Requests\It;
 
 use App\Http\Controllers\It\Concerns\StoresItAttachments;
-use App\Models\ItTicket;
+use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -14,23 +14,14 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class StoreTicketCommentRequest extends FormRequest
 {
+    use ConcealsInaccessibleItWork;
     use StoresItAttachments;
 
     public function authorize(): bool
     {
-        /** @var ItTicket $ticket */
-        $ticket = $this->route('ticket');
-        $user = $this->user();
+        $this->visibleTicketOrNotFound();
 
-        if (! $user || ! $user->can('comment', $ticket)) {
-            return false;
-        }
-
-        if ($this->boolean('is_internal') && ! $user->canDo('it.manage')) {
-            return false;
-        }
-
-        return true;
+        return $this->user() !== null;
     }
 
     public function rules(): array

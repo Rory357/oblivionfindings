@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\It;
 
-use App\Models\ItTicket;
+use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -11,13 +11,13 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class ResolveTicketRequest extends FormRequest
 {
+    use ConcealsInaccessibleItWork;
+
     public function authorize(): bool
     {
-        /** @var ItTicket $ticket */
-        $ticket = $this->route('ticket');
-        $user = $this->user();
+        $this->workableTicketOrNotFound();
 
-        return $user !== null && $user->can('resolve', $ticket);
+        return (bool) $this->user()?->canDo('it.manage');
     }
 
     public function rules(): array

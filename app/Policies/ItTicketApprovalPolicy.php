@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Models\ItTicketApproval;
 use App\Models\User;
 
@@ -13,10 +14,13 @@ use App\Models\User;
  */
 class ItTicketApprovalPolicy
 {
+    public function __construct(private readonly ItWorkAccessService $access) {}
+
     /** Approve or reject a pending request — agent work, never your own. */
     public function decide(User $user, ItTicketApproval $approval): bool
     {
-        return $user->canDo('it.manage')
+        return $approval->ticket !== null
+            && $this->access->canWork($user, $approval->ticket)
             && $approval->status === 'pending'
             && (int) $approval->requested_by !== (int) $user->id;
     }

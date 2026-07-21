@@ -2,14 +2,19 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
 use App\Models\ItWorkTask;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class UpdateItWorkTaskRequest extends FormRequest
 {
+    use ConcealsInaccessibleItWork;
+
     public function authorize(): bool
     {
+        $this->workableTaskOrNotFound();
+
         return (bool) $this->user()?->canDo('it.manage');
     }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\It;
 
 use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\Services\ItChangeService;
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
@@ -16,10 +17,12 @@ use App\Models\ItService;
 use App\Models\ItTicket;
 use App\Models\ItTicketLink;
 use App\Models\Site;
+use App\Models\User;
 use DomainException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ItChangeController extends Controller
@@ -28,12 +31,13 @@ class ItChangeController extends Controller
 
     public function __construct(
         private readonly ItChangeService $changeService,
+        private readonly ItWorkAccessService $workAccess,
     ) {}
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', ItChange::class);
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        $user = $request->user();
         $period = $request->validate([
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d'],
@@ -48,7 +52,7 @@ class ItChangeController extends Controller
         ];
 
         $changes = ItChange::query()
-            ->forTenant($tenantId)
+            ->whereHas('ticket', fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user))
             ->with('ticket:id,tenant_id,reference,title,priority,status,workflow_state,next_action,requires_approval,updated_at')
             ->when($filters['type'] !== '', fn ($query) => $query->where('change_type', $filters['type']))
             ->when($filters['risk'] !== '', fn ($query) => $query->where('risk_level', $filters['risk']))
@@ -78,10 +82,12 @@ class ItChangeController extends Controller
     public function store(StoreItChangeRequest $request)
     {
         $this->authorize('create', ItChange::class);
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $data = $this->creationData($user, $request->validated());
 
         try {
-            $change = $this->changeService->create($request->user(), $tenantId, $request->validated());
+            $change = $this->changeService->create($user, $tenantId, $data);
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -91,9 +97,11 @@ class ItChangeController extends Controller
 
     public function show(Request $request, ItChange $change)
     {
+        $user = $request->user();
+        $change->loadMissing('ticket');
+        abort_unless($change->ticket && $this->workAccess->canView($user, $change->ticket), 404);
         $this->authorize('view', $change);
         $tenantId = $this->resolveHrTenantIdForUser($request->user());
-        $this->assertHrTenantAccess($tenantId, $change->tenant_id);
         $change->load(['ticket', 'implementedBy:id,name', 'validatedBy:id,name', 'reviewedBy:id,name']);
         $ticket = $change->ticket;
         $ticket->loadCount(['comments', 'tasks', 'approvals', 'attachments', 'events']);
@@ -146,17 +154,19 @@ class ItChangeController extends Controller
                 'attachments_count' => $ticket->attachments_count,
                 'events_count' => $ticket->events_count,
             ],
-            'links' => $this->presentLinks($links),
-            'options' => $this->options($tenantId),
-            'can' => ['manage' => $request->user()->canDo('it.manage')],
+            'links' => $this->presentLinks($links, $user),
+            'options' => $this->options($tenantId, $user),
+            'can' => ['manage' => $this->workAccess->canWork($user, $ticket)],
         ]);
     }
 
     public function update(UpdateItChangeRequest $request, ItChange $change)
     {
+        $user = $request->user();
+        $change->loadMissing('ticket');
+        abort_unless($change->ticket && $this->workAccess->canWork($user, $change->ticket), 404);
         $this->authorize('update', $change);
         $tenantId = $this->resolveHrTenantIdForUser($request->user());
-        $this->assertHrTenantAccess($tenantId, $change->tenant_id);
 
         try {
             $this->changeService->update($change, $request->user(), $tenantId, $request->validated());
@@ -169,9 +179,11 @@ class ItChangeController extends Controller
 
     public function transition(TransitionItChangeRequest $request, ItChange $change)
     {
+        $user = $request->user();
+        $change->loadMissing('ticket');
+        abort_unless($change->ticket && $this->workAccess->canWork($user, $change->ticket), 404);
         $this->authorize('update', $change);
         $tenantId = $this->resolveHrTenantIdForUser($request->user());
-        $this->assertHrTenantAccess($tenantId, $change->tenant_id);
         $data = $request->validated();
 
         try {
@@ -208,7 +220,7 @@ class ItChangeController extends Controller
     }
 
     /** @return array<string, array<int, array<string, mixed>>> */
-    private function presentLinks(Collection $links): array
+    private function presentLinks(Collection $links, User $user): array
     {
         $values = [
             'services' => [], 'sites' => [], 'devices' => [], 'alerts' => [], 'incidents' => [], 'problems' => [],
@@ -227,9 +239,13 @@ class ItChangeController extends Controller
             } elseif ($link->relationship === 'source_alert' && $target instanceof ControlRoomAlert) {
                 $values['alerts'][] = ['id' => $target->id, 'reference' => $target->reference_number, 'title' => $target->alert_type];
             } elseif ($link->relationship === 'related_incident' && $target instanceof ItTicket) {
-                $values['incidents'][] = $this->ticketOption($target);
+                if ($this->workAccess->canView($user, $target)) {
+                    $values['incidents'][] = $this->ticketOption($target);
+                }
             } elseif ($link->relationship === 'related_problem' && $target instanceof ItTicket) {
-                $values['problems'][] = $this->ticketOption($target);
+                if ($this->workAccess->canView($user, $target)) {
+                    $values['problems'][] = $this->ticketOption($target);
+                }
             }
         }
 
@@ -237,20 +253,20 @@ class ItChangeController extends Controller
     }
 
     /** @return array<string, array<int, array<string, mixed>>> */
-    private function options(int $tenantId): array
+    private function options(int $tenantId, User $user): array
     {
         return [
             'services' => ItService::query()->forTenant($tenantId)->where('is_active', true)->orderBy('name')->limit(100)->get()
                 ->map(fn (ItService $service) => ['id' => $service->id, 'name' => $service->name])->all(),
-            'sites' => Site::query()->where('tenant_id', $tenantId)->where('is_active', true)->orderBy('name')->limit(100)->get()
+            'sites' => Site::query()->whereIn('id', $this->workAccess->approvedSiteIds($user))->where('is_active', true)->where('archived', false)->orderBy('name')->limit(100)->get()
                 ->map(fn (Site $site) => ['id' => $site->id, 'name' => $site->name])->all(),
             'devices' => Device::query()->forTenant($tenantId)->orderBy('name')->limit(100)->get()
                 ->map(fn (Device $device) => ['id' => $device->id, 'name' => $device->name, 'uid' => $device->device_uid])->all(),
             'alerts' => ControlRoomAlert::query()->whereHas('site', fn ($site) => $site->where('tenant_id', $tenantId))->latest('id')->limit(100)->get()
                 ->map(fn (ControlRoomAlert $alert) => ['id' => $alert->id, 'name' => ($alert->reference_number ?: 'Alert '.$alert->id).' · '.$alert->alert_type])->all(),
-            'incidents' => ItTicket::query()->forTenant($tenantId)->whereIn('work_type', ['incident', 'major_incident'])->latest('id')->limit(100)->get()
+            'incidents' => $this->workAccess->applyViewScope(ItTicket::query(), $user)->whereIn('work_type', ['incident', 'major_incident'])->latest('id')->limit(100)->get()
                 ->map(fn (ItTicket $ticket) => $this->ticketOption($ticket))->all(),
-            'problems' => ItTicket::query()->forTenant($tenantId)->where('work_type', 'problem')->latest('id')->limit(100)->get()
+            'problems' => $this->workAccess->applyViewScope(ItTicket::query(), $user)->where('work_type', 'problem')->latest('id')->limit(100)->get()
                 ->map(fn (ItTicket $ticket) => $this->ticketOption($ticket))->all(),
         ];
     }
@@ -291,5 +307,38 @@ class ItChangeController extends Controller
         }
 
         return 'overdue';
+    }
+
+    /** @param array<string, mixed> $data @return array<string, mixed> */
+    private function creationData(User $user, array $data): array
+    {
+        $wide = (bool) ($data['is_organisation_wide'] ?? false);
+        $siteWasSupplied = array_key_exists('site_id', $data);
+        $siteId = $wide
+            ? null
+            : ($siteWasSupplied && $data['site_id'] !== null
+                ? (int) $data['site_id']
+                : $this->workAccess->defaultSiteId($user));
+
+        if ($wide && $siteWasSupplied && $data['site_id'] !== null) {
+            throw ValidationException::withMessages([
+                'site_id' => 'Organisation-wide work cannot also have a Site.',
+            ]);
+        }
+
+        if (! $this->workAccess->canAssignScope($user, $siteId, $wide)) {
+            if ($siteWasSupplied || $wide) {
+                abort(403);
+            }
+
+            throw ValidationException::withMessages([
+                'site_id' => 'Choose an active approved Site for this change.',
+            ]);
+        }
+
+        $data['site_id'] = $siteId;
+        $data['is_organisation_wide'] = $wide;
+
+        return $data;
     }
 }

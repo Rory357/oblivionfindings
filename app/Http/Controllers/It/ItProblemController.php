@@ -4,6 +4,7 @@ namespace App\Http\Controllers\It;
 
 use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\Services\ItProblemService;
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\It\StoreItProblemRequest;
@@ -12,8 +13,10 @@ use App\Http\Requests\It\UpdateItProblemRequest;
 use App\Models\ItProblem;
 use App\Models\ItTicket;
 use App\Models\ItTicketLink;
+use App\Models\User;
 use DomainException;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ItProblemController extends Controller
@@ -22,12 +25,13 @@ class ItProblemController extends Controller
 
     public function __construct(
         private readonly ItProblemService $problemService,
+        private readonly ItWorkAccessService $workAccess,
     ) {}
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', ItProblem::class);
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        $user = $request->user();
         $state = trim((string) $request->query('state', ''));
         $search = trim((string) $request->query('q', ''));
         $period = $request->validate([
@@ -38,7 +42,7 @@ class ItProblemController extends Controller
         $to = (string) ($period['to'] ?? '');
 
         $problems = ItProblem::query()
-            ->forTenant($tenantId)
+            ->whereHas('ticket', fn ($ticket) => $this->workAccess->applyViewScope($ticket, $user))
             ->with('ticket:id,tenant_id,reference,title,priority,status,workflow_state,next_action,updated_at')
             ->when($state !== '', fn ($query) => $query->whereHas('ticket', fn ($ticket) => $ticket->where('workflow_state', $state)))
             ->when($from !== '', fn ($query) => $query->whereDate('created_at', '>=', $from))
@@ -72,10 +76,12 @@ class ItProblemController extends Controller
     public function store(StoreItProblemRequest $request)
     {
         $this->authorize('create', ItProblem::class);
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $data = $this->creationData($user, $request->validated());
 
         try {
-            $problem = $this->problemService->create($request->user(), $tenantId, $request->validated());
+            $problem = $this->problemService->create($user, $tenantId, $data);
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -85,9 +91,10 @@ class ItProblemController extends Controller
 
     public function show(Request $request, ItProblem $problem)
     {
+        $user = $request->user();
+        $problem->loadMissing('ticket');
+        abort_unless($problem->ticket && $this->workAccess->canView($user, $problem->ticket), 404);
         $this->authorize('view', $problem);
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
-        $this->assertHrTenantAccess($tenantId, $problem->tenant_id);
         $problem->load('ticket');
         $ticket = $problem->ticket;
         $ticket->loadCount(['comments', 'tasks', 'approvals', 'attachments', 'events']);
@@ -95,11 +102,15 @@ class ItProblemController extends Controller
         $incidentLinks = $ticket->links()
             ->where('relationship', 'related_incident')
             ->with('linkable')
-            ->get();
+            ->get()
+            ->filter(fn (ItTicketLink $link) => $link->linkable instanceof ItTicket
+                && $this->workAccess->canView($user, $link->linkable));
         $changeLink = $ticket->links()
             ->where('relationship', 'related_change')
             ->with('linkable')
-            ->first();
+            ->get()
+            ->first(fn (ItTicketLink $link) => $link->linkable instanceof ItTicket
+                && $this->workAccess->canView($user, $link->linkable));
 
         return Inertia::render('it/problems/show', [
             'problem' => [
@@ -126,23 +137,23 @@ class ItProblemController extends Controller
             ],
             'incidents' => $incidentLinks->map(fn (ItTicketLink $link) => $this->ticketOption($link->linkable))->values()->all(),
             'permanentFixChange' => $changeLink?->linkable instanceof ItTicket ? $this->ticketOption($changeLink->linkable) : null,
-            'incidentOptions' => ItTicket::query()
-                ->forTenant($tenantId)
+            'incidentOptions' => $this->workAccess->applyViewScope(ItTicket::query(), $user)
                 ->whereIn('work_type', ['incident', 'major_incident'])
                 ->latest('id')->limit(100)->get()->map(fn (ItTicket $candidate) => $this->ticketOption($candidate))->all(),
-            'changeOptions' => ItTicket::query()
-                ->forTenant($tenantId)
+            'changeOptions' => $this->workAccess->applyViewScope(ItTicket::query(), $user)
                 ->where('work_type', 'change')
                 ->latest('id')->limit(100)->get()->map(fn (ItTicket $candidate) => $this->ticketOption($candidate))->all(),
-            'can' => ['manage' => $request->user()->canDo('it.manage')],
+            'can' => ['manage' => $this->workAccess->canWork($user, $ticket)],
         ]);
     }
 
     public function update(UpdateItProblemRequest $request, ItProblem $problem)
     {
+        $user = $request->user();
+        $problem->loadMissing('ticket');
+        abort_unless($problem->ticket && $this->workAccess->canWork($user, $problem->ticket), 404);
         $this->authorize('update', $problem);
         $tenantId = $this->resolveHrTenantIdForUser($request->user());
-        $this->assertHrTenantAccess($tenantId, $problem->tenant_id);
 
         try {
             $this->problemService->update($problem, $request->user(), $tenantId, $request->validated());
@@ -155,9 +166,11 @@ class ItProblemController extends Controller
 
     public function transition(TransitionItProblemRequest $request, ItProblem $problem)
     {
+        $user = $request->user();
+        $problem->loadMissing('ticket');
+        abort_unless($problem->ticket && $this->workAccess->canWork($user, $problem->ticket), 404);
         $this->authorize('update', $problem);
         $tenantId = $this->resolveHrTenantIdForUser($request->user());
-        $this->assertHrTenantAccess($tenantId, $problem->tenant_id);
         $data = $request->validated();
 
         try {
@@ -200,5 +213,38 @@ class ItProblemController extends Controller
             'workflow_state' => $ticket->workflow_state,
             'href' => "/it/tickets/{$ticket->id}",
         ];
+    }
+
+    /** @param array<string, mixed> $data @return array<string, mixed> */
+    private function creationData(User $user, array $data): array
+    {
+        $wide = (bool) ($data['is_organisation_wide'] ?? false);
+        $siteWasSupplied = array_key_exists('site_id', $data);
+        $siteId = $wide
+            ? null
+            : ($siteWasSupplied && $data['site_id'] !== null
+                ? (int) $data['site_id']
+                : $this->workAccess->defaultSiteId($user));
+
+        if ($wide && $siteWasSupplied && $data['site_id'] !== null) {
+            throw ValidationException::withMessages([
+                'site_id' => 'Organisation-wide work cannot also have a Site.',
+            ]);
+        }
+
+        if (! $this->workAccess->canAssignScope($user, $siteId, $wide)) {
+            if ($siteWasSupplied || $wide) {
+                abort(403);
+            }
+
+            throw ValidationException::withMessages([
+                'site_id' => 'Choose an active approved Site for this problem.',
+            ]);
+        }
+
+        $data['site_id'] = $siteId;
+        $data['is_organisation_wide'] = $wide;
+
+        return $data;
     }
 }

@@ -62,6 +62,7 @@ class ItTicket extends Model
         'owner_user_id',
         'asset_id',
         'site_id',
+        'is_organisation_wide',
         'team_id',
         'queue_id',
         'it_service_id',
@@ -116,6 +117,7 @@ class ItTicket extends Model
         'csat_score' => 'integer',
         'requires_approval' => 'boolean',
         'is_sensitive' => 'boolean',
+        'is_organisation_wide' => 'boolean',
         'due_at' => 'datetime',
     ];
 

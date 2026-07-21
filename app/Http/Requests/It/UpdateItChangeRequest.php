@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
 use App\Models\ItChange;
 use App\Models\ItTicket;
 use Illuminate\Foundation\Http\FormRequest;
@@ -9,8 +10,12 @@ use Illuminate\Validation\Rule;
 
 class UpdateItChangeRequest extends FormRequest
 {
+    use ConcealsInaccessibleItWork;
+
     public function authorize(): bool
     {
+        $this->workableChangeOrNotFound();
+
         return (bool) $this->user()?->canDo('it.manage');
     }
 
