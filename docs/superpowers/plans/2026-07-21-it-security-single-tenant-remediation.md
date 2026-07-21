@@ -222,8 +222,8 @@ Only after a repository-wide dependency audit, data backup/restore rehearsal, an
 
 | Task | Status | Evidence |
 | --- | --- | --- |
-| 1. Boundary gate and collision report | Completed | Commit `4eaa0771b`; independently approved 476 path-rule / 3,083-occurrence no-regression baseline; 206-line redacted local development audit; 12 focused tests / 149 assertions |
-| 2. IT access kernel | Pending | Site/team/sensitivity/organisation-wide policy matrix |
+| 1. Boundary gate and collision report | Completed | Commit `4eaa0771b`; independently approved initial 476 path-rule / 3,083-occurrence no-regression baseline; 206-line redacted local development audit; 12 focused tests / 149 assertions |
+| 2. IT access kernel | Completed | Commit `a1696b8c3`; independently approved Site/team/sensitivity/explicit organisation-wide boundary; pre-validation direct-object concealment across ticket, child, approval, merge, and nested-task routes; 18 focused tests / 196 assertions plus parent gate 24 tests / 242 assertions; ratchet reduced to 472 path-rule entries / 2,935 occurrences |
 | 3. High-risk IT ingress and context | Pending | Email/API/context/monitoring/link direct-object tests |
 | 4. Remaining IT refactor | Pending | IT controller/service/regression matrix |
 | 5. Security & Devices access refactor | Pending | Site/privacy/count/export/mutation matrix |
