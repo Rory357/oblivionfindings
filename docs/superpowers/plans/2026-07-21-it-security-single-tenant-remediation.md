@@ -1,6 +1,6 @@
 # IT, Security & Devices, and Monitoring Single-Tenant Remediation Plan
 
-> **Status:** In progress; Tasks 1-7 are complete and Task 8 is next.
+> **Status:** In progress; Tasks 1-8 are complete and Task 9 is next.
 >
 > **Product boundary:** Oblivion Findings is one application for one operating organisation across all configured sites. Site access, canonical record ownership, role/capability, direct-object denial, and privacy policy are the security boundaries. A legacy `tenant_id` or `organization_id` column is storage compatibility only and must never decide access.
 >
@@ -206,6 +206,8 @@ Add forward global constraints, after collision handling, for:
 
 Add replacement non-tenant indexes before switching query paths. Update `ItTicket::nextReference()` to serialize against the global reference identity and make inbound email reject any pre-existing ambiguity. Stop active writers from sourcing legacy values from authenticated users; if a required compatibility field remains, one application-level compatibility provider supplies it without influencing access.
 
+**Status: Completed in `4cf048d40`.** Fourteen application-global identities now reject collisions before schema mutation, and active IT/Security tables no longer retain legacy-leading operational indexes. Ticket references allocate from the shared row-locked sequence, lift their floor above imported/manual references, and preserve the established constraint name while MySQL atomically changes it to a global identity so pre-release queue workers continue recognizing collisions. Inbound email fails closed on pre-migration reference ambiguity. Forward migration, exact rollback column restoration, runtime allocation/ingress, broad regression, architecture, static, and independent-review gates passed.
+
 ## Task 9: Replace fixtures, copy, active docs, and close the architecture gate
 
 Replace fictional cross/foreign-tenant tests in the IT, Security & Devices, and Monitoring suites with one-organisation cases covering allowed/denied Sites, restricted roles, unrelated people/assets/devices, sensitive work, accidental null-Site rows, forged IDs, bulk mixtures, exports, collectors, and explicit organisation-wide/all-sites authority.
@@ -239,7 +241,7 @@ Only after a repository-wide dependency audit, data backup/restore rehearsal, an
 | 5. Security & Devices access refactor | Completed | Commit `401db9b58`; canonical Site/Room/Client/staff/vehicle/Asset/Device visibility with privacy, direct-object, count, option, export, mutation, unassigned-stock, and explicit all-Sites coverage; Client Profile tracker/location/geofence provenance hardened; independent review approved |
 | 6. Provider connection refactor | Completed | Commit `401db9b58`; global application provider identity with Site-scoped credentials/mappings/capabilities/sync/projections; canonical UniFi/Milesight/Queclink device resolution, global webhook idempotency, write-only secrets, canonical Queclink audit/history, and collision-preflight uniqueness; consolidated 105 tests / 1,076 assertions plus fresh Client Profile 14 / 301, frontend 4 files / 20 tests, TypeScript, Pint, 85-file PHP syntax, diff, client 4,993-module and SSR 1,645-module builds; independent review approved |
 | 7. Monitoring foundation refactor | Completed | Commit `cfb078645`; global collector/profile identity with collision preflight, canonical Device/Site/collector enforcement, immutable observation provenance, nullable zero-downtime expansion plus explicit fail-closed reconciliation, soft-delete and collision coverage; broad matrix 134 passing tests / 1,234 assertions with the sole stale offline-call expectation corrected by a fresh 9-test / 56-assertion resolver run, and Device Profile fresh at 8 / 145; architecture gate 7 / 269 with ratchet reduced to 229 path-rule entries / 1,185 occurrences; TypeScript, Pint, 34-file PHP syntax, diff, client 4,993-module and SSR 1,645-module builds; independent review approved |
-| 8. Data and global identity migration | Pending | Collision resolution, migration, uniqueness, and query-plan evidence |
+| 8. Data and global identity migration | Completed | Commit `4cf048d40`; 14 collision-gated global identities; zero legacy-leading indexes across active IT/Security tables; atomic rolling-worker-compatible ticket constraint and shared row-locked sequence; inbound ambiguity fail-closed; fresh MySQL migration/rollback 31 / 64; post-fix runtime 20 / 317; broad affected matrix 381 / 3,290; architecture 7 / 269 at 229 entries / 1,183 occurrences; TypeScript, Pint, PHP syntax, diff, and independent review passed |
 | 9. Fixtures/docs/full acceptance | Pending | Architecture, backend, frontend, build, and desktop browser gates |
 | 10. Legacy column removal | Optional | Separate approval and dependency/restore evidence |
 
