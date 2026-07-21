@@ -1,0 +1,232 @@
+# IT, Security & Devices, and Monitoring Single-Tenant Remediation Plan
+
+> **Status:** Approved architecture correction; implementation pending.
+>
+> **Product boundary:** Oblivion Findings is one application for one operating organisation across all configured sites. Site access, canonical record ownership, role/capability, direct-object denial, and privacy policy are the security boundaries. A legacy `tenant_id` or `organization_id` column is storage compatibility only and must never decide access.
+>
+> **Safety rule:** Do not remove an existing tenant filter until the replacement site, ownership, queue/team, sensitivity, or privacy rule is tested. Removing filters mechanically would expose stale and restricted records.
+
+## Goal
+
+Remove active multi-tenant product and authorization behaviour from IT & Support, Security & Devices, and native Monitoring without weakening their real access boundaries. Replace tenant-derived controller/service inputs, model scopes, provider ownership, tests, UI copy, and active documentation. Add forward migrations for global application identities only after collision and provenance evidence is reviewed.
+
+This plan is authoritative for the single-tenant cleanup named in the IT/Security/Monitoring completion goal. The native monitoring runtime plan remains authoritative for protocol and runtime delivery work.
+
+## Confirmed risks
+
+The 2026-07-21 read-only audit found 264 active tenant-resolver or `forTenant` references across 48 committed production files in the three target domains. The highest-risk confirmed paths are:
+
+- all ten main IT controllers reuse `ResolvesHrTenant` as an authorization partition;
+- `ItTicketContextPresenter` exposes linked device, Control Room, Problem, Change, and Major Incident context by tenant equality rather than the viewer's actual site/privacy access;
+- `ItTicketPolicy::view()` treats every `it.view` user as an all-ticket agent and does not account for site or sensitivity;
+- `InboundEmailIngestor` accepts a known ticket reference from any recognized staff sender without requester, watcher, site, sensitivity, or ticket-policy authorization;
+- allowed-site service identities can operate null-site tickets through `ItApiWorkItemController`;
+- `BuildsItOptions::assetOptions()` returns active assets without site or asset-policy filtering;
+- `securityDevices.integrations.manage` currently behaves as an all-sites/device-visibility bypass, including tracker, healthcare, Client, and staff assignments;
+- provider and collector ownership is expressed as tenant-wide identity rather than one application connection plus approved site/network/device scope;
+- tenant-leading unique keys and indexes would become incorrect or inefficient if query filters were removed first.
+
+## Required access kernels
+
+### IT work access
+
+Create one `ItWorkAccessService` consumed by policies, HTTP controllers, service API, email ingress, presenters, bulk/export paths, and child-record services. It must combine:
+
+- requester and requested-for ownership;
+- approved site access;
+- queue/team responsibility;
+- an explicit organisation-wide IT capability;
+- a separate sensitive-work capability;
+- direct-object 404 behaviour;
+- parent-derived access for comments, attachments, events, approvals, links, tasks, deliveries, Problems, Changes, and Major Incidents;
+- default denial for `site_id = null` unless the record is explicitly marked organisation-wide.
+
+### Security & Devices access
+
+Refactor `SecurityDevicesAccessService` so visibility is derived from:
+
+- active canonical Site assignment or Room parent Site;
+- Client policy and Client Site;
+- current staff/HR Site;
+- vehicle/Asset policy and canonical Site provenance;
+- device class and privacy rules;
+- explicit inventory-manager access to unassigned stock;
+- a dedicated all-sites permission that is not implied by integration administration;
+- provider credentials governed by integration permission and mappings governed by approved Site;
+- collector scope governed by approved Site, network, device, and capability;
+- monitor/observation scope derived from canonical Device and collector Site.
+
+## Task 1: Lock the behavioural boundary and produce collision evidence
+
+**Create:**
+
+- `tests/Architecture/ItSecuritySingleTenantBoundaryTest.php`
+- `app/Console/Commands/AuditItSecuritySingleTenantData.php`
+- `docs/audits/it-security-single-tenant-data-audit.md`
+
+The architecture test scans only `app/Domain/It`, `app/Domain/Monitoring`, `app/Domain/SecurityDevices`, the ten IT controllers and their IT concerns, IT API middleware/controller, IT listeners/policies/models, the named IT/Security frontend pages, and active IT/Security/monitoring documents. It rejects active `forTenant`, `scopeForTenant`, tenant resolvers/parameters, tenant-based comparisons/queries, `canViewAllTenantSites`, `*MatchesTenant`, `tenantSecret`, user-facing tenant copy, fictional tenant acceptance fixtures, and new tenant-partition migrations. Explicit legacy storage fields remain temporarily allowlisted.
+
+The read-only command reports, without mutation:
+
+- distinct legacy IDs and contradictory Site/record provenance;
+- duplicate values that would collide under global keys;
+- orphan links and provider mappings;
+- null-site tickets and whether they have evidence of organisation-wide intent;
+- unassigned or ambiguously assigned devices;
+- duplicate ticket references and inbound-email ambiguity;
+- tenant-leading indexes that need replacements.
+
+Commit the report as evidence. No normalization occurs in this task.
+
+## Task 2: Add explicit IT site, team, sensitivity, and organisation-wide access
+
+**Create/modify:**
+
+- `app/Domain/It/Services/ItWorkAccessService.php`
+- `app/Policies/ItTicketPolicy.php`
+- IT Problem/Change/Major Incident/Task/KB/Provisioning policies as required
+- a forward migration for an explicit organisation-wide scope marker if the current schema cannot distinguish it from accidental `site_id = null`
+- permission seeding for organisation-wide IT access and sensitive-work access
+- focused policy/access tests
+
+Start with denied tests for a same-organisation technician at an unapproved Site, unrelated requester, wrong queue/team, sensitive work without the sensitive capability, accidental null-Site work, and forged direct IDs. Prove allowed requester, approved-Site technician, responsible queue/team, explicit organisation-wide manager, and sensitive-work operator paths.
+
+Child records must delegate to the parent work item's access. Bulk actions, counts, search, filters, options, exports, and direct show/mutation routes must share the same boundary.
+
+## Task 3: Close high-risk IT ingress and linked-context paths
+
+**Modify first:**
+
+- `app/Domain/It/Presenters/ItTicketContextPresenter.php`
+- `app/Domain/It/Services/InboundEmailIngestor.php`
+- `app/Http/Controllers/Api/V1/ItApiWorkItemController.php`
+- `app/Http/Middleware/AuthenticateItServiceIdentity.php`
+- `app/Http/Middleware/RecordItApiRequest.php`
+- `app/Domain/It/Services/ItApiWorkItemService.php`
+- `app/Domain/It/Services/ItTicketLinkService.php`
+- `app/Listeners/It/CreateOrUpdateMonitoringTicket.php`
+- attachment, bulk, export, and delivery paths reached by those workflows
+
+Linked devices must pass `SecurityDevicesAccessService::visibleDevices()` or a stricter canonical equivalent for the exact viewer. Linked Control Room alerts must pass the shared `UserSiteAccessService` alert scope and the alert permission. Related IT records must pass their policy, Site, and sensitivity boundary; tenant equality is never sufficient.
+
+Inbound email globally matches one immutable ticket reference, then authorizes the sender as requester, requested-for user, watcher, assigned agent/team, or explicit mailbox principal through `ItWorkAccessService`. Unknown, ambiguous, sensitive, or unauthorized replies are quarantined with bounded evidence and no ticket comment.
+
+Service identities authenticate by active credential and execution account, then by explicit abilities, allowed Sites, permitted work types/fields, and sensitivity policy. Null-Site work is denied unless the identity has a separate organisation-wide ability. Every direct object and mutation is reauthorized at use time.
+
+Monitoring-created tickets use canonical Device/Site evidence and a system principal with only the required operation, never a tenant-derived shortcut.
+
+## Task 4: Refactor all remaining IT controllers and services
+
+Remove `ResolvesHrTenant` from:
+
+- `ItCatalogController`
+- `ItChangeController`
+- `ItKbController`
+- `ItMajorIncidentController`
+- `ItProblemController`
+- `ItProvisioningController`
+- `ItReportsController`
+- `ItServiceManagementSetupController`
+- `ItTicketController`
+- `ItWorkTaskController`
+
+Replace tenant arguments and model scopes throughout IT catalogue, routing, lifecycle, provisioning, setup, email, reporting, work transition, Problems, Changes, Major Incidents, tasks, queues, teams, services, and KB with the Task 2 access kernel and global application configuration queries. `ItStaffDirectory` must use active/approved account, role/capability, team/queue, and approved-Site criteria rather than organisation filtering.
+
+Replace `ItTransitionInput::$tenantId`, tenant-shaped email context, and tenant-derived audit inputs with canonical work item, actor/system-principal, Site, queue/team, and bounded audit context.
+
+## Task 5: Replace Security & Devices tenant access with canonical visibility
+
+Refactor `SecurityDevicesAccessService`, `ResolvesDeviceTenant`, `DeviceRegistryService`, `DeviceGroupAutoRuleService`, Device/Profile/Discovery/Estate/Facilities/Healthcare/Tracking/Network/Monitoring/Settings presenters, controller queries, exports, and mutations.
+
+Required tests use one organisation with allowed and denied Sites, hidden Clients/staff/assets, inaccessible Rooms, unassigned stock, ambiguous assignments, site-limited users, inventory managers, integration managers, and explicit all-sites operators. Prove:
+
+- same-organisation different-Site denial;
+- Client/staff/vehicle privacy;
+- direct-ID denial and zero mutation;
+- count/search/filter/export parity;
+- integration administration does not imply all-device visibility;
+- unassigned stock is inventory-manager only;
+- explicit all-sites behavior is separately granted and audited.
+
+Do not remove tenant filters until each caller uses the canonical replacement.
+
+## Task 6: Rename and govern provider connections as single-application resources
+
+Replace tenant-wide provider terminology and behavior in UniFi, Milesight, Queclink, integration services, controllers, presenters, and frontend contracts:
+
+- `IntegrationTenantSecret` and `tenantSecret` become an application/provider connection secret contract;
+- provider `resolveTenantId()` methods are removed;
+- one provider connection is globally identified per application where the provider supports it;
+- Site credentials, mappings, sync cursors, capabilities, and device projections remain Site-scoped;
+- Queclink Device/Asset/history access uses canonical device and asset visibility, not tenant equality;
+- audit records retain canonical provider connection, Site, Device, actor, and bounded outcome.
+
+Update active UI copy such as “Tenant scope” and “tenant-wide.” Secret values remain write-only and never appear in props, logs, exceptions, or audits.
+
+## Task 7: Remove active tenant behavior from native Monitoring foundations
+
+Remove `scopeForTenant` and active tenant propagation from `Monitor`, `MonitoringCollector`, `MonitoringProfile`, `MonitorObservation`, factories, presenters, listeners, and tests. Collectors are globally identified and Site-scoped. Profiles are globally named unless an explicit Site override is designed. Monitors derive scope from their canonical Device and optional collector Site. Observations inherit immutable monitor/device/site evidence, not a tenant partition.
+
+Add a forward migration after collision evidence:
+
+- `monitoring_collectors(tenant_id, collector_uuid)` to global `collector_uuid`;
+- `monitoring_profiles(tenant_id, name)` to global `name`;
+- tenant-leading monitor/observation indexes to non-tenant state/time/device/source indexes.
+
+Legacy columns may remain temporarily only when a zero-downtime compatibility writer requires them; the application must not query them for access.
+
+## Task 8: Normalize data and replace IT/Security global identities and indexes
+
+Use the Task 1 report to normalize or quarantine contradictions. Never merge or expose records merely because an old tenant value matches.
+
+Add forward global constraints, after collision handling, for:
+
+- ticket reference;
+- SLA priority;
+- KB slug;
+- mailbox provider connection;
+- team name, queue key, service key, catalogue slug;
+- catalogue requester/idempotency identity;
+- provisioning workflow source-event key;
+- Device Group name;
+- integration provider connection and provider event identity;
+- Queclink preset slug.
+
+Add replacement non-tenant indexes before switching query paths. Update `ItTicket::nextReference()` to serialize against the global reference identity and make inbound email reject any pre-existing ambiguity. Stop active writers from sourcing legacy values from authenticated users; if a required compatibility field remains, one application-level compatibility provider supplies it without influencing access.
+
+## Task 9: Replace fixtures, copy, active docs, and close the architecture gate
+
+Replace fictional cross/foreign-tenant tests in the IT, Security & Devices, and Monitoring suites with one-organisation cases covering allowed/denied Sites, restricted roles, unrelated people/assets/devices, sensitive work, accidental null-Site rows, forged IDs, bulk mixtures, exports, collectors, and explicit organisation-wide/all-sites authority.
+
+Rename/remove active product and code language including `tenantId`, `resolveTenantId`, `resolveDeviceTenantId`, `resolveHrTenantIdForUser`, `forTenant`, `scopeForTenant`, `canViewAllTenantSites`, `tenantUserOptions`, `tenantSecret`, “same tenant,” “tenant-wide,” “tenant-scoped,” and “foreign tenant.” Compatibility schema field names stay only in the architecture allowlist and migration/storage adapters.
+
+Update at minimum:
+
+- `docs/it-support-security-devices-completion-goal.md`
+- `docs/it-support-service-api-v1.md`
+- `docs/security-devices-restructure-plan.md`
+- `docs/superpowers/plans/2026-07-18-it-support-service-management-expansion.md`
+- affected Security & Devices and IT React props/copy
+
+Run focused domain suites, the complete IT/Security/Monitoring backend matrix, frontend tests, TypeScript, ESLint, client build, SSR build, migration/collision verification, route/schedule checks, architecture gates, and standard/compact desktop browser acceptance. No mobile acceptance is required.
+
+## Optional Task 10: Remove legacy columns
+
+Only after a repository-wide dependency audit, data backup/restore rehearsal, and separate approval, remove obsolete legacy columns and indexes in child-to-parent order. This optional schema simplification is not required to prove single-tenant behavior; Tasks 1–9 are required.
+
+## Completion ledger
+
+| Task | Status | Evidence |
+| --- | --- | --- |
+| 1. Boundary gate and collision report | Pending | Architecture test and committed read-only report |
+| 2. IT access kernel | Pending | Site/team/sensitivity/organisation-wide policy matrix |
+| 3. High-risk IT ingress and context | Pending | Email/API/context/monitoring/link direct-object tests |
+| 4. Remaining IT refactor | Pending | IT controller/service/regression matrix |
+| 5. Security & Devices access refactor | Pending | Site/privacy/count/export/mutation matrix |
+| 6. Provider connection refactor | Pending | Secret/capability/Site mapping tests and UI contracts |
+| 7. Monitoring foundation refactor | Pending | Global collector/profile and canonical Device/Site tests |
+| 8. Data and global identity migration | Pending | Collision resolution, migration, uniqueness, and query-plan evidence |
+| 9. Fixtures/docs/full acceptance | Pending | Architecture, backend, frontend, build, and desktop browser gates |
+| 10. Legacy column removal | Optional | Separate approval and dependency/restore evidence |
+
+The goal is not complete until Tasks 1–9 are proven. Legacy column removal may remain deferred, but no active product, authorization, query, API, UI, test, or current document may continue to present Oblivion Findings as multi-tenant.
