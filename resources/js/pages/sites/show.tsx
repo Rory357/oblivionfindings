@@ -38,7 +38,7 @@ import {
 } from './tabs/checklists';
 import { SiteProfileClients, type SiteClientsData } from './tabs/clients';
 import { SiteProfileContacts, type SiteContactsData } from './tabs/contacts';
-import { SiteProfileDocuments } from './tabs/documents';
+import { SiteProfileDocuments, type SiteDocumentsData } from './tabs/documents';
 import { SiteProfileDrills, type SiteDrillsData } from './tabs/drills';
 import {
     SiteProfileEmergencyPlan,
@@ -72,7 +72,7 @@ import {
     SiteProfileRiskAssessments,
     type SiteRiskAssessmentsData,
 } from './tabs/risk-assessments';
-import { SiteProfileServices } from './tabs/services';
+import { SiteProfileServices, type SiteServicesData } from './tabs/services';
 import {
     SiteProfileShiftCoverage,
     type SiteShiftCoverageData,
@@ -92,7 +92,10 @@ import type {
     SiteProfileDataProp,
     SiteProfilePermissionMap,
 } from './tabs/types';
-import { SiteProfileVendors } from './tabs/vendors';
+import {
+    SiteProfileVendors,
+    type SiteVendorsCredentialsData,
+} from './tabs/vendors';
 
 export type SiteProfileSite = {
     id: number;
@@ -258,10 +261,10 @@ export type SiteProfileProps = {
     fleetData?: SiteFleetData;
     hardwareData?: SiteHardwareData;
     planData?: SitePlanData;
-    documentsData?: SiteProfileSummaryModule;
+    documentsData?: SiteDocumentsData;
     financialsData?: SiteProfileFinancialsModule;
-    vendorsCredentialsData?: SiteProfileSummaryModule;
-    servicesData?: SiteProfileSummaryModule;
+    vendorsCredentialsData?: SiteVendorsCredentialsData;
+    servicesData?: SiteServicesData;
 };
 
 const QUICK_ACTION_ICONS: Record<string, LucideIcon> = {
@@ -779,11 +782,7 @@ function SiteProfileContent({
         case 'plan':
             return <SiteProfilePlan data={tabData as SitePlanData} />;
         case 'documents':
-            return (
-                <SiteProfileDocuments
-                    data={tabData as SiteProfileSummaryModule}
-                />
-            );
+            return <SiteProfileDocuments data={tabData as SiteDocumentsData} />;
         case 'financials':
             return (
                 <SiteProfileFinancials
@@ -793,15 +792,11 @@ function SiteProfileContent({
         case 'vendors':
             return (
                 <SiteProfileVendors
-                    data={tabData as SiteProfileSummaryModule}
+                    data={tabData as SiteVendorsCredentialsData}
                 />
             );
         case 'services':
-            return (
-                <SiteProfileServices
-                    data={tabData as SiteProfileSummaryModule}
-                />
-            );
+            return <SiteProfileServices data={tabData as SiteServicesData} />;
     }
 
     return (

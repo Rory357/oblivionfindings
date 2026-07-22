@@ -1,19 +1,10 @@
-import {
-    SiteProfileModuleSummary,
-    type SiteProfileSummaryModule,
-} from './module-summary-panel';
+import { SiteDocumentsSurface, type SiteDocumentsProps } from '../documents';
 
-export function SiteProfileDocuments({
-    data,
-}: {
-    data: SiteProfileSummaryModule;
-}) {
-    return (
-        <SiteProfileModuleSummary
-            label="Documents"
-            description="Recent Site documents and expiry status. Uploads, folders, versions, and document changes remain in the Site Documents workspace."
-            data={data}
-            actionLabel="Open Site Documents"
-        />
-    );
+export type SiteDocumentsData = SiteDocumentsProps & {
+    locked?: boolean;
+    href: string;
+};
+
+export function SiteProfileDocuments({ data }: { data: SiteDocumentsData }) {
+    return <SiteDocumentsSurface {...data} embedded />;
 }

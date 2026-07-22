@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,7 +21,6 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     CheckCircle2,
@@ -36,7 +36,8 @@ import {
     Trash2,
     Upload,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { ConfirmAction } from './_confirm-action';
 import {
     SITE_DOCUMENT_CATEGORIES,
     formatSiteDocumentFileSize,
@@ -46,7 +47,6 @@ import {
     isSiteDocumentExpiringSoon,
     type SiteDocumentRecord,
 } from './_document-helpers';
-import { ConfirmAction } from './_confirm-action';
 
 type Site = {
     id: number;
@@ -60,13 +60,42 @@ type DocumentFolder = {
     name: string;
 };
 
-type Props = {
+export type SiteDocumentsProps = {
     site: Site;
     can_edit: boolean;
     folders?: DocumentFolder[];
     documents: SiteDocumentRecord[];
     recommendedDocuments?: RecommendedDocument[];
 };
+
+function SiteDocumentsFrame({
+    embedded,
+    site,
+    labels,
+    children,
+}: {
+    embedded: boolean;
+    site: Site;
+    labels?: Record<string, string>;
+    children: ReactNode;
+}) {
+    if (embedded) return <Fragment>{children}</Fragment>;
+
+    return (
+        <AppLayout
+            breadcrumbs={[
+                {
+                    title: labels?.['site.plural'] ?? 'Sites',
+                    href: '/sites',
+                },
+                { title: site.name, href: `/sites/${site.id}` },
+                { title: 'Documents', href: `/sites/${site.id}/documents` },
+            ]}
+        >
+            {children}
+        </AppLayout>
+    );
+}
 
 type DocumentForm = {
     file: File | null;
@@ -88,13 +117,14 @@ type RecommendedDocument = {
     category: string;
 };
 
-export default function SiteDocuments({
+export function SiteDocumentsSurface({
     site,
     can_edit,
     folders = [],
     documents,
     recommendedDocuments = [],
-}: Props) {
+    embedded = false,
+}: SiteDocumentsProps & { embedded?: boolean }) {
     const { labels } = usePage().props as {
         labels?: Record<string, string>;
     };
@@ -216,10 +246,12 @@ export default function SiteDocuments({
     };
 
     const visibleFolders = useMemo(
-        () => Object.entries(folderCounts).sort(([a], [b]) => a.localeCompare(b)),
+        () =>
+            Object.entries(folderCounts).sort(([a], [b]) => a.localeCompare(b)),
         [folderCounts],
     );
-    const isEmpty = filesInCurrentView.length === 0 && visibleFolders.length === 0;
+    const isEmpty =
+        filesInCurrentView.length === 0 && visibleFolders.length === 0;
 
     const openUpload = (folder: string | null = currentFolder) => {
         uploadForm.setData('folder', folder ?? '');
@@ -273,58 +305,88 @@ export default function SiteDocuments({
     };
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                {
-                    title: labels?.['site.plural'] ?? 'Sites',
-                    href: '/sites',
-                },
-                { title: site.name, href: `/sites/${site.id}` },
-                { title: 'Documents', href: `/sites/${site.id}/documents` },
-            ]}
-        >
-            <Head title={`Documents - ${site.name}`} />
+        <SiteDocumentsFrame embedded={embedded} site={site} labels={labels}>
+            {!embedded ? <Head title={`Documents - ${site.name}`} /> : null}
 
             <PageLayout
                 hero={
-                    <PageHero
-                        icon={FileText}
-                        backHref={`/sites/${site.id}`}
-                        title="Documents"
-                        description={`${site.name} document library`}
-                        stats={[
-                            { label: 'Total', value: stats.total },
-                            { label: 'Folders', value: stats.folders },
-                            { label: 'Expiring', value: stats.expiring },
-                            { label: 'Expired', value: stats.expired },
-                        ]}
-                        actions={
-                            can_edit ? (
-                                <>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                        onClick={() => setShowNewFolder(true)}
-                                    >
-                                        <FolderPlus className="h-4 w-4" />
-                                        New Folder
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        className="gap-1.5 bg-primary hover:bg-primary"
-                                        onClick={() => openUpload()}
-                                    >
-                                        <Upload className="h-4 w-4" />
-                                        Upload Document
-                                    </Button>
-                                </>
-                            ) : null
-                        }
-                    />
+                    embedded ? (
+                        <Card>
+                            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h2 className="text-lg font-semibold">
+                                        Site documents
+                                    </h2>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        {stats.total} files in {stats.folders}{' '}
+                                        folders · {stats.expiring} expiring ·{' '}
+                                        {stats.expired} expired
+                                    </p>
+                                </div>
+                                {can_edit ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                                setShowNewFolder(true)
+                                            }
+                                        >
+                                            <FolderPlus className="mr-1.5 h-4 w-4" />
+                                            New Folder
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => openUpload()}
+                                        >
+                                            <Upload className="mr-1.5 h-4 w-4" />
+                                            Upload Document
+                                        </Button>
+                                    </div>
+                                ) : null}
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <PageHero
+                            icon={FileText}
+                            backHref={`/sites/${site.id}`}
+                            title="Documents"
+                            description={`${site.name} document library`}
+                            stats={[
+                                { label: 'Total', value: stats.total },
+                                { label: 'Folders', value: stats.folders },
+                                { label: 'Expiring', value: stats.expiring },
+                                { label: 'Expired', value: stats.expired },
+                            ]}
+                            actions={
+                                can_edit ? (
+                                    <>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                            onClick={() =>
+                                                setShowNewFolder(true)
+                                            }
+                                        >
+                                            <FolderPlus className="h-4 w-4" />
+                                            New Folder
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            className="gap-1.5 bg-primary hover:bg-primary"
+                                            onClick={() => openUpload()}
+                                        >
+                                            <Upload className="h-4 w-4" />
+                                            Upload Document
+                                        </Button>
+                                    </>
+                                ) : null
+                            }
+                        />
+                    )
                 }
             >
-
                 {currentFolder && (
                     <div className="flex items-center gap-2 text-sm">
                         <Button
@@ -444,7 +506,9 @@ export default function SiteDocuments({
                                                     size="sm"
                                                     variant="outline"
                                                     onClick={() =>
-                                                        openSuggestedUpload(document)
+                                                        openSuggestedUpload(
+                                                            document,
+                                                        )
                                                     }
                                                 >
                                                     Upload
@@ -469,28 +533,31 @@ export default function SiteDocuments({
                     </Card>
                 ) : viewMode === 'grid' ? (
                     <div className="space-y-6">
-                        {currentFolder === null && visibleFolders.length > 0 && (
-                            <div>
-                                <div className="mb-2 flex items-center gap-2">
-                                    <FolderOpen className="h-4 w-4 text-primary" />
-                                    <span className="text-sm font-semibold">
-                                        Folders
-                                    </span>
+                        {currentFolder === null &&
+                            visibleFolders.length > 0 && (
+                                <div>
+                                    <div className="mb-2 flex items-center gap-2">
+                                        <FolderOpen className="h-4 w-4 text-primary" />
+                                        <span className="text-sm font-semibold">
+                                            Folders
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                                        {visibleFolders.map(
+                                            ([folder, count]) => (
+                                                <FolderTile
+                                                    key={folder}
+                                                    folder={folder}
+                                                    count={count}
+                                                    onOpen={() =>
+                                                        setCurrentFolder(folder)
+                                                    }
+                                                />
+                                            ),
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                                    {visibleFolders.map(([folder, count]) => (
-                                        <FolderTile
-                                            key={folder}
-                                            folder={folder}
-                                            count={count}
-                                            onOpen={() =>
-                                                setCurrentFolder(folder)
-                                            }
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                            )}
 
                         {filesInCurrentView.length > 0 && (
                             <div>
@@ -602,17 +669,14 @@ export default function SiteDocuments({
                                 uploadForm.processing || !uploadForm.data.file
                             }
                             onClick={() =>
-                                uploadForm.post(
-                                    `/sites/${site.id}/documents`,
-                                    {
-                                        forceFormData: true,
-                                        preserveScroll: true,
-                                        onSuccess: () => {
-                                            uploadForm.reset();
-                                            setShowUpload(false);
-                                        },
+                                uploadForm.post(`/sites/${site.id}/documents`, {
+                                    forceFormData: true,
+                                    preserveScroll: true,
+                                    onSuccess: () => {
+                                        uploadForm.reset();
+                                        setShowUpload(false);
                                     },
-                                )
+                                })
                             }
                         >
                             Upload
@@ -707,8 +771,12 @@ export default function SiteDocuments({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </AppLayout>
+        </SiteDocumentsFrame>
     );
+}
+
+export default function SiteDocuments(props: SiteDocumentsProps) {
+    return <SiteDocumentsSurface {...props} />;
 }
 
 function FolderTile({
@@ -1063,7 +1131,9 @@ function DocumentFormFields({
                             <SelectValue placeholder="Select..." />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="__none__">No category</SelectItem>
+                            <SelectItem value="__none__">
+                                No category
+                            </SelectItem>
                             {SITE_DOCUMENT_CATEGORIES.map((category) => (
                                 <SelectItem
                                     key={category.value}

@@ -20,11 +20,19 @@ describe('site profile admin ownership', () => {
 
     it('keeps the complete Site-owned Documents workspace in profile', () => {
         const documents = readFileSync(resolve(tabs, 'documents.tsx'), 'utf8');
+        const surface = readFileSync(
+            resolve(root, 'resources/js/pages/sites/documents.tsx'),
+            'utf8',
+        );
 
         expect(documents).not.toContain('SiteProfileModuleSummary');
-        expect(documents).toContain('download');
-        expect(documents).toContain('upload');
-        expect(documents).toContain('expiry');
+        expect(documents).toContain('SiteDocumentsSurface');
+        expect(surface).toContain('uploadForm');
+        expect(surface).toContain('showNewFolder');
+        expect(surface).toContain('editForm');
+        expect(surface).toContain('deleteDocument');
+        expect(surface).toContain('Download');
+        expect(surface).toContain('expiry_date');
     });
 
     it('makes Finance the primary owner and the house ledger secondary', () => {
@@ -33,26 +41,35 @@ describe('site profile admin ownership', () => {
             'utf8',
         );
         const backend = readFileSync(
-            resolve(root, 'app/Services/Sites/SiteProfileData.php'),
+            resolve(
+                root,
+                'app/Services/Sites/Profile/SiteProfileAdminPresenter.php',
+            ),
             'utf8',
         );
 
-        expect(financials).toContain('SiteLedgerSurface');
+        expect(financials).toContain('SiteLedgerPanel');
         expect(financials).toContain('Finance');
         expect(backend).toContain("canDo('sites.ledger.view')");
+        expect(backend).toContain('HouseLedgerPresenter::payload');
     });
 
     it('restores vendor and credential registers while secrets stay separate', () => {
         const vendors = readFileSync(resolve(tabs, 'vendors.tsx'), 'utf8');
         const backend = readFileSync(
-            resolve(root, 'app/Services/Sites/SiteProfileData.php'),
+            resolve(
+                root,
+                'app/Services/Sites/Profile/SiteProfileAdminPresenter.php',
+            ),
             'utf8',
         );
 
         expect(vendors).not.toContain('SiteProfileModuleSummary');
         expect(vendors).toMatch(/Credential.*Dialog/);
         expect(vendors).toMatch(/Vendor.*Dialog/);
-        expect(vendors).toContain('audit');
+        expect(vendors).toContain('AuditLogDialog');
+        expect(vendors).toContain('RemoveTotpDialog');
+        expect(vendors).toContain('ShowCredentialDialog');
         expect(backend).not.toContain("'encrypted_value'");
         expect(backend).not.toContain("'totp_secret_encrypted'");
     });
@@ -60,7 +77,10 @@ describe('site profile admin ownership', () => {
     it('keeps the complete Site-context Services register', () => {
         const services = readFileSync(resolve(tabs, 'services.tsx'), 'utf8');
         const backend = readFileSync(
-            resolve(root, 'app/Services/Sites/SiteProfileData.php'),
+            resolve(
+                root,
+                'app/Services/Sites/Profile/SiteProfileAdminPresenter.php',
+            ),
             'utf8',
         );
 

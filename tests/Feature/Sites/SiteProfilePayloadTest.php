@@ -166,7 +166,8 @@ class SiteProfilePayloadTest extends TestCase
         $response = $this->actingAs($this->admin)
             ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'vendorsCredentialsData'))
             ->assertOk()
-            ->assertJsonPath('props.vendorsCredentialsData.summary.credentials', 1);
+            ->assertJsonCount(1, 'props.vendorsCredentialsData.credentials')
+            ->assertJsonPath('props.vendorsCredentialsData.credentials.0.label', 'Alarm panel');
 
         $serialized = $response->getContent();
         $this->assertStringNotContainsString('SITE_PROFILE_SECRET_SENTINEL', $serialized);
@@ -175,7 +176,7 @@ class SiteProfilePayloadTest extends TestCase
         $this->assertStringNotContainsString('totp_secret', $serialized);
     }
 
-    public function test_admin_tab_payloads_are_bounded_and_link_to_canonical_owners(): void
+    public function test_admin_tab_payloads_restore_full_site_workspaces_and_canonical_owners(): void
     {
         foreach (range(1, 14) as $index) {
             SiteDocument::query()->create([
@@ -218,18 +219,24 @@ class SiteProfilePayloadTest extends TestCase
                 'documentsData,financialsData,vendorsCredentialsData,servicesData',
             ))
             ->assertOk()
-            ->assertJsonCount(12, 'props.documentsData.items')
-            ->assertJsonPath('props.documentsData.summary.total', 14)
-            ->assertJsonPath('props.documentsData.summary.shown', 12)
+            ->assertJsonCount(14, 'props.documentsData.documents')
+            ->assertJsonPath('props.documentsData.documents.0.title', 'Admin document 14')
+            ->assertJsonStructure(['props' => [
+                'documentsData' => ['site', 'can_edit', 'folders', 'documents', 'recommendedDocuments'],
+                'financialsData' => ['site', 'house_ledger'],
+                'vendorsCredentialsData' => ['site', 'vendors', 'credentials', 'credentialTypeOptions', 'can'],
+                'servicesData' => ['items', 'can_manage'],
+            ]])
             ->assertJsonPath('props.documentsData.href', route('sites.documents.index', $this->site))
             ->assertJsonPath('props.financialsData.href', route('finance.sites.financial-dashboard', $this->site))
-            ->assertJsonPath('props.financialsData.house_ledger.href', route('sites.ledger.index', $this->site))
-            ->assertJsonPath('props.vendorsCredentialsData.summary.vendors', 1)
-            ->assertJsonPath('props.vendorsCredentialsData.summary.credentials', 1)
+            ->assertJsonPath('props.financialsData.house_ledger.ledger.currency', 'NZD')
+            ->assertJsonPath('props.financialsData.house_ledger.entries.meta.total', 0)
+            ->assertJsonCount(1, 'props.vendorsCredentialsData.vendors')
+            ->assertJsonCount(1, 'props.vendorsCredentialsData.credentials')
+            ->assertJsonPath('props.vendorsCredentialsData.vendors.0.company_name', 'Canonical Vendor')
+            ->assertJsonPath('props.vendorsCredentialsData.credentials.0.label', 'Canonical Credential')
             ->assertJsonPath('props.vendorsCredentialsData.href', route('sites.vendors.global', ['site_id' => $this->site->id]))
-            ->assertJsonCount(12, 'props.servicesData.items')
-            ->assertJsonPath('props.servicesData.summary.total', 14)
-            ->assertJsonPath('props.servicesData.summary.active', 13)
+            ->assertJsonCount(14, 'props.servicesData.items')
             ->assertJsonPath('props.servicesData.href', route('settings.service_contexts'));
     }
 
