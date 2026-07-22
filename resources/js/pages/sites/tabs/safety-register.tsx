@@ -35,7 +35,12 @@ export function SafetyRegisterHeader({
             </div>
             <div className="flex flex-wrap gap-2">
                 {children}
-                <Button asChild variant="outline" size="sm">
+                <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="min-h-11"
+                >
                     <Link href={href}>
                         {actionLabel}
                         <ArrowUpRight className="ml-1.5 h-4 w-4" />

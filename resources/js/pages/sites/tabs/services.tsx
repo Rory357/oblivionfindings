@@ -32,7 +32,12 @@ export function SiteProfileServices({ data }: { data: SiteServicesData }) {
                     </p>
                 </div>
                 {data.href ? (
-                    <Button asChild size="sm" variant="outline">
+                    <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="min-h-11"
+                    >
                         <Link href={data.href}>
                             Manage service contexts
                             <ArrowUpRight className="ml-1.5 h-4 w-4" />

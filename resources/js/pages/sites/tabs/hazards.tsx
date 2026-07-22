@@ -46,7 +46,7 @@ export function SiteProfileHazards({ data }: { data: SiteHazardsData }) {
                 count={data.items.length}
             >
                 {data.can_create ? (
-                    <Button asChild size="sm">
+                    <Button asChild size="sm" className="min-h-11">
                         <Link href={`${data.href}/create`}>
                             <Plus className="mr-1.5 h-4 w-4" />
                             Report hazard

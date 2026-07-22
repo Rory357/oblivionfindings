@@ -41,7 +41,12 @@ export function SiteProfileFinancials({
                     </p>
                 </div>
                 {data.href ? (
-                    <Button asChild size="sm" variant="outline">
+                    <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="min-h-11"
+                    >
                         <Link href={data.href}>
                             Finance Site Dashboard
                             <ExternalLink className="ml-1.5 h-4 w-4" />

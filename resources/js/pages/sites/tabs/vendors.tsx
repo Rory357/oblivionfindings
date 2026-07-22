@@ -73,7 +73,12 @@ export function SiteProfileVendors({
                         re-authenticated and audited.
                     </p>
                 </div>
-                <Button asChild size="sm" variant="outline">
+                <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="min-h-11"
+                >
                     <Link href={data.href}>
                         Open unified workspace
                         <ArrowUpRight className="ml-1.5 h-4 w-4" />
@@ -85,6 +90,7 @@ export function SiteProfileVendors({
                 {data.can.vendors ? (
                     <Button
                         size="sm"
+                        className="min-h-11"
                         variant={section === 'vendors' ? 'secondary' : 'ghost'}
                         onClick={() => setSection('vendors')}
                     >
@@ -97,6 +103,7 @@ export function SiteProfileVendors({
                 {data.can.credentials ? (
                     <Button
                         size="sm"
+                        className="min-h-11"
                         variant={
                             section === 'credentials' ? 'secondary' : 'ghost'
                         }
@@ -119,6 +126,7 @@ export function SiteProfileVendors({
                         {data.can.vendorsManage ? (
                             <Button
                                 size="sm"
+                                className="min-h-11"
                                 onClick={() =>
                                     setVendorDialog({
                                         mode: 'add',
@@ -142,7 +150,7 @@ export function SiteProfileVendors({
                                             target: vendor,
                                         })
                                     }
-                                    className="flex w-full items-start justify-between gap-3 p-4 text-left hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                    className="flex min-h-11 w-full items-start justify-between gap-3 p-4 text-left hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                 >
                                     <div>
                                         <div className="font-medium">
@@ -194,6 +202,7 @@ export function SiteProfileVendors({
                         {data.can.credentialsManage ? (
                             <Button
                                 size="sm"
+                                className="min-h-11"
                                 onClick={() =>
                                     setCredentialDialog({
                                         mode: 'add',
@@ -218,7 +227,7 @@ export function SiteProfileVendors({
                                             target: credential,
                                         })
                                     }
-                                    className="flex w-full items-start justify-between gap-3 p-4 text-left hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                    className="flex min-h-11 w-full items-start justify-between gap-3 p-4 text-left hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                 >
                                     <div>
                                         <div className="flex flex-wrap items-center gap-2 font-medium">

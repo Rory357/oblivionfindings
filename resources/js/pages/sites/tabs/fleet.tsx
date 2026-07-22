@@ -94,7 +94,12 @@ export function SiteProfileFleet({ data }: { data: SiteFleetData }) {
                         bookings and outings, monthly activity and compliance.
                     </p>
                 </div>
-                <Button asChild size="sm" variant="outline">
+                <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="min-h-11"
+                >
                     <Link href={data.href}>
                         Open Fleet dashboard
                         <ArrowUpRight className="ml-1.5 h-4 w-4" />

@@ -9,13 +9,11 @@ const ledger = readFileSync(
 
 describe('Site Profile corrective capability ledger', () => {
     it('is tied to the authoritative baseline and has no removed outcome', () => {
-        expect(ledger).toContain(
-            'b5b5df463ce788fbbf988c74f5142b7fcbb52628',
-        );
+        expect(ledger).toContain('b5b5df463ce788fbbf988c74f5142b7fcbb52628');
         expect(ledger).not.toMatch(/\| Removed \|/);
     });
 
-    it('tracks every required capability family and closure state', () => {
+    it('tracks and closes every required capability family with exact evidence', () => {
         for (const heading of [
             'Composition, navigation, payload, and states',
             'Overview and readiness',
@@ -36,8 +34,15 @@ describe('Site Profile corrective capability ledger', () => {
             expect(row).toMatch(
                 /\| (?:Restore|Canonical replacement|Improve) \|/,
             );
-            expect(row).toMatch(/\| Open \|/);
+            expect(row).toMatch(
+                /\| (?:Restored|Canonical replacement|Improved|Blocked) \|/,
+            );
+            expect(row).toMatch(
+                /E-(?:SHELL|OVERVIEW|PEOPLE|SAFETY|OPERATIONS|ADMIN|DIALOG)/,
+            );
         }
+        expect(ledger).not.toMatch(/\| Open \|/);
+        expect(ledger).toContain('## Closure evidence index');
     });
 
     it('records endpoint and permission contracts for every required module', () => {

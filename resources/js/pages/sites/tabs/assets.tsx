@@ -40,13 +40,18 @@ export function SiteProfileAssets({ data }: { data: SiteAssetsData }) {
                 </div>
                 <div className="flex flex-wrap gap-2">
                     {data.can_create ? (
-                        <Button asChild size="sm">
+                        <Button asChild size="sm" className="min-h-11">
                             <Link href={`${data.href}&new=1`}>
                                 <Plus className="mr-1.5 h-4 w-4" /> Add asset
                             </Link>
                         </Button>
                     ) : null}
-                    <Button asChild size="sm" variant="outline">
+                    <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="min-h-11"
+                    >
                         <Link href={data.href}>
                             Open Assets
                             <ArrowUpRight className="ml-1.5 h-4 w-4" />

@@ -79,5 +79,9 @@ describe('corrective Site Profile contract', () => {
                 name,
             ).not.toContain('SiteProfileModuleSummary');
         }
+
+        expect(read('resources/js/pages/sites/show.tsx')).not.toContain(
+            'module-summary-panel',
+        );
     });
 });

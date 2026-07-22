@@ -57,7 +57,6 @@ import {
     type SiteInspectionsData,
 } from './tabs/inspections';
 import { SiteProfileMealPlanner } from './tabs/meal-planner';
-import type { SiteProfileSummaryModule } from './tabs/module-summary-panel';
 import { SiteProfileOverview } from './tabs/overview';
 import { SiteProfilePlan, type SitePlanData } from './tabs/plan';
 import { SiteProfilePpe, type SitePpeData } from './tabs/ppe';
@@ -256,7 +255,7 @@ export type SiteProfileProps = {
     emergencyPlanData?: EmergencyPlanModule & { locked?: boolean };
     calendarData?: SiteProfileCalendarData;
     checklistsData?: SiteProfileChecklistsData;
-    mealPlannerData?: SiteProfileSummaryModule;
+    mealPlannerData?: { locked?: boolean };
     assetsData?: SiteAssetsData;
     fleetData?: SiteFleetData;
     hardwareData?: SiteHardwareData;
@@ -770,7 +769,7 @@ function SiteProfileContent({
             return (
                 <SiteProfileMealPlanner
                     site={props.site}
-                    data={tabData as SiteProfileSummaryModule}
+                    data={tabData as { locked?: boolean }}
                 />
             );
         case 'assets':

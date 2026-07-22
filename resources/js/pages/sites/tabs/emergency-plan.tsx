@@ -35,7 +35,7 @@ export function SiteProfileEmergencyPlan({
                         </p>
                     </div>
                     {data.plan_href ? (
-                        <Button asChild>
+                        <Button asChild className="min-h-11">
                             <Link href={data.plan_href}>Open floor plan</Link>
                         </Button>
                     ) : null}

@@ -384,11 +384,16 @@ export function SiteProfileStaffRequirements({
                             <Button
                                 type="button"
                                 variant="outline"
+                                className="min-h-11"
                                 onClick={() => setDialogOpen(false)}
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={form.processing}>
+                            <Button
+                                type="submit"
+                                className="min-h-11"
+                                disabled={form.processing}
+                            >
                                 {form.processing
                                     ? 'Saving…'
                                     : 'Save requirement'}
