@@ -196,8 +196,12 @@ class SiteProfileAuthorizationTest extends TestCase
 
         $operations = $this->partial('calendarData,checklistsData,assetsData,fleetData,hardwareData')
             ->assertJsonPath('props.calendarData.locked', true)
-            ->assertJsonPath('props.calendarData.summary', null)
-            ->assertJsonPath('props.checklistsData.summary', null)
+            ->assertJsonPath('props.calendarData.canCreate', false)
+            ->assertJsonPath('props.calendarData.canManage', false)
+            ->assertJsonPath('props.calendarData.canApprove', false)
+            ->assertJsonMissingPath('props.calendarData.people.0')
+            ->assertJsonMissingPath('props.checklistsData.templates')
+            ->assertJsonMissingPath('props.checklistsData.runs')
             ->assertJsonPath('props.assetsData.summary', null)
             ->assertJsonPath('props.fleetData.summary', null)
             ->assertJsonPath('props.hardwareData.summary', null);

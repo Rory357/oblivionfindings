@@ -304,7 +304,7 @@ class SiteProfileData
         $keys = [
             'sites.update', 'clients.viewAny', 'clients.viewAssigned', 'clients.create',
             'clients.assignments.update', 'staff.viewAny', 'rostering.viewAny',
-            'hazards.view', 'hazards.create', 'calendar.view', 'calendar.create',
+            'hazards.view', 'hazards.create', 'calendar.view', 'calendar.create', 'calendar.manage', 'calendar.approve',
             'checklists.view', 'sites.meals.view', 'assets.viewAny', 'assets.viewAssigned',
             'fleet.viewAny', 'securityDevices.devices.view', 'finance.dashboard',
             'vendors.view', 'credentials.view', 'assets.geofences.manage',

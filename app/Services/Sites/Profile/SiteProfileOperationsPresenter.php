@@ -5,10 +5,9 @@ namespace App\Services\Sites\Profile;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Models\Asset;
 use App\Models\Site;
-use App\Models\SiteCalendarEvent;
-use App\Models\SiteChecklistRun;
 use App\Models\User;
 use App\Services\Sites\SiteTypePlanService;
+use App\Support\ChecklistsDashboardData;
 use Illuminate\Database\Eloquent\Builder;
 
 class SiteProfileOperationsPresenter
@@ -23,28 +22,15 @@ class SiteProfileOperationsPresenter
     {
         $this->primePermissions($user);
         $canView = $user->canDo('calendar.view');
-        $items = $canView
-            ? SiteCalendarEvent::query()
-                ->where('site_id', $site->id)
-                ->where('start_at', '>=', now()->startOfDay())
-                ->orderBy('start_at')
-                ->limit(12)
-                ->get(['id', 'event_type', 'title', 'start_at', 'end_at', 'status'])
-                ->map(fn (SiteCalendarEvent $event) => [
-                    'id' => $event->id,
-                    'type' => $event->event_type,
-                    'title' => $event->title,
-                    'start_at' => $event->start_at?->toISOString(),
-                    'end_at' => $event->end_at?->toISOString(),
-                    'status' => $event->status,
-                ])->values()
-            : collect();
 
         return [
             'locked' => ! $canView,
-            'items' => $items,
-            'summary' => $canView ? ['upcoming' => $items->count()] : null,
-            'href' => $canView ? route('sites.calendar.index', $site) : null,
+            'site' => ['id' => $site->id, 'name' => $site->name, 'type' => $site->type],
+            'people' => $canView ? User::query()->staff()->orderBy('name')->get(['id', 'name']) : collect(),
+            'canCreate' => $canView && ! $site->archived && $user->canDo('calendar.create') && $user->can('update', $site),
+            'canManage' => $canView && ! $site->archived && $user->canDo('calendar.manage') && $user->can('update', $site),
+            'canApprove' => $canView && ! $site->archived && $user->canDo('calendar.approve') && $user->can('update', $site),
+            'feedUrl' => null,
         ];
     }
 
@@ -53,42 +39,13 @@ class SiteProfileOperationsPresenter
     {
         $this->primePermissions($user);
         $canView = $user->canDo('checklists.view');
-        $query = SiteChecklistRun::query()->where('site_id', $site->id);
-        $items = $canView
-            ? (clone $query)
-                ->with('template:id,name')
-                ->orderByDesc('scheduled_date')
-                ->limit(12)
-                ->get(['id', 'template_id', 'scheduled_date', 'status', 'completion_percentage', 'items_failed'])
-                ->map(fn (SiteChecklistRun $run) => [
-                    'id' => $run->id,
-                    'name' => $run->template?->name,
-                    'scheduled_date' => $run->scheduled_date?->toDateString(),
-                    'status' => $run->status,
-                    'completion_percentage' => (float) $run->completion_percentage,
-                    'items_failed' => (int) $run->items_failed,
-                    'href' => route('sites.checklists.showRun', $run),
-                ])->values()
-            : collect();
-        $counts = $canView
-            ? (clone $query)
-                ->selectRaw('COUNT(*) as total')
-                ->selectRaw("SUM(CASE WHEN status IN ('scheduled', 'in_progress') THEN 1 ELSE 0 END) as open_count")
-                ->selectRaw("SUM(CASE WHEN scheduled_date < ? AND status IN ('scheduled', 'in_progress') THEN 1 ELSE 0 END) as overdue_count", [now()->toDateString()])
-                ->selectRaw('SUM(CASE WHEN items_failed > 0 THEN 1 ELSE 0 END) as failed_count')
-                ->first()
-            : null;
+        $workspace = $canView ? (new ChecklistsDashboardData(request()))->forSite($site) : [];
 
         return [
             'locked' => ! $canView,
-            'items' => $items,
-            'summary' => $canView ? [
-                'total' => (int) ($counts?->total ?? 0),
-                'open' => (int) ($counts?->open_count ?? 0),
-                'overdue' => (int) ($counts?->overdue_count ?? 0),
-                'failed' => (int) ($counts?->failed_count ?? 0),
-            ] : null,
-            'href' => $canView ? route('sites.checklists.index', $site) : null,
+            ...$workspace,
+            'site' => ['id' => $site->id, 'name' => $site->name, 'type' => $site->type],
+            'backHref' => route('sites.show', $site),
         ];
     }
 

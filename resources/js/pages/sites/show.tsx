@@ -28,12 +28,18 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SiteProfileDialogHost } from './site-profile-dialog-host';
 import { SiteProfileAssets } from './tabs/assets';
-import { SiteProfileCalendar } from './tabs/calendar';
-import { SiteProfileChecklists } from './tabs/checklists';
+import {
+    SiteProfileCalendar,
+    type SiteProfileCalendarData,
+} from './tabs/calendar';
+import {
+    SiteProfileChecklists,
+    type SiteProfileChecklistsData,
+} from './tabs/checklists';
 import { SiteProfileClients, type SiteClientsData } from './tabs/clients';
 import { SiteProfileContacts, type SiteContactsData } from './tabs/contacts';
 import { SiteProfileDocuments } from './tabs/documents';
-import { SiteProfileDrills } from './tabs/drills';
+import { SiteProfileDrills, type SiteDrillsData } from './tabs/drills';
 import {
     SiteProfileEmergencyPlan,
     type EmergencyPlanModule,
@@ -42,16 +48,19 @@ import {
     SiteProfileFinancials,
     type SiteProfileFinancialsModule,
 } from './tabs/financials';
-import { SiteProfileFirstAid } from './tabs/first-aid';
+import { SiteProfileFirstAid, type SiteFirstAidData } from './tabs/first-aid';
 import { SiteProfileFleet } from './tabs/fleet';
 import { SiteProfileHardware } from './tabs/hardware';
-import { SiteProfileHazards } from './tabs/hazards';
-import { SiteProfileInspections } from './tabs/inspections';
+import { SiteProfileHazards, type SiteHazardsData } from './tabs/hazards';
+import {
+    SiteProfileInspections,
+    type SiteInspectionsData,
+} from './tabs/inspections';
 import { SiteProfileMealPlanner } from './tabs/meal-planner';
 import type { SiteProfileSummaryModule } from './tabs/module-summary-panel';
 import { SiteProfileOverview } from './tabs/overview';
 import { SiteProfilePlan, type SitePlanSummaryModule } from './tabs/plan';
-import { SiteProfilePpe } from './tabs/ppe';
+import { SiteProfilePpe, type SitePpeData } from './tabs/ppe';
 import { SiteProfileReadiness } from './tabs/readiness';
 import {
     dataPropForTab,
@@ -59,7 +68,10 @@ import {
     siteProfileGroups,
     visibleSiteProfileTabs,
 } from './tabs/registry';
-import { SiteProfileRiskAssessments } from './tabs/risk-assessments';
+import {
+    SiteProfileRiskAssessments,
+    type SiteRiskAssessmentsData,
+} from './tabs/risk-assessments';
 import { SiteProfileServices } from './tabs/services';
 import {
     SiteProfileShiftCoverage,
@@ -220,10 +232,6 @@ export type SiteReadinessData = {
     is_active_but_incomplete: boolean;
 };
 
-type SiteSafetyTabData = SiteProfileSummaryModule & {
-    locked: boolean;
-};
-
 export type SiteProfileProps = {
     site: SiteProfileSite;
     hero: SiteProfileHeroData;
@@ -236,15 +244,15 @@ export type SiteProfileProps = {
     contactsData?: SiteContactsData;
     staffRequirementsData?: SiteStaffRequirementsData;
     shiftCoverageData?: SiteShiftCoverageData;
-    hazardsData?: SiteSafetyTabData;
-    riskAssessmentsData?: SiteSafetyTabData;
-    inspectionsData?: SiteSafetyTabData;
-    drillsData?: SiteSafetyTabData;
-    firstAidData?: SiteSafetyTabData;
-    ppeData?: SiteSafetyTabData;
+    hazardsData?: SiteHazardsData;
+    riskAssessmentsData?: SiteRiskAssessmentsData;
+    inspectionsData?: SiteInspectionsData;
+    drillsData?: SiteDrillsData;
+    firstAidData?: SiteFirstAidData;
+    ppeData?: SitePpeData;
     emergencyPlanData?: EmergencyPlanModule & { locked?: boolean };
-    calendarData?: SiteProfileSummaryModule;
-    checklistsData?: SiteProfileSummaryModule;
+    calendarData?: SiteProfileCalendarData;
+    checklistsData?: SiteProfileChecklistsData;
     mealPlannerData?: SiteProfileSummaryModule;
     assetsData?: SiteProfileSummaryModule;
     fleetData?: SiteProfileSummaryModule;
@@ -720,37 +728,23 @@ function SiteProfileContent({
                 />
             );
         case 'hazards':
-            return (
-                <SiteProfileHazards
-                    data={tabData as SiteProfileSummaryModule}
-                />
-            );
+            return <SiteProfileHazards data={tabData as SiteHazardsData} />;
         case 'risk_assessments':
             return (
                 <SiteProfileRiskAssessments
-                    data={tabData as SiteProfileSummaryModule}
+                    data={tabData as SiteRiskAssessmentsData}
                 />
             );
         case 'inspections':
             return (
-                <SiteProfileInspections
-                    data={tabData as SiteProfileSummaryModule}
-                />
+                <SiteProfileInspections data={tabData as SiteInspectionsData} />
             );
         case 'drills':
-            return (
-                <SiteProfileDrills data={tabData as SiteProfileSummaryModule} />
-            );
+            return <SiteProfileDrills data={tabData as SiteDrillsData} />;
         case 'first_aid':
-            return (
-                <SiteProfileFirstAid
-                    data={tabData as SiteProfileSummaryModule}
-                />
-            );
+            return <SiteProfileFirstAid data={tabData as SiteFirstAidData} />;
         case 'ppe':
-            return (
-                <SiteProfilePpe data={tabData as SiteProfileSummaryModule} />
-            );
+            return <SiteProfilePpe data={tabData as SitePpeData} />;
         case 'emergency_plan':
             return (
                 <SiteProfileEmergencyPlan
@@ -760,13 +754,13 @@ function SiteProfileContent({
         case 'calendar':
             return (
                 <SiteProfileCalendar
-                    data={tabData as SiteProfileSummaryModule}
+                    data={tabData as SiteProfileCalendarData}
                 />
             );
         case 'checklists':
             return (
                 <SiteProfileChecklists
-                    data={tabData as SiteProfileSummaryModule}
+                    data={tabData as SiteProfileChecklistsData}
                 />
             );
         case 'meal_planner':
