@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SiteProfileDialogHost } from './site-profile-dialog-host';
-import { SiteProfileAssets } from './tabs/assets';
+import { SiteProfileAssets, type SiteAssetsData } from './tabs/assets';
 import {
     SiteProfileCalendar,
     type SiteProfileCalendarData,
@@ -49,8 +49,8 @@ import {
     type SiteProfileFinancialsModule,
 } from './tabs/financials';
 import { SiteProfileFirstAid, type SiteFirstAidData } from './tabs/first-aid';
-import { SiteProfileFleet } from './tabs/fleet';
-import { SiteProfileHardware } from './tabs/hardware';
+import { SiteProfileFleet, type SiteFleetData } from './tabs/fleet';
+import { SiteProfileHardware, type SiteHardwareData } from './tabs/hardware';
 import { SiteProfileHazards, type SiteHazardsData } from './tabs/hazards';
 import {
     SiteProfileInspections,
@@ -59,7 +59,7 @@ import {
 import { SiteProfileMealPlanner } from './tabs/meal-planner';
 import type { SiteProfileSummaryModule } from './tabs/module-summary-panel';
 import { SiteProfileOverview } from './tabs/overview';
-import { SiteProfilePlan, type SitePlanSummaryModule } from './tabs/plan';
+import { SiteProfilePlan, type SitePlanData } from './tabs/plan';
 import { SiteProfilePpe, type SitePpeData } from './tabs/ppe';
 import { SiteProfileReadiness } from './tabs/readiness';
 import {
@@ -254,10 +254,10 @@ export type SiteProfileProps = {
     calendarData?: SiteProfileCalendarData;
     checklistsData?: SiteProfileChecklistsData;
     mealPlannerData?: SiteProfileSummaryModule;
-    assetsData?: SiteProfileSummaryModule;
-    fleetData?: SiteProfileSummaryModule;
-    hardwareData?: SiteProfileSummaryModule;
-    planData?: SitePlanSummaryModule;
+    assetsData?: SiteAssetsData;
+    fleetData?: SiteFleetData;
+    hardwareData?: SiteHardwareData;
+    planData?: SitePlanData;
     documentsData?: SiteProfileSummaryModule;
     financialsData?: SiteProfileFinancialsModule;
     vendorsCredentialsData?: SiteProfileSummaryModule;
@@ -771,21 +771,13 @@ function SiteProfileContent({
                 />
             );
         case 'assets':
-            return (
-                <SiteProfileAssets data={tabData as SiteProfileSummaryModule} />
-            );
+            return <SiteProfileAssets data={tabData as SiteAssetsData} />;
         case 'fleet':
-            return (
-                <SiteProfileFleet data={tabData as SiteProfileSummaryModule} />
-            );
+            return <SiteProfileFleet data={tabData as SiteFleetData} />;
         case 'hardware':
-            return (
-                <SiteProfileHardware
-                    data={tabData as SiteProfileSummaryModule}
-                />
-            );
+            return <SiteProfileHardware data={tabData as SiteHardwareData} />;
         case 'plan':
-            return <SiteProfilePlan data={tabData as SitePlanSummaryModule} />;
+            return <SiteProfilePlan data={tabData as SitePlanData} />;
         case 'documents':
             return (
                 <SiteProfileDocuments

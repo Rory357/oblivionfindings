@@ -305,8 +305,8 @@ class SiteProfileData
             'sites.update', 'clients.viewAny', 'clients.viewAssigned', 'clients.create',
             'clients.assignments.update', 'staff.viewAny', 'rostering.viewAny',
             'hazards.view', 'hazards.create', 'calendar.view', 'calendar.create', 'calendar.manage', 'calendar.approve',
-            'checklists.view', 'sites.meals.view', 'assets.viewAny', 'assets.viewAssigned',
-            'fleet.viewAny', 'securityDevices.devices.view', 'finance.dashboard',
+            'checklists.view', 'sites.meals.view', 'assets.viewAny', 'assets.viewAssigned', 'assets.create',
+            'fleet.viewAny', 'securityDevices.devices.view', 'siteHardware.view', 'siteHardware.manage', 'finance.dashboard',
             'vendors.view', 'credentials.view', 'assets.geofences.manage',
         ];
 

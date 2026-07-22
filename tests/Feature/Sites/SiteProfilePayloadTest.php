@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Sites;
 
+use App\Models\Asset;
 use App\Models\EmergencyDrill;
 use App\Models\FirstAidRecord;
 use App\Models\HsRiskAssessment;
@@ -120,6 +121,36 @@ class SiteProfilePayloadTest extends TestCase
             ->assertJsonPath('props.shiftCoverageData.requirements.0.allow_overstaffing', false)
             ->assertJsonStructure(['props' => ['shiftCoverageData' => ['preview', 'clients', 'service_contexts']]])
             ->assertJsonMissingPath('props.clientsData');
+    }
+
+    public function test_operations_payload_restores_assets_fleet_hardware_and_full_plan_shapes(): void
+    {
+        Asset::factory()->create([
+            'site_id' => $this->site->id,
+            'home_site_id' => $this->site->id,
+            'category' => 'vehicle',
+            'name' => 'Accessible Site Van',
+            'risk_level' => 'medium',
+            'inspection_due_at' => now()->addDays(10),
+            'maintenance_due_at' => now()->addDays(20),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get(
+                route('sites.show', $this->site),
+                $this->inertiaPartialHeaders('sites/show', 'assetsData,fleetData,hardwareData,planData'),
+            )
+            ->assertOk()
+            ->assertJsonPath('props.assetsData.items.0.name', 'Accessible Site Van')
+            ->assertJsonPath('props.assetsData.items.0.owner.type', 'site')
+            ->assertJsonPath('props.assetsData.items.0.risk_level', 'medium')
+            ->assertJsonPath('props.fleetData.vehicles.0.name', 'Accessible Site Van')
+            ->assertJsonStructure(['props' => [
+                'fleetData' => ['today_bookings', 'active_outings', 'stats', 'compliance'],
+                'hardwareData' => ['site', 'devices', 'rooms', 'typePlan', 'can'],
+                'planData' => ['site', 'typePlan', 'can'],
+            ]])
+            ->assertJsonMissingPath('props.documentsData');
     }
 
     public function test_vendor_credentials_payload_never_serializes_credential_secret_material(): void
