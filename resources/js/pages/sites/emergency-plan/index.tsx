@@ -14,7 +14,7 @@ import {
     Siren,
     Users,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import SiteTypePlanBuilderDialog from '../plan/_builder-dialog';
 import {
@@ -73,7 +73,7 @@ type TypePlanSummary = {
     has_emergency_layer?: boolean;
 };
 
-type Props = {
+export type SiteEmergencyPlanProps = {
     site: Site;
     organisation: { name: string; logo_url?: string | null };
     plan: PlanRecord;
@@ -125,7 +125,7 @@ function filenameFromDisposition(
     return match?.[1] ?? fallback;
 }
 
-export default function SiteEmergencyPlanIndex({
+export function SiteEmergencyPlanSurface({
     site,
     organisation,
     plan,
@@ -137,7 +137,12 @@ export default function SiteEmergencyPlanIndex({
     footer,
     typePlan,
     can,
-}: Props) {
+    embedded = false,
+    BuilderDialog = SiteTypePlanBuilderDialog,
+}: SiteEmergencyPlanProps & {
+    embedded?: boolean;
+    BuilderDialog?: typeof SiteTypePlanBuilderDialog;
+}) {
     const [builderOpen, setBuilderOpen] = useState(false);
     const [builderMode, setBuilderMode] = useState<BuilderMode>('emergency');
     const [builderFocus, setBuilderFocus] = useState<string | undefined>();
@@ -224,88 +229,103 @@ export default function SiteEmergencyPlanIndex({
         }
     }
 
-    return (
-        <AppLayout>
-            <Head title={`${site.name} Emergency Plan`} />
-            <PageShell>
-                <PageHero
-                    icon={Siren}
-                    backHref={`/sites/${site.id}/plan`}
-                    backLabel="Back to site plan"
-                    title="Emergency Plan"
-                    description={`${site.name} - ${organisation.name}`}
-                    stats={[
-                        { label: 'Status', value: ready ? 'Ready' : 'Draft' },
-                        {
-                            label: 'Emergency pins',
-                            value: emergencyPins.length,
-                        },
-                        { label: 'Contacts', value: contacts.length },
-                        {
-                            label: 'Paper',
-                            value: PAPER_SIZES[selectedPaper].label,
-                        },
-                    ]}
-                    actions={
-                        <div className="flex flex-wrap items-center gap-2">
-                            {(Object.keys(PAPER_SIZES) as PaperSize[]).map(
-                                (paper) => (
-                                    <Button
-                                        key={paper}
-                                        type="button"
-                                        variant={
-                                            selectedPaper === paper
-                                                ? 'default'
-                                                : 'outline'
-                                        }
-                                        disabled={exportingPaper !== null}
-                                        className={
-                                            selectedPaper === paper
-                                                ? undefined
-                                                : 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground'
-                                        }
-                                        onClick={() => setSelectedPaper(paper)}
-                                        data-test={`emergency-paper-${paper}`}
-                                    >
-                                        {PAPER_SIZES[paper].label}
-                                    </Button>
-                                ),
-                            )}
-                            <Button
-                                type="button"
-                                disabled={!ready || exportingPaper !== null}
-                                onClick={() =>
-                                    downloadEmergencyPlan(selectedPaper)
-                                }
-                                data-test="emergency-plan-download"
-                            >
-                                <FileDown className="mr-2 h-4 w-4" />
-                                {exportingPaper
-                                    ? 'Exporting...'
-                                    : `Export ${PAPER_SIZES[selectedPaper].label}`}
-                            </Button>
-                            {can.update && (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    onClick={() => {
-                                        setBuilderMode('emergency');
-                                        setBuilderFocus(
-                                            ready
-                                                ? undefined
-                                                : 'assembly_point',
-                                        );
-                                        setBuilderOpen(true);
-                                    }}
-                                >
-                                    <Pencil className="mr-2 h-4 w-4" />
-                                    Edit emergency plan
-                                </Button>
-                            )}
-                        </div>
+    const actions = (
+        <div className="flex flex-wrap items-center gap-2">
+            {(Object.keys(PAPER_SIZES) as PaperSize[]).map((paper) => (
+                <Button
+                    key={paper}
+                    type="button"
+                    variant={selectedPaper === paper ? 'default' : 'outline'}
+                    disabled={exportingPaper !== null}
+                    className={
+                        embedded || selectedPaper === paper
+                            ? undefined
+                            : 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground'
                     }
-                />
+                    onClick={() => setSelectedPaper(paper)}
+                    data-test={`emergency-paper-${paper}`}
+                >
+                    {PAPER_SIZES[paper].label}
+                </Button>
+            ))}
+            <Button
+                type="button"
+                disabled={!ready || exportingPaper !== null}
+                onClick={() => downloadEmergencyPlan(selectedPaper)}
+                data-test="emergency-plan-download"
+            >
+                <FileDown className="mr-2 h-4 w-4" />
+                {exportingPaper
+                    ? 'Exporting...'
+                    : `Export ${PAPER_SIZES[selectedPaper].label}`}
+            </Button>
+            {can.update ? (
+                <Button
+                    type="button"
+                    variant="outline"
+                    className={
+                        embedded
+                            ? undefined
+                            : 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground'
+                    }
+                    onClick={() => {
+                        setBuilderMode('emergency');
+                        setBuilderFocus(ready ? undefined : 'assembly_point');
+                        setBuilderOpen(true);
+                    }}
+                >
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit emergency plan
+                </Button>
+            ) : null}
+        </div>
+    );
+    const Layout = embedded ? Fragment : AppLayout;
+    const SurfaceShell = embedded ? Fragment : PageShell;
+
+    return (
+        <Layout>
+            {!embedded ? <Head title={`${site.name} Emergency Plan`} /> : null}
+            <SurfaceShell>
+                {!embedded ? (
+                    <PageHero
+                        icon={Siren}
+                        backHref={`/sites/${site.id}/plan`}
+                        backLabel="Back to site plan"
+                        title="Emergency Plan"
+                        description={`${site.name} - ${organisation.name}`}
+                        stats={[
+                            {
+                                label: 'Status',
+                                value: ready ? 'Ready' : 'Draft',
+                            },
+                            {
+                                label: 'Emergency pins',
+                                value: emergencyPins.length,
+                            },
+                            { label: 'Contacts', value: contacts.length },
+                            {
+                                label: 'Paper',
+                                value: PAPER_SIZES[selectedPaper].label,
+                            },
+                        ]}
+                        actions={actions}
+                    />
+                ) : (
+                    <Card>
+                        <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <CardTitle>Emergency plan</CardTitle>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Published evacuation map, emergency
+                                    contacts, procedures and export controls for{' '}
+                                    {site.name}.
+                                </p>
+                            </div>
+                            {actions}
+                        </CardHeader>
+                    </Card>
+                )}
 
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
                     <Card>
@@ -328,9 +348,9 @@ export default function SiteEmergencyPlanIndex({
                             </div>
                         </CardHeader>
                         <CardContent>
-                        <div className="rounded-lg border bg-muted p-4 shadow-inner">
+                            <div className="rounded-lg border bg-muted p-4 shadow-inner">
                                 <div
-                                className="relative mx-auto max-h-[640px] max-w-full overflow-hidden rounded-md bg-background shadow-sm ring-1 ring-border"
+                                    className="relative mx-auto max-h-[640px] max-w-full overflow-hidden rounded-md bg-background shadow-sm ring-1 ring-border"
                                     style={{ aspectRatio: previewAspect }}
                                     data-test="emergency-plan-preview-page"
                                 >
@@ -465,8 +485,8 @@ export default function SiteEmergencyPlanIndex({
                         )}
                     </div>
                 </div>
-            </PageShell>
-            <SiteTypePlanBuilderDialog
+            </SurfaceShell>
+            <BuilderDialog
                 site={site}
                 typePlan={typePlan}
                 open={builderOpen}
@@ -480,6 +500,10 @@ export default function SiteEmergencyPlanIndex({
                 focusTool={builderFocus}
                 mode={builderMode}
             />
-        </AppLayout>
+        </Layout>
     );
+}
+
+export default function SiteEmergencyPlanIndex(props: SiteEmergencyPlanProps) {
+    return <SiteEmergencyPlanSurface {...props} />;
 }

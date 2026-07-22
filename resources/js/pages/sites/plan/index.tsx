@@ -1,12 +1,20 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowRight, FileDown, Map, MapPinned, Pencil, Plus, ShieldAlert } from 'lucide-react';
-import { useState } from 'react';
+import {
+    ArrowRight,
+    FileDown,
+    Map,
+    MapPinned,
+    Pencil,
+    Plus,
+    ShieldAlert,
+} from 'lucide-react';
+import { Fragment, useState, type ReactNode } from 'react';
 import SiteTypePlanBuilderDialog from './_builder-dialog';
 import { PlanThumbnail } from './_thumbnail';
 import type { Inventory, PlanLayout, PlanPin, Taxonomy } from './_types';
@@ -44,7 +52,7 @@ type TypePlanSummary = {
     taxonomy?: Taxonomy | null;
 };
 
-type Props = {
+export type SitePlanProps = {
     site: Site;
     typePlan: TypePlanSummary;
     can: { update?: boolean };
@@ -57,81 +65,145 @@ function planStatusLabel(status: TypePlanSummary['status']) {
     return 'Not started';
 }
 
-export default function SitePlanIndex({ site, typePlan, can }: Props) {
+function SitePlanFrame({
+    embedded,
+    children,
+}: {
+    embedded: boolean;
+    children: ReactNode;
+}) {
+    return embedded ? (
+        <Fragment>{children}</Fragment>
+    ) : (
+        <AppLayout>{children}</AppLayout>
+    );
+}
+
+function SitePlanShell({
+    embedded,
+    children,
+}: {
+    embedded: boolean;
+    children: ReactNode;
+}) {
+    return embedded ? (
+        <Fragment>{children}</Fragment>
+    ) : (
+        <PageShell>{children}</PageShell>
+    );
+}
+
+export function SitePlanSurface({
+    site,
+    typePlan,
+    can,
+    embedded = false,
+    BuilderDialog = SiteTypePlanBuilderDialog,
+}: SitePlanProps & {
+    embedded?: boolean;
+    BuilderDialog?: typeof SiteTypePlanBuilderDialog;
+}) {
     const [builderOpen, setBuilderOpen] = useState(false);
     const activePlan = typePlan.draft ?? typePlan.published;
+    const actions = (
+        <div className="flex flex-wrap items-center gap-2">
+            <Button
+                asChild
+                variant="outline"
+                className={
+                    embedded
+                        ? undefined
+                        : 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground'
+                }
+            >
+                <Link href={typePlan.inventory_href}>
+                    {typePlan.inventory_label}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+            </Button>
+            {typePlan.has_published ? (
+                <Button
+                    asChild
+                    variant="outline"
+                    className={
+                        embedded
+                            ? undefined
+                            : 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground'
+                    }
+                >
+                    <Link href={`/sites/${site.id}/emergency-plan`}>
+                        <ShieldAlert className="mr-2 h-4 w-4" />
+                        Emergency Plan
+                    </Link>
+                </Button>
+            ) : null}
+            {can.update ? (
+                <Button onClick={() => setBuilderOpen(true)}>
+                    {activePlan ? (
+                        <Pencil className="mr-2 h-4 w-4" />
+                    ) : (
+                        <Plus className="mr-2 h-4 w-4" />
+                    )}
+                    {activePlan ? 'Edit Plan' : 'Build Plan'}
+                </Button>
+            ) : null}
+        </div>
+    );
 
     return (
-        <AppLayout>
-            <Head title={`${site.name} ${typePlan.tab_label}`} />
-            <PageShell>
-                <PageHero
-                    icon={Map}
-                    backHref={`/sites/${site.id}`}
-                    backLabel="Back to site"
-                    title={typePlan.tab_label}
-                    description={`${site.name} ${site.display_type}`}
-                    stats={[
-                        {
-                            label: 'Status',
-                            value:
-                                typePlan.status === 'draft_over_published'
-                                    ? 'Draft changes'
-                                    : typePlan.status === 'draft'
-                                      ? 'Draft'
-                                      : typePlan.status === 'published'
-                                        ? 'Published'
-                                        : 'Not started',
-                        },
-                        {
-                            label: 'Pins',
-                            value: Object.values(typePlan.pin_counts).reduce(
-                                (sum, c) => sum + (c ?? 0),
-                                0,
-                            ),
-                        },
-                        {
-                            label: 'Emergency layer',
-                            value: typePlan.has_emergency_layer ? 'Ready' : 'Pending',
-                        },
-                    ]}
-                    actions={
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                                asChild
-                                variant="outline"
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <Link href={typePlan.inventory_href}>
-                                    {typePlan.inventory_label}
-                                    <ArrowRight className="ml-2 h-4 w-4" />
-                                </Link>
-                            </Button>
-                            {typePlan.has_published && (
-                                <Button
-                                    asChild
-                                    variant="outline"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                >
-                                    <Link href={`/sites/${site.id}/emergency-plan`}>
-                                        <ShieldAlert className="mr-2 h-4 w-4" />
-                                        Emergency Plan
-                                    </Link>
-                                </Button>
-                            )}
-                            {can.update && (
-                                <Button onClick={() => setBuilderOpen(true)}>
-                                    {activePlan ? (
-                                        <Pencil className="mr-2 h-4 w-4" />
-                                    ) : (
-                                        <Plus className="mr-2 h-4 w-4" />
-                                    )}
-                                    {activePlan ? 'Edit Plan' : 'Build Plan'}
-                                </Button>
-                            )}
-                        </div>
-                    }
-                />
+        <SitePlanFrame embedded={embedded}>
+            {!embedded ? (
+                <Head title={`${site.name} ${typePlan.tab_label}`} />
+            ) : null}
+            <SitePlanShell embedded={embedded}>
+                {!embedded ? (
+                    <PageHero
+                        icon={Map}
+                        backHref={`/sites/${site.id}`}
+                        backLabel="Back to site"
+                        title={typePlan.tab_label}
+                        description={`${site.name} ${site.display_type}`}
+                        stats={[
+                            {
+                                label: 'Status',
+                                value:
+                                    typePlan.status === 'draft_over_published'
+                                        ? 'Draft changes'
+                                        : typePlan.status === 'draft'
+                                          ? 'Draft'
+                                          : typePlan.status === 'published'
+                                            ? 'Published'
+                                            : 'Not started',
+                            },
+                            {
+                                label: 'Pins',
+                                value: Object.values(
+                                    typePlan.pin_counts,
+                                ).reduce((sum, c) => sum + (c ?? 0), 0),
+                            },
+                            {
+                                label: 'Emergency layer',
+                                value: typePlan.has_emergency_layer
+                                    ? 'Ready'
+                                    : 'Pending',
+                            },
+                        ]}
+                        actions={actions}
+                    />
+                ) : (
+                    <Card>
+                        <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <CardTitle>{typePlan.tab_label}</CardTitle>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Published and draft plan, Site inventory,
+                                    room assignments, emergency layer and pins.
+                                </p>
+                            </div>
+                            {actions}
+                        </CardHeader>
+                    </Card>
+                )}
 
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
                     <Card>
@@ -140,7 +212,9 @@ export default function SitePlanIndex({ site, typePlan, can }: Props) {
                                 <MapPinned className="h-5 w-5 text-primary" />
                                 Current Plan
                             </CardTitle>
-                            <Badge variant="outline">{planStatusLabel(typePlan.status)}</Badge>
+                            <Badge variant="outline">
+                                {planStatusLabel(typePlan.status)}
+                            </Badge>
                         </CardHeader>
                         <CardContent>
                             {activePlan ? (
@@ -156,10 +230,15 @@ export default function SitePlanIndex({ site, typePlan, can }: Props) {
                                     <div className="max-w-sm space-y-3">
                                         <MapPinned className="mx-auto h-10 w-10 text-muted-foreground" />
                                         <p className="text-sm text-muted-foreground">
-                                            No plan has been started for this site.
+                                            No plan has been started for this
+                                            site.
                                         </p>
                                         {can.update && (
-                                            <Button onClick={() => setBuilderOpen(true)}>
+                                            <Button
+                                                onClick={() =>
+                                                    setBuilderOpen(true)
+                                                }
+                                            >
                                                 <Plus className="mr-2 h-4 w-4" />
                                                 Build Plan
                                             </Button>
@@ -173,24 +252,48 @@ export default function SitePlanIndex({ site, typePlan, can }: Props) {
                     <div className="space-y-4">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">Readiness</CardTitle>
+                                <CardTitle className="text-base">
+                                    Readiness
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3 text-sm">
                                 <div className="flex items-center justify-between rounded-md border p-3">
                                     <span>Emergency layer</span>
-                                    <Badge variant={typePlan.has_emergency_layer ? 'default' : 'outline'}>
-                                        {typePlan.has_emergency_layer ? 'Ready' : 'Needs pins'}
+                                    <Badge
+                                        variant={
+                                            typePlan.has_emergency_layer
+                                                ? 'default'
+                                                : 'outline'
+                                        }
+                                    >
+                                        {typePlan.has_emergency_layer
+                                            ? 'Ready'
+                                            : 'Needs pins'}
                                     </Badge>
                                 </div>
                                 <div className="flex items-center justify-between rounded-md border p-3">
                                     <span>Medication storage</span>
-                                    <Badge variant={typePlan.has_medication_pin ? 'default' : 'outline'}>
-                                        {typePlan.has_medication_pin ? 'Pinned' : 'Not pinned'}
+                                    <Badge
+                                        variant={
+                                            typePlan.has_medication_pin
+                                                ? 'default'
+                                                : 'outline'
+                                        }
+                                    >
+                                        {typePlan.has_medication_pin
+                                            ? 'Pinned'
+                                            : 'Not pinned'}
                                     </Badge>
                                 </div>
                                 {typePlan.has_published && (
-                                    <Button asChild variant="outline" className="w-full justify-start">
-                                        <Link href={`/sites/${site.id}/emergency-plan.pdf?paper=a4`}>
+                                    <Button
+                                        asChild
+                                        variant="outline"
+                                        className="w-full justify-start"
+                                    >
+                                        <Link
+                                            href={`/sites/${site.id}/emergency-plan.pdf?paper=a4`}
+                                        >
                                             <FileDown className="mr-2 h-4 w-4" />
                                             Export A4 Emergency Plan
                                         </Link>
@@ -201,31 +304,49 @@ export default function SitePlanIndex({ site, typePlan, can }: Props) {
 
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">Pin Counts</CardTitle>
+                                <CardTitle className="text-base">
+                                    Pin Counts
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2 text-sm">
-                                {Object.entries(typePlan.pin_counts).length > 0 ? (
-                                    Object.entries(typePlan.pin_counts).map(([kind, count]) => (
-                                        <div key={kind} className="flex items-center justify-between rounded-md border p-2">
-                                            <span className="capitalize">{kind.replaceAll('_', ' ')}</span>
-                                            <Badge variant="secondary">{count}</Badge>
-                                        </div>
-                                    ))
+                                {Object.entries(typePlan.pin_counts).length >
+                                0 ? (
+                                    Object.entries(typePlan.pin_counts).map(
+                                        ([kind, count]) => (
+                                            <div
+                                                key={kind}
+                                                className="flex items-center justify-between rounded-md border p-2"
+                                            >
+                                                <span className="capitalize">
+                                                    {kind.replaceAll('_', ' ')}
+                                                </span>
+                                                <Badge variant="secondary">
+                                                    {count}
+                                                </Badge>
+                                            </div>
+                                        ),
+                                    )
                                 ) : (
-                                    <p className="text-muted-foreground">No pins yet.</p>
+                                    <p className="text-muted-foreground">
+                                        No pins yet.
+                                    </p>
                                 )}
                             </CardContent>
                         </Card>
                     </div>
                 </div>
-            </PageShell>
+            </SitePlanShell>
 
-            <SiteTypePlanBuilderDialog
+            <BuilderDialog
                 site={site}
                 typePlan={typePlan}
                 open={builderOpen}
                 onOpenChange={setBuilderOpen}
             />
-        </AppLayout>
+        </SitePlanFrame>
     );
+}
+
+export default function SitePlanIndex(props: SitePlanProps) {
+    return <SitePlanSurface {...props} />;
 }

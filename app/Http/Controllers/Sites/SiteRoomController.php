@@ -7,12 +7,16 @@ use App\Models\Asset;
 use App\Models\ClientPersonalAsset;
 use App\Models\Site;
 use App\Models\SiteHouseRoom;
+use App\Services\Sites\SiteClientPlacementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 
 class SiteRoomController extends Controller
 {
+    public function __construct(
+        private readonly SiteClientPlacementService $placements,
+    ) {}
+
     public function index(Request $request, Site $site)
     {
         $this->authorize('view', $site);
@@ -90,6 +94,7 @@ class SiteRoomController extends Controller
             ],
             'rooms' => $rooms->map(function ($r) use ($siteAssetsByRoom, $personalAssetsByRoom) {
                 $client = $r->assignedClient;
+
                 return [
                     'id' => $r->id,
                     'name' => $r->name,
@@ -183,7 +188,7 @@ class SiteRoomController extends Controller
                     ->filter(fn ($r) => $r->assignedClient && $r->assignedClient->safeguarding_flag)
                     ->count(),
                 'missing_key_worker' => $assignableCollection
-                    ->filter(fn ($r) => $r->assignedClient && !$r->assignedClient->key_worker_id)
+                    ->filter(fn ($r) => $r->assignedClient && ! $r->assignedClient->key_worker_id)
                     ->count(),
             ],
             'can_edit' => (bool) $request->user()?->canDo('sites.update'),
@@ -233,7 +238,6 @@ class SiteRoomController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'notes' => 'nullable|string',
-            'assigned_client_id' => 'nullable|exists:clients,id',
             'is_assignable' => 'nullable|boolean',
         ]);
 
@@ -241,12 +245,7 @@ class SiteRoomController extends Controller
             ? (bool) $validated['is_assignable']
             : true;
 
-        // Disallow seeding a client on a non-assignable room.
-        if (!$isAssignable) {
-            $validated['assigned_client_id'] = null;
-        }
-
-        $room = SiteHouseRoom::create([
+        SiteHouseRoom::create([
             ...$validated,
             'site_id' => $site->id,
             'tenant_id' => $site->tenant_id,
@@ -265,39 +264,15 @@ class SiteRoomController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'notes' => 'nullable|string',
-            'assigned_client_id' => 'nullable|exists:clients,id',
             'is_assignable' => 'nullable|boolean',
         ]);
 
         // If the room is being flipped to non-assignable, clear any active
         // occupant and close their history row in one go.
-        if (array_key_exists('is_assignable', $validated) && !$validated['is_assignable']) {
+        if (array_key_exists('is_assignable', $validated) && ! $validated['is_assignable']) {
             if ($room->assigned_client_id) {
-                $room->history()
-                    ->where('client_id', $room->assigned_client_id)
-                    ->whereNull('assigned_until')
-                    ->latest('id')
-                    ->first()
-                    ?->update(['assigned_until' => now()->toDateString()]);
+                $this->placements->assignRoom($site, $room, null, $request->user());
             }
-            $validated['assigned_client_id'] = null;
-            $validated['assigned_from'] = null;
-            $validated['assigned_until'] = null;
-        }
-
-        // Legacy path: if a new client is assigned via update, mirror the
-        // history-writing behaviour of the canonical assign() endpoint.
-        if (
-            array_key_exists('assigned_client_id', $validated)
-            && $room->assigned_client_id !== $validated['assigned_client_id']
-            && $validated['assigned_client_id']
-        ) {
-            $room->history()->create([
-                'tenant_id' => $site->tenant_id,
-                'client_id' => $validated['assigned_client_id'],
-                'assigned_from' => now(),
-                'assigned_by_user_id' => $request->user()->id,
-            ]);
         }
 
         $room->update($validated);
@@ -310,6 +285,9 @@ class SiteRoomController extends Controller
         $this->authorize('update', $site);
         abort_unless($room->site_id === $site->id, 404);
 
+        if ($room->assigned_client_id) {
+            $this->placements->assignRoom($site, $room, null, $request->user());
+        }
         $room->update(['is_active' => false]);
 
         return redirect()->back()->with('success', 'Bedroom deactivated.');
@@ -333,49 +311,8 @@ class SiteRoomController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $newClientId = $validated['client_id'] ?? null;
-
-        // Block assignments to non-assignable rooms (kitchens, lounges, etc.)
-        // but allow the null path so callers can still clear an old stuck
-        // assignment after the room is flipped to non-assignable.
-        if ($newClientId && !$room->is_assignable) {
-            return back()->with(
-                'error',
-                'This room is marked as a communal space and cannot have a client assigned.',
-            )->withErrors([
-                'client_id' => 'This room is not assignable to clients.',
-            ]);
-        }
-        $previousClientId = $room->assigned_client_id;
-        $today = now()->toDateString();
-
-        // Close the previous open history row when the occupant is being
-        // replaced or cleared.
-        if ($previousClientId && $previousClientId !== $newClientId) {
-            $room->history()
-                ->where('client_id', $previousClientId)
-                ->whereNull('assigned_until')
-                ->latest('id')
-                ->first()
-                ?->update(['assigned_until' => $today]);
-        }
-
-        $room->update([
-            'assigned_client_id' => $newClientId,
-            'assigned_from' => $newClientId ? ($validated['assigned_from'] ?? $today) : null,
-            'assigned_until' => $newClientId ? ($validated['assigned_until'] ?? null) : null,
-        ]);
-
-        if ($newClientId && $newClientId !== $previousClientId) {
-            $room->history()->create([
-                'tenant_id' => $site->tenant_id,
-                'client_id' => $newClientId,
-                'assigned_from' => $validated['assigned_from'] ?? $today,
-                'assigned_until' => $validated['assigned_until'] ?? null,
-                'assigned_by_user_id' => $request->user()->id,
-                'notes' => $validated['notes'] ?? null,
-            ]);
-        }
+        $newClientId = isset($validated['client_id']) ? (int) $validated['client_id'] : null;
+        $this->placements->assignRoom($site, $room, $newClientId, $request->user(), $validated);
 
         return back()->with(
             'success',

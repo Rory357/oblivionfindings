@@ -1,16 +1,20 @@
 <?php
 
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteCredential;
 use App\Models\SiteCredentialAuditLog;
+use App\Models\SiteVendor;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->admin = User::factory()->create([
         'role' => 'admin',
@@ -25,7 +29,7 @@ beforeEach(function () {
     ]);
 });
 
-test('site show page exposes credentials array with safe fields', function () {
+test('site show defers credential metadata and never exposes credential secrets', function () {
     SiteCredential::create([
         'site_id' => $this->site->id,
         'tenant_id' => $this->site->tenant_id,
@@ -33,7 +37,7 @@ test('site show page exposes credentials array with safe fields', function () {
         'username' => 'reception',
         'url' => 'https://door.example.test',
         'credential_type' => 'pin',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('1234'),
+        'encrypted_value' => Crypt::encryptString('1234'),
         'requires_reauth' => false,
         'is_shareable' => true,
         'password_strength' => 3,
@@ -45,18 +49,23 @@ test('site show page exposes credentials array with safe fields', function () {
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('sites/show')
-            ->has('credentials', 1)
-            ->where('credentials.0.label', 'Door Code')
-            ->where('credentials.0.username', 'reception')
-            ->where('credentials.0.url', 'https://door.example.test')
-            ->where('credentials.0.credential_type', 'pin')
-            ->where('credentials.0.is_shareable', true)
-            ->where('credentials.0.password_strength', 3)
-            ->where('credentials.0.has_totp', false)
-            ->missing('credentials.0.encrypted_value')
-            ->missing('credentials.0.totp_secret_encrypted')
-            ->missing('credentials.0.iv')
+            ->missing('credentials')
+            ->missing('adminData')
         );
+
+    $response = $this->actingAs($this->admin)
+        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'vendorsCredentialsData'))
+        ->assertOk()
+        ->assertJsonPath('props.vendorsCredentialsData.credentials.0.label', 'Door Code')
+        ->assertJsonPath('props.vendorsCredentialsData.credentials.0.username', 'reception')
+        ->assertJsonMissingPath('props.vendorsCredentialsData.credentials.0.encrypted_value');
+
+    expect($response->getContent())
+        ->toContain('Door Code')
+        ->toContain('reception')
+        ->not->toContain('1234')
+        ->not->toContain('encrypted_value')
+        ->not->toContain('totp_secret_encrypted');
 });
 
 test('retired per-site credentials page redirects to the unified vendors view', function () {
@@ -103,7 +112,7 @@ test('credential store accepts new fields, encrypts password, and writes a creat
     expect($credential->is_shareable)->toBeFalse();
     expect($credential->password_strength)->toBe(4);
     expect($credential->encrypted_value)->not->toBe('Sup3rS3cretPw!');
-    expect(\Illuminate\Support\Facades\Crypt::decryptString($credential->encrypted_value))
+    expect(Crypt::decryptString($credential->encrypted_value))
         ->toBe('Sup3rS3cretPw!');
 
     expect(
@@ -137,7 +146,7 @@ test('credential update rejects unsafe url schemes', function () {
         'label' => 'old name',
         'credential_type' => 'password',
         'url' => 'https://safe.example.test',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('keep-me'),
+        'encrypted_value' => Crypt::encryptString('keep-me'),
     ]);
 
     $this->actingAs($this->admin)
@@ -160,7 +169,7 @@ test('credential update can change metadata without rotating password', function
         'tenant_id' => $this->site->tenant_id,
         'label' => 'old name',
         'credential_type' => 'password',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('keep-me'),
+        'encrypted_value' => Crypt::encryptString('keep-me'),
         'requires_reauth' => false,
         'is_shareable' => false,
     ]);
@@ -180,7 +189,7 @@ test('credential update can change metadata without rotating password', function
     expect($credential->label)->toBe('new name');
     expect($credential->username)->toBe('user@example.test');
     expect($credential->is_shareable)->toBeTrue();
-    expect(\Illuminate\Support\Facades\Crypt::decryptString($credential->encrypted_value))
+    expect(Crypt::decryptString($credential->encrypted_value))
         ->toBe('keep-me');
 
     expect(
@@ -191,8 +200,8 @@ test('credential update can change metadata without rotating password', function
     )->toBeTrue();
 });
 
-test('site show for a vendor-only user: vendors populated, credentials empty', function () {
-    \App\Models\SiteVendor::create([
+test('site show for a vendor-only user exposes only the deferred vendor register', function () {
+    SiteVendor::create([
         'site_id' => $this->site->id,
         'tenant_id' => $this->site->tenant_id,
         'service_type' => 'electrician',
@@ -205,7 +214,7 @@ test('site show for a vendor-only user: vendors populated, credentials empty', f
         'tenant_id' => $this->site->tenant_id,
         'label' => 'Should not be visible',
         'credential_type' => 'password',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('x'),
+        'encrypted_value' => Crypt::encryptString('x'),
     ]);
 
     // team_lead has sites.viewAny + sites.type.house.view + vendors.view +
@@ -216,26 +225,25 @@ test('site show for a vendor-only user: vendors populated, credentials empty', f
         Role::query()->where('name', 'team_lead')->firstOrFail()->id,
     ]);
     $vendorOnly->permissionOverrides()->syncWithoutDetaching([
-        \App\Models\Permission::query()->where('key', 'credentials.view')->firstOrFail()->id => ['allowed' => false],
+        Permission::query()->where('key', 'credentials.view')->firstOrFail()->id => ['allowed' => false],
     ]);
 
     expect($vendorOnly->canDo('vendors.view'))->toBeTrue();
     expect($vendorOnly->canDo('credentials.view'))->toBeFalse();
 
-    $this->actingAs($vendorOnly)
-        ->get("/sites/{$this->site->id}")
+    $response = $this->actingAs($vendorOnly)
+        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'vendorsCredentialsData'))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->component('sites/show')
-            ->has('vendors', 1)
-            ->where('vendors.0.company_name', 'Sparks NZ')
-            ->has('credentials', 0)
-            ->where('credentialCount', 0)
-        );
+        ->assertJsonPath('props.vendorsCredentialsData.vendors.0.company_name', 'Sparks NZ')
+        ->assertJsonCount(0, 'props.vendorsCredentialsData.credentials');
+
+    expect($response->getContent())
+        ->toContain('Sparks NZ')
+        ->not->toContain('Should not be visible');
 });
 
-test('site show for a credential-only user: credentials populated, vendors empty', function () {
-    \App\Models\SiteVendor::create([
+test('site show for a credential-only user exposes only the deferred credential register', function () {
+    SiteVendor::create([
         'site_id' => $this->site->id,
         'tenant_id' => $this->site->tenant_id,
         'service_type' => 'electrician',
@@ -248,7 +256,7 @@ test('site show for a credential-only user: credentials populated, vendors empty
         'tenant_id' => $this->site->tenant_id,
         'label' => 'Door Code',
         'credential_type' => 'pin',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('1234'),
+        'encrypted_value' => Crypt::encryptString('1234'),
     ]);
 
     // team_lead minus vendors.view = credential-only tester.
@@ -257,26 +265,26 @@ test('site show for a credential-only user: credentials populated, vendors empty
         Role::query()->where('name', 'team_lead')->firstOrFail()->id,
     ]);
     $credentialOnly->permissionOverrides()->syncWithoutDetaching([
-        \App\Models\Permission::query()->where('key', 'vendors.view')->firstOrFail()->id => ['allowed' => false],
+        Permission::query()->where('key', 'vendors.view')->firstOrFail()->id => ['allowed' => false],
     ]);
 
     expect($credentialOnly->canDo('vendors.view'))->toBeFalse();
     expect($credentialOnly->canDo('credentials.view'))->toBeTrue();
 
-    $this->actingAs($credentialOnly)
-        ->get("/sites/{$this->site->id}")
+    $response = $this->actingAs($credentialOnly)
+        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'vendorsCredentialsData'))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->component('sites/show')
-            ->has('vendors', 0)
-            ->has('credentials', 1)
-            ->where('credentials.0.label', 'Door Code')
-            ->where('credentialCount', 1)
-        );
+        ->assertJsonCount(0, 'props.vendorsCredentialsData.vendors')
+        ->assertJsonPath('props.vendorsCredentialsData.credentials.0.label', 'Door Code');
+
+    expect($response->getContent())
+        ->not->toContain('Sparks NZ')
+        ->toContain('Door Code')
+        ->not->toContain('1234');
 });
 
-test('site show for a both-permission user (admin): both sides populated', function () {
-    \App\Models\SiteVendor::create([
+test('site show for an admin exposes both deferred full registers without secrets', function () {
+    SiteVendor::create([
         'site_id' => $this->site->id,
         'tenant_id' => $this->site->tenant_id,
         'service_type' => 'electrician',
@@ -289,18 +297,16 @@ test('site show for a both-permission user (admin): both sides populated', funct
         'tenant_id' => $this->site->tenant_id,
         'label' => 'Door Code',
         'credential_type' => 'pin',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('1234'),
+        'encrypted_value' => Crypt::encryptString('1234'),
     ]);
 
     $this->actingAs($this->admin)
-        ->get("/sites/{$this->site->id}")
+        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'vendorsCredentialsData'))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->component('sites/show')
-            ->has('vendors', 1)
-            ->has('credentials', 1)
-            ->where('credentialCount', 1)
-        );
+        ->assertJsonPath('props.vendorsCredentialsData.vendors.0.company_name', 'Sparks NZ')
+        ->assertJsonPath('props.vendorsCredentialsData.credentials.0.label', 'Door Code')
+        ->assertJsonMissingPath('props.vendorsCredentialsData.credentials.0.encrypted_value')
+        ->assertJsonMissingPath('props.vendorsCredentialsData.credentials.0.totp_secret_encrypted');
 });
 
 test('credential destroy returns back(303) and audits delete (audit row survives via nullOnDelete)', function () {
@@ -309,7 +315,7 @@ test('credential destroy returns back(303) and audits delete (audit row survives
         'tenant_id' => $this->site->tenant_id,
         'label' => 'to delete',
         'credential_type' => 'password',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('x'),
+        'encrypted_value' => Crypt::encryptString('x'),
     ]);
 
     $tenantId = $this->site->tenant_id;

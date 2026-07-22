@@ -1,12 +1,5 @@
-import AppLayout from '@/layouts/app-layout';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -18,6 +11,15 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -25,6 +27,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -32,7 +36,16 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PageHero } from '@/components/page';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     ArrowRight,
     Ban,
@@ -50,8 +63,12 @@ import {
     Wifi,
     WifiOff,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { PlanThumbnail, type PlanLayout, type PlanPin } from '../plan/_thumbnail';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import {
+    PlanThumbnail,
+    type PlanLayout,
+    type PlanPin,
+} from '../plan/_thumbnail';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -105,13 +122,51 @@ type TypePlanSummary = {
     has_plan: boolean;
 };
 
-type Props = {
+export type SiteHardwareProps = {
     site: Site;
     devices: DeviceItem[];
     rooms: Room[];
     can: Permissions;
     typePlan?: TypePlanSummary | null;
 };
+
+function SiteHardwareFrame({
+    embedded,
+    site,
+    children,
+}: {
+    embedded: boolean;
+    site: Site;
+    children: ReactNode;
+}) {
+    if (embedded) return <Fragment>{children}</Fragment>;
+
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Sites', href: '/sites' },
+                { title: site.name, href: `/sites/${site.id}` },
+                { title: 'Hardware', href: `/sites/${site.id}/hardware` },
+            ]}
+        >
+            {children}
+        </AppLayout>
+    );
+}
+
+function SiteHardwareShell({
+    embedded,
+    children,
+}: {
+    embedded: boolean;
+    children: ReactNode;
+}) {
+    return embedded ? (
+        <Fragment>{children}</Fragment>
+    ) : (
+        <PageShell>{children}</PageShell>
+    );
+}
 
 // ---------------------------------------------------------------------------
 // Status helpers
@@ -132,17 +187,20 @@ const deviceStatusConfig: Record<
 > = {
     active: {
         label: 'Online',
-        className: 'bg-status-success-bg text-status-success border-status-success/30',
+        className:
+            'bg-status-success-bg text-status-success border-status-success/30',
         icon: Wifi,
     },
     offline: {
         label: 'Offline',
-        className: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+        className:
+            'bg-status-critical-bg text-status-critical border-status-critical/30',
         icon: WifiOff,
     },
     degraded: {
         label: 'Degraded',
-        className: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+        className:
+            'bg-status-warning-bg text-status-warning border-status-warning/30',
         icon: HelpCircle,
     },
     maintenance: {
@@ -152,17 +210,20 @@ const deviceStatusConfig: Record<
     },
     decommissioned: {
         label: 'Retired',
-        className: 'bg-muted-foreground/10 text-muted-foreground border-border/20',
+        className:
+            'bg-muted-foreground/10 text-muted-foreground border-border/20',
         icon: Ban,
     },
     in_stock: {
         label: 'In Stock',
-        className: 'bg-muted-foreground/20 text-muted-foreground border-border/30',
+        className:
+            'bg-muted-foreground/20 text-muted-foreground border-border/30',
         icon: HelpCircle,
     },
     lost: {
         label: 'Lost',
-        className: 'bg-status-critical-bg text-status-critical border-status-critical/20',
+        className:
+            'bg-status-critical-bg text-status-critical border-status-critical/20',
         icon: Ban,
     },
 };
@@ -171,7 +232,8 @@ function getDeviceStatus(status: string) {
     return (
         deviceStatusConfig[status as DeviceStatusKey] ?? {
             label: status || 'Unknown',
-            className: 'bg-muted-foreground/20 text-muted-foreground border-border/30',
+            className:
+                'bg-muted-foreground/20 text-muted-foreground border-border/30',
             icon: HelpCircle,
         }
     );
@@ -194,7 +256,14 @@ function formatDateTime(value?: string | null): string {
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function SiteHardware({ site, devices, rooms, can, typePlan = null }: Props) {
+export function SiteHardwareSurface({
+    site,
+    devices,
+    rooms,
+    can,
+    typePlan = null,
+    embedded = false,
+}: SiteHardwareProps & { embedded?: boolean }) {
     // ── filter / search state ──────────────────────────────────────
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -209,11 +278,17 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
     const [savingRoomId, setSavingRoomId] = useState<number | null>(null);
 
     // ── device → room assignment (row-level only; physical placement) ─
-    const [assigningDeviceId, setAssigningDeviceId] = useState<number | null>(null);
+    const [assigningDeviceId, setAssigningDeviceId] = useState<number | null>(
+        null,
+    );
     const [pinningDevice, setPinningDevice] = useState<DeviceItem | null>(null);
-    const [pinDraft, setPinDraft] = useState<{ x: number; y: number } | null>(null);
+    const [pinDraft, setPinDraft] = useState<{ x: number; y: number } | null>(
+        null,
+    );
     const [savingPin, setSavingPin] = useState(false);
-    const [deviceRoomDraft, setDeviceRoomDraft] = useState<Record<number, string>>(() =>
+    const [deviceRoomDraft, setDeviceRoomDraft] = useState<
+        Record<number, string>
+    >(() =>
         devices.reduce<Record<number, string>>((acc, d) => {
             acc[d.id] =
                 d.assignment_type === 'room' && d.assignment_id
@@ -230,8 +305,12 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
     const stats = useMemo(() => {
         const total = devices.length;
         const online = devices.filter((d) => d.status === 'active').length;
-        const offline = devices.filter((d) => d.status === 'offline' || d.status === 'degraded').length;
-        const unassigned = devices.filter((d) => d.assignment_type !== 'room').length;
+        const offline = devices.filter(
+            (d) => d.status === 'offline' || d.status === 'degraded',
+        ).length;
+        const unassigned = devices.filter(
+            (d) => d.assignment_type !== 'room',
+        ).length;
         return { total, online, offline, unassigned };
     }, [devices]);
 
@@ -243,20 +322,27 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
     }, [devices]);
 
     const statusOptions = useMemo(() => {
-        const values = Array.from(new Set(devices.map((d) => d.status).filter(Boolean)));
+        const values = Array.from(
+            new Set(devices.map((d) => d.status).filter(Boolean)),
+        );
         return values.sort((a, b) => a.localeCompare(b));
     }, [devices]);
 
     const categoryOptions = useMemo(() => {
-        const values = Array.from(new Set(devices.map((d) => d.category).filter(Boolean)));
+        const values = Array.from(
+            new Set(devices.map((d) => d.category).filter(Boolean)),
+        );
         return values.sort((a, b) => a.localeCompare(b));
     }, [devices]);
 
     const filteredDevices = useMemo(() => {
         return devices.filter((d) => {
-            if (filterStatus !== 'all' && d.status !== filterStatus) return false;
-            if (filterCategory !== 'all' && d.category !== filterCategory) return false;
-            if (filterProvider !== 'all' && d.provider !== filterProvider) return false;
+            if (filterStatus !== 'all' && d.status !== filterStatus)
+                return false;
+            if (filterCategory !== 'all' && d.category !== filterCategory)
+                return false;
+            if (filterProvider !== 'all' && d.provider !== filterProvider)
+                return false;
             if (search) {
                 const q = search.toLowerCase();
                 const haystack = [
@@ -347,7 +433,11 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
 
     function openPinDialog(device: DeviceItem) {
         setPinningDevice(device);
-        setPinDraft(device.plan_pin ? { x: device.plan_pin.x, y: device.plan_pin.y } : null);
+        setPinDraft(
+            device.plan_pin
+                ? { x: device.plan_pin.x, y: device.plan_pin.y }
+                : null,
+        );
     }
 
     function savePlanPin() {
@@ -392,63 +482,95 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
 
     // ── render ─────────────────────────────────────────────────────
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Sites', href: '/sites' },
-                { title: site.name, href: `/sites/${site.id}` },
-                { title: 'Hardware', href: `/sites/${site.id}/hardware` },
-            ]}
-        >
-            <Head title={`${site.name} - Hardware`} />
+        <SiteHardwareFrame embedded={embedded} site={site}>
+            {!embedded ? <Head title={`${site.name} - Hardware`} /> : null}
 
-            <PageShell>
-                <PageHero
-                    icon={HardDrive}
-                    backHref={`/sites/${site.id}`}
-                    backLabel="Back to site"
-                    title="Hardware at this location"
-                    description="Read-only view of devices at this site, with room placement. Device management lives in Security & Devices."
-                    stats={[
-                        { label: 'Total', value: stats.total },
-                        { label: 'Online', value: stats.online },
-                        { label: 'Offline', value: stats.offline },
-                        { label: 'Unassigned', value: stats.unassigned },
-                    ]}
-                    actions={
-                        <div className="flex items-center gap-2">
-                            {planForPins && (
+            <SiteHardwareShell embedded={embedded}>
+                {!embedded ? (
+                    <PageHero
+                        icon={HardDrive}
+                        backHref={`/sites/${site.id}`}
+                        backLabel="Back to site"
+                        title="Hardware at this location"
+                        description="Read-only view of devices at this site, with room placement. Device management lives in Security & Devices."
+                        stats={[
+                            { label: 'Total', value: stats.total },
+                            { label: 'Online', value: stats.online },
+                            { label: 'Offline', value: stats.offline },
+                            { label: 'Unassigned', value: stats.unassigned },
+                        ]}
+                        actions={
+                            <div className="flex items-center gap-2">
+                                {planForPins && (
+                                    <Button
+                                        asChild
+                                        variant="outline"
+                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
+                                        <Link
+                                            href={`/sites/${site.id}?tab=type-plan`}
+                                        >
+                                            <MapPin className="mr-1 h-4 w-4" />
+                                            Open {typePlan?.tab_label ?? 'Plan'}
+                                        </Link>
+                                    </Button>
+                                )}
                                 <Button
                                     asChild
                                     variant="outline"
                                     className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                 >
-                                    <Link href={`/sites/${site.id}?tab=type-plan`}>
-                                        <MapPin className="mr-1 h-4 w-4" />
-                                        Open {typePlan?.tab_label ?? 'Plan'}
-                                    </Link>
+                                    <a
+                                        href={`/security-devices/devices?site_id=${site.id}`}
+                                    >
+                                        Manage in Security &amp; Devices
+                                        <ArrowRight className="ml-1 h-4 w-4" />
+                                    </a>
                                 </Button>
-                            )}
-                            <Button
-                                asChild
-                                variant="outline"
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <a href={`/security-devices/devices?site_id=${site.id}`}>
-                                    Manage in Security &amp; Devices
-                                    <ArrowRight className="ml-1 h-4 w-4" />
-                                </a>
-                            </Button>
-                            <Button asChild>
-                                <a
-                                    href={`/security-devices/devices/create?domain=&site_id=${site.id}`}
-                                >
-                                    <Plus className="mr-1 h-4 w-4" />
-                                    Register Device
-                                </a>
-                            </Button>
-                        </div>
-                    }
-                />
+                                <Button asChild>
+                                    <a
+                                        href={`/security-devices/devices/create?domain=&site_id=${site.id}`}
+                                    >
+                                        <Plus className="mr-1 h-4 w-4" />
+                                        Register Device
+                                    </a>
+                                </Button>
+                            </div>
+                        }
+                    />
+                ) : (
+                    <Card>
+                        <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <CardTitle>Hardware at this location</CardTitle>
+                                <CardDescription>
+                                    Canonical device register, live state, room
+                                    assignment and plan-pin controls.
+                                </CardDescription>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {planForPins ? (
+                                    <Button asChild variant="outline">
+                                        <Link
+                                            href={`/sites/${site.id}?tab=plan`}
+                                        >
+                                            <MapPin className="mr-1 h-4 w-4" />
+                                            Open {typePlan?.tab_label ?? 'Plan'}
+                                        </Link>
+                                    </Button>
+                                ) : null}
+                                <Button asChild variant="outline">
+                                    <a
+                                        href={`/security-devices/devices?site_id=${site.id}`}
+                                    >
+                                        Manage in Security &amp; Devices
+                                        <ArrowRight className="ml-1 h-4 w-4" />
+                                    </a>
+                                </Button>
+                            </div>
+                        </CardHeader>
+                    </Card>
+                )}
 
                 {/* ── Ownership banner ─────────────────────────────── */}
                 <Card className="border-dashed bg-muted/30">
@@ -460,8 +582,8 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                 <span className="font-medium text-foreground">
                                     {site.name}
                                 </span>
-                                . Credentials, provider sync, device creation and
-                                reassignment happen in{' '}
+                                . Credentials, provider sync, device creation
+                                and reassignment happen in{' '}
                                 <a
                                     href="/security-devices"
                                     className="font-medium text-primary hover:underline"
@@ -490,8 +612,12 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                 <Cpu className="h-5 w-5 text-muted-foreground" />
                             </div>
                             <div>
-                                <div className="text-2xl font-bold">{stats.total}</div>
-                                <div className="text-sm text-muted-foreground">Total devices</div>
+                                <div className="text-2xl font-bold">
+                                    {stats.total}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    Total devices
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -504,7 +630,9 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                 <div className="text-2xl font-bold text-status-success">
                                     {stats.online}
                                 </div>
-                                <div className="text-sm text-muted-foreground">Online</div>
+                                <div className="text-sm text-muted-foreground">
+                                    Online
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -517,7 +645,9 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                 <div className="text-2xl font-bold text-status-critical">
                                     {stats.offline}
                                 </div>
-                                <div className="text-sm text-muted-foreground">Offline / degraded</div>
+                                <div className="text-sm text-muted-foreground">
+                                    Offline / degraded
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -530,7 +660,9 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                 <div className="text-2xl font-bold text-status-warning">
                                     {stats.unassigned}
                                 </div>
-                                <div className="text-sm text-muted-foreground">Unassigned to rooms</div>
+                                <div className="text-sm text-muted-foreground">
+                                    Unassigned to rooms
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -540,7 +672,7 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                 <Card>
                     <CardContent className="flex flex-wrap items-center gap-3 p-4">
                         <div className="relative min-w-[240px] flex-1">
-                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
@@ -548,12 +680,17 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                 className="pl-9"
                             />
                         </div>
-                        <Select value={filterStatus} onValueChange={setFilterStatus}>
+                        <Select
+                            value={filterStatus}
+                            onValueChange={setFilterStatus}
+                        >
                             <SelectTrigger className="w-[140px]">
                                 <SelectValue placeholder="Status" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All statuses</SelectItem>
+                                <SelectItem value="all">
+                                    All statuses
+                                </SelectItem>
                                 {statusOptions.map((s) => (
                                     <SelectItem key={s} value={s}>
                                         {getDeviceStatus(s).label}
@@ -561,12 +698,17 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                 ))}
                             </SelectContent>
                         </Select>
-                        <Select value={filterCategory} onValueChange={setFilterCategory}>
+                        <Select
+                            value={filterCategory}
+                            onValueChange={setFilterCategory}
+                        >
                             <SelectTrigger className="w-[160px]">
                                 <SelectValue placeholder="Category" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All categories</SelectItem>
+                                <SelectItem value="all">
+                                    All categories
+                                </SelectItem>
                                 {categoryOptions.map((c) => (
                                     <SelectItem key={c} value={c}>
                                         {c}
@@ -574,12 +716,17 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                 ))}
                             </SelectContent>
                         </Select>
-                        <Select value={filterProvider} onValueChange={setFilterProvider}>
+                        <Select
+                            value={filterProvider}
+                            onValueChange={setFilterProvider}
+                        >
                             <SelectTrigger className="w-[140px]">
                                 <SelectValue placeholder="Provider" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All providers</SelectItem>
+                                <SelectItem value="all">
+                                    All providers
+                                </SelectItem>
                                 {providerOptions.map((p) => (
                                     <SelectItem key={p} value={p}>
                                         {p}
@@ -596,7 +743,8 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                     <CardHeader>
                         <CardTitle>Devices</CardTitle>
                         <CardDescription>
-                            Click any device to open it in Security &amp; Devices.
+                            Click any device to open it in Security &amp;
+                            Devices.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -612,20 +760,27 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                         <TableHead>Room</TableHead>
                                         <TableHead>Plan Pin</TableHead>
                                         <TableHead>Last seen</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableHead className="text-right">
+                                            Actions
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {filteredDevices.map((d) => {
                                         const badge = getDeviceStatus(d.status);
-                                        const draft = deviceRoomDraft[d.id] ?? 'unassigned';
-                                        const saving = assigningDeviceId === d.id;
+                                        const draft =
+                                            deviceRoomDraft[d.id] ??
+                                            'unassigned';
+                                        const saving =
+                                            assigningDeviceId === d.id;
                                         return (
                                             <TableRow key={d.id}>
                                                 <TableCell>
                                                     <Badge
                                                         variant="outline"
-                                                        className={badge.className}
+                                                        className={
+                                                            badge.className
+                                                        }
                                                     >
                                                         <badge.icon className="mr-1 h-3 w-3" />
                                                         {badge.label}
@@ -645,13 +800,18 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-sm">
-                                                    {d.subcategory ?? d.category}
+                                                    {d.subcategory ??
+                                                        d.category}
                                                 </TableCell>
                                                 <TableCell>
                                                     {d.provider ? (
-                                                        <Badge variant="secondary">{d.provider}</Badge>
+                                                        <Badge variant="secondary">
+                                                            {d.provider}
+                                                        </Badge>
                                                     ) : (
-                                                        <Badge variant="outline">manual</Badge>
+                                                        <Badge variant="outline">
+                                                            manual
+                                                        </Badge>
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-sm text-muted-foreground">
@@ -661,13 +821,19 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                                     <div className="flex items-center gap-2">
                                                         <Select
                                                             value={draft}
-                                                            onValueChange={(v) =>
-                                                                setDeviceRoomDraft((prev) => ({
-                                                                    ...prev,
-                                                                    [d.id]: v,
-                                                                }))
+                                                            onValueChange={(
+                                                                v,
+                                                            ) =>
+                                                                setDeviceRoomDraft(
+                                                                    (prev) => ({
+                                                                        ...prev,
+                                                                        [d.id]: v,
+                                                                    }),
+                                                                )
                                                             }
-                                                            disabled={!canManageHardware}
+                                                            disabled={
+                                                                !canManageHardware
+                                                            }
                                                         >
                                                             <SelectTrigger className="h-8 w-[160px]">
                                                                 <SelectValue placeholder="Room" />
@@ -676,29 +842,48 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                                                 <SelectItem value="unassigned">
                                                                     Unassigned
                                                                 </SelectItem>
-                                                                {rooms.map((r) => (
-                                                                    <SelectItem
-                                                                        key={r.id}
-                                                                        value={String(r.id)}
-                                                                    >
-                                                                        {r.name}
-                                                                    </SelectItem>
-                                                                ))}
+                                                                {rooms.map(
+                                                                    (r) => (
+                                                                        <SelectItem
+                                                                            key={
+                                                                                r.id
+                                                                            }
+                                                                            value={String(
+                                                                                r.id,
+                                                                            )}
+                                                                        >
+                                                                            {
+                                                                                r.name
+                                                                            }
+                                                                        </SelectItem>
+                                                                    ),
+                                                                )}
                                                             </SelectContent>
                                                         </Select>
                                                         {canManageHardware &&
                                                             draft !==
-                                                                (d.assignment_type === 'room' &&
+                                                                (d.assignment_type ===
+                                                                    'room' &&
                                                                 d.assignment_id
-                                                                    ? String(d.assignment_id)
+                                                                    ? String(
+                                                                          d.assignment_id,
+                                                                      )
                                                                     : 'unassigned') && (
                                                                 <Button
                                                                     size="sm"
                                                                     variant="outline"
-                                                                    onClick={() => assignDeviceRoom(d.id)}
-                                                                    disabled={saving}
+                                                                    onClick={() =>
+                                                                        assignDeviceRoom(
+                                                                            d.id,
+                                                                        )
+                                                                    }
+                                                                    disabled={
+                                                                        saving
+                                                                    }
                                                                 >
-                                                                    {saving ? 'Saving…' : 'Save'}
+                                                                    {saving
+                                                                        ? 'Saving…'
+                                                                        : 'Save'}
                                                                 </Button>
                                                             )}
                                                     </div>
@@ -714,30 +899,45 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                                                 <Button
                                                                     size="sm"
                                                                     variant="ghost"
-                                                                    onClick={() => openPinDialog(d)}
+                                                                    onClick={() =>
+                                                                        openPinDialog(
+                                                                            d,
+                                                                        )
+                                                                    }
                                                                 >
                                                                     Move
                                                                 </Button>
                                                             )}
                                                         </div>
-                                                    ) : canManageHardware && planForPins ? (
+                                                    ) : canManageHardware &&
+                                                      planForPins ? (
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            onClick={() => openPinDialog(d)}
+                                                            onClick={() =>
+                                                                openPinDialog(d)
+                                                            }
                                                         >
                                                             <MapPin className="mr-1 h-3.5 w-3.5" />
                                                             Pin
                                                         </Button>
                                                     ) : (
-                                                        <span className="text-sm text-muted-foreground">-</span>
+                                                        <span className="text-sm text-muted-foreground">
+                                                            -
+                                                        </span>
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-sm text-muted-foreground">
-                                                    {formatDateTime(d.last_seen_at)}
+                                                    {formatDateTime(
+                                                        d.last_seen_at,
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button asChild size="sm" variant="ghost">
+                                                    <Button
+                                                        asChild
+                                                        size="sm"
+                                                        variant="ghost"
+                                                    >
                                                         <a
                                                             href={`/security-devices/devices/${d.id}`}
                                                         >
@@ -773,7 +973,8 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                         <div>
                             <CardTitle>Rooms</CardTitle>
                             <CardDescription>
-                                Physical rooms at this site. Used for placing devices.
+                                Physical rooms at this site. Used for placing
+                                devices.
                             </CardDescription>
                         </div>
                         {canManageHardware && !showAddRoom && (
@@ -798,14 +999,21 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                     <Input
                                         id="room_name"
                                         value={roomForm.data.name}
-                                        onChange={(e) => roomForm.setData('name', e.target.value)}
+                                        onChange={(e) =>
+                                            roomForm.setData(
+                                                'name',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="e.g. Lounge"
                                     />
                                 </div>
                                 <Button
                                     type="submit"
                                     size="sm"
-                                    disabled={addingRoom || !roomForm.data.name.trim()}
+                                    disabled={
+                                        addingRoom || !roomForm.data.name.trim()
+                                    }
                                 >
                                     {addingRoom ? 'Saving…' : 'Save'}
                                 </Button>
@@ -826,7 +1034,8 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                         {rooms.length === 0 ? (
                             <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
                                 No rooms yet.
-                                {canManageHardware && ' Add one to start placing devices.'}
+                                {canManageHardware &&
+                                    ' Add one to start placing devices.'}
                             </div>
                         ) : (
                             <div className="rounded-md border">
@@ -835,22 +1044,33 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                         <TableRow>
                                             <TableHead>Room</TableHead>
                                             <TableHead>Devices</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
+                                            <TableHead className="text-right">
+                                                Actions
+                                            </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {rooms.map((room) => {
-                                            const isEditing = editingRoomId === room.id;
-                                            const count = deviceCountInRoom(room.id);
-                                            const saving = savingRoomId === room.id;
+                                            const isEditing =
+                                                editingRoomId === room.id;
+                                            const count = deviceCountInRoom(
+                                                room.id,
+                                            );
+                                            const saving =
+                                                savingRoomId === room.id;
                                             return (
                                                 <TableRow key={room.id}>
                                                     <TableCell>
                                                         {isEditing ? (
                                                             <Input
-                                                                value={editingRoomName}
+                                                                value={
+                                                                    editingRoomName
+                                                                }
                                                                 onChange={(e) =>
-                                                                    setEditingRoomName(e.target.value)
+                                                                    setEditingRoomName(
+                                                                        e.target
+                                                                            .value,
+                                                                    )
                                                                 }
                                                                 className="h-8 max-w-xs"
                                                             />
@@ -864,7 +1084,8 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="text-sm text-muted-foreground">
-                                                        {count} device{count === 1 ? '' : 's'}
+                                                        {count} device
+                                                        {count === 1 ? '' : 's'}
                                                     </TableCell>
                                                     <TableCell className="text-right">
                                                         {canManageHardware && (
@@ -874,21 +1095,29 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                                                         <Button
                                                                             size="sm"
                                                                             onClick={() =>
-                                                                                submitEditRoom(room.id)
+                                                                                submitEditRoom(
+                                                                                    room.id,
+                                                                                )
                                                                             }
                                                                             disabled={
                                                                                 saving ||
                                                                                 !editingRoomName.trim()
                                                                             }
                                                                         >
-                                                                            {saving ? 'Saving…' : 'Save'}
+                                                                            {saving
+                                                                                ? 'Saving…'
+                                                                                : 'Save'}
                                                                         </Button>
                                                                         <Button
                                                                             size="sm"
                                                                             variant="ghost"
                                                                             onClick={() => {
-                                                                                setEditingRoomId(null);
-                                                                                setEditingRoomName('');
+                                                                                setEditingRoomId(
+                                                                                    null,
+                                                                                );
+                                                                                setEditingRoomName(
+                                                                                    '',
+                                                                                );
                                                                             }}
                                                                         >
                                                                             Cancel
@@ -900,17 +1129,24 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                                                             size="sm"
                                                                             variant="ghost"
                                                                             onClick={() =>
-                                                                                startEditRoom(room)
+                                                                                startEditRoom(
+                                                                                    room,
+                                                                                )
                                                                             }
                                                                         >
                                                                             <Pencil className="h-3.5 w-3.5" />
                                                                         </Button>
                                                                         <AlertDialog>
-                                                                            <AlertDialogTrigger asChild>
+                                                                            <AlertDialogTrigger
+                                                                                asChild
+                                                                            >
                                                                                 <Button
                                                                                     size="sm"
                                                                                     variant="ghost"
-                                                                                    disabled={count > 0}
+                                                                                    disabled={
+                                                                                        count >
+                                                                                        0
+                                                                                    }
                                                                                 >
                                                                                     <Trash2 className="h-3.5 w-3.5" />
                                                                                 </Button>
@@ -918,14 +1154,25 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                                                             <AlertDialogContent>
                                                                                 <AlertDialogHeader>
                                                                                     <AlertDialogTitle>
-                                                                                        Delete room "
-                                                                                        {room.name}"?
+                                                                                        Delete
+                                                                                        room
+                                                                                        "
+                                                                                        {
+                                                                                            room.name
+                                                                                        }
+                                                                                        "?
                                                                                     </AlertDialogTitle>
                                                                                     <AlertDialogDescription>
-                                                                                        This cannot be
-                                                                                        undone. Devices
-                                                                                        must be moved
-                                                                                        out first.
+                                                                                        This
+                                                                                        cannot
+                                                                                        be
+                                                                                        undone.
+                                                                                        Devices
+                                                                                        must
+                                                                                        be
+                                                                                        moved
+                                                                                        out
+                                                                                        first.
                                                                                     </AlertDialogDescription>
                                                                                 </AlertDialogHeader>
                                                                                 <AlertDialogFooter>
@@ -958,7 +1205,7 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                         )}
                     </CardContent>
                 </Card>
-            </PageShell>
+            </SiteHardwareShell>
 
             <Dialog
                 open={pinningDevice !== null}
@@ -972,7 +1219,8 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                 <DialogContent className="max-w-4xl">
                     <DialogHeader>
                         <DialogTitle>
-                            Pin {pinningDevice?.name ?? 'device'} to {typePlan?.tab_label ?? 'plan'}
+                            Pin {pinningDevice?.name ?? 'device'} to{' '}
+                            {typePlan?.tab_label ?? 'plan'}
                         </DialogTitle>
                     </DialogHeader>
                     {planForPins ? (
@@ -990,7 +1238,9 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                               {
                                                   kind: 'device',
                                                   device_id: pinningDevice.id,
-                                                  label: pinningDevice.name || pinningDevice.device_uid,
+                                                  label:
+                                                      pinningDevice.name ||
+                                                      pinningDevice.device_uid,
                                                   x: pinDraft.x,
                                                   y: pinDraft.y,
                                               },
@@ -1016,7 +1266,9 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                                         type="button"
                                         variant="outline"
                                         className="w-full justify-start"
-                                        onClick={() => removePlanPin(pinningDevice)}
+                                        onClick={() =>
+                                            removePlanPin(pinningDevice)
+                                        }
                                         disabled={savingPin}
                                     >
                                         Remove pin
@@ -1050,6 +1302,10 @@ export default function SiteHardware({ site, devices, rooms, can, typePlan = nul
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </AppLayout>
+        </SiteHardwareFrame>
     );
+}
+
+export default function SiteHardware(props: SiteHardwareProps) {
+    return <SiteHardwareSurface {...props} />;
 }

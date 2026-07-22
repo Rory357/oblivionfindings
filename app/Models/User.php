@@ -341,6 +341,11 @@ class User extends Authenticatable
         return $this->hasMany(UserNotificationPreference::class);
     }
 
+    public function uiPreferences()
+    {
+        return $this->hasMany(UserUiPreference::class);
+    }
+
     public function breakGlassAccesses()
     {
         return $this->hasMany(ClientBreakGlassAccess::class);
