@@ -21,25 +21,23 @@ describe('site profile operations ownership', () => {
         }
     });
 
-    it('keeps Checklists compact and routes work to its canonical workspace', () => {
-        const profile = readFileSync(
-            resolve(root, 'resources/js/pages/sites/show.tsx'),
-            'utf8',
-        );
+    it('embeds the complete canonical Checklists workspace', () => {
         const checklists = readFileSync(
             resolve(tabs, 'checklists.tsx'),
             'utf8',
         );
-        const backend = readFileSync(
-            resolve(root, 'app/Services/Sites/SiteProfileData.php'),
-            'utf8',
-        );
 
-        expect(profile).not.toContain('ChecklistsWorkspace');
-        expect(checklists).not.toContain('ChecklistsWorkspace');
-        expect(checklists).toContain('SiteProfileModuleSummary');
-        expect(backend).toContain("route('sites.checklists.index'");
-        expect(backend).toContain('->limit(12)');
+        expect(checklists).toContain('ChecklistsWorkspace');
+        expect(checklists).toContain('embedded');
+        expect(checklists).not.toContain('SiteProfileModuleSummary');
+    });
+
+    it('embeds the complete canonical Site Calendar', () => {
+        const calendar = readFileSync(resolve(tabs, 'calendar.tsx'), 'utf8');
+
+        expect(calendar).toContain('SiteCalendar');
+        expect(calendar).toContain('context="profile"');
+        expect(calendar).not.toContain('SiteProfileModuleSummary');
     });
 
     it('reuses the canonical Meal Planner in embedded mode', () => {
@@ -53,20 +51,19 @@ describe('site profile operations ownership', () => {
         expect(mealPlanner).not.toContain('<form');
     });
 
-    it('links asset, fleet, hardware, and plan summaries to their owners', () => {
-        const backend = readFileSync(
-            resolve(root, 'app/Services/Sites/SiteProfileData.php'),
-            'utf8',
-        );
-
-        for (const routeName of [
-            'fleet-assets.assets.index',
-            'fleet-assets.dashboard',
-            'sites.hardware.index',
-            'sites.plan.show',
+    it('restores full asset, fleet, hardware, and plan surfaces', () => {
+        for (const file of [
+            'assets.tsx',
+            'fleet.tsx',
+            'hardware.tsx',
+            'plan.tsx',
         ]) {
-            expect(backend).toContain(routeName);
+            const source = readFileSync(resolve(tabs, file), 'utf8');
+            expect(source, file).not.toContain('SiteProfileModuleSummary');
         }
+        expect(readFileSync(resolve(tabs, 'plan.tsx'), 'utf8')).toContain(
+            'SitePlanSurface',
+        );
     });
 
     it('keeps Meal Planner hidden for head office Sites', () => {

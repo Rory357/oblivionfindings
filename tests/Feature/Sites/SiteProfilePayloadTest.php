@@ -64,6 +64,10 @@ class SiteProfilePayloadTest extends TestCase
                 ->missing('safetyData')
                 ->missing('operationsData')
                 ->missing('adminData')
+                ->missing('clientsData')
+                ->missing('hazardsData')
+                ->missing('calendarData')
+                ->missing('documentsData')
                 ->missing('clients')
                 ->missing('assets')
                 ->missing('vendors')
@@ -72,17 +76,21 @@ class SiteProfilePayloadTest extends TestCase
             );
     }
 
-    public function test_partial_request_materializes_only_the_requested_optional_group(): void
+    public function test_partial_request_materializes_only_the_requested_optional_tab(): void
     {
         $this->actingAs($this->admin)
-            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'safetyData'))
+            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'hazardsData'))
             ->assertOk()
             ->assertHeader('X-Inertia', 'true')
             ->assertJsonPath('component', 'sites/show')
-            ->assertJsonStructure(['props' => ['safetyData']])
-            ->assertJsonMissingPath('props.peopleData')
-            ->assertJsonMissingPath('props.operationsData')
-            ->assertJsonMissingPath('props.adminData');
+            ->assertJsonStructure(['props' => ['hazardsData']])
+            ->assertJsonPath('props.hazardsData.locked', false)
+            ->assertJsonMissingPath('props.riskAssessmentsData')
+            ->assertJsonMissingPath('props.inspectionsData')
+            ->assertJsonMissingPath('props.drillsData')
+            ->assertJsonMissingPath('props.firstAidData')
+            ->assertJsonMissingPath('props.ppeData')
+            ->assertJsonMissingPath('props.emergencyPlanData');
     }
 
     public function test_admin_payload_never_serializes_credential_secret_material(): void
