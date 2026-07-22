@@ -93,7 +93,7 @@ class SiteProfilePayloadTest extends TestCase
             ->assertJsonMissingPath('props.emergencyPlanData');
     }
 
-    public function test_admin_payload_never_serializes_credential_secret_material(): void
+    public function test_vendor_credentials_payload_never_serializes_credential_secret_material(): void
     {
         SiteCredential::query()->create([
             'site_id' => $this->site->id,
@@ -104,9 +104,9 @@ class SiteProfilePayloadTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'adminData'))
+            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'vendorsCredentialsData'))
             ->assertOk()
-            ->assertJsonPath('props.adminData.vendors_credentials.summary.credentials', 1);
+            ->assertJsonPath('props.vendorsCredentialsData.summary.credentials', 1);
 
         $serialized = $response->getContent();
         $this->assertStringNotContainsString('SITE_PROFILE_SECRET_SENTINEL', $serialized);
@@ -115,7 +115,7 @@ class SiteProfilePayloadTest extends TestCase
         $this->assertStringNotContainsString('totp_secret', $serialized);
     }
 
-    public function test_admin_payload_is_bounded_and_links_to_canonical_owners(): void
+    public function test_admin_tab_payloads_are_bounded_and_link_to_canonical_owners(): void
     {
         foreach (range(1, 14) as $index) {
             SiteDocument::query()->create([
@@ -153,24 +153,27 @@ class SiteProfilePayloadTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'adminData'))
+            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders(
+                'sites/show',
+                'documentsData,financialsData,vendorsCredentialsData,servicesData',
+            ))
             ->assertOk()
-            ->assertJsonCount(12, 'props.adminData.documents.items')
-            ->assertJsonPath('props.adminData.documents.summary.total', 14)
-            ->assertJsonPath('props.adminData.documents.summary.shown', 12)
-            ->assertJsonPath('props.adminData.documents.href', route('sites.documents.index', $this->site))
-            ->assertJsonPath('props.adminData.financials.href', route('finance.sites.financial-dashboard', $this->site))
-            ->assertJsonPath('props.adminData.financials.house_ledger.href', route('sites.ledger.index', $this->site))
-            ->assertJsonPath('props.adminData.vendors_credentials.summary.vendors', 1)
-            ->assertJsonPath('props.adminData.vendors_credentials.summary.credentials', 1)
-            ->assertJsonPath('props.adminData.vendors_credentials.href', route('sites.vendors.global', ['site_id' => $this->site->id]))
-            ->assertJsonCount(12, 'props.adminData.services.items')
-            ->assertJsonPath('props.adminData.services.summary.total', 14)
-            ->assertJsonPath('props.adminData.services.summary.active', 13)
-            ->assertJsonPath('props.adminData.services.href', route('settings.service_contexts'));
+            ->assertJsonCount(12, 'props.documentsData.items')
+            ->assertJsonPath('props.documentsData.summary.total', 14)
+            ->assertJsonPath('props.documentsData.summary.shown', 12)
+            ->assertJsonPath('props.documentsData.href', route('sites.documents.index', $this->site))
+            ->assertJsonPath('props.financialsData.href', route('finance.sites.financial-dashboard', $this->site))
+            ->assertJsonPath('props.financialsData.house_ledger.href', route('sites.ledger.index', $this->site))
+            ->assertJsonPath('props.vendorsCredentialsData.summary.vendors', 1)
+            ->assertJsonPath('props.vendorsCredentialsData.summary.credentials', 1)
+            ->assertJsonPath('props.vendorsCredentialsData.href', route('sites.vendors.global', ['site_id' => $this->site->id]))
+            ->assertJsonCount(12, 'props.servicesData.items')
+            ->assertJsonPath('props.servicesData.summary.total', 14)
+            ->assertJsonPath('props.servicesData.summary.active', 13)
+            ->assertJsonPath('props.servicesData.href', route('settings.service_contexts'));
     }
 
-    public function test_shell_and_optional_groups_stay_within_explicit_query_ceilings(): void
+    public function test_shell_and_optional_tabs_stay_within_explicit_query_ceilings(): void
     {
         foreach (range(1, 3) as $index) {
             SiteHazard::query()->create([
@@ -239,15 +242,15 @@ class SiteProfilePayloadTest extends TestCase
 
         DB::flushQueryLog();
         $this->actingAs($this->admin)
-            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'safetyData'))
+            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'hazardsData'))
             ->assertOk();
-        $safetyQueries = count(DB::getQueryLog());
+        $hazardsQueries = count(DB::getQueryLog());
 
         DB::flushQueryLog();
         $this->actingAs($this->admin)
-            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'adminData'))
+            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'documentsData'))
             ->assertOk();
-        $adminQueries = count(DB::getQueryLog());
+        $documentsQueries = count(DB::getQueryLog());
         DB::disableQueryLog();
 
         $shellTables = collect($shellLog)
@@ -261,7 +264,7 @@ class SiteProfilePayloadTest extends TestCase
             ->toJson();
 
         $this->assertLessThanOrEqual(45, $shellQueries, "Site profile shell used {$shellQueries} queries: {$shellTables}");
-        $this->assertLessThanOrEqual(21, $safetyQueries, "Safety group used {$safetyQueries} queries.");
-        $this->assertLessThanOrEqual(20, $adminQueries, "Admin group used {$adminQueries} queries.");
+        $this->assertLessThanOrEqual(16, $hazardsQueries, "Hazards tab used {$hazardsQueries} queries.");
+        $this->assertLessThanOrEqual(16, $documentsQueries, "Documents tab used {$documentsQueries} queries.");
     }
 }

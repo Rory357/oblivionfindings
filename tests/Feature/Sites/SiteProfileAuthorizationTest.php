@@ -139,14 +139,14 @@ class SiteProfileAuthorizationTest extends TestCase
                 ->has('hero.quick_actions', 0)
             );
 
-        $this->partial('peopleData')
-            ->assertJsonPath('props.peopleData.clients.can_create', false)
-            ->assertJsonPath('props.peopleData.clients.can_place_existing', false)
-            ->assertJsonPath('props.peopleData.contacts.can_manage', false)
-            ->assertJsonPath('props.peopleData.staff_requirements.can_manage', false);
+        $this->partial('clientsData,contactsData,staffRequirementsData')
+            ->assertJsonPath('props.clientsData.can_create', false)
+            ->assertJsonPath('props.clientsData.can_place_existing', false)
+            ->assertJsonPath('props.contactsData.can_manage', false)
+            ->assertJsonPath('props.staffRequirementsData.can_manage', false);
 
-        $this->partial('operationsData')
-            ->assertJsonPath('props.operationsData.meal_planner.locked', true);
+        $this->partial('mealPlannerData')
+            ->assertJsonPath('props.mealPlannerData.locked', true);
     }
 
     public function test_restricted_deep_links_and_partial_payloads_expose_no_protected_counts(): void
@@ -180,39 +180,39 @@ class SiteProfileAuthorizationTest extends TestCase
                 ->component('sites/show')
                 ->where('permissions', fn ($permissions) => $permissions['finance.dashboard'] === false
                     && $permissions['hazards.view'] === false)
-                ->missing('safetyData')
-                ->missing('operationsData')
-                ->missing('adminData')
+                ->missing('hazardsData')
+                ->missing('calendarData')
+                ->missing('financialsData')
             );
 
         $this->assertStringNotContainsString('PROTECTED_HAZARD_SENTINEL', $shell->getContent());
         $this->assertStringNotContainsString('PROTECTED_CALENDAR_SENTINEL', $shell->getContent());
 
         $this->actingAs($restricted);
-        $safety = $this->partial('safetyData')
-            ->assertJsonPath('props.safetyData.locked', true)
-            ->assertJsonPath('props.safetyData.hazards.summary', null);
+        $safety = $this->partial('hazardsData')
+            ->assertJsonPath('props.hazardsData.locked', true)
+            ->assertJsonPath('props.hazardsData.summary', null);
         $this->assertStringNotContainsString('PROTECTED_HAZARD_SENTINEL', $safety->getContent());
 
-        $operations = $this->partial('operationsData')
-            ->assertJsonPath('props.operationsData.calendar.locked', true)
-            ->assertJsonPath('props.operationsData.calendar.summary', null)
-            ->assertJsonPath('props.operationsData.checklists.summary', null)
-            ->assertJsonPath('props.operationsData.assets.summary', null)
-            ->assertJsonPath('props.operationsData.fleet.summary', null)
-            ->assertJsonPath('props.operationsData.hardware.summary', null);
+        $operations = $this->partial('calendarData,checklistsData,assetsData,fleetData,hardwareData')
+            ->assertJsonPath('props.calendarData.locked', true)
+            ->assertJsonPath('props.calendarData.summary', null)
+            ->assertJsonPath('props.checklistsData.summary', null)
+            ->assertJsonPath('props.assetsData.summary', null)
+            ->assertJsonPath('props.fleetData.summary', null)
+            ->assertJsonPath('props.hardwareData.summary', null);
         $this->assertStringNotContainsString('PROTECTED_CALENDAR_SENTINEL', $operations->getContent());
 
-        $this->partial('peopleData')
-            ->assertJsonPath('props.peopleData.clients.summary', null)
-            ->assertJsonPath('props.peopleData.shift_coverage.summary', null);
+        $this->partial('clientsData,shiftCoverageData')
+            ->assertJsonPath('props.clientsData.summary', null)
+            ->assertJsonPath('props.shiftCoverageData.summary', null);
 
-        $this->partial('adminData')
-            ->assertJsonPath('props.adminData.financials.locked', true)
-            ->assertJsonPath('props.adminData.financials.href', null)
-            ->assertJsonPath('props.adminData.financials.house_ledger', null)
-            ->assertJsonPath('props.adminData.vendors_credentials.locked', true)
-            ->assertJsonPath('props.adminData.vendors_credentials.summary', null);
+        $this->partial('financialsData,vendorsCredentialsData')
+            ->assertJsonPath('props.financialsData.locked', true)
+            ->assertJsonPath('props.financialsData.href', null)
+            ->assertJsonPath('props.financialsData.house_ledger', null)
+            ->assertJsonPath('props.vendorsCredentialsData.locked', true)
+            ->assertJsonPath('props.vendorsCredentialsData.summary', null);
     }
 
     public function test_active_site_quick_actions_use_the_canonical_workflows(): void
@@ -250,11 +250,11 @@ class SiteProfileAuthorizationTest extends TestCase
         return $viewer;
     }
 
-    private function partial(string $group): TestResponse
+    private function partial(string $props): TestResponse
     {
         return $this->get(
             route('sites.show', $this->site),
-            $this->inertiaPartialHeaders('sites/show', $group),
+            $this->inertiaPartialHeaders('sites/show', $props),
         )->assertOk();
     }
 }

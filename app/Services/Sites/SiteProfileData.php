@@ -2,28 +2,14 @@
 
 namespace App\Services\Sites;
 
-use App\Domain\SecurityDevices\Services\DeviceRegistryService;
-use App\Models\Asset;
 use App\Models\Client;
-use App\Models\EmergencyDrill;
-use App\Models\FirstAidRecord;
-use App\Models\HsRiskAssessment;
-use App\Models\PpeInventory;
-use App\Models\ServiceContext;
 use App\Models\Site;
-use App\Models\SiteCalendarEvent;
-use App\Models\SiteChecklistRun;
-use App\Models\SiteCredential;
-use App\Models\SiteDocument;
-use App\Models\SiteHazard;
-use App\Models\SiteInspectionSchedule;
-use App\Models\SiteStaffRequirement;
-use App\Models\SiteVendor;
 use App\Models\User;
 use App\Models\UserUiPreference;
-use App\Services\Clients\ClientFormOptions;
-use App\Services\Clients\ClientWorkerEligibility;
-use App\Services\ShiftCoverageService;
+use App\Services\Sites\Profile\SiteProfileAdminPresenter;
+use App\Services\Sites\Profile\SiteProfileOperationsPresenter;
+use App\Services\Sites\Profile\SiteProfilePeoplePresenter;
+use App\Services\Sites\Profile\SiteProfileSafetyPresenter;
 use Illuminate\Database\Eloquent\Builder;
 
 class SiteProfileData
@@ -33,11 +19,10 @@ class SiteProfileData
     public function __construct(
         private readonly SiteReadinessService $readiness,
         private readonly SiteProfileAttentionService $attention,
-        private readonly SiteTypePlanService $typePlans,
-        private readonly ShiftCoverageService $coverage,
-        private readonly DeviceRegistryService $devices,
-        private readonly ClientFormOptions $clientFormOptions,
-        private readonly ClientWorkerEligibility $clientWorkers,
+        private readonly SiteProfilePeoplePresenter $peoplePresenter,
+        private readonly SiteProfileSafetyPresenter $safetyPresenter,
+        private readonly SiteProfileOperationsPresenter $operationsPresenter,
+        private readonly SiteProfileAdminPresenter $adminPresenter,
     ) {}
 
     /** @return array<string, mixed> */
@@ -75,560 +60,51 @@ class SiteProfileData
     /** @return array<string, mixed> */
     public function people(User $user, Site $site): array
     {
-        $this->primeViewerPermissions($user);
-        $canViewClients = $this->canViewClients($user) && $site->type !== 'head_office';
-        $canPlaceClients = ! $site->archived
-            && $canViewClients
-            && $user->canDo('clients.assignments.update');
-        $canCreateClients = ! $site->archived
-            && $canViewClients
-            && $user->canDo('clients.create');
-        $canViewStaff = $user->canDo('staff.viewAny');
-        $canViewCoverage = $user->canDo('rostering.viewAny') && $site->type !== 'head_office';
-        $clientFormOptions = ($canCreateClients || $canPlaceClients)
-            ? $this->clientFormOptions->forOrganization($site->tenant_id ?? $user->organization_id)
-            : null;
-
-        $clients = $canViewClients
-            ? $site->clients()
-                ->with(['keyWorker:id,name', 'serviceContext:id,name,type', 'room:id,name'])
-                ->orderBy('first_name')
-                ->orderBy('last_name')
-                ->limit(100)
-                ->get([
-                    'id', 'site_id', 'first_name', 'last_name', 'preferred_name',
-                    'status', 'profile_photo_path', 'risk_level', 'safeguarding_flag',
-                    'service_start_date', 'service_context_id', 'key_worker_id', 'room_id',
-                ])
-                ->map(fn (Client $client) => [
-                    'id' => $client->id,
-                    'first_name' => $client->first_name,
-                    'last_name' => $client->last_name,
-                    'name' => $client->full_name,
-                    'preferred_name' => $client->preferred_name,
-                    'status' => $client->status,
-                    'profile_photo_url' => $client->profile_photo_url,
-                    'risk_level' => $client->risk_level,
-                    'safeguarding_flag' => (bool) $client->safeguarding_flag,
-                    'service_start_date' => $client->service_start_date?->toDateString(),
-                    'key_worker' => $client->keyWorker?->only(['id', 'name']),
-                    'service_context' => $client->serviceContext?->only(['id', 'name', 'type']),
-                    'room' => $client->room?->only(['id', 'name']),
-                    'href' => route('clients.show', $client),
-                ])->values()
-            : collect();
-
-        $availableClients = $canPlaceClients
-            ? Client::query()
-                ->whereNull('site_id')
-                ->when($user->organization_id, fn (Builder $query, int $organizationId) => $query->where('organization_id', $organizationId))
-                ->orderBy('first_name')
-                ->orderBy('last_name')
-                ->limit(100)
-                ->get(['id', 'first_name', 'last_name', 'preferred_name', 'status'])
-                ->map(fn (Client $client) => [
-                    'id' => $client->id,
-                    'first_name' => $client->first_name,
-                    'last_name' => $client->last_name,
-                    'name' => $client->full_name,
-                    'preferred_name' => $client->preferred_name,
-                    'status' => $client->status,
-                ])->values()
-            : collect();
-
-        $contacts = $site->contacts()
-            ->orderByDesc('is_primary')
-            ->orderBy('name')
-            ->limit(100)
-            ->get(['id', 'type', 'name', 'role', 'phone', 'email', 'is_primary', 'notes'])
-            ->map(fn ($contact) => [
-                'id' => $contact->id,
-                'type' => $contact->type,
-                'name' => $contact->name,
-                'role' => $contact->role,
-                'phone' => $contact->phone,
-                'email' => $contact->email,
-                'is_primary' => (bool) $contact->is_primary,
-                'notes' => $contact->notes,
-            ])->values();
-
-        $staffRequirements = $canViewStaff
-            ? SiteStaffRequirement::query()
-                ->where('site_id', $site->id)
-                ->active()
-                ->orderBy('category')
-                ->orderBy('requirement_name')
-                ->limit(100)
-                ->get()
-                ->map(fn (SiteStaffRequirement $requirement) => [
-                    'id' => $requirement->id,
-                    'name' => $requirement->requirement_name,
-                    'category' => $requirement->category,
-                    'description' => $requirement->description,
-                    'certification_required' => (bool) $requirement->certification_required,
-                    'expiry_period_months' => $requirement->expiry_period_months,
-                ])->values()
-            : collect();
-
         return [
-            'clients' => [
-                'locked' => ! $canViewClients,
-                'items' => $clients,
-                'summary' => $canViewClients ? [
-                    'total' => $clients->count(),
-                    'active' => $clients->where('status', 'active')->count(),
-                    'onboarding' => $clients->where('status', 'onboarding')->count(),
-                    'high_risk' => $clients->where('risk_level', 'high')->count(),
-                    'safeguarding' => $clients->where('safeguarding_flag', true)->count(),
-                ] : null,
-                'available' => $availableClients,
-                'can_create' => $canCreateClients,
-                'can_place_existing' => $canPlaceClients,
-                'create_options' => $canCreateClients ? $clientFormOptions : null,
-                'placement_options' => $canPlaceClients ? [
-                    'rooms' => $site->houseRooms()
-                        ->available()
-                        ->orderBy('sort_order')
-                        ->orderBy('name')
-                        ->get(['id', 'name', 'notes']),
-                    'service_contexts' => ServiceContext::query()
-                        ->forOrganization($site->tenant_id ?? $user->organization_id)
-                        ->where(fn (Builder $query) => $query
-                            ->whereNull('site_id')
-                            ->orWhere('site_id', $site->id))
-                        ->where('is_active', true)
-                        ->orderBy('name')
-                        ->get(['id', 'name', 'type']),
-                    'key_workers' => $this->clientWorkers
-                        ->queryForOrganization($site->tenant_id ?? $user->organization_id)
-                        ->orderBy('name')
-                        ->get(['id', 'name']),
-                ] : null,
-            ],
-            'contacts' => [
-                'items' => $contacts,
-                'can_manage' => ! $site->archived && $user->can('update', $site),
-            ],
-            'staff_requirements' => [
-                'locked' => ! $canViewStaff,
-                'items' => $staffRequirements,
-                'can_manage' => ! $site->archived && $canViewStaff && $user->can('update', $site),
-            ],
-            'shift_coverage' => [
-                'locked' => ! $canViewCoverage,
-                'summary' => $canViewCoverage
-                    ? $this->coverage->buildSiteSummaries(now()->startOfWeek(), now()->addWeek()->endOfWeek(), $site->id)
-                    : null,
-                'href' => $canViewCoverage ? route('operations.rostering.index', ['site_id' => $site->id]) : null,
-            ],
+            'clients' => $this->peoplePresenter->clients($user, $site),
+            'contacts' => $this->peoplePresenter->contacts($user, $site),
+            'staff_requirements' => $this->peoplePresenter->staffRequirements($user, $site),
+            'shift_coverage' => $this->peoplePresenter->shiftCoverage($user, $site),
         ];
     }
 
     /** @return array<string, mixed> */
     public function safety(User $user, Site $site): array
     {
-        $this->primeViewerPermissions($user);
-        $canView = $user->canDo('hazards.view');
-
-        if (! $canView) {
-            return [
-                'locked' => true,
-                'hazards' => ['items' => [], 'summary' => null],
-                'risk_assessments' => ['items' => [], 'summary' => null],
-                'inspections' => ['items' => [], 'summary' => null],
-                'drills' => ['items' => [], 'summary' => null],
-                'first_aid' => ['items' => [], 'summary' => null],
-                'ppe' => ['items' => [], 'summary' => null],
-                'emergency_plan' => ['summary' => null],
-            ];
-        }
-
-        $hazards = SiteHazard::query()
-            ->where('site_id', $site->id)
-            ->whereIn('status', ['open', 'in_progress', 'reopened'])
-            ->orderByDesc('created_at')
-            ->limit(20)
-            ->get(['id', 'reference_number', 'description', 'severity', 'risk_rating', 'status', 'due_date', 'review_date'])
-            ->map(fn (SiteHazard $hazard) => [
-                'id' => $hazard->id,
-                'reference' => $hazard->reference_number,
-                'description' => $hazard->description,
-                'severity' => $hazard->severity,
-                'risk_rating' => $hazard->risk_rating,
-                'status' => $hazard->status,
-                'due_date' => $hazard->due_date?->toDateString(),
-                'review_date' => $hazard->review_date?->toDateString(),
-                'href' => route('sites.hazards.show', $hazard),
-            ])->values();
-
-        $riskAssessments = HsRiskAssessment::query()
-            ->forAssessable(Site::class, $site->id)
-            ->orderByDesc('created_at')
-            ->limit(20)
-            ->get(['id', 'reference_number', 'title', 'status', 'risk_level', 'review_due_at'])
-            ->map(fn (HsRiskAssessment $assessment) => [
-                'id' => $assessment->id,
-                'reference' => $assessment->reference_number,
-                'title' => $assessment->title,
-                'status' => $assessment->status,
-                'risk_level' => $assessment->risk_level,
-                'review_due_at' => $assessment->review_due_at?->toDateString(),
-                'href' => route('health-safety.risk-assessments.show', $assessment),
-            ])->values();
-
-        $inspections = SiteInspectionSchedule::query()
-            ->where('site_id', $site->id)
-            ->active()
-            ->orderBy('next_due_date')
-            ->limit(20)
-            ->get(['id', 'title', 'inspection_type', 'frequency', 'next_due_date'])
-            ->map(fn (SiteInspectionSchedule $schedule) => [
-                'id' => $schedule->id,
-                'title' => $schedule->title,
-                'type' => $schedule->inspection_type,
-                'frequency' => $schedule->frequency,
-                'next_due_date' => $schedule->next_due_date?->toDateString(),
-                'overdue' => $schedule->next_due_date?->isPast() ?? false,
-            ])->values();
-
-        $drills = EmergencyDrill::query()
-            ->where('site_id', $site->id)
-            ->orderByDesc('scheduled_at')
-            ->limit(20)
-            ->get(['id', 'title', 'drill_type', 'scheduled_at', 'completed_at', 'status', 'outcome'])
-            ->map(fn (EmergencyDrill $drill) => [
-                'id' => $drill->id,
-                'title' => $drill->title,
-                'type' => $drill->drill_type,
-                'scheduled_at' => $drill->scheduled_at?->toISOString(),
-                'completed_at' => $drill->completed_at?->toISOString(),
-                'status' => $drill->status,
-                'outcome' => $drill->outcome,
-                'href' => route('health-safety.drills.show', $drill),
-            ])->values();
-
-        $firstAid = FirstAidRecord::query()
-            ->where('site_id', $site->id)
-            ->orderByDesc('treatment_date')
-            ->limit(20)
-            ->get(['id', 'reference_number', 'treatment_date', 'treated_person_name', 'injury_illness_type', 'treatment_outcome', 'ambulance_called'])
-            ->map(fn (FirstAidRecord $record) => [
-                'id' => $record->id,
-                'reference' => $record->reference_number,
-                'treatment_date' => $record->treatment_date?->toISOString(),
-                'person' => $record->treated_person_name,
-                'injury' => $record->injury_illness_type,
-                'outcome' => $record->treatment_outcome,
-                'ambulance_called' => (bool) $record->ambulance_called,
-                'href' => route('health-safety.first-aid.show', $record),
-            ])->values();
-
-        $ppe = PpeInventory::query()
-            ->where('site_id', $site->id)
-            ->whereNotIn('status', ['disposed', 'lost'])
-            ->with('ppeType:id,name')
-            ->orderBy('expiry_date')
-            ->limit(20)
-            ->get(['id', 'ppe_type_id', 'brand', 'model', 'condition', 'quantity', 'status', 'expiry_date', 'next_inspection_due'])
-            ->map(fn (PpeInventory $item) => [
-                'id' => $item->id,
-                'name' => $item->ppeType?->name ?? trim((string) $item->brand.' '.(string) $item->model),
-                'condition' => $item->condition,
-                'quantity' => (int) $item->quantity,
-                'status' => $item->status,
-                'expiry_date' => $item->expiry_date?->toDateString(),
-                'next_inspection_due' => $item->next_inspection_due?->toDateString(),
-            ])->values();
-
         return [
-            'locked' => false,
-            'hazards' => [
-                'items' => $hazards,
-                'summary' => ['open' => $hazards->count()],
-                'href' => route('sites.hazards.index', $site),
-            ],
-            'risk_assessments' => [
-                'items' => $riskAssessments,
-                'summary' => ['total' => $riskAssessments->count()],
-                'href' => route('health-safety.risk-assessments.index', ['site_id' => $site->id]),
-            ],
-            'inspections' => [
-                'items' => $inspections,
-                'summary' => [
-                    'active' => $inspections->count(),
-                    'overdue' => $inspections->where('overdue', true)->count(),
-                ],
-                'href' => route('sites.inspections.index', $site),
-            ],
-            'drills' => [
-                'items' => $drills,
-                'summary' => ['total' => $drills->count()],
-                'href' => route('health-safety.drills.index', ['site_id' => $site->id]),
-            ],
-            'first_aid' => [
-                'items' => $firstAid,
-                'summary' => ['recent' => $firstAid->count()],
-                'href' => route('health-safety.first-aid.index', ['site_id' => $site->id]),
-            ],
-            'ppe' => [
-                'items' => $ppe,
-                'summary' => ['items' => $ppe->count(), 'units' => $ppe->sum('quantity')],
-                'href' => route('health-safety.ppe.index', ['site_id' => $site->id]),
-            ],
-            'emergency_plan' => [
-                'summary' => [
-                    'location' => $site->emergency_plan_location,
-                    'medication_storage_location' => $site->medication_storage_location,
-                ],
-                'href' => route('sites.emergency-plan.show', $site),
-            ],
+            'locked' => ! $user->canDo('hazards.view'),
+            'hazards' => $this->safetyPresenter->hazards($user, $site),
+            'risk_assessments' => $this->safetyPresenter->riskAssessments($user, $site),
+            'inspections' => $this->safetyPresenter->inspections($user, $site),
+            'drills' => $this->safetyPresenter->drills($user, $site),
+            'first_aid' => $this->safetyPresenter->firstAid($user, $site),
+            'ppe' => $this->safetyPresenter->ppe($user, $site),
+            'emergency_plan' => $this->safetyPresenter->emergencyPlan($user, $site),
         ];
     }
 
     /** @return array<string, mixed> */
     public function operations(User $user, Site $site): array
     {
-        $this->primeViewerPermissions($user);
-
-        $calendar = $user->canDo('calendar.view')
-            ? SiteCalendarEvent::query()
-                ->where('site_id', $site->id)
-                ->where('start_at', '>=', now()->startOfDay())
-                ->orderBy('start_at')
-                ->limit(12)
-                ->get(['id', 'event_type', 'title', 'start_at', 'end_at', 'status'])
-                ->map(fn (SiteCalendarEvent $event) => [
-                    'id' => $event->id,
-                    'type' => $event->event_type,
-                    'title' => $event->title,
-                    'start_at' => $event->start_at?->toISOString(),
-                    'end_at' => $event->end_at?->toISOString(),
-                    'status' => $event->status,
-                ])->values()
-            : collect();
-
-        $canViewChecklists = $user->canDo('checklists.view');
-        $checklistsQuery = SiteChecklistRun::query()->where('site_id', $site->id);
-        $checklists = $canViewChecklists
-            ? (clone $checklistsQuery)
-                ->with('template:id,name')
-                ->orderByDesc('scheduled_date')
-                ->limit(12)
-                ->get(['id', 'template_id', 'scheduled_date', 'status', 'completion_percentage', 'items_failed'])
-                ->map(fn (SiteChecklistRun $run) => [
-                    'id' => $run->id,
-                    'name' => $run->template?->name,
-                    'scheduled_date' => $run->scheduled_date?->toDateString(),
-                    'status' => $run->status,
-                    'completion_percentage' => (float) $run->completion_percentage,
-                    'items_failed' => (int) $run->items_failed,
-                    'href' => route('sites.checklists.showRun', $run),
-                ])->values()
-            : collect();
-        $checklistCounts = $canViewChecklists
-            ? (clone $checklistsQuery)
-                ->selectRaw('COUNT(*) as total')
-                ->selectRaw("SUM(CASE WHEN status IN ('scheduled', 'in_progress') THEN 1 ELSE 0 END) as open_count")
-                ->selectRaw("SUM(CASE WHEN scheduled_date < ? AND status IN ('scheduled', 'in_progress') THEN 1 ELSE 0 END) as overdue_count", [now()->toDateString()])
-                ->selectRaw('SUM(CASE WHEN items_failed > 0 THEN 1 ELSE 0 END) as failed_count')
-                ->first()
-            : null;
-
-        $canViewAssets = $this->canViewAssets($user);
-        $assetsQuery = Asset::query()->where('site_id', $site->id);
-        $assets = $canViewAssets
-            ? (clone $assetsQuery)
-                ->orderBy('name')
-                ->limit(12)
-                ->get(['id', 'name', 'asset_tag', 'category', 'status', 'risk_level', 'location', 'inspection_due_at', 'maintenance_due_at'])
-                ->map(fn (Asset $asset) => [
-                    'id' => $asset->id,
-                    'name' => $asset->name,
-                    'asset_tag' => $asset->asset_tag,
-                    'category' => $asset->category,
-                    'status' => $asset->status,
-                    'risk_level' => $asset->risk_level,
-                    'location' => $asset->location,
-                    'inspection_due_at' => $asset->inspection_due_at?->toDateString(),
-                    'maintenance_due_at' => $asset->maintenance_due_at?->toDateString(),
-                    'href' => route('fleet-assets.assets.show', $asset),
-                ])->values()
-            : collect();
-        $assetCount = $canViewAssets ? (clone $assetsQuery)->count() : 0;
-
-        $tenantId = (int) ($site->tenant_id ?? $user->tenant_id ?? $user->organization_id ?? 1);
-        $hardwareCount = $user->canDo('securityDevices.devices.view')
-            ? $this->devices->forSite($tenantId, $site->id)->count()
-            : 0;
-        $fleetCount = $user->canDo('fleet.viewAny')
-            ? Asset::query()
-                ->vehicles()
-                ->where(fn (Builder $query) => $query
-                    ->where('site_id', $site->id)
-                    ->orWhere('home_site_id', $site->id))
-                ->count()
-            : 0;
-        $plan = $this->typePlans->profileSummaryFor(
-            $site,
-            $user->canDo('securityDevices.devices.view') ? $hardwareCount : null,
-        );
-
         return [
-            'calendar' => [
-                'locked' => ! $user->canDo('calendar.view'),
-                'items' => $calendar,
-                'summary' => $user->canDo('calendar.view') ? ['upcoming' => $calendar->count()] : null,
-                'href' => $user->canDo('calendar.view') ? route('sites.calendar.index', $site) : null,
-            ],
-            'checklists' => [
-                'locked' => ! $canViewChecklists,
-                'items' => $checklists,
-                'summary' => $canViewChecklists ? [
-                    'total' => (int) ($checklistCounts?->total ?? 0),
-                    'open' => (int) ($checklistCounts?->open_count ?? 0),
-                    'overdue' => (int) ($checklistCounts?->overdue_count ?? 0),
-                    'failed' => (int) ($checklistCounts?->failed_count ?? 0),
-                ] : null,
-                'href' => $canViewChecklists ? route('sites.checklists.index', $site) : null,
-            ],
-            'meal_planner' => [
-                'locked' => $site->archived || ! $user->canDo('sites.meals.view') || $site->type === 'head_office',
-                'href' => ! $site->archived && $user->canDo('sites.meals.view') && $site->type !== 'head_office'
-                    ? route('sites.meals.plan.index', $site)
-                    : null,
-            ],
-            'assets' => [
-                'locked' => ! $canViewAssets,
-                'items' => $assets,
-                'summary' => $canViewAssets ? ['total' => $assetCount, 'shown' => $assets->count()] : null,
-                'href' => $canViewAssets ? route('fleet-assets.assets.index', ['site_id' => $site->id]) : null,
-            ],
-            'fleet' => [
-                'locked' => ! $user->canDo('fleet.viewAny'),
-                'summary' => $user->canDo('fleet.viewAny') ? ['vehicles' => $fleetCount] : null,
-                'href' => $user->canDo('fleet.viewAny') ? route('fleet-assets.dashboard', ['site_id' => $site->id]) : null,
-            ],
-            'hardware' => [
-                'locked' => ! $user->canDo('securityDevices.devices.view'),
-                'summary' => $user->canDo('securityDevices.devices.view') ? ['total' => $hardwareCount] : null,
-                'href' => $user->canDo('securityDevices.devices.view') ? route('sites.hardware.index', $site) : null,
-            ],
-            'plan' => [
-                'summary' => $plan['summary'],
-                'href' => route('sites.plan.show', $site),
-                'inventory_href' => $plan['inventory_href'],
-                'inventory_label' => $plan['inventory_label'],
-            ],
+            'calendar' => $this->operationsPresenter->calendar($user, $site),
+            'checklists' => $this->operationsPresenter->checklists($user, $site),
+            'meal_planner' => $this->operationsPresenter->mealPlanner($user, $site),
+            'assets' => $this->operationsPresenter->assets($user, $site),
+            'fleet' => $this->operationsPresenter->fleet($user, $site),
+            'hardware' => $this->operationsPresenter->hardware($user, $site),
+            'plan' => $this->operationsPresenter->plan($user, $site),
         ];
     }
 
     /** @return array<string, mixed> */
     public function admin(User $user, Site $site): array
     {
-        $this->primeViewerPermissions($user);
-
-        $documentQuery = SiteDocument::query()->where('site_id', $site->id);
-        $today = now()->toDateString();
-        $documentCounts = (clone $documentQuery)
-            ->selectRaw('COUNT(*) as total')
-            ->selectRaw(
-                'SUM(CASE WHEN expiry_date >= ? AND expiry_date <= ? THEN 1 ELSE 0 END) as expiring_soon',
-                [$today, now()->addDays(60)->toDateString()],
-            )
-            ->selectRaw(
-                'SUM(CASE WHEN expiry_date < ? THEN 1 ELSE 0 END) as expired',
-                [$today],
-            )
-            ->first();
-        $documents = (clone $documentQuery)
-            ->with('uploadedBy:id,name')
-            ->orderByDesc('created_at')
-            ->limit(SiteDocument::PROFILE_LIMIT)
-            ->get()
-            ->map(fn (SiteDocument $document) => [
-                'id' => $document->id,
-                'title' => $document->title,
-                'category' => $document->category,
-                'folder' => $document->folder,
-                'version' => $document->version,
-                'effective_date' => $document->effective_date?->toDateString(),
-                'expiry_date' => $document->expiry_date?->toDateString(),
-                'original_name' => $document->original_name,
-                'size_bytes' => $document->size_bytes,
-                'uploaded_by' => $document->uploadedBy?->name,
-                'created_at' => $document->created_at?->toISOString(),
-                'href' => route('sites.documents.download', [$site, $document]),
-            ])->values();
-
-        $canViewVendors = $user->canDo('vendors.view');
-        $canViewCredentials = $user->canDo('credentials.view');
-        $canViewFinancials = $user->canDo('finance.dashboard');
-        $canViewHouseLedger = in_array($site->type, ['house', 'residential'], true)
-            && $user->canDo('sites.ledger.view');
-        $canManageServiceContexts = $user->canDo('settings.service_contexts.manage');
-
-        $serviceQuery = $site->serviceContexts();
-        $serviceCounts = (clone $serviceQuery)
-            ->selectRaw('COUNT(*) as total')
-            ->selectRaw('SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active')
-            ->first();
-        $services = (clone $serviceQuery)
-            ->orderByDesc('is_active')
-            ->orderBy('name')
-            ->limit(ServiceContext::PROFILE_LIMIT)
-            ->get(['id', 'name', 'type', 'description', 'is_active'])
-            ->map(fn (ServiceContext $context) => [
-                'id' => $context->id,
-                'name' => $context->name,
-                'type' => $context->type?->value,
-                'description' => $context->description,
-                'status' => $context->is_active ? 'active' : 'inactive',
-            ])->values();
-
         return [
-            'documents' => [
-                'items' => $documents,
-                'summary' => [
-                    'total' => (int) ($documentCounts?->total ?? 0),
-                    'shown' => $documents->count(),
-                    'expiring_soon' => (int) ($documentCounts?->expiring_soon ?? 0),
-                    'expired' => (int) ($documentCounts?->expired ?? 0),
-                ],
-                'href' => route('sites.documents.index', $site),
-            ],
-            'financials' => [
-                'locked' => ! $canViewFinancials,
-                'href' => $canViewFinancials
-                    ? route('finance.sites.financial-dashboard', $site)
-                    : null,
-                'house_ledger' => $canViewHouseLedger ? [
-                    'href' => route('sites.ledger.index', $site),
-                    'label' => 'House ledger',
-                ] : null,
-            ],
-            'vendors_credentials' => [
-                'locked' => ! $canViewVendors && ! $canViewCredentials,
-                'summary' => $canViewVendors || $canViewCredentials ? [
-                    'vendors' => $canViewVendors
-                        ? SiteVendor::query()->where('site_id', $site->id)->where('is_active', true)->count()
-                        : null,
-                    'credentials' => $canViewCredentials
-                        ? SiteCredential::query()->where('site_id', $site->id)->count()
-                        : null,
-                ] : null,
-                'href' => $canViewVendors || $canViewCredentials
-                    ? route('sites.vendors.global', ['site_id' => $site->id])
-                    : null,
-            ],
-            'services' => [
-                'items' => $services,
-                'summary' => [
-                    'total' => (int) ($serviceCounts?->total ?? 0),
-                    'active' => (int) ($serviceCounts?->active ?? 0),
-                    'shown' => $services->count(),
-                ],
-                'href' => $canManageServiceContexts ? route('settings.service_contexts') : null,
-            ],
+            'documents' => $this->adminPresenter->documents($user, $site),
+            'financials' => $this->adminPresenter->financials($user, $site),
+            'vendors_credentials' => $this->adminPresenter->vendorsCredentials($user, $site),
+            'services' => $this->adminPresenter->services($user, $site),
         ];
     }
 
