@@ -116,6 +116,9 @@ describe('site profile registry', () => {
             resolveSiteProfileTab('hazards', 'house', allPermissions).id,
         ).toBe('hazards');
         expect(
+            resolveSiteProfileTab('meal-planner', 'house', allPermissions).id,
+        ).toBe('meal_planner');
+        expect(
             resolveSiteProfileTab('meal_planner', 'head_office', allPermissions)
                 .id,
         ).toBe('overview');

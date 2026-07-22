@@ -79,6 +79,14 @@ export function siteProfileTerminology(
 
 const literal = (label: string) => () => label;
 
+const SITE_PROFILE_TAB_ALIASES: Record<string, string> = {
+    'meal-planner': 'meal_planner',
+};
+
+export function siteProfileTabQueryValue(tabId: string): string {
+    return tabId === 'meal_planner' ? 'meal-planner' : tabId;
+}
+
 export const siteProfileTabs: SiteProfileTabDefinition[] = [
     {
         id: 'overview',
@@ -323,9 +331,12 @@ export function resolveSiteProfileTab(
     permissions: SiteProfilePermissionMap,
 ): ResolvedSiteProfileTab {
     const visible = visibleSiteProfileTabs(siteType, permissions);
+    const normalizedTab =
+        (requestedTab && SITE_PROFILE_TAB_ALIASES[requestedTab]) ??
+        requestedTab;
 
     return (
-        visible.find((tab) => tab.id === requestedTab && !tab.locked) ??
+        visible.find((tab) => tab.id === normalizedTab && !tab.locked) ??
         visible.find((tab) => tab.id === 'overview') ??
         visible[0]
     );

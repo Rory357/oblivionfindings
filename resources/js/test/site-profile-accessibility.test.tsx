@@ -203,4 +203,25 @@ describe('site profile accessibility and responsive contract', () => {
             /window\.(?:confirm|alert|prompt)|\bconfirm\s*\(/,
         );
     });
+
+    it('keeps primary Site-owned dialogs described and the meal chart shrinkable', () => {
+        const overviewDialogs = readFileSync(
+            resolve(root, 'resources/js/pages/sites/_overview-dialogs.tsx'),
+            'utf8',
+        );
+        const mealDialogs = readFileSync(
+            resolve(root, 'resources/js/pages/sites/meal-planner/_dialogs.tsx'),
+            'utf8',
+        );
+        const mealCalendar = readFileSync(
+            resolve(root, 'resources/js/pages/sites/meal-planner/_calendar-grid.tsx'),
+            'utf8',
+        );
+
+        expect(overviewDialogs).toContain('<DialogDescription>');
+        expect(mealDialogs).toContain('<DialogDescription>');
+        expect(mealCalendar).toContain(
+            'flex w-full min-w-0 flex-1 items-end justify-between gap-1 sm:gap-2',
+        );
+    });
 });

@@ -65,6 +65,7 @@ import {
     dataPropForTab,
     resolveSiteProfileTab,
     siteProfileGroups,
+    siteProfileTabQueryValue,
     visibleSiteProfileTabs,
 } from './tabs/registry';
 import {
@@ -282,7 +283,7 @@ function replaceTabInUrl(tab: string) {
     if (typeof window === 'undefined') return;
 
     const url = new URL(window.location.href);
-    url.searchParams.set('tab', tab);
+    url.searchParams.set('tab', siteProfileTabQueryValue(tab));
     window.history.replaceState(window.history.state, '', url);
 }
 

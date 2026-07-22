@@ -32,10 +32,10 @@ describe('Site Profile corrective capability ledger', () => {
         expect(rows).toHaveLength(149);
         for (const row of rows) {
             expect(row).toMatch(
-                /\| (?:Restore|Canonical replacement|Improve) \|/,
+                /\|\s+(?:Restore|Canonical replacement|Improve)\s+\|/,
             );
             expect(row).toMatch(
-                /\| (?:Restored|Canonical replacement|Improved|Blocked) \|/,
+                /\|\s+(?:Restored|Canonical replacement|Improved|Blocked)\s+\|/,
             );
             expect(row).toMatch(
                 /E-(?:SHELL|OVERVIEW|PEOPLE|SAFETY|OPERATIONS|ADMIN|DIALOG)/,
