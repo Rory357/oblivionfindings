@@ -284,7 +284,7 @@ class HouseLedgerTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_site_show_defers_house_ledger_to_its_canonical_workspace(): void
+    public function test_site_show_defers_the_complete_house_ledger_to_its_financials_tab(): void
     {
         $service = app(HouseLedgerService::class);
         $ledger = $service->getOrCreateLedger($this->houseSite);
@@ -302,18 +302,20 @@ class HouseLedgerTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('sites/show')
                 ->missing('houseLedger')
+                ->missing('financialsData')
                 ->missing('adminData')
             );
 
         $response = $this->actingAs($this->admin)
-            ->get("/sites/{$this->houseSite->id}", $this->inertiaPartialHeaders('sites/show', 'adminData'))
+            ->get("/sites/{$this->houseSite->id}", $this->inertiaPartialHeaders('sites/show', 'financialsData'))
             ->assertOk()
             ->assertJsonPath(
-                'props.adminData.financials.house_ledger.href',
-                route('sites.ledger.index', $this->houseSite),
+                'props.financialsData.house_ledger.entries.data.0.description',
+                'Opening balance',
             );
 
-        $this->assertStringNotContainsString('Opening balance', $response->getContent());
+        $this->assertStringContainsString('Opening balance', $response->getContent());
+        $this->assertStringNotContainsString('adminData', $response->getContent());
     }
 
     public function test_non_house_site_cannot_add_ledger_entry(): void

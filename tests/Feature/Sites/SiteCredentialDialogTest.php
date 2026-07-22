@@ -29,7 +29,7 @@ beforeEach(function () {
     ]);
 });
 
-test('site show defers credential counts and never exposes credential fields', function () {
+test('site show defers credential metadata and never exposes credential secrets', function () {
     SiteCredential::create([
         'site_id' => $this->site->id,
         'tenant_id' => $this->site->tenant_id,
@@ -54,14 +54,15 @@ test('site show defers credential counts and never exposes credential fields', f
         );
 
     $response = $this->actingAs($this->admin)
-        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'adminData'))
+        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'vendorsCredentialsData'))
         ->assertOk()
-        ->assertJsonPath('props.adminData.vendors_credentials.summary.credentials', 1)
-        ->assertJsonMissingPath('props.adminData.vendors_credentials.items');
+        ->assertJsonPath('props.vendorsCredentialsData.credentials.0.label', 'Door Code')
+        ->assertJsonPath('props.vendorsCredentialsData.credentials.0.username', 'reception')
+        ->assertJsonMissingPath('props.vendorsCredentialsData.credentials.0.encrypted_value');
 
     expect($response->getContent())
-        ->not->toContain('Door Code')
-        ->not->toContain('reception')
+        ->toContain('Door Code')
+        ->toContain('reception')
         ->not->toContain('1234')
         ->not->toContain('encrypted_value')
         ->not->toContain('totp_secret_encrypted');
@@ -199,7 +200,7 @@ test('credential update can change metadata without rotating password', function
     )->toBeTrue();
 });
 
-test('site show for a vendor-only user exposes only the deferred vendor count', function () {
+test('site show for a vendor-only user exposes only the deferred vendor register', function () {
     SiteVendor::create([
         'site_id' => $this->site->id,
         'tenant_id' => $this->site->tenant_id,
@@ -231,18 +232,17 @@ test('site show for a vendor-only user exposes only the deferred vendor count', 
     expect($vendorOnly->canDo('credentials.view'))->toBeFalse();
 
     $response = $this->actingAs($vendorOnly)
-        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'adminData'))
+        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'vendorsCredentialsData'))
         ->assertOk()
-        ->assertJsonPath('props.adminData.vendors_credentials.summary.vendors', 1)
-        ->assertJsonPath('props.adminData.vendors_credentials.summary.credentials', null)
-        ->assertJsonMissingPath('props.adminData.vendors_credentials.items');
+        ->assertJsonPath('props.vendorsCredentialsData.vendors.0.company_name', 'Sparks NZ')
+        ->assertJsonCount(0, 'props.vendorsCredentialsData.credentials');
 
     expect($response->getContent())
-        ->not->toContain('Sparks NZ')
+        ->toContain('Sparks NZ')
         ->not->toContain('Should not be visible');
 });
 
-test('site show for a credential-only user exposes only the deferred credential count', function () {
+test('site show for a credential-only user exposes only the deferred credential register', function () {
     SiteVendor::create([
         'site_id' => $this->site->id,
         'tenant_id' => $this->site->tenant_id,
@@ -272,19 +272,18 @@ test('site show for a credential-only user exposes only the deferred credential 
     expect($credentialOnly->canDo('credentials.view'))->toBeTrue();
 
     $response = $this->actingAs($credentialOnly)
-        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'adminData'))
+        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'vendorsCredentialsData'))
         ->assertOk()
-        ->assertJsonPath('props.adminData.vendors_credentials.summary.vendors', null)
-        ->assertJsonPath('props.adminData.vendors_credentials.summary.credentials', 1)
-        ->assertJsonMissingPath('props.adminData.vendors_credentials.items');
+        ->assertJsonCount(0, 'props.vendorsCredentialsData.vendors')
+        ->assertJsonPath('props.vendorsCredentialsData.credentials.0.label', 'Door Code');
 
     expect($response->getContent())
         ->not->toContain('Sparks NZ')
-        ->not->toContain('Door Code')
+        ->toContain('Door Code')
         ->not->toContain('1234');
 });
 
-test('site show for an admin exposes both deferred counts without records', function () {
+test('site show for an admin exposes both deferred full registers without secrets', function () {
     SiteVendor::create([
         'site_id' => $this->site->id,
         'tenant_id' => $this->site->tenant_id,
@@ -302,11 +301,12 @@ test('site show for an admin exposes both deferred counts without records', func
     ]);
 
     $this->actingAs($this->admin)
-        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'adminData'))
+        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'vendorsCredentialsData'))
         ->assertOk()
-        ->assertJsonPath('props.adminData.vendors_credentials.summary.vendors', 1)
-        ->assertJsonPath('props.adminData.vendors_credentials.summary.credentials', 1)
-        ->assertJsonMissingPath('props.adminData.vendors_credentials.items');
+        ->assertJsonPath('props.vendorsCredentialsData.vendors.0.company_name', 'Sparks NZ')
+        ->assertJsonPath('props.vendorsCredentialsData.credentials.0.label', 'Door Code')
+        ->assertJsonMissingPath('props.vendorsCredentialsData.credentials.0.encrypted_value')
+        ->assertJsonMissingPath('props.vendorsCredentialsData.credentials.0.totp_secret_encrypted');
 });
 
 test('credential destroy returns back(303) and audits delete (audit row survives via nullOnDelete)', function () {
