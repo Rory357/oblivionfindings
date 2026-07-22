@@ -25,11 +25,12 @@ import { registerLabel } from './safety-register';
 
 type VendorMode = 'add' | 'show' | 'edit' | 'delete' | null;
 type CredentialMode = 'add' | 'show' | 'edit' | 'delete' | 'remove-totp' | null;
+type SiteVendorRecord = VendorRecord & { site_id: number };
 
 export type SiteVendorsCredentialsData = {
     locked?: boolean;
     site: SiteOption;
-    vendors: VendorRecord[];
+    vendors: SiteVendorRecord[];
     credentials: CredentialRecord[];
     credentialTypeOptions: CredentialPickerOption[];
     can: {
