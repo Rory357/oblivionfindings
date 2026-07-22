@@ -27,4 +27,23 @@ describe('site profile overview ownership', () => {
         expect(attention).toContain('text-status-critical');
         expect(attention).toContain('text-status-warning');
     });
+
+    it('restores the complete Site-owned overview workflows', () => {
+        const overview = readFileSync(resolve(tabs, 'overview.tsx'), 'utf8');
+
+        for (const contract of [
+            'EditSiteLineDialog',
+            'EditLocationDialog',
+            'SiteOverviewMapCard',
+            'SiteGeofenceDialog',
+            'EditSafetyDialog',
+            'AddSiteNoteDialog',
+            'ConfirmAction',
+            'Open full contact register',
+            'Open full Emergency Plan',
+            'Open full services register',
+        ]) {
+            expect(overview, contract).toContain(contract);
+        }
+    });
 });

@@ -9,6 +9,7 @@ use App\Models\PpeInventory;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Site;
+use App\Models\SiteCoverageRequirement;
 use App\Models\SiteCredential;
 use App\Models\SiteDocument;
 use App\Models\SiteHazard;
@@ -91,6 +92,34 @@ class SiteProfilePayloadTest extends TestCase
             ->assertJsonMissingPath('props.firstAidData')
             ->assertJsonMissingPath('props.ppeData')
             ->assertJsonMissingPath('props.emergencyPlanData');
+    }
+
+    public function test_shift_coverage_payload_keeps_site_requirements_and_live_preview_context(): void
+    {
+        SiteCoverageRequirement::query()->create([
+            'site_id' => $this->site->id,
+            'organization_id' => $this->admin->organization_id,
+            'name' => 'Overnight support',
+            'coverage_type' => 'overnight',
+            'day_of_week' => 'mon',
+            'starts_time' => '23:00',
+            'ends_time' => '07:00',
+            'minimum_staff' => 2,
+            'role_requirements' => [['key' => 'caregiver', 'minimum' => 2]],
+            'allow_overstaffing' => false,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get(route('sites.show', $this->site), $this->inertiaPartialHeaders('sites/show', 'shiftCoverageData'))
+            ->assertOk()
+            ->assertJsonPath('props.shiftCoverageData.locked', false)
+            ->assertJsonPath('props.shiftCoverageData.can_manage', true)
+            ->assertJsonPath('props.shiftCoverageData.requirements.0.name', 'Overnight support')
+            ->assertJsonPath('props.shiftCoverageData.requirements.0.role_requirements.0.key', 'caregiver')
+            ->assertJsonPath('props.shiftCoverageData.requirements.0.allow_overstaffing', false)
+            ->assertJsonStructure(['props' => ['shiftCoverageData' => ['preview', 'clients', 'service_contexts']]])
+            ->assertJsonMissingPath('props.clientsData');
     }
 
     public function test_vendor_credentials_payload_never_serializes_credential_secret_material(): void

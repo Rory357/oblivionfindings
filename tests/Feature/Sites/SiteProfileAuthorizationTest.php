@@ -205,7 +205,7 @@ class SiteProfileAuthorizationTest extends TestCase
 
         $this->partial('clientsData,shiftCoverageData')
             ->assertJsonPath('props.clientsData.summary', null)
-            ->assertJsonPath('props.shiftCoverageData.summary', null);
+            ->assertJsonPath('props.shiftCoverageData.preview', null);
 
         $this->partial('financialsData,vendorsCredentialsData')
             ->assertJsonPath('props.financialsData.locked', true)

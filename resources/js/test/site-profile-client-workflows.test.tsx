@@ -19,7 +19,7 @@ describe('site profile client workflow ownership', () => {
         expect(clientsSource).toContain(
             '@/components/clients/add-client-dialog',
         );
-        expect(clientsSource).toContain("only: ['peopleData']");
+        expect(clientsSource).toContain("only: ['clientsData']");
         expect(readFileSync(canonicalWizard, 'utf8')).toContain(
             'onSaved?.(savedClientId)',
         );

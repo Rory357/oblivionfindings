@@ -2,6 +2,7 @@
 
 namespace App\Services\Sites;
 
+use App\Models\Asset;
 use App\Models\Client;
 use App\Models\Site;
 use App\Models\User;
@@ -49,7 +50,7 @@ class SiteProfileData
             'hero' => $this->hero($user, $site, $permissions, $readiness, $attention, $occupancy),
             'permissions' => $permissions,
             'attention' => $attention,
-            'overview' => $this->overview($site),
+            'overview' => $this->overview($user, $site),
             'readiness' => $readiness,
             'uiPreferences' => [
                 'pinned_tabs' => $this->pinnedTabs($user),
@@ -210,7 +211,7 @@ class SiteProfileData
     }
 
     /** @return array<string, mixed> */
-    private function overview(Site $site): array
+    private function overview(User $user, Site $site): array
     {
         $contacts = $site->contacts()
             ->orderByDesc('is_primary')
@@ -248,6 +249,29 @@ class SiteProfileData
                 'created_by' => $note->createdBy?->name,
             ])->values();
 
+        $geofences = $site->geofences()
+            ->with('assignedAssets:id')
+            ->orderByDesc('is_active')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($geofence) => [
+                'id' => $geofence->id,
+                'name' => $geofence->name,
+                'type' => $geofence->type,
+                'shape' => $geofence->shape,
+                'breach_type' => $geofence->breach_type,
+                'is_active' => (bool) $geofence->is_active,
+                'asset_id' => $geofence->asset_id,
+                'assigned_asset_ids' => $geofence->assignedAssets->pluck('id')->values(),
+            ])->values();
+
+        $geofenceAssets = $this->canViewAssets($user)
+            ? Asset::query()
+                ->where('site_id', $site->id)
+                ->orderBy('name')
+                ->get(['id', 'name', 'asset_tag', 'category', 'status'])
+            : collect();
+
         return [
             'location' => [
                 'address' => $site->address,
@@ -267,6 +291,10 @@ class SiteProfileData
             ],
             'services' => $services,
             'notes' => $notes,
+            'geofences' => $geofences,
+            'geofence_assets' => $geofenceAssets,
+            'can_manage' => ! $site->archived && $user->can('update', $site),
+            'can_manage_geofences' => ! $site->archived && $user->canDo('assets.geofences.manage'),
         ];
     }
 
@@ -279,7 +307,7 @@ class SiteProfileData
             'hazards.view', 'hazards.create', 'calendar.view', 'calendar.create',
             'checklists.view', 'sites.meals.view', 'assets.viewAny', 'assets.viewAssigned',
             'fleet.viewAny', 'securityDevices.devices.view', 'finance.dashboard',
-            'vendors.view', 'credentials.view',
+            'vendors.view', 'credentials.view', 'assets.geofences.manage',
         ];
 
         $permissions = [];

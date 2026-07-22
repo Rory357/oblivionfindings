@@ -5,6 +5,7 @@ namespace App\Services\Sites\Profile;
 use App\Models\Client;
 use App\Models\ServiceContext;
 use App\Models\Site;
+use App\Models\SiteCoverageRequirement;
 use App\Models\SiteStaffRequirement;
 use App\Models\User;
 use App\Services\Clients\ClientFormOptions;
@@ -167,11 +168,53 @@ class SiteProfilePeoplePresenter
         $this->primePermissions($user);
         $canView = $user->canDo('rostering.viewAny') && $site->type !== 'head_office';
 
+        $requirements = $canView
+            ? SiteCoverageRequirement::query()
+                ->where('site_id', $site->id)
+                ->active()
+                ->with(['serviceContext:id,name,type', 'preferredClient:id,first_name,last_name'])
+                ->orderBy('day_of_week')
+                ->orderBy('starts_time')
+                ->get()
+                ->map(fn (SiteCoverageRequirement $requirement) => [
+                    'id' => $requirement->id,
+                    'name' => $requirement->name,
+                    'coverage_type' => $requirement->coverage_type,
+                    'day_of_week' => $requirement->day_of_week,
+                    'starts_time' => substr((string) $requirement->starts_time, 0, 5),
+                    'ends_time' => substr((string) $requirement->ends_time, 0, 5),
+                    'minimum_staff' => $requirement->minimum_staff,
+                    'service_context_id' => $requirement->service_context_id,
+                    'service_context' => $requirement->serviceContext?->only(['id', 'name', 'type']),
+                    'preferred_client_id' => $requirement->preferred_client_id,
+                    'preferred_client' => $requirement->preferredClient ? [
+                        'id' => $requirement->preferredClient->id,
+                        'name' => $requirement->preferredClient->full_name,
+                    ] : null,
+                    'role_requirements' => $requirement->role_requirements ?? [],
+                    'allow_overstaffing' => (bool) $requirement->allow_overstaffing,
+                    'shift_type' => $requirement->shift_type,
+                    'notes' => $requirement->notes,
+                ])->values()
+            : collect();
+
         return [
             'locked' => ! $canView,
-            'summary' => $canView
+            'preview' => $canView
                 ? $this->coverage->buildSiteSummaries(now()->startOfWeek(), now()->addWeek()->endOfWeek(), $site->id)
                 : null,
+            'requirements' => $requirements,
+            'clients' => $canView
+                ? $site->clients()
+                    ->whereIn('status', ['active', 'onboarding'])
+                    ->orderBy('first_name')
+                    ->get(['id', 'first_name', 'last_name', 'preferred_name'])
+                    ->map(fn (Client $client) => ['id' => $client->id, 'name' => $client->full_name])
+                : collect(),
+            'service_contexts' => $canView
+                ? $site->serviceContexts()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'type'])
+                : collect(),
+            'can_manage' => $canView && ! $site->archived && $user->can('update', $site),
             'href' => $canView ? route('operations.rostering.index', ['site_id' => $site->id]) : null,
         ];
     }

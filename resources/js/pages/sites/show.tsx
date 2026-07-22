@@ -93,7 +93,20 @@ export type SiteProfileSite = {
     is_active: boolean;
     archived: boolean;
     address?: string | null;
+    address_line_1?: string | null;
+    address_line_2?: string | null;
+    suburb?: string | null;
+    city?: string | null;
+    postcode?: string | null;
+    country?: string | null;
     region?: string | null;
+    latitude?: string | number | null;
+    longitude?: string | number | null;
+    access_instructions?: string | null;
+    risk_notes?: string | null;
+    risk_review_date?: string | null;
+    emergency_plan_location?: string | null;
+    medication_storage_location?: string | null;
     is_high_risk: boolean;
     is_high_needs: boolean;
     primary_contact?: { id: number; name: string } | null;
@@ -135,6 +148,8 @@ export type SiteProfileOverviewData = {
     location: {
         address?: string | null;
         region?: string | null;
+        latitude?: string | number | null;
+        longitude?: string | number | null;
         access_instructions?: string | null;
     };
     contacts: Array<{
@@ -166,6 +181,25 @@ export type SiteProfileOverviewData = {
         created_at?: string | null;
         created_by?: string | null;
     }>;
+    geofences: Array<{
+        id: number;
+        name: string;
+        type: 'circle' | 'polygon';
+        shape: Record<string, unknown> | null;
+        breach_type: 'enter' | 'exit' | 'both';
+        is_active?: boolean;
+        asset_id?: number | null;
+        assigned_asset_ids?: number[];
+    }>;
+    geofence_assets: Array<{
+        id: number;
+        name: string;
+        asset_tag?: string | null;
+        category?: string | null;
+        status?: string | null;
+    }>;
+    can_manage: boolean;
+    can_manage_geofences: boolean;
 };
 
 export type SiteReadinessData = {
@@ -681,6 +715,7 @@ function SiteProfileContent({
         case 'shift_coverage':
             return (
                 <SiteProfileShiftCoverage
+                    siteId={props.site.id}
                     data={tabData as SiteShiftCoverageData}
                 />
             );
