@@ -40,6 +40,24 @@ describe('site profile operations ownership', () => {
         expect(calendar).not.toContain('SiteProfileModuleSummary');
     });
 
+    it('opens the canonical calendar create workflow from Site Profile deep links', () => {
+        const calendar = readFileSync(
+            resolve(
+                root,
+                'resources/js/pages/sites/calendar/SiteCalendar.tsx',
+            ),
+            'utf8',
+        );
+
+        expect(calendar).toContain(
+            "new URLSearchParams(window.location.search).get('action')",
+        );
+        expect(calendar).toContain(
+            "action === 'create' || action === 'add'",
+        );
+        expect(calendar).toContain('openCreate();');
+    });
+
     it('reuses the canonical Meal Planner in embedded mode', () => {
         const mealPlanner = readFileSync(
             resolve(tabs, 'meal-planner.tsx'),
