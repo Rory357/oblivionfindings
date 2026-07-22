@@ -31,7 +31,7 @@ export function SiteProfileContacts({
     );
     const refreshPeople = () =>
         router.reload({
-            only: ['peopleData'],
+            only: ['contactsData'],
             preserveState: true,
             preserveScroll: true,
         });

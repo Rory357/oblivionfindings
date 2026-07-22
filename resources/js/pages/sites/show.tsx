@@ -1,4 +1,4 @@
-import { PageHero, PageLayout, type PageHeroStat } from '@/components/page';
+import { PageLayout } from '@/components/page';
 import {
     GroupPillRail,
     TabSearchPalette,
@@ -6,13 +6,17 @@ import {
     useGroupedProfileSearchShortcut,
     type GroupedProfileNavGroup,
 } from '@/components/page/grouped-profile-nav';
+import { SiteProfileAlertRibbon } from '@/components/sites/profile/alert-ribbon';
+import {
+    SiteProfileHero,
+    type SiteHeroStat,
+} from '@/components/sites/profile/hero';
 import { useUiPreference } from '@/hooks/use-ui-preference';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     BedDouble,
     BellRing,
-    Building2,
     CalendarPlus,
     ExternalLink,
     Gauge,
@@ -22,6 +26,7 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { SiteProfileDialogHost } from './site-profile-dialog-host';
 import { SiteProfileAssets } from './tabs/assets';
 import { SiteProfileCalendar } from './tabs/calendar';
 import { SiteProfileChecklists } from './tabs/checklists';
@@ -49,7 +54,7 @@ import { SiteProfilePlan, type SitePlanSummaryModule } from './tabs/plan';
 import { SiteProfilePpe } from './tabs/ppe';
 import { SiteProfileReadiness } from './tabs/readiness';
 import {
-    dataGroupForTab,
+    dataPropForTab,
     resolveSiteProfileTab,
     siteProfileGroups,
     visibleSiteProfileTabs,
@@ -72,7 +77,7 @@ import {
 } from './tabs/staff-requirements';
 import type {
     ResolvedSiteProfileTab,
-    SiteProfileDataGroup,
+    SiteProfileDataProp,
     SiteProfilePermissionMap,
 } from './tabs/types';
 import { SiteProfileVendors } from './tabs/vendors';
@@ -181,39 +186,8 @@ export type SiteReadinessData = {
     is_active_but_incomplete: boolean;
 };
 
-type SitePeopleData = {
-    clients: SiteClientsData;
-    contacts: SiteContactsData;
-    staff_requirements: SiteStaffRequirementsData;
-    shift_coverage: SiteShiftCoverageData;
-};
-
-type SiteSafetyData = {
+type SiteSafetyTabData = SiteProfileSummaryModule & {
     locked: boolean;
-    hazards: SiteProfileSummaryModule;
-    risk_assessments: SiteProfileSummaryModule;
-    inspections: SiteProfileSummaryModule;
-    drills: SiteProfileSummaryModule;
-    first_aid: SiteProfileSummaryModule;
-    ppe: SiteProfileSummaryModule;
-    emergency_plan: EmergencyPlanModule;
-};
-
-type SiteOperationsData = {
-    calendar: SiteProfileSummaryModule;
-    checklists: SiteProfileSummaryModule;
-    meal_planner: SiteProfileSummaryModule;
-    assets: SiteProfileSummaryModule;
-    fleet: SiteProfileSummaryModule;
-    hardware: SiteProfileSummaryModule;
-    plan: SitePlanSummaryModule;
-};
-
-type SiteAdminData = {
-    documents: SiteProfileSummaryModule;
-    financials: SiteProfileFinancialsModule;
-    vendors_credentials: SiteProfileSummaryModule;
-    services: SiteProfileSummaryModule;
 };
 
 export type SiteProfileProps = {
@@ -224,10 +198,28 @@ export type SiteProfileProps = {
     overview: SiteProfileOverviewData;
     readiness: SiteReadinessData;
     uiPreferences: { pinned_tabs: string[] };
-    peopleData?: SitePeopleData;
-    safetyData?: SiteSafetyData;
-    operationsData?: SiteOperationsData;
-    adminData?: SiteAdminData;
+    clientsData?: SiteClientsData;
+    contactsData?: SiteContactsData;
+    staffRequirementsData?: SiteStaffRequirementsData;
+    shiftCoverageData?: SiteShiftCoverageData;
+    hazardsData?: SiteSafetyTabData;
+    riskAssessmentsData?: SiteSafetyTabData;
+    inspectionsData?: SiteSafetyTabData;
+    drillsData?: SiteSafetyTabData;
+    firstAidData?: SiteSafetyTabData;
+    ppeData?: SiteSafetyTabData;
+    emergencyPlanData?: EmergencyPlanModule & { locked?: boolean };
+    calendarData?: SiteProfileSummaryModule;
+    checklistsData?: SiteProfileSummaryModule;
+    mealPlannerData?: SiteProfileSummaryModule;
+    assetsData?: SiteProfileSummaryModule;
+    fleetData?: SiteProfileSummaryModule;
+    hardwareData?: SiteProfileSummaryModule;
+    planData?: SitePlanSummaryModule;
+    documentsData?: SiteProfileSummaryModule;
+    financialsData?: SiteProfileFinancialsModule;
+    vendorsCredentialsData?: SiteProfileSummaryModule;
+    servicesData?: SiteProfileSummaryModule;
 };
 
 const QUICK_ACTION_ICONS: Record<string, LucideIcon> = {
@@ -250,15 +242,6 @@ function replaceTabInUrl(tab: string) {
     window.history.replaceState(window.history.state, '', url);
 }
 
-function initials(name: string): string {
-    return name
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase())
-        .join('');
-}
-
 type InertiaRequestException = {
     config?: {
         headers?: {
@@ -268,9 +251,9 @@ type InertiaRequestException = {
     };
 };
 
-function exceptionTargetsGroup(
+function exceptionTargetsProp(
     exception: unknown,
-    dataGroup: SiteProfileDataGroup,
+    dataProp: SiteProfileDataProp,
 ): boolean {
     const headers = (exception as InertiaRequestException)?.config?.headers;
     if (!headers) return false;
@@ -287,14 +270,7 @@ function exceptionTargetsGroup(
         partialData
             .split(',')
             .map((value) => value.trim())
-            .includes(dataGroup)
-    );
-}
-
-function stableHue(value: string): number {
-    return [...value].reduce(
-        (total, character) => (total * 31 + character.charCodeAt(0)) % 360,
-        0,
+            .includes(dataProp)
     );
 }
 
@@ -320,44 +296,44 @@ export default function SiteShow(props: SiteProfileProps) {
     );
     const [activeTab, setActiveTab] = useState(initialTab);
     const [searchOpen, setSearchOpen] = useState(false);
-    const [loadingGroups, setLoadingGroups] = useState<
-        Partial<Record<SiteProfileDataGroup, boolean>>
+    const [loadingProps, setLoadingProps] = useState<
+        Partial<Record<SiteProfileDataProp, boolean>>
     >({});
-    const loadingGroupsRef = useRef<
-        Partial<Record<SiteProfileDataGroup, boolean>>
+    const loadingPropsRef = useRef<
+        Partial<Record<SiteProfileDataProp, boolean>>
     >({});
-    const [groupErrors, setGroupErrors] = useState<
-        Partial<Record<SiteProfileDataGroup, boolean>>
+    const [propErrors, setPropErrors] = useState<
+        Partial<Record<SiteProfileDataProp, boolean>>
     >({});
     const pinned = useUiPreference<string[]>({
         key: 'sites.profile.pinned-tabs',
         initialValue: uiPreferences.pinned_tabs,
     });
 
-    const requestGroup = useCallback(
-        (dataGroup: SiteProfileDataGroup, force = false) => {
+    const requestProp = useCallback(
+        (dataProp: SiteProfileDataProp, force = false) => {
             if (
-                (!force && props[dataGroup] !== undefined) ||
-                loadingGroupsRef.current[dataGroup]
+                (!force && props[dataProp] !== undefined) ||
+                loadingPropsRef.current[dataProp]
             ) {
                 return;
             }
 
-            loadingGroupsRef.current[dataGroup] = true;
-            setLoadingGroups((current) => ({ ...current, [dataGroup]: true }));
-            setGroupErrors((current) => ({ ...current, [dataGroup]: false }));
+            loadingPropsRef.current[dataProp] = true;
+            setLoadingProps((current) => ({ ...current, [dataProp]: true }));
+            setPropErrors((current) => ({ ...current, [dataProp]: false }));
 
-            const failGroupRequest = () =>
-                setGroupErrors((current) => ({
+            const failPropRequest = () =>
+                setPropErrors((current) => ({
                     ...current,
-                    [dataGroup]: true,
+                    [dataProp]: true,
                 }));
             const stopWatchingExceptions = router.on('exception', (event) => {
-                if (!exceptionTargetsGroup(event.detail.exception, dataGroup)) {
+                if (!exceptionTargetsProp(event.detail.exception, dataProp)) {
                     return;
                 }
 
-                failGroupRequest();
+                failPropRequest();
                 stopWatchingExceptions();
 
                 // This request owns the visible error state, so suppress the
@@ -366,21 +342,21 @@ export default function SiteShow(props: SiteProfileProps) {
             });
 
             router.reload({
-                only: [dataGroup],
+                only: [dataProp],
                 preserveState: true,
                 preserveScroll: true,
                 onError: () => {
                     stopWatchingExceptions();
-                    failGroupRequest();
+                    failPropRequest();
                 },
                 onSuccess: stopWatchingExceptions,
                 onCancel: stopWatchingExceptions,
                 onFinish: () => {
                     stopWatchingExceptions();
-                    loadingGroupsRef.current[dataGroup] = false;
-                    setLoadingGroups((current) => ({
+                    loadingPropsRef.current[dataProp] = false;
+                    setLoadingProps((current) => ({
                         ...current,
-                        [dataGroup]: false,
+                        [dataProp]: false,
                     }));
                 },
             });
@@ -399,10 +375,10 @@ export default function SiteShow(props: SiteProfileProps) {
 
             setActiveTab(resolved.id);
             replaceTabInUrl(resolved.id);
-            const dataGroup = dataGroupForTab(resolved.id);
-            if (dataGroup) requestGroup(dataGroup);
+            const dataProp = dataPropForTab(resolved.id);
+            if (dataProp) requestProp(dataProp);
         },
-        [permissions, requestGroup, site.type],
+        [permissions, requestProp, site.type],
     );
 
     useGroupedProfileSearchShortcut(() => setSearchOpen(true));
@@ -417,9 +393,9 @@ export default function SiteShow(props: SiteProfileProps) {
             replaceTabInUrl(normalized.id);
         }
         setActiveTab(normalized.id);
-        const dataGroup = dataGroupForTab(normalized.id);
-        if (dataGroup) requestGroup(dataGroup);
-    }, [permissions, requestGroup, site.type]);
+        const dataProp = dataPropForTab(normalized.id);
+        if (dataProp) requestProp(dataProp);
+    }, [permissions, requestProp, site.type]);
 
     const navGroups = useMemo(
         () => buildNavGroups(resolvedTabs),
@@ -430,30 +406,29 @@ export default function SiteShow(props: SiteProfileProps) {
     const activeGroup = active?.group ?? 'overview';
     const groupTabs =
         navGroups.find((group) => group.key === activeGroup)?.tabs ?? [];
-    const heroStats: PageHeroStat[] = [
+    const heroStats: SiteHeroStat[] = [
         {
+            id: 'readiness',
             label: 'Readiness',
             value: `${hero.readiness.score}%`,
-            sub:
+            detail:
                 hero.readiness.missing_critical > 0
                     ? `${hero.readiness.missing_critical} critical missing`
                     : 'Core setup complete',
             icon: Gauge,
-            tone: hero.readiness.missing_critical > 0 ? 'warning' : 'success',
-            hideOnMobile: false,
         },
         {
+            id: 'attention',
             label: 'Needs attention',
-            value: hero.attention.total,
-            sub:
+            value: String(hero.attention.total),
+            detail:
                 hero.attention.critical > 0
                     ? `${hero.attention.critical} critical`
                     : 'No critical items',
             icon: BellRing,
-            tone: hero.attention.critical > 0 ? 'critical' : 'neutral',
-            hideOnMobile: false,
         },
         {
+            id: 'occupancy',
             label: hero.occupancy.label,
             value: `${hero.occupancy.occupied}/${hero.occupancy.total}`,
             icon: BedDouble,
@@ -471,60 +446,33 @@ export default function SiteShow(props: SiteProfileProps) {
             <PageLayout
                 width="wide"
                 hero={
-                    <PageHero
-                        category="sites"
-                        brandColour={site.brand_colour || 'var(--primary)'}
-                        backHref="/sites"
-                        backLabel="All Sites"
-                        icon={Building2}
-                        title={site.name}
+                    <SiteProfileHero
+                        siteId={site.id}
+                        name={site.name}
                         description={hero.description}
-                        avatarStack={hero.avatars.map((avatar) => ({
-                            id: avatar.id,
-                            initials: initials(avatar.name),
-                            hue: stableHue(avatar.name),
-                            name: avatar.name,
-                            popover: {
-                                title: avatar.name,
-                                subtitle: 'Client at this Site',
-                                primaryAction: {
-                                    label: 'Open profile',
-                                    href: `/clients/${avatar.id}`,
-                                },
-                            },
-                        }))}
-                        badges={[
-                            {
-                                label: site.display_type,
-                                tone: 'default',
-                            },
-                            {
-                                label:
-                                    hero.status === 'archived'
-                                        ? 'Archived'
-                                        : hero.status === 'active'
-                                          ? 'Active'
-                                          : 'Inactive',
-                                tone:
-                                    hero.status === 'active'
-                                        ? 'success'
-                                        : 'warning',
-                            },
-                            ...(site.is_high_risk
-                                ? [
-                                      {
-                                          label: 'High risk',
-                                          tone: 'critical' as const,
-                                      },
-                                  ]
-                                : []),
-                        ]}
+                        brandColour={site.brand_colour ?? hero.brand_colour}
+                        statusLabel={
+                            hero.status === 'archived'
+                                ? 'Archived'
+                                : hero.status === 'active'
+                                  ? 'Active'
+                                  : 'Inactive'
+                        }
+                        typeLabel={site.display_type}
+                        region={site.region}
+                        avatars={hero.avatars}
                         stats={heroStats}
-                        quickActions={hero.quick_actions.map((action) => ({
+                        actions={hero.quick_actions.map((action) => ({
+                            id: action.id,
                             label: action.label,
                             href: action.href,
                             icon: QUICK_ACTION_ICONS[action.id] ?? ExternalLink,
                         }))}
+                        onEdit={
+                            permissions['site.update']
+                                ? () => router.visit(`/sites/${site.id}/edit`)
+                                : undefined
+                        }
                         footer={
                             <GroupPillRail
                                 groups={navGroups}
@@ -539,6 +487,19 @@ export default function SiteShow(props: SiteProfileProps) {
                     />
                 }
             >
+                <SiteProfileAlertRibbon
+                    alerts={attention.items.slice(0, 6).map((item) => ({
+                        id: item.id,
+                        label: item.title,
+                        detail: item.detail,
+                        tone: item.severity,
+                        icon:
+                            item.severity === 'critical'
+                                ? ShieldAlert
+                                : BellRing,
+                        onSelect: () => selectTab(item.tab),
+                    }))}
+                />
                 <TierTwoTabs
                     tabs={groupTabs}
                     activeTab={activeTab}
@@ -574,13 +535,14 @@ export default function SiteShow(props: SiteProfileProps) {
                     <SiteProfileContent
                         active={active}
                         props={props}
-                        loadingGroups={loadingGroups}
-                        groupErrors={groupErrors}
+                        loadingProps={loadingProps}
+                        propErrors={propErrors}
                         onNavigate={selectTab}
-                        onRetry={(group) => requestGroup(group, true)}
+                        onRetry={(dataProp) => requestProp(dataProp, true)}
                     />
                 </div>
             </PageLayout>
+            <SiteProfileDialogHost />
             <TabSearchPalette
                 open={searchOpen}
                 onClose={() => setSearchOpen(false)}
@@ -629,17 +591,17 @@ function tabMetrics(props: SiteProfileProps) {
 function SiteProfileContent({
     active,
     props,
-    loadingGroups,
-    groupErrors,
+    loadingProps,
+    propErrors,
     onNavigate,
     onRetry,
 }: {
     active?: ResolvedSiteProfileTab;
     props: SiteProfileProps;
-    loadingGroups: Partial<Record<SiteProfileDataGroup, boolean>>;
-    groupErrors: Partial<Record<SiteProfileDataGroup, boolean>>;
+    loadingProps: Partial<Record<SiteProfileDataProp, boolean>>;
+    propErrors: Partial<Record<SiteProfileDataProp, boolean>>;
     onNavigate: (tab: string) => void;
-    onRetry: (group: SiteProfileDataGroup) => void;
+    onRetry: (dataProp: SiteProfileDataProp) => void;
 }) {
     if (!active) return null;
     if (active.locked) return <SiteProfileLockedState label={active.label} />;
@@ -663,8 +625,8 @@ function SiteProfileContent({
         );
     }
 
-    const dataGroup = dataGroupForTab(active.id);
-    if (!dataGroup) {
+    const dataProp = dataPropForTab(active.id);
+    if (!dataProp) {
         return (
             <SiteProfileEmptyState
                 title={`${active.label} is not configured`}
@@ -672,115 +634,153 @@ function SiteProfileContent({
             />
         );
     }
-    if (groupErrors[dataGroup]) {
+    if (propErrors[dataProp]) {
         return (
             <SiteProfileErrorState
                 label={active.label}
-                onRetry={() => onRetry(dataGroup)}
+                onRetry={() => onRetry(dataProp)}
             />
         );
     }
-    const groupData = props[dataGroup];
-    if (loadingGroups[dataGroup] || groupData === undefined) {
+    const tabData = props[dataProp];
+    if (loadingProps[dataProp] || tabData === undefined) {
         return <SiteProfileLoadingState label={active.label} />;
     }
 
-    if (dataGroup === 'peopleData') {
-        const people = groupData as SitePeopleData;
-        switch (active.id) {
-            case 'clients':
-                return (
-                    <SiteProfileClients
-                        siteId={props.site.id}
-                        data={people.clients}
-                    />
-                );
-            case 'contacts':
-                return (
-                    <SiteProfileContacts
-                        siteId={props.site.id}
-                        data={people.contacts}
-                    />
-                );
-            case 'staff_requirements':
-                return (
-                    <SiteProfileStaffRequirements
-                        siteId={props.site.id}
-                        data={people.staff_requirements}
-                    />
-                );
-            case 'shift_coverage':
-                return (
-                    <SiteProfileShiftCoverage data={people.shift_coverage} />
-                );
-        }
+    if (
+        typeof tabData === 'object' &&
+        tabData !== null &&
+        'locked' in tabData &&
+        tabData.locked
+    ) {
+        return <SiteProfileLockedState label={active.label} />;
     }
 
-    if (dataGroup === 'safetyData') {
-        const safety = groupData as SiteSafetyData;
-        if (safety.locked) return <SiteProfileLockedState label="Safety" />;
-
-        switch (active.id) {
-            case 'hazards':
-                return <SiteProfileHazards data={safety.hazards} />;
-            case 'risk_assessments':
-                return (
-                    <SiteProfileRiskAssessments
-                        data={safety.risk_assessments}
-                    />
-                );
-            case 'inspections':
-                return <SiteProfileInspections data={safety.inspections} />;
-            case 'drills':
-                return <SiteProfileDrills data={safety.drills} />;
-            case 'first_aid':
-                return <SiteProfileFirstAid data={safety.first_aid} />;
-            case 'ppe':
-                return <SiteProfilePpe data={safety.ppe} />;
-            case 'emergency_plan':
-                return (
-                    <SiteProfileEmergencyPlan data={safety.emergency_plan} />
-                );
-        }
-    }
-
-    if (dataGroup === 'operationsData') {
-        const operations = groupData as SiteOperationsData;
-        switch (active.id) {
-            case 'calendar':
-                return <SiteProfileCalendar data={operations.calendar} />;
-            case 'checklists':
-                return <SiteProfileChecklists data={operations.checklists} />;
-            case 'meal_planner':
-                return (
-                    <SiteProfileMealPlanner
-                        site={props.site}
-                        data={operations.meal_planner}
-                    />
-                );
-            case 'assets':
-                return <SiteProfileAssets data={operations.assets} />;
-            case 'fleet':
-                return <SiteProfileFleet data={operations.fleet} />;
-            case 'hardware':
-                return <SiteProfileHardware data={operations.hardware} />;
-            case 'plan':
-                return <SiteProfilePlan data={operations.plan} />;
-        }
-    }
-
-    if (dataGroup === 'adminData') {
-        const admin = groupData as SiteAdminData;
-        switch (active.id) {
-            case 'documents':
-                return <SiteProfileDocuments data={admin.documents} />;
-            case 'financials':
-                return <SiteProfileFinancials data={admin.financials} />;
-            case 'vendors':
-                return <SiteProfileVendors data={admin.vendors_credentials} />;
-            case 'services':
-                return <SiteProfileServices data={admin.services} />;
-        }
+    switch (active.id) {
+        case 'clients':
+            return (
+                <SiteProfileClients
+                    siteId={props.site.id}
+                    data={tabData as SiteClientsData}
+                />
+            );
+        case 'contacts':
+            return (
+                <SiteProfileContacts
+                    siteId={props.site.id}
+                    data={tabData as SiteContactsData}
+                />
+            );
+        case 'staff_requirements':
+            return (
+                <SiteProfileStaffRequirements
+                    siteId={props.site.id}
+                    data={tabData as SiteStaffRequirementsData}
+                />
+            );
+        case 'shift_coverage':
+            return (
+                <SiteProfileShiftCoverage
+                    data={tabData as SiteShiftCoverageData}
+                />
+            );
+        case 'hazards':
+            return (
+                <SiteProfileHazards
+                    data={tabData as SiteProfileSummaryModule}
+                />
+            );
+        case 'risk_assessments':
+            return (
+                <SiteProfileRiskAssessments
+                    data={tabData as SiteProfileSummaryModule}
+                />
+            );
+        case 'inspections':
+            return (
+                <SiteProfileInspections
+                    data={tabData as SiteProfileSummaryModule}
+                />
+            );
+        case 'drills':
+            return (
+                <SiteProfileDrills data={tabData as SiteProfileSummaryModule} />
+            );
+        case 'first_aid':
+            return (
+                <SiteProfileFirstAid
+                    data={tabData as SiteProfileSummaryModule}
+                />
+            );
+        case 'ppe':
+            return (
+                <SiteProfilePpe data={tabData as SiteProfileSummaryModule} />
+            );
+        case 'emergency_plan':
+            return (
+                <SiteProfileEmergencyPlan
+                    data={tabData as EmergencyPlanModule}
+                />
+            );
+        case 'calendar':
+            return (
+                <SiteProfileCalendar
+                    data={tabData as SiteProfileSummaryModule}
+                />
+            );
+        case 'checklists':
+            return (
+                <SiteProfileChecklists
+                    data={tabData as SiteProfileSummaryModule}
+                />
+            );
+        case 'meal_planner':
+            return (
+                <SiteProfileMealPlanner
+                    site={props.site}
+                    data={tabData as SiteProfileSummaryModule}
+                />
+            );
+        case 'assets':
+            return (
+                <SiteProfileAssets data={tabData as SiteProfileSummaryModule} />
+            );
+        case 'fleet':
+            return (
+                <SiteProfileFleet data={tabData as SiteProfileSummaryModule} />
+            );
+        case 'hardware':
+            return (
+                <SiteProfileHardware
+                    data={tabData as SiteProfileSummaryModule}
+                />
+            );
+        case 'plan':
+            return <SiteProfilePlan data={tabData as SitePlanSummaryModule} />;
+        case 'documents':
+            return (
+                <SiteProfileDocuments
+                    data={tabData as SiteProfileSummaryModule}
+                />
+            );
+        case 'financials':
+            return (
+                <SiteProfileFinancials
+                    data={tabData as SiteProfileFinancialsModule}
+                />
+            );
+        case 'vendors':
+            return (
+                <SiteProfileVendors
+                    data={tabData as SiteProfileSummaryModule}
+                />
+            );
+        case 'services':
+            return (
+                <SiteProfileServices
+                    data={tabData as SiteProfileSummaryModule}
+                />
+            );
     }
 
     return (

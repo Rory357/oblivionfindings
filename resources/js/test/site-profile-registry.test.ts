@@ -1,5 +1,5 @@
 import {
-    dataGroupForTab,
+    dataPropForTab,
     resolveSiteProfileTab,
     siteProfileGroups,
     siteProfileTabs,
@@ -130,12 +130,12 @@ describe('site profile registry', () => {
         ).toBe('overview');
     });
 
-    it('maps every deferred tab to exactly one optional payload group', () => {
-        expect(dataGroupForTab('clients')).toBe('peopleData');
-        expect(dataGroupForTab('hazards')).toBe('safetyData');
-        expect(dataGroupForTab('checklists')).toBe('operationsData');
-        expect(dataGroupForTab('vendors')).toBe('adminData');
-        expect(dataGroupForTab('overview')).toBeUndefined();
+    it('maps every deferred tab to its own optional payload prop', () => {
+        expect(dataPropForTab('clients')).toBe('clientsData');
+        expect(dataPropForTab('hazards')).toBe('hazardsData');
+        expect(dataPropForTab('checklists')).toBe('checklistsData');
+        expect(dataPropForTab('vendors')).toBe('vendorsCredentialsData');
+        expect(dataPropForTab('overview')).toBeUndefined();
     });
 
     it('totals warning counts by group without treating ordinary counts as warnings', () => {

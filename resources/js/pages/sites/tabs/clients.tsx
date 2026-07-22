@@ -85,7 +85,7 @@ export function SiteProfileClients({
     const placementOptions = data.placement_options;
     const refreshPeople = () =>
         router.reload({
-            only: ['peopleData'],
+            only: ['clientsData'],
             preserveState: true,
             preserveScroll: true,
         });
