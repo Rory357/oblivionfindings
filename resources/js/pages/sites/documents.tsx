@@ -483,11 +483,11 @@ export function SiteDocumentsSurface({
                             </div>
 
                             {!search && !categoryFilter && !currentFolder && (
-                                <ul className="grid gap-2 sm:grid-cols-2">
+                                <ul className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
                                     {recommendedDocuments.map((document) => (
                                         <li
                                             key={document.key}
-                                            className="flex items-center justify-between gap-3 rounded-lg border bg-card/40 px-3 py-2"
+                                            className="flex min-w-0 items-center justify-between gap-3 rounded-lg border bg-card/40 px-3 py-2"
                                         >
                                             <div className="flex min-w-0 items-start gap-2">
                                                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/40" />
@@ -505,6 +505,7 @@ export function SiteDocumentsSurface({
                                                     type="button"
                                                     size="sm"
                                                     variant="outline"
+                                                    className="shrink-0"
                                                     onClick={() =>
                                                         openSuggestedUpload(
                                                             document,

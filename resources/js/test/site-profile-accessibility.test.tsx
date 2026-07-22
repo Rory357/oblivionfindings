@@ -214,7 +214,10 @@ describe('site profile accessibility and responsive contract', () => {
             'utf8',
         );
         const mealCalendar = readFileSync(
-            resolve(root, 'resources/js/pages/sites/meal-planner/_calendar-grid.tsx'),
+            resolve(
+                root,
+                'resources/js/pages/sites/meal-planner/_calendar-grid.tsx',
+            ),
             'utf8',
         );
 
@@ -222,6 +225,30 @@ describe('site profile accessibility and responsive contract', () => {
         expect(mealDialogs).toContain('<DialogDescription>');
         expect(mealCalendar).toContain(
             'flex w-full min-w-0 flex-1 items-end justify-between gap-1 sm:gap-2',
+        );
+    });
+
+    it('keeps Documents and Meal Planner controls inside narrow viewports', () => {
+        const documents = readFileSync(
+            resolve(root, 'resources/js/pages/sites/documents.tsx'),
+            'utf8',
+        );
+        const mealToolbar = readFileSync(
+            resolve(root, 'resources/js/pages/sites/meal-planner/_hero.tsx'),
+            'utf8',
+        );
+
+        expect(documents).toContain(
+            'grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2',
+        );
+        expect(documents).toContain(
+            'flex min-w-0 items-center justify-between gap-3',
+        );
+        expect(mealToolbar).toContain(
+            'flex min-w-0 flex-wrap items-center gap-2',
+        );
+        expect(mealToolbar).toContain(
+            'flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between md:contents',
         );
     });
 });
