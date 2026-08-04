@@ -4,9 +4,13 @@ use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinFixedAsset;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinJournalLine;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Quote;
+use App\Models\Site;
 use App\Models\User;
+use Illuminate\Testing\TestResponse;
 
 /**
  * Finance list CSV export (C3d) — AR-remainder (quotes) + Ledger tabs
@@ -14,16 +18,29 @@ use App\Models\User;
  * each endpoint streams text/csv with a header row + one row per record,
  * honours the current filters, and 403s without the tab's view permission.
  */
-function exportUserWith(string $permission): User
+function exportUserWith(string $permission, ?Site $site = null): User
 {
-    $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $user = User::factory()->create(['approved_at' => now()]);
     $perm = Permission::firstOrCreate(['key' => $permission], ['description' => $permission]);
     $user->permissionOverrides()->syncWithoutDetaching([$perm->id => ['allowed' => true]]);
+
+    if ($site) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+    }
 
     return $user;
 }
 
-function streamedLedger(\Illuminate\Testing\TestResponse $response): string
+function streamedLedger(TestResponse $response): string
 {
     ob_start();
     $response->sendContent();
@@ -39,9 +56,11 @@ function csvLines(string $csv): array
 
 // ── Quotes ───────────────────────────────────────────────────────────────
 it('streams quotes as CSV with a header and one row per quote', function () {
-    Quote::factory()->count(3)->create(['organization_id' => 1, 'status' => 'sent']);
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    Quote::factory()->count(3)->create(['client_id' => $client->id, 'status' => 'sent']);
 
-    $response = $this->actingAs(exportUserWith('finance.ar.view'))->get(route('finance.quotes.export'));
+    $response = $this->actingAs(exportUserWith('finance.ar.view', $site))->get(route('finance.quotes.export'));
 
     $response->assertOk();
     expect($response->headers->get('content-type'))->toContain('text/csv');
@@ -52,10 +71,12 @@ it('streams quotes as CSV with a header and one row per quote', function () {
 });
 
 it('honours the status filter in the quotes export', function () {
-    Quote::factory()->create(['organization_id' => 1, 'status' => 'accepted', 'quote_number' => 'QTE-ACC-1']);
-    Quote::factory()->create(['organization_id' => 1, 'status' => 'draft', 'quote_number' => 'QTE-DRAFT-1']);
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    Quote::factory()->create(['client_id' => $client->id, 'status' => 'accepted', 'quote_number' => 'QTE-ACC-1']);
+    Quote::factory()->create(['client_id' => $client->id, 'status' => 'draft', 'quote_number' => 'QTE-DRAFT-1']);
 
-    $csv = streamedLedger($this->actingAs(exportUserWith('finance.ar.view'))
+    $csv = streamedLedger($this->actingAs(exportUserWith('finance.ar.view', $site))
         ->get(route('finance.quotes.export', ['status' => 'accepted'])));
 
     expect($csv)->toContain('QTE-ACC-1')
@@ -63,14 +84,14 @@ it('honours the status filter in the quotes export', function () {
 });
 
 it('403s the quotes export without finance.ar.view', function () {
-    $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $user = User::factory()->create(['approved_at' => now()]);
 
     $this->actingAs($user)->get(route('finance.quotes.export'))->assertForbidden();
 });
 
 // ── Journals ─────────────────────────────────────────────────────────────
 it('streams journals as CSV with a header and one row per journal', function () {
-    FinJournal::factory()->count(3)->create(['organization_id' => 1, 'status' => 'posted']);
+    FinJournal::factory()->count(3)->create(['status' => 'posted']);
 
     $response = $this->actingAs(exportUserWith('finance.ledger.view'))->get(route('finance.journals.export'));
 
@@ -83,9 +104,8 @@ it('streams journals as CSV with a header and one row per journal', function () 
 });
 
 it('sums journal line debits/credits in the export totals', function () {
-    $account = FinAccount::factory()->create(['organization_id' => 1]);
+    $account = FinAccount::factory()->create();
     $journal = FinJournal::factory()->create([
-        'organization_id' => 1,
         'status' => 'posted',
         'journal_number' => 'JNL-SUM-1',
     ]);
@@ -101,8 +121,8 @@ it('sums journal line debits/credits in the export totals', function () {
 });
 
 it('honours the status filter in the journals export', function () {
-    FinJournal::factory()->create(['organization_id' => 1, 'status' => 'posted', 'journal_number' => 'JNL-POSTED-1']);
-    FinJournal::factory()->create(['organization_id' => 1, 'status' => 'draft', 'journal_number' => 'JNL-DRAFT-1']);
+    FinJournal::factory()->create(['status' => 'posted', 'journal_number' => 'JNL-POSTED-1']);
+    FinJournal::factory()->create(['status' => 'draft', 'journal_number' => 'JNL-DRAFT-1']);
 
     $csv = streamedLedger($this->actingAs(exportUserWith('finance.ledger.view'))
         ->get(route('finance.journals.export', ['status' => 'posted'])));
@@ -112,14 +132,14 @@ it('honours the status filter in the journals export', function () {
 });
 
 it('403s the journals export without finance.ledger.view', function () {
-    $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $user = User::factory()->create(['approved_at' => now()]);
 
     $this->actingAs($user)->get(route('finance.journals.export'))->assertForbidden();
 });
 
 // ── Chart of Accounts ────────────────────────────────────────────────────
 it('streams accounts as a flat CSV with a header and one row per account', function () {
-    FinAccount::factory()->count(3)->create(['organization_id' => 1]);
+    FinAccount::factory()->count(3)->create();
 
     $response = $this->actingAs(exportUserWith('finance.ledger.view'))->get(route('finance.accounts.export'));
 
@@ -132,14 +152,14 @@ it('streams accounts as a flat CSV with a header and one row per account', funct
 });
 
 it('403s the accounts export without finance.ledger.view', function () {
-    $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $user = User::factory()->create(['approved_at' => now()]);
 
     $this->actingAs($user)->get(route('finance.accounts.export'))->assertForbidden();
 });
 
 // ── Fixed Assets ─────────────────────────────────────────────────────────
 it('streams fixed assets as CSV with a header and one row per asset', function () {
-    FinFixedAsset::factory()->count(3)->create(['organization_id' => 1, 'status' => 'active']);
+    FinFixedAsset::factory()->count(3)->create(['status' => 'active']);
 
     $response = $this->actingAs(exportUserWith('finance.assets.view'))->get(route('finance.fixed-assets.export'));
 
@@ -152,8 +172,8 @@ it('streams fixed assets as CSV with a header and one row per asset', function (
 });
 
 it('honours the category filter in the fixed assets export', function () {
-    FinFixedAsset::factory()->create(['organization_id' => 1, 'category' => 'vehicle', 'asset_tag' => 'FA-VEHICLE-1']);
-    FinFixedAsset::factory()->create(['organization_id' => 1, 'category' => 'building', 'asset_tag' => 'FA-BUILDING-1']);
+    FinFixedAsset::factory()->create(['category' => 'vehicle', 'asset_tag' => 'FA-VEHICLE-1']);
+    FinFixedAsset::factory()->create(['category' => 'building', 'asset_tag' => 'FA-BUILDING-1']);
 
     $csv = streamedLedger($this->actingAs(exportUserWith('finance.assets.view'))
         ->get(route('finance.fixed-assets.export', ['category' => 'vehicle'])));
@@ -163,7 +183,7 @@ it('honours the category filter in the fixed assets export', function () {
 });
 
 it('403s the fixed assets export without finance.assets.view', function () {
-    $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $user = User::factory()->create(['approved_at' => now()]);
 
     $this->actingAs($user)->get(route('finance.fixed-assets.export'))->assertForbidden();
 });

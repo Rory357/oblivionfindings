@@ -1,22 +1,39 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrReviewGoal;
+use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create(['name' => 'Review Goals Site']);
 
     $this->manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
-    $this->manager->setAttribute('tenant_id', 1);
-    $hrRole = \App\Models\Role::query()->where('name', 'hr')->first();
+    $hrRole = Role::query()->where('name', 'hr')->first();
     if ($hrRole) {
         $this->manager->roles()->syncWithoutDetaching([$hrRole->id]);
     }
 
     $this->employee = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
-    $this->employee->setAttribute('tenant_id', 1);
+    reviewGoalsProfile($this->manager, $this->site);
+    reviewGoalsProfile($this->employee, $this->site);
 });
+
+function reviewGoalsProfile(User $user, Site $site): HrEmployeeProfile
+{
+    return HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+}
 
 test('creating a review with goals writes structured hr_review_goals rows', function () {
     $this->actingAs($this->manager)->post('/hr/performance/reviews', [
@@ -37,7 +54,6 @@ test('creating a review with goals writes structured hr_review_goals rows', func
 
 test('updating a review resyncs its structured goals', function () {
     $review = HrPerformanceReview::create([
-        'tenant_id' => 1,
         'employee_user_id' => $this->employee->id,
         'reviewer_user_id' => $this->manager->id,
         'review_type' => 'annual',
@@ -59,7 +75,6 @@ test('updating a review resyncs its structured goals', function () {
 
 test('reviewGoalList falls back to the legacy JSON blob when no child rows exist', function () {
     $review = HrPerformanceReview::create([
-        'tenant_id' => 1,
         'employee_user_id' => $this->employee->id,
         'reviewer_user_id' => $this->manager->id,
         'review_type' => 'annual',

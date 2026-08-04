@@ -4,7 +4,9 @@ import {
     SuccessionPlanWizard,
     type ExistingSuccessionPlan,
     type SuccessionHolderOption,
+    type SuccessionPlanPrefill,
     type SuccessionPositionOption,
+    type SuccessionSiteOption,
 } from '@/components/hr/succession-wizards';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +31,7 @@ type SuccessionPlan = {
     role_title: string;
     department: string | null;
     risk_level: string;
+    site: SuccessionSiteOption;
     current_holder_name: string | null;
     current_holder: { id: number; name: string } | null;
     position: { id: number; title: string } | null;
@@ -52,6 +55,8 @@ type Props = {
     };
     positions?: SuccessionPositionOption[];
     holders?: SuccessionHolderOption[];
+    sites?: SuccessionSiteOption[];
+    prefill?: SuccessionPlanPrefill | null;
     can: { manage?: boolean };
 };
 
@@ -88,6 +93,8 @@ export default function SuccessionIndex({
     stats,
     positions = [],
     holders = [],
+    sites = [],
+    prefill = null,
     can,
 }: Props) {
     // /hr/succession/create now redirects here with ?new=1 — open the wizard on mount.
@@ -106,6 +113,7 @@ export default function SuccessionIndex({
             role_title: plan.role_title,
             department: plan.department,
             risk_level: plan.risk_level,
+            site: plan.site,
             current_holder: plan.current_holder,
             position: plan.position,
             notes: plan.notes,
@@ -225,6 +233,12 @@ export default function SuccessionIndex({
                                         <div className="space-y-2 text-sm">
                                             <div className="flex justify-between">
                                                 <span className="text-muted-foreground">
+                                                    Site
+                                                </span>
+                                                <span>{plan.site.name}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">
                                                     Current Holder
                                                 </span>
                                                 <span>
@@ -255,6 +269,8 @@ export default function SuccessionIndex({
                     onClose={() => setWizardOpen(false)}
                     positions={positions}
                     holders={holders}
+                    sites={sites}
+                    prefill={prefill}
                 />
             )}
             {can.manage && editing && (
@@ -263,6 +279,7 @@ export default function SuccessionIndex({
                     onClose={() => setEditing(null)}
                     positions={positions}
                     holders={holders}
+                    sites={sites}
                     plan={editing}
                 />
             )}

@@ -4,18 +4,18 @@ namespace App\Models;
 
 use App\Contracts\Timeline\EmitsToTimeline;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClientSeizureEntry extends Model implements EmitsToTimeline
 {
-    use AuditableChanges;
+    use AuditableChanges, WritesLegacyOrganizationStorageContext;
     use SoftDeletes;
 
     protected $fillable = [
         'client_id',
-        'organization_id',
         'occurred_at',
         'duration_seconds',
         'seizure_type',

@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\RosterSuggestion;
@@ -7,6 +8,8 @@ use App\Models\RosterSuggestionRun;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\OperationsPermissionsSeeder;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
 
 /*
@@ -18,12 +21,11 @@ use Illuminate\Support\Carbon;
  */
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
-    $this->seed(\Database\Seeders\OperationsPermissionsSeeder::class);
+    $this->seed(RbacSeeder::class);
+    $this->seed(OperationsPermissionsSeeder::class);
     config()->set('features.rostering.auto_schedule', true);
 
     $this->manager = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'coordinator',
         'approved_at' => now(),
     ]);
@@ -36,17 +38,18 @@ beforeEach(function () {
 
 it('drives suggest, accept and apply end to end over HTTP', function () {
     $site = Site::factory()->create();
+    assignSuggestionUserToSite($this->manager, $site);
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
     ]);
-    $candidateA = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
-    $candidateB = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $candidateA = User::factory()->create(['approved_at' => now()]);
+    $candidateB = User::factory()->create(['approved_at' => now()]);
+    assignSuggestionUserToSite($candidateA, $site);
+    assignSuggestionUserToSite($candidateB, $site);
 
     // Future week so the shift is actionable and generation runs synchronously.
     $weekStart = Carbon::parse(now()->addWeek()->startOfWeek()->toDateString(), 'Pacific/Auckland')->startOfDay();
     $shift = Shift::factory()->unassigned()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'site_id' => $site->id,
         'starts_at' => $weekStart->copy()->setTime(9, 0)->utc(),
@@ -93,19 +96,28 @@ it('drives suggest, accept and apply end to end over HTTP', function () {
         ->and($top->accepted_at)->not->toBeNull();
 });
 
+it('denies a suggestion run outside the manager Site assignment', function () {
+    $accessibleSite = Site::factory()->create();
+    $outsideSite = Site::factory()->create();
+    assignSuggestionUserToSite($this->manager, $accessibleSite);
+    $outsideRun = RosterSuggestionRun::factory()->create(['site_id' => $outsideSite->id]);
+
+    $this->actingAs($this->manager)
+        ->get(route('operations.rostering.suggestions.show', $outsideRun))
+        ->assertForbidden();
+});
+
 it('refuses suggestion actions without the autoSchedule permission', function () {
     $worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
     $suggestion = RosterSuggestion::factory()->create([
-        'roster_suggestion_run_id' => RosterSuggestionRun::factory()->create(['organization_id' => 1])->id,
+        'roster_suggestion_run_id' => RosterSuggestionRun::factory()->create()->id,
         'shift_id' => Shift::factory()->unassigned()->create([
-            'organization_id' => 1,
             'status' => 'scheduled',
         ])->id,
-        'candidate_user_id' => User::factory()->create(['organization_id' => 1])->id,
+        'candidate_user_id' => User::factory()->create()->id,
         'rank' => 1,
         'status' => RosterSuggestion::STATUS_SUGGESTED,
     ]);
@@ -114,3 +126,15 @@ it('refuses suggestion actions without the autoSchedule permission', function ()
         ->post(route('operations.rostering.suggestions.accept', $suggestion))
         ->assertForbidden();
 });
+
+function assignSuggestionUserToSite(User $user, Site $site): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+}

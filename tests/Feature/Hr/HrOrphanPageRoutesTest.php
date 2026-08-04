@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrCompetency;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Permission;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
@@ -11,24 +12,25 @@ beforeEach(function () {
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
 
     $this->staff = User::factory()->create([
         'role' => 'support_worker',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
+    $this->site = Site::factory()->create(['name' => 'Orphan route Site']);
 
     foreach ([$this->hr, $this->staff] as $index => $user) {
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 1,
             'user_id' => $user->id,
             'employee_number' => sprintf('ORPHAN-%03d', $index + 1),
             'work_email' => "orphan-{$user->id}@example.test",
             'position_title' => $user->id === $this->hr->id ? 'HR Manager' : 'Support Worker',
             'position_role' => $user->role,
+            'primary_site_id' => $this->site->id,
+            'start_date' => today()->subYear(),
+            'is_active' => true,
             'created_by' => $this->hr->id,
             'updated_by' => $this->hr->id,
         ]);
@@ -67,7 +69,6 @@ test('my expenses page is routed and accepts self-service expense claims', funct
         ->assertSessionHas('success');
 
     $this->assertDatabaseHas('hr_expense_claims', [
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'title' => 'Mileage and supplies',
         'status' => 'draft',
@@ -81,7 +82,6 @@ test('my expenses page is routed and accepts self-service expense claims', funct
 
 test('competency assessment page is routed for managers', function () {
     HrCompetency::query()->create([
-        'tenant_id' => 1,
         'name' => 'Safe medication support',
         'description' => 'Demonstrates safe medication support practice.',
         'category' => 'Clinical',

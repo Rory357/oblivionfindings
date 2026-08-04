@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Domain\Clinical;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
@@ -16,12 +18,15 @@ class ClientClinicalEventControllerTest extends TestCase
 
     protected Client $client;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
-        $this->client = Client::factory()->create();
+        $this->site = Site::factory()->create();
+        $this->client = Client::factory()->create(['site_id' => $this->site->id]);
     }
 
     protected function createUserWithRole(string $roleName): User
@@ -41,6 +46,14 @@ class ClientClinicalEventControllerTest extends TestCase
     public function test_support_worker_can_record_event_for_assigned_client(): void
     {
         $user = $this->createUserWithRole('support_worker');
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
         $this->client->supportWorkers()->attach($user);
 
         $response = $this->actingAs($user)

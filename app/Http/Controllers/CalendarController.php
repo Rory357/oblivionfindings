@@ -74,7 +74,7 @@ class CalendarController extends Controller
         if (! $canManageAny) {
             $query
                 ->where('user_id', $auth->id)
-                ->visibleToFrontline($auth->organization_id);
+                ->visibleToFrontline();
         } else {
             if (! empty($data['staff_id'])) {
                 $query->where('user_id', $data['staff_id']);

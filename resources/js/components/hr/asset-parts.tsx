@@ -97,6 +97,7 @@ export interface CategoryOption {
     value: string;
     label: string;
     fleet: boolean;
+    device: boolean;
 }
 
 export interface AssetHero {
@@ -184,7 +185,10 @@ export const STATUS_META: Record<
 /*  NZ formatting                                                     */
 /* ------------------------------------------------------------------ */
 
-export function nzd(value: number | null | undefined, opts?: { cents?: boolean }): string {
+export function nzd(
+    value: number | null | undefined,
+    opts?: { cents?: boolean },
+): string {
     if (value == null) return '—';
     return new Intl.NumberFormat('en-NZ', {
         style: 'currency',

@@ -54,7 +54,6 @@ class HsEventService
      *     asset_id?: int|null,
      *     shift_id?: int|null,
      *     worksafe_notifiable?: bool,
-     *     organization_id?: int|null,
      *     created_by?: int|null,
      *     control_room_alert_id?: int|null,
      *     handover_status?: string,
@@ -82,7 +81,6 @@ class HsEventService
 
         try {
             $hsEvent = HsEvent::create([
-                'organization_id' => $data['organization_id'] ?? null,
                 'reference_number' => HsEvent::generateReferenceNumber(),
                 'source_type' => get_class($source),
                 'source_id' => $source->getKey(),

@@ -3,6 +3,7 @@
 namespace App\Domain\Finance\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,12 +11,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FinIrdFiling extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory, WritesLegacyOrganizationStorageContext;
 
     protected $table = 'fin_ird_filings';
 
     protected $fillable = [
-        'organization_id',
         'ird_number',
         'filing_type',
         'period_from',
@@ -49,11 +49,6 @@ class FinIrdFiling extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
-    }
-
-    public function scopeForOrganization($query, ?int $orgId)
-    {
-        return $query->when($orgId, fn ($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
     }
 
     public function scopeOfType($query, string $type)

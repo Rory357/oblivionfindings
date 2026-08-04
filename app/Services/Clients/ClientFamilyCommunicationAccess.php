@@ -2,23 +2,30 @@
 
 namespace App\Services\Clients;
 
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Models\Client;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 
 class ClientFamilyCommunicationAccess
 {
     public function __construct(
         private readonly ClientWorkerEligibility $workerEligibility,
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly HrCurrentStaffService $currentStaff,
     ) {}
 
     public function canView(User $user, Client $client): bool
     {
-        if (! $this->sharesOrganization($user, $client)) {
+        if (! $this->currentStaff->isCurrent($user)) {
             return false;
         }
 
         if ($user->canDo('family_portal.viewAny') || $user->canDo('family_portal.manage')) {
-            return true;
+            return $this->canAccessClientSite($user, $client, [
+                'family_portal.viewAny',
+                'family_portal.manage',
+            ]);
         }
 
         return $this->isAssigned($user, $client)
@@ -27,17 +34,35 @@ class ClientFamilyCommunicationAccess
 
     public function canManage(User $user, Client $client): bool
     {
-        if (! $this->sharesOrganization($user, $client)) {
+        if (! $this->currentStaff->isCurrent($user)) {
             return false;
         }
 
         if ($user->canDo('family_portal.manage')) {
-            return true;
+            return $this->canAccessClientSite($user, $client, ['family_portal.manage']);
         }
 
         return $this->isAssigned($user, $client)
             && $user->canDo('progress_notes.viewAny')
             && ($user->canDo('progress_notes.create') || $user->canDo('progress_notes.update'));
+    }
+
+    /**
+     * Stored conversation membership is historical state, not current
+     * authority. Only a currently linked portal identity or a currently
+     * authorized staff identity may be projected as an active participant.
+     */
+    public function canAppearAsParticipant(User $user, Client $client): bool
+    {
+        if ($user->canAccessClientPortal($client)) {
+            return $this->currentStaff->historicalProfileFor($user) === null;
+        }
+
+        if (! $this->currentStaff->isCurrent($user)) {
+            return false;
+        }
+
+        return $this->canView($user, $client);
     }
 
     private function isAssigned(User $user, Client $client): bool
@@ -50,15 +75,18 @@ class ClientFamilyCommunicationAccess
             && $this->workerEligibility->isEligible($client, $user);
     }
 
-    private function sharesOrganization(User $user, Client $client): bool
+    /** @param array<int, string> $bypassPermissions */
+    private function canAccessClientSite(User $user, Client $client, array $bypassPermissions): bool
     {
-        $userOrganizationId = $user->organization_id;
-        $clientOrganizationId = $client->organization_id;
+        $siteId = is_numeric($client->site_id) && (int) $client->site_id > 0
+            ? (int) $client->site_id
+            : null;
 
-        if ($userOrganizationId === null || $clientOrganizationId === null) {
-            return true;
-        }
-
-        return (int) $userOrganizationId === (int) $clientOrganizationId;
+        return $siteId !== null
+            && in_array(
+                $siteId,
+                $this->siteAccess->accessibleSiteIds($user, $bypassPermissions),
+                true,
+            );
     }
 }

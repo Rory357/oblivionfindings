@@ -42,7 +42,6 @@ class ClientDailyNoteController extends Controller
         ClientNote::query()->create([
             ...$data,
             'client_id' => $client->id,
-            'organization_id' => $request->user()?->organization_id ?? $client->organization_id,
             'user_id' => $request->user()->id,
             'type' => $data['type'] ?? 'daily_note',
             'category' => $data['category'] ?? 'other',

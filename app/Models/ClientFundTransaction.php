@@ -3,15 +3,15 @@
 namespace App\Models;
 
 use App\Domain\Finance\Models\FinJournal;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ClientFundTransaction extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'client_fund_id',
         'idempotency_key',
         'transaction_type',

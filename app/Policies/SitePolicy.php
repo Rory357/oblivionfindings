@@ -8,6 +8,8 @@ use App\Services\UserSiteAccessService;
 
 class SitePolicy
 {
+    private const SITE_BYPASS_PERMISSIONS = ['sites.viewAll'];
+
     public function viewAny(User $user): bool
     {
         return $user->canDo('sites.viewAny')
@@ -50,7 +52,7 @@ class SitePolicy
             && $this->canAccessAssignedSite($user, $site);
     }
 
-    private function canViewType(User $user, string $type): bool
+    private function canViewType(User $user, ?string $type): bool
     {
         $typePermissions = [
             'head_office' => 'sites.type.head_office.view',
@@ -71,11 +73,11 @@ class SitePolicy
 
     private function canAccessAssignedSite(User $user, Site $site): bool
     {
-        $accessibleSiteIds = $this->siteAccess()->accessibleSiteIds($user);
-
-        if ($accessibleSiteIds === []) {
+        if ($this->siteAccess()->canBypass($user, self::SITE_BYPASS_PERMISSIONS)) {
             return true;
         }
+
+        $accessibleSiteIds = $this->siteAccess()->accessibleSiteIds($user);
 
         return in_array((int) $site->id, $accessibleSiteIds, true);
     }

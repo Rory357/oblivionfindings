@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
+use App\Services\References\ReferenceNumberGenerator;
+use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,25 +15,32 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HsRiskAssessment extends Model
 {
-    use AuditableChanges, HasFactory, SoftDeletes;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     protected $table = 'hs_risk_assessments';
 
     /* ------------------------------------------------------------------ */
-    /*  Constants                                                          */
+    /*  Constants */
     /* ------------------------------------------------------------------ */
 
     // Status lifecycle
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_UNDER_REVIEW = 'under_review';
+
     public const STATUS_SUPERSEDED = 'superseded';
+
     public const STATUS_ARCHIVED = 'archived';
 
     // Risk levels (calculated from 5x5 matrix)
     public const LEVEL_LOW = 'low';
+
     public const LEVEL_MEDIUM = 'medium';
+
     public const LEVEL_HIGH = 'high';
+
     public const LEVEL_EXTREME = 'extreme';
 
     /**
@@ -43,18 +53,17 @@ class HsRiskAssessment extends Model
      *   16–25: extreme
      */
     public const RISK_BANDS = [
-        'low'     => [1, 4],
-        'medium'  => [5, 9],
-        'high'    => [10, 15],
+        'low' => [1, 4],
+        'medium' => [5, 9],
+        'high' => [10, 15],
         'extreme' => [16, 25],
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Fillable / Casts                                                   */
+    /*  Fillable / Casts */
     /* ------------------------------------------------------------------ */
 
     protected $fillable = [
-        'organization_id',
         'reference_number',
         'assessable_type',
         'assessable_id',
@@ -101,7 +110,7 @@ class HsRiskAssessment extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function assessable(): MorphTo
@@ -140,7 +149,7 @@ class HsRiskAssessment extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeActive($query)
@@ -162,11 +171,14 @@ class HsRiskAssessment extends Model
 
     public function scopeForAssessable($query, string $type, int $id)
     {
-        return $query->where('assessable_type', $type)->where('assessable_id', $id);
+        $query->where('assessable_type', $type)->where('assessable_id', $id);
+
+        return app(UserSiteAccessService::class)
+            ->applyHsRiskAssessmentApplicationScope($query);
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scoring helpers                                                     */
+    /*  Scoring helpers */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -198,7 +210,7 @@ class HsRiskAssessment extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Lifecycle helpers                                                   */
+    /*  Lifecycle helpers */
     /* ------------------------------------------------------------------ */
 
     public function isActive(): bool
@@ -217,11 +229,11 @@ class HsRiskAssessment extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Reference number generation                                        */
+    /*  Reference number generation */
     /* ------------------------------------------------------------------ */
 
     public static function generateReferenceNumber(): string
     {
-        return app(\App\Services\References\ReferenceNumberGenerator::class)->next('RA');
+        return app(ReferenceNumberGenerator::class)->next('RA');
     }
 }

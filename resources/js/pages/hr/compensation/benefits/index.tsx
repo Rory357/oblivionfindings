@@ -1,4 +1,8 @@
-import { CompensationHero, CompensationTabs, type CompensationHeroStats } from '@/components/hr';
+import {
+    CompensationHero,
+    CompensationTabs,
+    type CompensationHeroStats,
+} from '@/components/hr';
 import { BenefitsEnrollDialog } from '@/components/hr/benefits-enroll-dialog';
 import { PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +28,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { Heart, Pencil, Plus, ShieldCheck } from 'lucide-react';
+import { Pencil, Plus, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 
 interface BenefitPlan {

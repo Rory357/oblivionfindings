@@ -6,13 +6,16 @@ use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Shifts\Timesheets\TimesheetApprovalService;
 use App\Models\Client;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\TimesheetAmendment;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\NotificationService;
 use App\Services\Operations\TimesheetReconciliationService;
 use App\Services\ShiftOperationalSnapshotService;
 use App\Services\UserSiteAccessService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -322,13 +325,13 @@ class TimesheetController extends Controller
         $clients = $clientScope->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
 
         $staff = $canApprove
-            ? $this->siteAccess()->applyStaffScope(\App\Models\User::staff(), $auth, $this->timesheetBypassPermissions())
+            ? $this->siteAccess()->applyStaffScope(User::staff(), $auth, $this->timesheetBypassPermissions())
                 ->orderBy('name')
                 ->get(['id', 'name', 'email'])
             : [];
 
         $sites = $this->siteAccess()
-            ->applySiteScope(\App\Models\Site::query(), $auth, $this->timesheetBypassPermissions())
+            ->applySiteScope(Site::query(), $auth, $this->timesheetBypassPermissions())
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -497,14 +500,17 @@ class TimesheetController extends Controller
         $hoursThisWeek = round($thisWeek->sum(fn ($t) => (float) $t->total_hours), 1);
 
         // Rostered hours (linked shifts in the same week).
-        $rosteredShifts = \App\Models\Shift::query()
+        $rosteredShifts = Shift::query()
             ->whereBetween('starts_at', [$weekStart, $weekEnd])
             ->when(! $auth->canDo('timesheets.manageAny'), fn ($q) => $q->where('user_id', $auth->id))
             ->get(['id', 'starts_at', 'ends_at', 'expected_break_minutes']);
 
         $hoursTarget = round($rosteredShifts->sum(function ($s) {
-            if (! $s->starts_at || ! $s->ends_at) return 0;
+            if (! $s->starts_at || ! $s->ends_at) {
+                return 0;
+            }
             $mins = $s->starts_at->diffInMinutes($s->ends_at) - (int) ($s->expected_break_minutes ?? 0);
+
             return max($mins, 0) / 60;
         }), 1);
 
@@ -522,11 +528,11 @@ class TimesheetController extends Controller
             'unapproved' => $statusCounts['submitted'] ?? 0,
             'hours_this_week' => $hoursThisWeek,
             'hours_target' => max($hoursTarget, 0.1),
-            'next_payroll_date' => now()->next(\Carbon\Carbon::FRIDAY)->format('d M'),
-            'sites_count' => $this->siteAccess()->applySiteScope(\App\Models\Site::query(), $auth, $this->timesheetBypassPermissions())->count(),
+            'next_payroll_date' => now()->next(Carbon::FRIDAY)->format('d M'),
+            'sites_count' => $this->siteAccess()->applySiteScope(Site::query(), $auth, $this->timesheetBypassPermissions())->count(),
             'regions_count' => 1,
-            'rostered_today' => \App\Models\Shift::query()->whereDate('starts_at', today())->count(),
-            'staff_on_shift' => \App\Models\Shift::query()->whereDate('starts_at', today())->where('status', 'in_progress')->count(),
+            'rostered_today' => Shift::query()->whereDate('starts_at', today())->count(),
+            'staff_on_shift' => Shift::query()->whereDate('starts_at', today())->where('status', 'in_progress')->count(),
         ];
     }
 
@@ -542,7 +548,7 @@ class TimesheetController extends Controller
         $start = now()->subDays(7);
         $end = now()->addDays(7);
 
-        $shifts = \App\Models\Shift::query()
+        $shifts = Shift::query()
             ->with([
                 'client:id,first_name,last_name',
                 'serviceContext:id,name',
@@ -599,6 +605,10 @@ class TimesheetController extends Controller
 
     public function show(Request $request, Timesheet $timesheet)
     {
+        $auth = $request->user();
+        abort_unless($auth, 403);
+        $this->assertCanViewTimesheet($auth, $timesheet);
+
         // The roster grid (and any other surface) opens the read-only
         // ViewTimesheetDialog inline. It fetches the same row payload the index
         // table feeds that modal, so serve JSON for those requests; normal
@@ -613,20 +623,15 @@ class TimesheetController extends Controller
     /**
      * JSON payload for the inline ViewTimesheetDialog ("View timesheet" from the
      * roster grid). Mirrors the relations index() eager-loads so the row is
-     * identical to what the index table hands the modal, applies the same access
-     * guard as edit(), and returns can_approve so the modal knows whether to
+     * identical to what the index table hands the modal, applies the same view
+     * guard as show(), and returns can_approve so the modal knows whether to
      * surface the approve / return / reject controls.
      */
     protected function showTimesheetCard(Request $request, Timesheet $timesheet)
     {
         $auth = $request->user();
-        abort_unless($auth && ($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned')), 403);
-
-        if (! $auth->canDo('timesheets.manageAny') && ! $this->canReviewTimesheets($auth) && $timesheet->user_id !== $auth->id) {
-            abort(403);
-        }
-
-        $this->assertCanAccessTimesheet($auth, $timesheet);
+        abort_unless($auth, 403);
+        $this->assertCanViewTimesheet($auth, $timesheet);
 
         $timesheet->load([
             'client:id,first_name,last_name',
@@ -828,7 +833,7 @@ class TimesheetController extends Controller
      */
     protected function manualSnapshot(User $auth, ?string $activityType, ?int $siteId): array
     {
-        $site = $siteId ? \App\Models\Site::find($siteId) : null;
+        $site = $siteId ? Site::find($siteId) : null;
 
         return [
             'site_id' => $siteId,
@@ -904,20 +909,18 @@ class TimesheetController extends Controller
      */
     public function edit(Request $request, Timesheet $timesheet)
     {
+        $auth = $request->user();
+        abort_unless($auth, 403);
+        $this->assertCanEditTimesheet($auth, $timesheet);
+
         return redirect()->to("/operations/timesheets?edit={$timesheet->id}");
     }
 
     public function update(Request $request, Timesheet $timesheet)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('timesheets.update'), 403);
-
-        // Ownership check
-        if (! $auth->canDo('timesheets.manageAny') && $timesheet->user_id !== $auth->id) {
-            abort(403);
-        }
-
-        $this->assertCanAccessTimesheet($auth, $timesheet);
+        abort_unless($auth, 403);
+        $this->assertCanEditTimesheet($auth, $timesheet);
 
         // Only editable while draft/returned (audit safety)
         if (! in_array($timesheet->status, ['draft', 'returned'], true)) {
@@ -1162,7 +1165,7 @@ class TimesheetController extends Controller
             return back()->withErrors($exception->errors());
         }
 
-        /** @var \App\Models\Timesheet $approvedTimesheet */
+        /** @var Timesheet $approvedTimesheet */
         $approvedTimesheet = $result->timesheet;
 
         if (! $result->changed) {
@@ -1367,7 +1370,7 @@ class TimesheetController extends Controller
 
         $amendment->update(['applied_at' => now()]);
 
-        \App\Services\AuditLogger::log('timesheet.amendment.payroll_processed', $amendment->timesheet, [
+        AuditLogger::log('timesheet.amendment.payroll_processed', $amendment->timesheet, [
             'amendment_id' => $amendment->id,
             'processed_by' => $auth->id,
         ]);
@@ -1411,5 +1414,27 @@ class TimesheetController extends Controller
             $this->timesheetBypassPermissions(),
             'You are not authorized to access timesheets for this site.',
         );
+    }
+
+    protected function assertCanViewTimesheet(User $auth, Timesheet $timesheet): void
+    {
+        abort_unless($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned'), 403);
+
+        if (! $auth->canDo('timesheets.manageAny') && ! $this->canReviewTimesheets($auth) && $timesheet->user_id !== $auth->id) {
+            abort(403);
+        }
+
+        $this->assertCanAccessTimesheet($auth, $timesheet);
+    }
+
+    protected function assertCanEditTimesheet(User $auth, Timesheet $timesheet): void
+    {
+        abort_unless($auth->canDo('timesheets.update'), 403);
+
+        if (! $auth->canDo('timesheets.manageAny') && $timesheet->user_id !== $auth->id) {
+            abort(403);
+        }
+
+        $this->assertCanAccessTimesheet($auth, $timesheet);
     }
 }

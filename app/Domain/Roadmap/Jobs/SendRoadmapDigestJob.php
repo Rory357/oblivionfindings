@@ -17,25 +17,18 @@ class SendRoadmapDigestJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(
-        public ?int $tenantId = null
-    ) {}
-
     public function handle(): void
     {
         $pendingSuggestions = InitiativeSuggestion::query()
-            ->when($this->tenantId !== null, fn ($q) => $q->where('tenant_id', $this->tenantId))
             ->where('status', InitiativeSuggestion::STATUS_TRIAGE_PENDING)
             ->count();
 
         $overdueTasks = InitiativeTask::query()
-            ->when($this->tenantId !== null, fn ($q) => $q->where('tenant_id', $this->tenantId))
             ->where('status', '!=', 'completed')
             ->whereDate('due_date', '<', now()->toDateString())
             ->count();
 
         $pendingDecisions = DecisionRequest::query()
-            ->when($this->tenantId !== null, fn ($q) => $q->where('tenant_id', $this->tenantId))
             ->where('status', 'pending')
             ->count();
 
@@ -48,7 +41,6 @@ class SendRoadmapDigestJob implements ShouldQueue
             'title' => 'Roadmap weekly digest',
             'body' => 'Roadmap digest generated with pending triage, overdue tasks, and decision queue.',
             'context' => [
-                'tenant_id' => $this->tenantId,
                 'pending_suggestions' => $pendingSuggestions,
                 'overdue_tasks' => $overdueTasks,
                 'pending_decisions' => $pendingDecisions,

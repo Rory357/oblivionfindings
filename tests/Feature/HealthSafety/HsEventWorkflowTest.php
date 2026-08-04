@@ -2,10 +2,13 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,21 +31,64 @@ class HsEventWorkflowTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-    protected function hsOfficer(): User
+    protected function activeSite(string $name): Site
+    {
+        return Site::factory()->create([
+            'name' => $name,
+            'is_active' => true,
+            'archived' => false,
+            'archived_at' => null,
+        ]);
+    }
+
+    protected function clientAt(Site $site): Client
+    {
+        return Client::factory()->create([
+            'site_id' => $site->id,
+            'status' => 'active',
+        ]);
+    }
+
+    protected function hsOfficer(Site $site): User
     {
         $user = User::factory()->create(['role' => 'health_safety_officer', 'approved_at' => now()]);
         if ($role = Role::where('name', 'health_safety_officer')->first()) {
             $user->roles()->attach($role);
         }
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'position_role' => 'health_safety_officer',
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
 
         return $user;
     }
 
+    protected function eventAt(Site $site, User $creator): HsEvent
+    {
+        return HsEvent::factory()->create([
+            'site_id' => $site->id,
+            'client_id' => $this->clientAt($site)->id,
+            'created_by' => $creator->id,
+        ]);
+    }
+
     public function test_investigation_lifecycle_advances_event_to_corrective_action(): void
     {
-        $officer = $this->hsOfficer();
+        $site = $this->activeSite('Kauri House');
+        $officer = $this->hsOfficer($site);
         $lead = $officer;
-        $event = HsEvent::factory()->high()->create();
+        $event = HsEvent::factory()->high()->create([
+            'site_id' => $site->id,
+            'client_id' => $this->clientAt($site)->id,
+            'created_by' => $officer->id,
+        ]);
 
         $this->actingAs($officer)->from('/health-safety/events')
             ->post("/health-safety/events/{$event->id}/investigations", [
@@ -51,6 +97,7 @@ class HsEventWorkflowTest extends TestCase
             ])->assertSessionHas('success');
 
         $inv = HsInvestigation::where('hs_event_id', $event->id)->firstOrFail();
+        $this->assertSame(1, HsInvestigation::where('hs_event_id', $event->id)->count());
         $this->assertEquals(HsInvestigation::STATUS_IN_PROGRESS, $inv->status);
         $this->assertEquals(HsEvent::STATUS_INVESTIGATING, $event->fresh()->status);
 
@@ -76,9 +123,14 @@ class HsEventWorkflowTest extends TestCase
 
     public function test_forbidden_investigation_transition_surfaces_gate_error(): void
     {
-        $officer = $this->hsOfficer();
+        $site = $this->activeSite('Rimu House');
+        $officer = $this->hsOfficer($site);
         $lead = $officer;
-        $event = HsEvent::factory()->high()->create();
+        $event = HsEvent::factory()->high()->create([
+            'site_id' => $site->id,
+            'client_id' => $this->clientAt($site)->id,
+            'created_by' => $officer->id,
+        ]);
 
         $this->actingAs($officer)->from('/health-safety/events')
             ->post("/health-safety/events/{$event->id}/investigations", [
@@ -86,6 +138,16 @@ class HsEventWorkflowTest extends TestCase
                 'lead_investigator_id' => $lead->id,
             ]);
         $inv = HsInvestigation::where('hs_event_id', $event->id)->firstOrFail();
+
+        $otherEvent = $this->eventAt($site, $officer);
+        $otherInvestigation = HsInvestigation::factory()->create([
+            'hs_event_id' => $otherEvent->id,
+            'lead_investigator_id' => $officer->id,
+            'created_by' => $officer->id,
+        ]);
+        $this->actingAs($officer)
+            ->post("/health-safety/events/{$event->id}/investigations/{$otherInvestigation->id}/submit")
+            ->assertNotFound();
 
         // Skip findings → submit (in_progress → under_review) is not an allowed transition.
         $this->actingAs($officer)->from('/health-safety/events')
@@ -96,9 +158,10 @@ class HsEventWorkflowTest extends TestCase
 
     public function test_corrective_action_lifecycle_enforces_separation_of_duties_and_auto_advances(): void
     {
-        $officer = $this->hsOfficer();   // completes
-        $verifier = $this->hsOfficer();  // a different manager, verifies
-        $event = HsEvent::factory()->create();
+        $site = $this->activeSite('Totara House');
+        $officer = $this->hsOfficer($site);   // completes
+        $verifier = $this->hsOfficer($site);  // a different manager, verifies
+        $event = $this->eventAt($site, $officer);
 
         $this->actingAs($officer)->from('/health-safety/events')
             ->post("/health-safety/events/{$event->id}/corrective-actions", [
@@ -106,8 +169,18 @@ class HsEventWorkflowTest extends TestCase
                 'priority' => 'high',
             ])->assertSessionHas('success');
         $action = HsCorrectiveAction::where('hs_event_id', $event->id)->firstOrFail();
+        $this->assertSame(1, HsCorrectiveAction::where('hs_event_id', $event->id)->count());
         $this->assertEquals(HsCorrectiveAction::STATUS_OPEN, $action->status);
         $this->assertEquals(HsEvent::STATUS_CORRECTIVE_ACTION, $event->fresh()->status);
+
+        $otherEvent = $this->eventAt($site, $officer);
+        $otherAction = HsCorrectiveAction::factory()->create([
+            'hs_event_id' => $otherEvent->id,
+            'created_by' => $officer->id,
+        ]);
+        $this->actingAs($officer)
+            ->post("/health-safety/events/{$event->id}/corrective-actions/{$otherAction->id}/start")
+            ->assertNotFound();
 
         $this->actingAs($officer)->from('/health-safety/events')
             ->post("/health-safety/events/{$event->id}/corrective-actions/{$action->id}/start")
@@ -144,9 +217,14 @@ class HsEventWorkflowTest extends TestCase
 
     public function test_seed_corrective_action_from_recommendation(): void
     {
-        $officer = $this->hsOfficer();
+        $site = $this->activeSite('Nikau House');
+        $officer = $this->hsOfficer($site);
         $lead = $officer;
-        $event = HsEvent::factory()->high()->create();
+        $event = HsEvent::factory()->high()->create([
+            'site_id' => $site->id,
+            'client_id' => $this->clientAt($site)->id,
+            'created_by' => $officer->id,
+        ]);
 
         // Build a completed investigation with one recommendation.
         $this->actingAs($officer)->from('/health-safety/events')
@@ -178,7 +256,11 @@ class HsEventWorkflowTest extends TestCase
 
     public function test_workflow_routes_require_hazards_manage(): void
     {
-        $event = HsEvent::factory()->create();
+        $site = $this->activeSite('Manuka House');
+        $event = HsEvent::factory()->create([
+            'site_id' => $site->id,
+            'client_id' => $this->clientAt($site)->id,
+        ]);
         $user = User::factory()->create(['approved_at' => now()]);
 
         $this->actingAs($user)

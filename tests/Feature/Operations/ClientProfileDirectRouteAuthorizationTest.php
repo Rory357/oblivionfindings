@@ -1,9 +1,11 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\BehaviourAbcEntry;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\TimelineEventComment;
 use App\Models\User;
@@ -28,18 +30,29 @@ function grantClientProfileDirectRoutePermissions(User $user, array $permissionK
     $user->roles()->syncWithoutDetaching([$role->id]);
 }
 
-function clientProfileDirectRouteUser(array $permissionKeys, int $organizationId = 1, string $role = 'manager'): User
+function clientProfileDirectRouteUser(array $permissionKeys, Site $site, string $role = 'manager'): User
 {
     $user = User::factory()->create([
-        'organization_id' => $organizationId,
         'role' => $role,
         'approved_at' => now(),
     ]);
 
     grantClientProfileDirectRoutePermissions($user, $permissionKeys);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 
     return $user;
 }
+
+beforeEach(function () {
+    $this->clientProfileDirectRouteSite = Site::factory()->create();
+});
 
 /** @return array{event: TimelineEvent, comment: TimelineEventComment} */
 function clientProfileDirectRouteTimelineFixture(User $actor, Client $client): array
@@ -80,8 +93,8 @@ function clientProfileDirectRouteAbcPayload(array $overrides = []): array
 }
 
 it('requires canonical timeline read access for the direct client timeline route', function () {
-    $viewer = clientProfileDirectRouteUser(['clients.viewAny']);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $viewer = clientProfileDirectRouteUser(['clients.viewAny'], $this->clientProfileDirectRouteSite);
+    $client = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
     TimelineEvent::factory()->create([
         'client_id' => $client->id,
         'actor_user_id' => $viewer->id,
@@ -97,8 +110,8 @@ it('allows a global timeline viewer to read the direct client timeline route', f
     $viewer = clientProfileDirectRouteUser([
         'clients.viewAny',
         'timeline.viewAny',
-    ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    ], $this->clientProfileDirectRouteSite);
+    $client = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
 
     $this->actingAs($viewer)
         ->get("/clients/{$client->id}/timeline")
@@ -109,8 +122,8 @@ it('allows an assigned care worker with timeline create access to read the clien
     $worker = clientProfileDirectRouteUser([
         'clients.viewAssigned',
         'timeline.create',
-    ], role: 'support_worker');
-    $client = Client::factory()->create(['organization_id' => 1]);
+    ], $this->clientProfileDirectRouteSite, role: 'support_worker');
+    $client = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
     $client->supportWorkers()->attach($worker);
 
     $this->actingAs($worker)
@@ -118,12 +131,13 @@ it('allows an assigned care worker with timeline create access to read the clien
         ->assertOk();
 });
 
-it('forbids direct timeline reads across organisations despite global timeline permission', function () {
+it('forbids direct timeline reads across Sites despite global timeline permission', function () {
     $viewer = clientProfileDirectRouteUser([
-        'clients.viewAny',
+        'clients.viewAssigned',
         'timeline.viewAny',
-    ], organizationId: 1);
-    $foreignClient = Client::factory()->create(['organization_id' => 2]);
+    ], $this->clientProfileDirectRouteSite);
+    $foreignSite = Site::factory()->create();
+    $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
 
     $this->actingAs($viewer)
         ->get("/clients/{$foreignClient->id}/timeline")
@@ -134,8 +148,8 @@ it('requires timeline create access for staff timeline interactions', function (
     $viewer = clientProfileDirectRouteUser([
         'clients.viewAny',
         'timeline.viewAny',
-    ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    ], $this->clientProfileDirectRouteSite);
+    $client = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
     ['event' => $event, 'comment' => $comment] = clientProfileDirectRouteTimelineFixture($viewer, $client);
 
     $this->actingAs($viewer);
@@ -174,8 +188,8 @@ it('allows staff timeline interactions with read and create access', function (s
         'clients.viewAny',
         'timeline.viewAny',
         'timeline.create',
-    ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    ], $this->clientProfileDirectRouteSite);
+    $client = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
     ['event' => $event, 'comment' => $comment] = clientProfileDirectRouteTimelineFixture($viewer, $client);
 
     $this->actingAs($viewer);
@@ -222,9 +236,9 @@ it('rejects staff timeline interactions through another client route', function 
         'clients.viewAny',
         'timeline.viewAny',
         'timeline.create',
-    ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $otherClient = Client::factory()->create(['organization_id' => 1]);
+    ], $this->clientProfileDirectRouteSite);
+    $client = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
+    $otherClient = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
     ['event' => $event, 'comment' => $comment] = clientProfileDirectRouteTimelineFixture($viewer, $otherClient);
 
     $this->actingAs($viewer);
@@ -258,13 +272,14 @@ it('rejects staff timeline interactions through another client route', function 
     'event reaction' => ['reaction'],
 ]);
 
-it('forbids timeline interaction writes across organisations', function () {
+it('forbids timeline interaction writes across Sites', function () {
     $viewer = clientProfileDirectRouteUser([
-        'clients.viewAny',
+        'clients.viewAssigned',
         'timeline.viewAny',
         'timeline.create',
-    ], organizationId: 1);
-    $foreignClient = Client::factory()->create(['organization_id' => 2]);
+    ], $this->clientProfileDirectRouteSite);
+    $foreignSite = Site::factory()->create();
+    $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
     ['event' => $event] = clientProfileDirectRouteTimelineFixture($viewer, $foreignClient);
 
     $this->actingAs($viewer)
@@ -281,8 +296,8 @@ it('requires canonical behaviour read access for direct ABC index and detail rou
     $viewer = clientProfileDirectRouteUser([
         'clients.viewAny',
         'clinical.events.viewAssigned',
-    ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    ], $this->clientProfileDirectRouteSite);
+    $client = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
     $entry = BehaviourAbcEntry::factory()->create(['client_id' => $client->id]);
 
     $this->actingAs($viewer)
@@ -297,8 +312,8 @@ it('allows a global behaviour viewer to read direct ABC index and detail routes'
     $viewer = clientProfileDirectRouteUser([
         'clients.viewAny',
         'clinical.behaviour.viewAny',
-    ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    ], $this->clientProfileDirectRouteSite);
+    $client = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
     $entry = BehaviourAbcEntry::factory()->create(['client_id' => $client->id]);
 
     $this->actingAs($viewer)
@@ -315,8 +330,8 @@ it('allows an assigned clinical events viewer to read direct ABC routes for thei
     $worker = clientProfileDirectRouteUser([
         'clients.viewAssigned',
         'clinical.events.viewAssigned',
-    ], role: 'support_worker');
-    $client = Client::factory()->create(['organization_id' => 1]);
+    ], $this->clientProfileDirectRouteSite, role: 'support_worker');
+    $client = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
     $client->supportWorkers()->attach($worker);
     $entry = BehaviourAbcEntry::factory()->create(['client_id' => $client->id]);
 
@@ -332,9 +347,9 @@ it('rejects an ABC detail record through another client route', function () {
     $viewer = clientProfileDirectRouteUser([
         'clients.viewAny',
         'clinical.behaviour.viewAny',
-    ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $otherClient = Client::factory()->create(['organization_id' => 1]);
+    ], $this->clientProfileDirectRouteSite);
+    $client = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
+    $otherClient = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
     $entry = BehaviourAbcEntry::factory()->create(['client_id' => $otherClient->id]);
 
     $this->actingAs($viewer)
@@ -342,12 +357,13 @@ it('rejects an ABC detail record through another client route', function () {
         ->assertNotFound();
 });
 
-it('forbids direct ABC reads across organisations despite global behaviour permission', function () {
+it('forbids direct ABC reads across Sites despite global behaviour permission', function () {
     $viewer = clientProfileDirectRouteUser([
-        'clients.viewAny',
+        'clients.viewAssigned',
         'clinical.behaviour.viewAny',
-    ], organizationId: 1);
-    $foreignClient = Client::factory()->create(['organization_id' => 2]);
+    ], $this->clientProfileDirectRouteSite);
+    $foreignSite = Site::factory()->create();
+    $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
 
     $this->actingAs($viewer)
         ->getJson("/clients/{$foreignClient->id}/behaviour/abc")
@@ -359,8 +375,8 @@ it('does not treat clinical event recording as ABC correction authority', functi
         'clients.viewAny',
         'clinical.behaviour.viewAny',
         'clinical.events.record',
-    ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    ], $this->clientProfileDirectRouteSite);
+    $client = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
     $entry = BehaviourAbcEntry::factory()->create([
         'client_id' => $client->id,
         'behaviour' => 'Original behaviour description.',
@@ -392,8 +408,8 @@ it('allows ABC update and deletion with the existing correction capability', fun
         'clients.viewAny',
         'clinical.behaviour.viewAny',
         'clinical.observations.correct',
-    ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    ], $this->clientProfileDirectRouteSite);
+    $client = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
     $entry = BehaviourAbcEntry::factory()->create([
         'client_id' => $client->id,
         'behaviour' => 'Original behaviour description.',
@@ -428,9 +444,9 @@ it('rejects an ABC correction through another client route', function () {
         'clients.viewAny',
         'clinical.behaviour.viewAny',
         'clinical.observations.correct',
-    ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $otherClient = Client::factory()->create(['organization_id' => 1]);
+    ], $this->clientProfileDirectRouteSite);
+    $client = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
+    $otherClient = Client::factory()->create(['site_id' => $this->clientProfileDirectRouteSite->id]);
     $entry = BehaviourAbcEntry::factory()->create(['client_id' => $otherClient->id]);
 
     $this->actingAs($viewer)
@@ -441,13 +457,14 @@ it('rejects an ABC correction through another client route', function () {
         ->assertNotFound();
 });
 
-it('forbids ABC deletion across organisations despite correction capability', function () {
+it('forbids ABC deletion across Sites despite correction capability', function () {
     $viewer = clientProfileDirectRouteUser([
-        'clients.viewAny',
+        'clients.viewAssigned',
         'clinical.behaviour.viewAny',
         'clinical.observations.correct',
-    ], organizationId: 1);
-    $foreignClient = Client::factory()->create(['organization_id' => 2]);
+    ], $this->clientProfileDirectRouteSite);
+    $foreignSite = Site::factory()->create();
+    $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
     $entry = BehaviourAbcEntry::factory()->create(['client_id' => $foreignClient->id]);
 
     $this->actingAs($viewer)

@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\UserSiteAccessService;
 use App\Support\EmarUrl;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,6 +16,10 @@ use Illuminate\Validation\ValidationException;
 
 class BreakGlassController extends Controller
 {
+    private const SITE_BYPASS_PERMISSIONS = ['medications.audit.view'];
+
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     /** Owner of the grant, or a manager/auditor, may revoke or extend. */
     private function canManage(User $user, ClientBreakGlassAccess $access): bool
     {
@@ -28,8 +33,9 @@ class BreakGlassController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('medications.breakglass'), 403);
         $this->authorize('breakGlass', $client);
+        $this->assertClientSiteAccess($user, $client);
 
-        $policy = BreakGlassPolicy::forOrganization($user->organization_id);
+        $policy = BreakGlassPolicy::current();
 
         $data = $request->validate([
             'reason' => [$policy->reason_required ? 'required' : 'nullable', 'string', 'max:255'],
@@ -37,12 +43,23 @@ class BreakGlassController extends Controller
             'minutes' => ['nullable', 'integer', 'min:5', 'max:'.$policy->max_minutes],
             'authorization_mode' => ['nullable', Rule::in(['self', 'co_sign'])],
             // Dual authorisation must be a *different* person.
-            'co_signed_by' => ['nullable', 'integer', Rule::exists('users', 'id'), Rule::notIn([$user->id]), 'required_if:authorization_mode,co_sign'],
+            'co_signed_by' => [
+                'bail',
+                'nullable',
+                'integer',
+                Rule::notIn([$user->id]),
+                'required_if:authorization_mode,co_sign',
+                function (string $attribute, mixed $value, \Closure $fail) use ($client): void {
+                    if (filled($value) && ! $this->isEligibleCoSigner((int) $value, $client)) {
+                        $fail('Choose an approved co-signer who can access this client Site.');
+                    }
+                },
+            ],
             'acknowledged_min_necessary' => ['nullable', 'boolean'],
             'acknowledged_incident_report' => ['nullable', 'boolean'],
         ]);
 
-        // Default to the org policy duration unless explicitly set, capped at the policy max.
+        // Default to the application policy duration unless explicitly set, capped at the policy max.
         $minutes = ! empty($data['minutes']) ? (int) $data['minutes'] : $policy->default_minutes;
         $minutes = min($minutes, $policy->max_minutes);
         $mode = $data['authorization_mode'] ?? 'self';
@@ -73,6 +90,7 @@ class BreakGlassController extends Controller
         abort_unless($user && ($user->canDo('medications.breakglass') || $user->canDo('medications.audit.view')), 403);
         $this->authorize('manageBreakGlass', $client);
         abort_unless((int) $access->client_id === (int) $client->id, 404);
+        $this->assertClientSiteAccess($user, $client);
         abort_unless($this->canManage($user, $access), 403);
 
         // Only a live grant can be extended; expired/revoked windows are closed.
@@ -80,8 +98,8 @@ class BreakGlassController extends Controller
             return back()->with('error', 'This grant has already ended and cannot be extended.');
         }
 
-        // Cap the total window (grant → new expiry) at the org policy maximum.
-        $policy = BreakGlassPolicy::forOrganization($user->organization_id);
+        // Cap the total window (grant → new expiry) at the application policy maximum.
+        $policy = BreakGlassPolicy::current();
         $hardCap = $access->created_at?->copy()->addMinutes($policy->max_minutes);
         $proposed = $access->expires_at->copy()->addMinutes($policy->extend_minutes);
         $newExpiry = $hardCap && $proposed->greaterThan($hardCap) ? $hardCap : $proposed;
@@ -100,6 +118,7 @@ class BreakGlassController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('medications.audit.view'), 403);
         $this->authorize('reviewBreakGlass', $client);
+        $this->assertClientSiteAccess($user, $client);
 
         // Reviews apply to completed activations, which may be expired or revoked
         // (soft-deleted) — resolve including trashed so the audit log's Review
@@ -131,7 +150,6 @@ class BreakGlassController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $this->canEditPolicy($user), 403);
-        abort_unless($user->organization_id, 422);
 
         $data = $request->validate([
             'default_minutes' => ['required', 'integer', 'min:5', 'max:1440'],
@@ -148,12 +166,12 @@ class BreakGlassController extends Controller
             ]);
         }
 
-        BreakGlassPolicy::updateOrCreate(['organization_id' => $user->organization_id], $data);
+        BreakGlassPolicy::updateApplicationPolicy($data);
 
         return back()->with('success', 'Break-glass policy updated.');
     }
 
-    /** Only organisation admins / provider managers may change the policy. */
+    /** Only application admins / provider managers may change the policy. */
     private function canEditPolicy(User $user): bool
     {
         return $user->hasRole('admin', 'provider_manager');
@@ -170,10 +188,12 @@ class BreakGlassController extends Controller
             'reason' => ['nullable', 'string', 'max:500'],
         ]);
 
-        // One acknowledgement per (org, type, key); dismissed_through advances on re-ack
+        abort_unless($this->canDismissSignal($user, $data['type'], $data['key']), 404);
+
+        // One acknowledgement per signal; dismissed_through advances on re-ack
         // so the signal re-surfaces only when newer activity appears.
         BreakGlassFlagDismissal::updateOrCreate(
-            ['organization_id' => $user->organization_id, 'signal_type' => $data['type'], 'signal_key' => $data['key']],
+            ['signal_type' => $data['type'], 'signal_key' => $data['key']],
             ['dismissed_by' => $user->id, 'reason' => $data['reason'] ?? null, 'dismissed_through' => now()],
         );
 
@@ -187,6 +207,7 @@ class BreakGlassController extends Controller
         $this->authorize('manageBreakGlass', $client);
 
         abort_unless((int) $access->client_id === (int) $client->id, 404);
+        $this->assertClientSiteAccess($user, $client);
         abort_unless($this->canManage($user, $access), 403);
 
         // Record the revoker, then soft-delete so the activation is retained for
@@ -200,5 +221,74 @@ class BreakGlassController extends Controller
         ]);
 
         return back()->with('success', 'Break-glass access revoked.');
+    }
+
+    private function assertClientSiteAccess(User $user, Client $client): void
+    {
+        $siteId = is_numeric($client->site_id) ? (int) $client->site_id : null;
+        $this->siteAccess->assertCanAccessSiteId(
+            $user,
+            $siteId,
+            self::SITE_BYPASS_PERMISSIONS,
+        );
+    }
+
+    private function isEligibleCoSigner(int $userId, Client $client): bool
+    {
+        $coSigner = User::query()->whereKey($userId)->whereNotNull('approved_at')->first();
+        $siteId = is_numeric($client->site_id) ? (int) $client->site_id : null;
+
+        if (! $coSigner || $siteId === null) {
+            return false;
+        }
+
+        if (! $coSigner->canDo('medications.breakglass') && ! $coSigner->canDo('medications.audit.view')) {
+            return false;
+        }
+
+        return in_array(
+            $siteId,
+            // Oversight access must not make someone eligible to authorise care
+            // at a Site where they do not have a current HR assignment.
+            $this->siteAccess->accessibleSiteIds($coSigner),
+            true,
+        );
+    }
+
+    private function canDismissSignal(User $user, string $type, string $key): bool
+    {
+        $siteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);
+        if ($siteIds === []) {
+            return false;
+        }
+
+        $policy = BreakGlassPolicy::current();
+        $siteScope = fn ($query) => $query->whereHas(
+            'client',
+            fn ($clients) => $clients->whereIn('site_id', $siteIds),
+        );
+
+        if ($type === 'repeat') {
+            if (! ctype_digit($key) || (int) $key < 1) {
+                return false;
+            }
+
+            return ClientBreakGlassAccess::withTrashed()
+                ->tap($siteScope)
+                ->where('user_id', (int) $key)
+                ->where('created_at', '>=', now()->subDays($policy->repeat_window_days))
+                ->count() >= $policy->repeat_threshold_count;
+        }
+
+        if ($type !== 'awaiting_review' || $key !== 'awaiting_review') {
+            return false;
+        }
+
+        return ClientBreakGlassAccess::query()
+            ->tap($siteScope)
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<', now())
+            ->whereNull('review_outcome')
+            ->exists();
     }
 }

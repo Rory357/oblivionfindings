@@ -3,7 +3,6 @@
 namespace App\Domain\Hr\Services;
 
 use App\Domain\Finance\Jobs\PostExpenseJournalJob;
-use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrExpenseItem;
 use App\Models\User;
@@ -11,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 
 class ExpenseService
 {
+    public function __construct(private readonly HrPerformanceAccessService $access) {}
+
     /**
      * Expense categories supported by the system.
      */
@@ -21,25 +22,26 @@ class ExpenseService
      *
      * @param  User|null  $onBehalfOf  When a manager files for another employee,
      *                                 the claim is OWNED by them but created_by
-     *                                 records the manager. Tenant is the actor's.
+     *                                 records the manager.
      */
     public function createClaim(User $user, array $data, ?User $onBehalfOf = null): HrExpenseClaim
     {
-        return DB::transaction(function () use ($user, $data, $onBehalfOf) {
-            $tenantId = $this->resolveTenantId($user);
-            $claimNumber = $this->generateClaimNumber($tenantId);
-            $owner = $onBehalfOf ?? $user;
+        return DB::transaction(function () use ($user, $data, $onBehalfOf): HrExpenseClaim {
+            $actor = $this->access->currentStaff($user, $user);
+            if ($onBehalfOf !== null && $onBehalfOf->isNot($actor)) {
+                abort_unless($actor->canDo('hr.expenses.manage'), 403);
+            }
+            $owner = $this->access->currentStaff($actor, $onBehalfOf ?? $actor);
 
             $claim = HrExpenseClaim::create([
-                'tenant_id' => $tenantId,
                 'user_id' => $owner->id,
-                'claim_number' => $claimNumber,
+                'claim_number' => $this->generateClaimNumber(),
                 'title' => $data['title'],
                 'status' => 'draft',
                 'total_amount' => 0,
                 'currency' => $data['currency'] ?? 'NZD',
                 'notes' => $data['notes'] ?? null,
-                'created_by' => $user->id,
+                'created_by' => $actor->id,
             ]);
 
             if (! empty($data['items'])) {
@@ -50,7 +52,7 @@ class ExpenseService
             }
 
             return $claim->load('items');
-        });
+        }, attempts: 1);
     }
 
     /**
@@ -61,27 +63,28 @@ class ExpenseService
      */
     public function addItem(HrExpenseClaim $claim, array $data): HrExpenseItem
     {
-        if (! in_array($claim->status, ['draft'], true)) {
-            throw new \LogicException("Cannot add items to a '{$claim->status}' claim.");
-        }
+        return DB::transaction(function () use ($claim, $data): HrExpenseItem {
+            $locked = HrExpenseClaim::query()->lockForUpdate()->findOrFail($claim->getKey());
+            if ($locked->status !== 'draft') {
+                throw new \LogicException("Cannot add items to a '{$locked->status}' claim.");
+            }
 
-        $item = $claim->items()->create([
-            'description' => $data['description'],
-            'category' => $data['category'],
-            'source_type' => $data['source_type'] ?? null,
-            'source_id' => $data['source_id'] ?? null,
-            'amount' => $data['amount'],
-            'expense_date' => $data['expense_date'],
-            'receipt_path' => $data['receipt_path'] ?? null,
-            'tax_amount' => $data['tax_amount'] ?? null,
-            'notes' => $data['notes'] ?? null,
-            'source_type' => $data['source_type'] ?? null,
-            'source_id' => $data['source_id'] ?? null,
-        ]);
+            $item = $locked->items()->create([
+                'description' => $data['description'],
+                'category' => $data['category'],
+                'source_type' => $data['source_type'] ?? null,
+                'source_id' => $data['source_id'] ?? null,
+                'amount' => $data['amount'],
+                'expense_date' => $data['expense_date'],
+                'receipt_path' => $data['receipt_path'] ?? null,
+                'tax_amount' => $data['tax_amount'] ?? null,
+                'notes' => $data['notes'] ?? null,
+            ]);
 
-        $this->recalculateTotal($claim);
+            $this->recalculateTotal($locked);
 
-        return $item;
+            return $item;
+        }, attempts: 1);
     }
 
     /**
@@ -94,23 +97,25 @@ class ExpenseService
      */
     public function submitClaim(HrExpenseClaim $claim): HrExpenseClaim
     {
-        if (! in_array($claim->status, ['draft', 'rejected'], true)) {
-            throw new \LogicException("Cannot submit a '{$claim->status}' claim.");
-        }
+        $claim = DB::transaction(function () use ($claim): HrExpenseClaim {
+            $locked = HrExpenseClaim::query()->lockForUpdate()->findOrFail($claim->getKey());
+            if (! in_array($locked->status, ['draft', 'rejected'], true)) {
+                throw new \LogicException("Cannot submit a '{$locked->status}' claim.");
+            }
+            if ($locked->items()->count() === 0) {
+                throw new \LogicException('Cannot submit a claim with no items.');
+            }
 
-        if ($claim->items()->count() === 0) {
-            throw new \LogicException('Cannot submit a claim with no items.');
-        }
+            $locked->update([
+                'status' => 'submitted',
+                'submitted_at' => now(),
+                'rejection_reason' => null,
+                'approved_by' => null,
+                'approved_at' => null,
+            ]);
 
-        $claim->update([
-            'status' => 'submitted',
-            'submitted_at' => now(),
-            'rejection_reason' => null,
-            'approved_by' => null,
-            'approved_at' => null,
-        ]);
-
-        $claim = $claim->fresh();
+            return $locked->fresh();
+        }, attempts: 1);
 
         app(HrNotificationService::class)->notifyExpenseSubmitted($claim);
 
@@ -127,16 +132,19 @@ class ExpenseService
      */
     public function withdrawClaim(HrExpenseClaim $claim): HrExpenseClaim
     {
-        if ($claim->status !== 'submitted') {
-            throw new \LogicException("Cannot withdraw a '{$claim->status}' claim.");
-        }
+        return DB::transaction(function () use ($claim): HrExpenseClaim {
+            $locked = HrExpenseClaim::query()->lockForUpdate()->findOrFail($claim->getKey());
+            if ($locked->status !== 'submitted') {
+                throw new \LogicException("Cannot withdraw a '{$locked->status}' claim.");
+            }
 
-        $claim->update([
-            'status' => 'draft',
-            'submitted_at' => null,
-        ]);
+            $locked->update([
+                'status' => 'draft',
+                'submitted_at' => null,
+            ]);
 
-        return $claim->fresh();
+            return $locked->fresh();
+        }, attempts: 1);
     }
 
     /**
@@ -147,19 +155,20 @@ class ExpenseService
      */
     public function approveClaim(HrExpenseClaim $claim, User $approver): HrExpenseClaim
     {
-        if ($claim->status !== 'submitted') {
-            throw new \LogicException("Cannot approve a '{$claim->status}' claim.");
-        }
+        $result = DB::transaction(function () use ($claim, $approver): HrExpenseClaim {
+            $locked = HrExpenseClaim::query()->lockForUpdate()->findOrFail($claim->getKey());
+            if ($locked->status !== 'submitted') {
+                throw new \LogicException("Cannot approve a '{$locked->status}' claim.");
+            }
 
-        $result = DB::transaction(function () use ($claim, $approver) {
-            $claim->update([
+            $locked->update([
                 'status' => 'approved',
                 'approved_by' => $approver->id,
                 'approved_at' => now(),
             ]);
 
-            return $claim->fresh();
-        });
+            return $locked->fresh();
+        }, attempts: 1);
 
         // Post the approved expense to the GL (DR expense accounts / CR accounts
         // payable). Idempotent: the job + service both short-circuit if a journal
@@ -181,20 +190,21 @@ class ExpenseService
      */
     public function rejectClaim(HrExpenseClaim $claim, User $reviewer, string $reason): HrExpenseClaim
     {
-        if ($claim->status !== 'submitted') {
-            throw new \LogicException("Cannot reject a '{$claim->status}' claim.");
-        }
+        $result = DB::transaction(function () use ($claim, $reviewer, $reason): HrExpenseClaim {
+            $locked = HrExpenseClaim::query()->lockForUpdate()->findOrFail($claim->getKey());
+            if ($locked->status !== 'submitted') {
+                throw new \LogicException("Cannot reject a '{$locked->status}' claim.");
+            }
 
-        $result = DB::transaction(function () use ($claim, $reviewer, $reason) {
-            $claim->update([
+            $locked->update([
                 'status' => 'rejected',
                 'approved_by' => $reviewer->id,
                 'approved_at' => now(),
                 'rejection_reason' => $reason,
             ]);
 
-            return $claim->fresh();
-        });
+            return $locked->fresh();
+        }, attempts: 1);
 
         // Tell the claimant why (best-effort inside the service — mirrors the
         // approve path's notifyExpenseApproved).
@@ -211,16 +221,22 @@ class ExpenseService
      */
     public function markPaid(HrExpenseClaim $claim): HrExpenseClaim
     {
-        if ($claim->status !== 'approved') {
-            throw new \LogicException("Cannot mark a '{$claim->status}' claim as paid.");
-        }
+        return DB::transaction(function () use ($claim): HrExpenseClaim {
+            $locked = HrExpenseClaim::query()->lockForUpdate()->findOrFail($claim->getKey());
+            if ($locked->status !== 'approved') {
+                throw new \LogicException("Cannot mark a '{$locked->status}' claim as paid.");
+            }
+            if ($locked->gl_posted_at === null) {
+                throw new \LogicException('Expense claim must be posted to the general ledger before it can be marked paid.');
+            }
 
-        $claim->update([
-            'status' => 'paid',
-            'paid_at' => now(),
-        ]);
+            $locked->update([
+                'status' => 'paid',
+                'paid_at' => now(),
+            ]);
 
-        return $claim->fresh();
+            return $locked->fresh();
+        }, attempts: 1);
     }
 
     /**
@@ -233,39 +249,22 @@ class ExpenseService
     }
 
     /**
-     * Generate a unique claim number for a tenant.
+     * Generate the next application-wide claim number while serializing against
+     * existing canonical numbers. The database unique key is the final guard.
      */
-    protected function generateClaimNumber(?int $tenantId): string
+    protected function generateClaimNumber(): string
     {
-        $latest = HrExpenseClaim::where('tenant_id', $tenantId)
-            ->orderByDesc('id')
-            ->value('claim_number');
-
-        if ($latest && preg_match('/EXP-(\d+)/', $latest, $matches)) {
-            $next = (int) $matches[1] + 1;
-        } else {
-            $next = 1;
-        }
+        $highest = HrExpenseClaim::query()
+            ->where('claim_number', 'like', 'EXP-%')
+            ->lockForUpdate()
+            ->pluck('claim_number')
+            ->reduce(function (int $maximum, string $number): int {
+                return preg_match('/^EXP-(\d+)$/', $number, $matches) === 1
+                    ? max($maximum, (int) $matches[1])
+                    : $maximum;
+            }, 0);
+        $next = $highest + 1;
 
         return 'EXP-'.str_pad($next, 5, '0', STR_PAD_LEFT);
-    }
-
-    protected function resolveTenantId(User $user): int
-    {
-        $tenantId = $user->getAttribute('tenant_id');
-        if (is_numeric($tenantId)) {
-            return (int) $tenantId;
-        }
-
-        $organizationId = $user->getAttribute('organization_id');
-        if (is_numeric($organizationId)) {
-            return (int) $organizationId;
-        }
-
-        $profileTenantId = HrEmployeeProfile::query()
-            ->where('user_id', $user->id)
-            ->value('tenant_id');
-
-        return (int) ($profileTenantId ?: 1);
     }
 }

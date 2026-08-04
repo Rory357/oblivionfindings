@@ -1,6 +1,12 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
@@ -24,7 +30,16 @@ import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { Activity, Check, Copy, Key, Plus, ShieldCheck, Trash2, Webhook } from 'lucide-react';
+import {
+    Activity,
+    Check,
+    Copy,
+    Key,
+    Plus,
+    ShieldCheck,
+    Trash2,
+    Webhook,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 type ApiKey = {
@@ -72,10 +87,18 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 function csrfToken(): string {
-    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+    return (
+        document
+            .querySelector('meta[name="csrf-token"]')
+            ?.getAttribute('content') ?? ''
+    );
 }
 
-async function requestJson<TResponse>(url: string, method: 'POST' | 'DELETE', body?: Record<string, unknown>): Promise<TResponse> {
+async function requestJson<TResponse>(
+    url: string,
+    method: 'POST' | 'DELETE',
+    body?: Record<string, unknown>,
+): Promise<TResponse> {
     const response = await fetch(url, {
         method,
         headers: {
@@ -90,7 +113,10 @@ async function requestJson<TResponse>(url: string, method: 'POST' | 'DELETE', bo
     const payload = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-        const message = typeof payload?.message === 'string' ? payload.message : 'Request failed.';
+        const message =
+            typeof payload?.message === 'string'
+                ? payload.message
+                : 'Request failed.';
         throw new Error(message);
     }
 
@@ -98,14 +124,25 @@ async function requestJson<TResponse>(url: string, method: 'POST' | 'DELETE', bo
 }
 
 function slugify(value: string): string {
-    return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    return value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
 }
 
 export default function Api() {
-    const { api_keys, webhooks: webhookProps, available_scopes, available_events, can } = usePage<ApiSettingsPageProps>().props;
+    const {
+        api_keys,
+        webhooks: webhookProps,
+        available_scopes,
+        available_events,
+        can,
+    } = usePage<ApiSettingsPageProps>().props;
     const [apiKeys, setApiKeys] = useState<ApiKey[]>(api_keys);
     const [webhooks, setWebhooks] = useState<WebhookEntry[]>(webhookProps);
-    const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
+    const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
+        null,
+    );
 
     const [showGenerateKey, setShowGenerateKey] = useState(false);
     const [newKeyName, setNewKeyName] = useState('');
@@ -119,8 +156,12 @@ export default function Api() {
     const [webhookEvents, setWebhookEvents] = useState<string[]>([]);
     const [webhookSecret, setWebhookSecret] = useState('');
     const [creatingWebhook, setCreatingWebhook] = useState(false);
-    const [testingWebhookId, setTestingWebhookId] = useState<string | null>(null);
-    const [deletingWebhookId, setDeletingWebhookId] = useState<string | null>(null);
+    const [testingWebhookId, setTestingWebhookId] = useState<string | null>(
+        null,
+    );
+    const [deletingWebhookId, setDeletingWebhookId] = useState<string | null>(
+        null,
+    );
     const [revokingKeyId, setRevokingKeyId] = useState<string | null>(null);
 
     useEffect(() => {
@@ -131,19 +172,35 @@ export default function Api() {
         setWebhooks(webhookProps);
     }, [webhookProps]);
 
-    const usage = useMemo(() => ({
-        activeKeys: apiKeys.filter((key) => key.status === 'active').length,
-        revokedKeys: apiKeys.filter((key) => key.status === 'revoked').length,
-        activeWebhooks: webhooks.filter((webhook) => webhook.status === 'active').length,
-        successfulTests: webhooks.filter((webhook) => webhook.lastDelivery !== null).length,
-    }), [apiKeys, webhooks]);
+    const usage = useMemo(
+        () => ({
+            activeKeys: apiKeys.filter((key) => key.status === 'active').length,
+            revokedKeys: apiKeys.filter((key) => key.status === 'revoked')
+                .length,
+            activeWebhooks: webhooks.filter(
+                (webhook) => webhook.status === 'active',
+            ).length,
+            successfulTests: webhooks.filter(
+                (webhook) => webhook.lastDelivery !== null,
+            ).length,
+        }),
+        [apiKeys, webhooks],
+    );
 
     function toggleScope(scope: string) {
-        setNewKeyScopes((current) => current.includes(scope) ? current.filter((item) => item !== scope) : [...current, scope]);
+        setNewKeyScopes((current) =>
+            current.includes(scope)
+                ? current.filter((item) => item !== scope)
+                : [...current, scope],
+        );
     }
 
     function toggleEvent(event: string) {
-        setWebhookEvents((current) => current.includes(event) ? current.filter((item) => item !== event) : [...current, event]);
+        setWebhookEvents((current) =>
+            current.includes(event)
+                ? current.filter((item) => item !== event)
+                : [...current, event],
+        );
     }
 
     function closeGenerateDialog() {
@@ -165,7 +222,11 @@ export default function Api() {
         setCreatingKey(true);
 
         try {
-            const payload = await requestJson<{ message: string; generatedKey: string; apiKey: ApiKey }>('/settings/api/keys', 'POST', {
+            const payload = await requestJson<{
+                message: string;
+                generatedKey: string;
+                apiKey: ApiKey;
+            }>('/settings/api/keys', 'POST', {
                 name: newKeyName,
                 scopes: newKeyScopes,
             });
@@ -174,7 +235,13 @@ export default function Api() {
             setGeneratedKey(payload.generatedKey);
             setStatusMessage({ type: 'success', text: payload.message });
         } catch (error) {
-            setStatusMessage({ type: 'error', text: error instanceof Error ? error.message : 'Could not generate API key.' });
+            setStatusMessage({
+                type: 'error',
+                text:
+                    error instanceof Error
+                        ? error.message
+                        : 'Could not generate API key.',
+            });
         } finally {
             setCreatingKey(false);
         }
@@ -194,11 +261,22 @@ export default function Api() {
         setRevokingKeyId(id);
 
         try {
-            const payload = await requestJson<{ message: string; apiKey: ApiKey }>(`/settings/api/keys/${id}/revoke`, 'POST');
-            setApiKeys((current) => current.map((key) => key.id === id ? payload.apiKey : key));
+            const payload = await requestJson<{
+                message: string;
+                apiKey: ApiKey;
+            }>(`/settings/api/keys/${id}/revoke`, 'POST');
+            setApiKeys((current) =>
+                current.map((key) => (key.id === id ? payload.apiKey : key)),
+            );
             setStatusMessage({ type: 'success', text: payload.message });
         } catch (error) {
-            setStatusMessage({ type: 'error', text: error instanceof Error ? error.message : 'Could not revoke API key.' });
+            setStatusMessage({
+                type: 'error',
+                text:
+                    error instanceof Error
+                        ? error.message
+                        : 'Could not revoke API key.',
+            });
         } finally {
             setRevokingKeyId(null);
         }
@@ -208,7 +286,11 @@ export default function Api() {
         setCreatingWebhook(true);
 
         try {
-            const payload = await requestJson<{ message: string; secret: string; webhook: WebhookEntry }>('/settings/api/webhooks', 'POST', {
+            const payload = await requestJson<{
+                message: string;
+                secret: string;
+                webhook: WebhookEntry;
+            }>('/settings/api/webhooks', 'POST', {
                 url: webhookUrl,
                 events: webhookEvents,
             });
@@ -217,7 +299,13 @@ export default function Api() {
             setWebhookSecret(payload.secret);
             setStatusMessage({ type: 'success', text: payload.message });
         } catch (error) {
-            setStatusMessage({ type: 'error', text: error instanceof Error ? error.message : 'Could not add webhook.' });
+            setStatusMessage({
+                type: 'error',
+                text:
+                    error instanceof Error
+                        ? error.message
+                        : 'Could not add webhook.',
+            });
         } finally {
             setCreatingWebhook(false);
         }
@@ -227,11 +315,22 @@ export default function Api() {
         setDeletingWebhookId(id);
 
         try {
-            const payload = await requestJson<{ message: string }>(`/settings/api/webhooks/${id}`, 'DELETE');
-            setWebhooks((current) => current.filter((webhook) => webhook.id !== id));
+            const payload = await requestJson<{ message: string }>(
+                `/settings/api/webhooks/${id}`,
+                'DELETE',
+            );
+            setWebhooks((current) =>
+                current.filter((webhook) => webhook.id !== id),
+            );
             setStatusMessage({ type: 'success', text: payload.message });
         } catch (error) {
-            setStatusMessage({ type: 'error', text: error instanceof Error ? error.message : 'Could not delete webhook.' });
+            setStatusMessage({
+                type: 'error',
+                text:
+                    error instanceof Error
+                        ? error.message
+                        : 'Could not delete webhook.',
+            });
         } finally {
             setDeletingWebhookId(null);
         }
@@ -241,11 +340,24 @@ export default function Api() {
         setTestingWebhookId(id);
 
         try {
-            const payload = await requestJson<{ message: string; webhook: WebhookEntry }>(`/settings/api/webhooks/${id}/test`, 'POST');
-            setWebhooks((current) => current.map((webhook) => webhook.id === id ? payload.webhook : webhook));
+            const payload = await requestJson<{
+                message: string;
+                webhook: WebhookEntry;
+            }>(`/settings/api/webhooks/${id}/test`, 'POST');
+            setWebhooks((current) =>
+                current.map((webhook) =>
+                    webhook.id === id ? payload.webhook : webhook,
+                ),
+            );
             setStatusMessage({ type: 'success', text: payload.message });
         } catch (error) {
-            setStatusMessage({ type: 'error', text: error instanceof Error ? error.message : 'Webhook test failed.' });
+            setStatusMessage({
+                type: 'error',
+                text:
+                    error instanceof Error
+                        ? error.message
+                        : 'Webhook test failed.',
+            });
         } finally {
             setTestingWebhookId(null);
         }
@@ -260,7 +372,9 @@ export default function Api() {
                     {statusMessage && (
                         <Card>
                             <CardContent className="py-4">
-                                <div className={`text-sm font-medium ${statusMessage.type === 'success' ? 'text-status-success' : 'text-status-critical'}`}>
+                                <div
+                                    className={`text-sm font-medium ${statusMessage.type === 'success' ? 'text-status-success' : 'text-status-critical'}`}
+                                >
                                     {statusMessage.text}
                                 </div>
                             </CardContent>
@@ -270,7 +384,9 @@ export default function Api() {
                     {!can.manage && (
                         <Card>
                             <CardContent className="py-4 text-sm text-muted-foreground">
-                                You can view outbound API settings here, but key and webhook management requires integration-admin access.
+                                You can view outbound API settings here, but key
+                                and webhook management requires
+                                integration-admin access.
                             </CardContent>
                         </Card>
                     )}
@@ -281,14 +397,20 @@ export default function Api() {
                                 <div className="flex items-center gap-2">
                                     <ShieldCheck className="h-5 w-5 text-primary" />
                                     <div>
-                                        <CardTitle>Device Integrations</CardTitle>
+                                        <CardTitle>
+                                            Device Integrations
+                                        </CardTitle>
                                         <CardDescription>
-                                            Hardware providers and inbound device webhooks are managed in Security & Devices.
+                                            Hardware providers and inbound
+                                            device webhooks are managed in
+                                            Security & Devices.
                                         </CardDescription>
                                     </div>
                                 </div>
                                 <Button asChild variant="outline">
-                                    <Link href="/security-devices/integrations">Open Security & Devices</Link>
+                                    <Link href="/security-devices/integrations">
+                                        Open Security & Devices
+                                    </Link>
                                 </Button>
                             </div>
                         </CardHeader>
@@ -301,11 +423,18 @@ export default function Api() {
                                     <Key className="h-5 w-5 text-primary" />
                                     <div>
                                         <CardTitle>API Keys</CardTitle>
-                                        <CardDescription>Generate tenant API keys for non-hardware integrations.</CardDescription>
+                                        <CardDescription>
+                                            Generate application API keys for
+                                            non-hardware integrations.
+                                        </CardDescription>
                                     </div>
                                 </div>
                                 {can.manage && (
-                                    <Button dusk="api-generate-open" onClick={() => setShowGenerateKey(true)} className="bg-primary hover:bg-primary">
+                                    <Button
+                                        dusk="api-generate-open"
+                                        onClick={() => setShowGenerateKey(true)}
+                                        className="bg-primary hover:bg-primary"
+                                    >
                                         <Plus className="mr-1.5 h-4 w-4" />
                                         Generate New Key
                                     </Button>
@@ -327,37 +456,66 @@ export default function Api() {
                                 <TableBody>
                                     {apiKeys.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
-                                                No API keys have been created yet.
+                                            <TableCell
+                                                colSpan={6}
+                                                className="text-center text-sm text-muted-foreground"
+                                            >
+                                                No API keys have been created
+                                                yet.
                                             </TableCell>
                                         </TableRow>
                                     )}
                                     {apiKeys.map((key) => (
-                                        <TableRow key={key.id} dusk={`api-key-row-${key.id}`}>
-                                            <TableCell className="font-medium">{key.name}</TableCell>
-                                            <TableCell>
-                                                <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{key.maskedKey}</code>
+                                        <TableRow
+                                            key={key.id}
+                                            dusk={`api-key-row-${key.id}`}
+                                        >
+                                            <TableCell className="font-medium">
+                                                {key.name}
                                             </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">{key.created}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">{key.lastUsed ?? 'Never'}</TableCell>
                                             <TableCell>
-                                                <Badge variant={key.status === 'active' ? 'default' : 'destructive'}>
+                                                <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                                                    {key.maskedKey}
+                                                </code>
+                                            </TableCell>
+                                            <TableCell className="text-sm text-muted-foreground">
+                                                {key.created}
+                                            </TableCell>
+                                            <TableCell className="text-sm text-muted-foreground">
+                                                {key.lastUsed ?? 'Never'}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge
+                                                    variant={
+                                                        key.status === 'active'
+                                                            ? 'default'
+                                                            : 'destructive'
+                                                    }
+                                                >
                                                     {key.status}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
-                                                {can.manage && key.status === 'active' && (
-                                                    <Button
-                                                        dusk={`api-key-revoke-${key.id}`}
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => revokeKey(key.id)}
-                                                        disabled={revokingKeyId === key.id}
-                                                        className="text-status-critical hover:text-status-critical"
-                                                    >
-                                                        Revoke
-                                                    </Button>
-                                                )}
+                                                {can.manage &&
+                                                    key.status === 'active' && (
+                                                        <Button
+                                                            dusk={`api-key-revoke-${key.id}`}
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                revokeKey(
+                                                                    key.id,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                revokingKeyId ===
+                                                                key.id
+                                                            }
+                                                            className="text-status-critical hover:text-status-critical"
+                                                        >
+                                                            Revoke
+                                                        </Button>
+                                                    )}
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -373,11 +531,18 @@ export default function Api() {
                                     <Webhook className="h-5 w-5 text-primary" />
                                     <div>
                                         <CardTitle>Outbound Webhooks</CardTitle>
-                                        <CardDescription>Configure tenant endpoints that receive application event notifications.</CardDescription>
+                                        <CardDescription>
+                                            Configure endpoints that receive
+                                            application event notifications.
+                                        </CardDescription>
                                     </div>
                                 </div>
                                 {can.manage && (
-                                    <Button dusk="api-webhook-open" variant="outline" onClick={() => setShowAddWebhook(true)}>
+                                    <Button
+                                        dusk="api-webhook-open"
+                                        variant="outline"
+                                        onClick={() => setShowAddWebhook(true)}
+                                    >
                                         <Plus className="mr-1.5 h-4 w-4" />
                                         Add Webhook
                                     </Button>
@@ -398,30 +563,53 @@ export default function Api() {
                                 <TableBody>
                                     {webhooks.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
-                                                No webhook endpoints have been configured yet.
+                                            <TableCell
+                                                colSpan={5}
+                                                className="text-center text-sm text-muted-foreground"
+                                            >
+                                                No webhook endpoints have been
+                                                configured yet.
                                             </TableCell>
                                         </TableRow>
                                     )}
                                     {webhooks.map((webhook) => (
-                                        <TableRow key={webhook.id} dusk={`api-webhook-row-${webhook.id}`}>
-                                            <TableCell className="max-w-[200px] truncate font-mono text-xs">{webhook.url}</TableCell>
+                                        <TableRow
+                                            key={webhook.id}
+                                            dusk={`api-webhook-row-${webhook.id}`}
+                                        >
+                                            <TableCell className="max-w-[200px] truncate font-mono text-xs">
+                                                {webhook.url}
+                                            </TableCell>
                                             <TableCell>
                                                 <div className="flex flex-wrap gap-1">
-                                                    {webhook.events.map((event) => (
-                                                        <Badge key={event} variant="secondary" className="text-xs">
-                                                            {event}
-                                                        </Badge>
-                                                    ))}
+                                                    {webhook.events.map(
+                                                        (event) => (
+                                                            <Badge
+                                                                key={event}
+                                                                variant="secondary"
+                                                                className="text-xs"
+                                                            >
+                                                                {event}
+                                                            </Badge>
+                                                        ),
+                                                    )}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant={webhook.status === 'active' ? 'default' : 'outline'}>
+                                                <Badge
+                                                    variant={
+                                                        webhook.status ===
+                                                        'active'
+                                                            ? 'default'
+                                                            : 'outline'
+                                                    }
+                                                >
                                                     {webhook.status}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-sm text-muted-foreground">
-                                                {webhook.lastDelivery ?? 'Never'}
+                                                {webhook.lastDelivery ??
+                                                    'Never'}
                                             </TableCell>
                                             <TableCell>
                                                 {can.manage && (
@@ -430,8 +618,15 @@ export default function Api() {
                                                             dusk={`api-webhook-test-${webhook.id}`}
                                                             variant="ghost"
                                                             size="sm"
-                                                            onClick={() => testWebhook(webhook.id)}
-                                                            disabled={testingWebhookId === webhook.id}
+                                                            onClick={() =>
+                                                                testWebhook(
+                                                                    webhook.id,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                testingWebhookId ===
+                                                                webhook.id
+                                                            }
                                                         >
                                                             Test
                                                         </Button>
@@ -440,8 +635,15 @@ export default function Api() {
                                                             variant="ghost"
                                                             size="sm"
                                                             className="text-status-critical hover:text-status-critical"
-                                                            onClick={() => deleteWebhook(webhook.id)}
-                                                            disabled={deletingWebhookId === webhook.id}
+                                                            onClick={() =>
+                                                                deleteWebhook(
+                                                                    webhook.id,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                deletingWebhookId ===
+                                                                webhook.id
+                                                            }
                                                         >
                                                             <Trash2 className="h-3.5 w-3.5" />
                                                         </Button>
@@ -461,38 +663,61 @@ export default function Api() {
                                 <Activity className="h-5 w-5 text-primary" />
                                 <div>
                                     <CardTitle>Usage</CardTitle>
-                                    <CardDescription>Current API key and webhook totals.</CardDescription>
+                                    <CardDescription>
+                                        Current API key and webhook totals.
+                                    </CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                                 <div className="rounded-lg border p-4 text-center">
-                                    <p className="text-2xl font-bold text-primary">{usage.activeKeys}</p>
-                                    <p className="text-xs text-muted-foreground">Active Keys</p>
+                                    <p className="text-2xl font-bold text-primary">
+                                        {usage.activeKeys}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Active Keys
+                                    </p>
                                 </div>
                                 <div className="rounded-lg border p-4 text-center">
-                                    <p className="text-2xl font-bold text-primary">{usage.revokedKeys}</p>
-                                    <p className="text-xs text-muted-foreground">Revoked Keys</p>
+                                    <p className="text-2xl font-bold text-primary">
+                                        {usage.revokedKeys}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Revoked Keys
+                                    </p>
                                 </div>
                                 <div className="rounded-lg border p-4 text-center">
-                                    <p className="text-2xl font-bold text-primary">{usage.activeWebhooks}</p>
-                                    <p className="text-xs text-muted-foreground">Active Webhooks</p>
+                                    <p className="text-2xl font-bold text-primary">
+                                        {usage.activeWebhooks}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Active Webhooks
+                                    </p>
                                 </div>
                                 <div className="rounded-lg border p-4 text-center">
-                                    <p className="text-2xl font-bold text-primary">{usage.successfulTests}</p>
-                                    <p className="text-xs text-muted-foreground">Successful Tests</p>
+                                    <p className="text-2xl font-bold text-primary">
+                                        {usage.successfulTests}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Successful Tests
+                                    </p>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
                 </div>
 
-                <Dialog open={showGenerateKey} onOpenChange={(open) => !open && closeGenerateDialog()}>
+                <Dialog
+                    open={showGenerateKey}
+                    onOpenChange={(open) => !open && closeGenerateDialog()}
+                >
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Generate New API Key</DialogTitle>
-                            <DialogDescription>Create a new API key for external integrations.</DialogDescription>
+                            <DialogDescription>
+                                Create a new API key for external integrations.
+                            </DialogDescription>
                         </DialogHeader>
                         {!generatedKey ? (
                             <div className="space-y-4">
@@ -502,7 +727,9 @@ export default function Api() {
                                         id="key-name"
                                         dusk="api-key-name"
                                         value={newKeyName}
-                                        onChange={(event) => setNewKeyName(event.target.value)}
+                                        onChange={(event) =>
+                                            setNewKeyName(event.target.value)
+                                        }
                                         placeholder="e.g. Production API"
                                         className="mt-1"
                                     />
@@ -511,14 +738,24 @@ export default function Api() {
                                     <Label>Scopes</Label>
                                     <div className="mt-2 space-y-2">
                                         {available_scopes.map((scope) => (
-                                            <div key={scope} className="flex items-center gap-2">
+                                            <div
+                                                key={scope}
+                                                className="flex items-center gap-2"
+                                            >
                                                 <Checkbox
                                                     id={`scope-${scope}`}
                                                     dusk={`api-scope-${slugify(scope)}`}
-                                                    checked={newKeyScopes.includes(scope)}
-                                                    onCheckedChange={() => toggleScope(scope)}
+                                                    checked={newKeyScopes.includes(
+                                                        scope,
+                                                    )}
+                                                    onCheckedChange={() =>
+                                                        toggleScope(scope)
+                                                    }
                                                 />
-                                                <Label htmlFor={`scope-${scope}`} className="text-sm font-normal">
+                                                <Label
+                                                    htmlFor={`scope-${scope}`}
+                                                    className="text-sm font-normal"
+                                                >
                                                     {scope}
                                                 </Label>
                                             </div>
@@ -529,7 +766,11 @@ export default function Api() {
                                     <Button
                                         dusk="api-key-generate"
                                         onClick={handleGenerateKey}
-                                        disabled={!newKeyName || newKeyScopes.length === 0 || creatingKey}
+                                        disabled={
+                                            !newKeyName ||
+                                            newKeyScopes.length === 0 ||
+                                            creatingKey
+                                        }
                                         className="bg-primary hover:bg-primary"
                                     >
                                         Generate Key
@@ -540,19 +781,35 @@ export default function Api() {
                             <div className="space-y-4">
                                 <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3">
                                     <p className="text-sm font-medium text-status-warning">
-                                        Copy this key now. You will not be able to see it again.
+                                        Copy this key now. You will not be able
+                                        to see it again.
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <code dusk="api-key-generated-value" className="flex-1 overflow-x-auto rounded-md bg-muted p-3 font-mono text-sm">
+                                    <code
+                                        dusk="api-key-generated-value"
+                                        className="flex-1 overflow-x-auto rounded-md bg-muted p-3 font-mono text-sm"
+                                    >
                                         {generatedKey}
                                     </code>
-                                    <Button dusk="api-key-copy" variant="outline" size="icon" onClick={handleCopyKey}>
-                                        {copied ? <Check className="h-4 w-4 text-status-success" /> : <Copy className="h-4 w-4" />}
+                                    <Button
+                                        dusk="api-key-copy"
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={handleCopyKey}
+                                    >
+                                        {copied ? (
+                                            <Check className="h-4 w-4 text-status-success" />
+                                        ) : (
+                                            <Copy className="h-4 w-4" />
+                                        )}
                                     </Button>
                                 </div>
                                 <DialogFooter>
-                                    <Button dusk="api-key-done" onClick={closeGenerateDialog}>
+                                    <Button
+                                        dusk="api-key-done"
+                                        onClick={closeGenerateDialog}
+                                    >
                                         Done
                                     </Button>
                                 </DialogFooter>
@@ -561,21 +818,31 @@ export default function Api() {
                     </DialogContent>
                 </Dialog>
 
-                <Dialog open={showAddWebhook} onOpenChange={(open) => !open && closeWebhookDialog()}>
+                <Dialog
+                    open={showAddWebhook}
+                    onOpenChange={(open) => !open && closeWebhookDialog()}
+                >
                     <DialogContent className="max-w-lg">
                         <DialogHeader>
                             <DialogTitle>Add Outbound Webhook</DialogTitle>
-                            <DialogDescription>Configure a tenant endpoint that receives application event notifications.</DialogDescription>
+                            <DialogDescription>
+                                Configure an endpoint that receives application
+                                event notifications.
+                            </DialogDescription>
                         </DialogHeader>
                         {!webhookSecret ? (
                             <div className="space-y-4">
                                 <div>
-                                    <Label htmlFor="webhook-url">Endpoint URL</Label>
+                                    <Label htmlFor="webhook-url">
+                                        Endpoint URL
+                                    </Label>
                                     <Input
                                         id="webhook-url"
                                         dusk="api-webhook-url"
                                         value={webhookUrl}
-                                        onChange={(event) => setWebhookUrl(event.target.value)}
+                                        onChange={(event) =>
+                                            setWebhookUrl(event.target.value)
+                                        }
                                         placeholder="https://api.example.com/webhooks"
                                         className="mt-1"
                                     />
@@ -584,14 +851,24 @@ export default function Api() {
                                     <Label>Events</Label>
                                     <div className="mt-2 grid grid-cols-2 gap-2">
                                         {available_events.map((event) => (
-                                            <div key={event} className="flex items-center gap-2">
+                                            <div
+                                                key={event}
+                                                className="flex items-center gap-2"
+                                            >
                                                 <Checkbox
                                                     id={`event-${event}`}
                                                     dusk={`api-event-${slugify(event)}`}
-                                                    checked={webhookEvents.includes(event)}
-                                                    onCheckedChange={() => toggleEvent(event)}
+                                                    checked={webhookEvents.includes(
+                                                        event,
+                                                    )}
+                                                    onCheckedChange={() =>
+                                                        toggleEvent(event)
+                                                    }
                                                 />
-                                                <Label htmlFor={`event-${event}`} className="font-mono text-xs font-normal">
+                                                <Label
+                                                    htmlFor={`event-${event}`}
+                                                    className="font-mono text-xs font-normal"
+                                                >
                                                     {event}
                                                 </Label>
                                             </div>
@@ -602,7 +879,11 @@ export default function Api() {
                                     <Button
                                         dusk="api-webhook-add"
                                         onClick={handleAddWebhook}
-                                        disabled={!webhookUrl || webhookEvents.length === 0 || creatingWebhook}
+                                        disabled={
+                                            !webhookUrl ||
+                                            webhookEvents.length === 0 ||
+                                            creatingWebhook
+                                        }
                                         className="bg-primary hover:bg-primary"
                                     >
                                         Add Webhook
@@ -613,24 +894,35 @@ export default function Api() {
                             <div className="space-y-4">
                                 <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3">
                                     <p className="text-sm font-medium text-status-warning">
-                                        Copy this signing secret now. You will not be able to see it again.
+                                        Copy this signing secret now. You will
+                                        not be able to see it again.
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <code dusk="api-webhook-secret" className="flex-1 overflow-x-auto rounded-md bg-muted p-3 font-mono text-sm">
+                                    <code
+                                        dusk="api-webhook-secret"
+                                        className="flex-1 overflow-x-auto rounded-md bg-muted p-3 font-mono text-sm"
+                                    >
                                         {webhookSecret}
                                     </code>
                                     <Button
                                         dusk="api-webhook-copy"
                                         variant="outline"
                                         size="icon"
-                                        onClick={() => navigator.clipboard.writeText(webhookSecret)}
+                                        onClick={() =>
+                                            navigator.clipboard.writeText(
+                                                webhookSecret,
+                                            )
+                                        }
                                     >
                                         <Copy className="h-4 w-4" />
                                     </Button>
                                 </div>
                                 <DialogFooter>
-                                    <Button dusk="api-webhook-done" onClick={closeWebhookDialog}>
+                                    <Button
+                                        dusk="api-webhook-done"
+                                        onClick={closeWebhookDialog}
+                                    >
                                         Done
                                     </Button>
                                 </DialogFooter>

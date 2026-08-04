@@ -2,16 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Services\HrLeaveAccessService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Models\StaffTimeOff;
-use App\Models\User;
 use Illuminate\Http\Request;
 
 class StaffTimeOffController extends Controller
 {
-    public function store(Request $request, LeaveService $leaveService)
-    {
+    public function store(
+        Request $request,
+        LeaveService $leaveService,
+        HrLeaveAccessService $leaveAccess,
+    ) {
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('staff.availability.updateAny') || $auth->canDo('staff.availability.updateSelf')), 403);
 
@@ -31,15 +33,13 @@ class StaffTimeOffController extends Controller
             abort(403);
         }
 
-        abort_unless(User::staff()->whereKey($userId)->exists(), 404);
+        $target = $leaveAccess->currentSubject($auth, (int) $userId);
 
         $returnTo = $data['return_to'] ?? route('operations.rostering.index');
 
-        // Roster-entered LEAVE routes through the leave engine so balances/ledger/tenant are
+        // Roster-entered LEAVE routes through the leave engine so balances and ledger entries are
         // written and HR can see it. unavailable/training stay roster-only (no balance impact).
         if ($data['type'] === 'leave') {
-            $target = User::findOrFail($userId);
-
             try {
                 $leaveService->createRosterLeave($target, $data, $auth);
             } catch (\InvalidArgumentException $e) {
@@ -50,8 +50,7 @@ class StaffTimeOffController extends Controller
         }
 
         StaffTimeOff::create([
-            'tenant_id' => HrEmployeeProfile::query()->where('user_id', $userId)->value('tenant_id') ?? 1,
-            'user_id' => $userId,
+            'user_id' => $target->id,
             'starts_at' => $data['starts_at'],
             'ends_at' => $data['ends_at'],
             'type' => $data['type'],
@@ -63,14 +62,18 @@ class StaffTimeOffController extends Controller
         return redirect($returnTo)->with('success', 'Time off saved.');
     }
 
-    public function destroy(Request $request, StaffTimeOff $staffTimeOff)
-    {
+    public function destroy(
+        Request $request,
+        StaffTimeOff $staffTimeOff,
+        HrLeaveAccessService $leaveAccess,
+    ) {
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('staff.availability.updateAny') || $auth->canDo('staff.availability.updateSelf')), 403);
 
         if ($staffTimeOff->user_id !== $auth->id && ! $auth->canDo('staff.availability.updateAny')) {
             abort(403);
         }
+        $leaveAccess->currentSubject($auth, (int) $staffTimeOff->user_id);
 
         $returnTo = $request->input('return_to') ?: route('operations.rostering.index');
 

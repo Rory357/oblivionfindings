@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Domain\Hr\Models\HrCalendarEventReminder;
+use App\Domain\Hr\Services\HrCalendarAccessService;
+use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -20,8 +22,10 @@ class DispatchCalendarReminders extends Command
 
     protected $description = 'Send due reminders for HR calendar events to their invitees.';
 
-    public function handle(NotificationService $notifications): int
-    {
+    public function handle(
+        NotificationService $notifications,
+        HrCalendarAccessService $calendarAccess,
+    ): int {
         $now = now();
         $windowStart = $now->copy()->subMinute();
         $sent = 0;
@@ -57,6 +61,14 @@ class DispatchCalendarReminders extends Command
             if ($userIds === [] && $event->created_by) {
                 $userIds = [(int) $event->created_by];
             }
+            $userIds = User::query()
+                ->whereKey($userIds)
+                ->get()
+                ->filter(fn (User $recipient) => $calendarAccess->canViewEvent($recipient, $event))
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
             if ($userIds === []) {
                 $reminder->update(['last_sent_at' => $triggerAt]);
 

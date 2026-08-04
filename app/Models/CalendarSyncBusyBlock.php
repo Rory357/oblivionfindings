@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
+use App\Services\Sites\Calendar\CalendarSyncService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -10,10 +12,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * two-way mapping. Read-only on our side — surfaced as the calendar's "external"
  * source and (optionally) counted as a clash in the create dialog.
  *
- * @see \App\Services\Sites\Calendar\CalendarSyncService::pullBusy()
+ * @see CalendarSyncService::pullBusy()
  */
 class CalendarSyncBusyBlock extends Model
 {
+    use WritesLegacyStorageContext;
+
     protected $fillable = [
         'tenant_id',
         'site_id',

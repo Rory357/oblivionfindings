@@ -6,11 +6,15 @@ use App\Domain\Hr\Models\HrEngagementSurvey;
 use App\Domain\Hr\Models\HrWellbeingCheckin;
 use App\Domain\Hr\Notifications\WellbeingFollowUpDueNotification;
 use App\Domain\Hr\Services\EngagementService;
+use App\Domain\Hr\Services\HrWellbeingAccessService;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -25,21 +29,20 @@ use Illuminate\Support\Facades\Log;
  *      recorded → notify the manager who logged the check-in, exactly once
  *      (deduped via the follow_up_reminder_sent_at stamp).
  *
- * Pass a tenant id to scope a single tenant; null sweeps all tenants.
+ * Oblivion Findings is one application across all Sites, so this sweep always
+ * evaluates every due record and applies canonical staff/Site access before a
+ * confidential reminder is delivered.
  */
 class SendWellbeingRemindersJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public ?int $tenantId = null) {}
-
-    public function handle(EngagementService $engagement): void
+    public function handle(EngagementService $engagement, HrWellbeingAccessService $access): void
     {
         $closed = $this->autoCloseExpiredSurveys($engagement);
-        $reminded = $this->sendFollowUpReminders();
+        $reminded = $this->sendFollowUpReminders($access);
 
         Log::info('SendWellbeingRemindersJob: wellbeing sweep completed.', [
-            'tenant_id' => $this->tenantId,
             'surveys_closed' => $closed,
             'follow_up_reminders' => $reminded,
         ]);
@@ -50,7 +53,6 @@ class SendWellbeingRemindersJob implements ShouldQueue
         $closed = 0;
 
         HrEngagementSurvey::query()
-            ->when($this->tenantId !== null, fn ($query) => $query->forTenant($this->tenantId))
             ->where('status', 'published')
             ->whereNotNull('ends_at')
             // ends_at is a date (midnight); "<= today" mirrors submitResponse's
@@ -72,27 +74,48 @@ class SendWellbeingRemindersJob implements ShouldQueue
         return $closed;
     }
 
-    protected function sendFollowUpReminders(): int
+    protected function sendFollowUpReminders(HrWellbeingAccessService $access): int
     {
         $reminded = 0;
 
         HrWellbeingCheckin::query()
-            ->when($this->tenantId !== null, fn ($query) => $query->forTenant($this->tenantId))
             ->whereNotNull('follow_up_date')
             ->whereDate('follow_up_date', '<=', now()->toDateString())
             ->whereNull('follow_up_reminder_sent_at')
-            ->with(['staff:id,name', 'manager:id,name'])
-            ->chunkById(200, function ($checkins) use (&$reminded) {
+            ->chunkById(200, function ($checkins) use ($access, &$reminded) {
                 foreach ($checkins as $checkin) {
                     try {
-                        if ($checkin->manager) {
-                            $checkin->manager->notify(new WellbeingFollowUpDueNotification($checkin));
+                        $sent = DB::transaction(function () use ($access, $checkin): bool {
+                            $locked = HrWellbeingCheckin::query()
+                                ->whereNull('follow_up_reminder_sent_at')
+                                ->lockForUpdate()
+                                ->find($checkin->getKey());
+                            if (! $locked) {
+                                return false;
+                            }
+
+                            $locked->load(['staff:id,name', 'manager:id,name']);
+                            $manager = $locked->manager;
+                            if (! $manager || ! $this->managerCanAccessCheckin($access, $manager, $locked)) {
+                                $locked->forceFill(['follow_up_reminder_sent_at' => now()])->saveQuietly();
+
+                                return false;
+                            }
+
+                            $alreadySent = $manager->notifications()
+                                ->where('type', WellbeingFollowUpDueNotification::class)
+                                ->where('data->checkin_id', $locked->id)
+                                ->exists();
+                            if (! $alreadySent) {
+                                $manager->notify(new WellbeingFollowUpDueNotification($locked));
+                            }
+                            $locked->forceFill(['follow_up_reminder_sent_at' => now()])->saveQuietly();
+
+                            return ! $alreadySent;
+                        }, attempts: 1);
+                        if ($sent) {
                             $reminded++;
                         }
-
-                        // Stamp even when the manager is gone so orphan rows
-                        // aren't rescanned every day.
-                        $checkin->forceFill(['follow_up_reminder_sent_at' => now()])->saveQuietly();
                     } catch (\Throwable $e) {
                         Log::warning('Failed to send wellbeing follow-up reminder', [
                             'checkin_id' => $checkin->id,
@@ -103,5 +126,20 @@ class SendWellbeingRemindersJob implements ShouldQueue
             });
 
         return $reminded;
+    }
+
+    private function managerCanAccessCheckin(
+        HrWellbeingAccessService $access,
+        User $manager,
+        HrWellbeingCheckin $checkin,
+    ): bool {
+        try {
+            $access->currentStaff($manager, $manager);
+            $access->checkin($manager, $checkin);
+        } catch (ModelNotFoundException) {
+            return false;
+        }
+
+        return true;
     }
 }

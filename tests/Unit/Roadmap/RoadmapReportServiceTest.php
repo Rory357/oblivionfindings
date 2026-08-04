@@ -43,7 +43,6 @@ class RoadmapReportServiceTest extends TestCase
             'title' => 'Create SOP placeholder',
             'task_type' => 'sop_placeholder',
             'status' => 'pending',
-            'tenant_id' => null,
         ]);
 
         $site = Site::create(['name' => 'House A', 'type' => 'house']);
@@ -61,7 +60,7 @@ class RoadmapReportServiceTest extends TestCase
             'readiness_status' => 'ready',
         ]);
 
-        $plan = $this->plannerService->generateDraft(now()->year, now()->quarter, 'board_ceo', null, $admin->id);
+        $plan = $this->plannerService->generateDraft(now()->year, now()->quarter, 'board_ceo', $admin->id);
         $plan = $this->plannerService->submitForManagerReview($plan, $admin->id);
         $plan = $this->plannerService->submitForExecutiveReview($plan, $admin->id);
         $plan = $this->plannerService->approve($plan, $admin->id);
@@ -78,7 +77,7 @@ class RoadmapReportServiceTest extends TestCase
         ];
 
         foreach ($types as $type) {
-            $snapshot = $this->reportService->generate($type, $plan, null, $admin->id);
+            $snapshot = $this->reportService->generate($type, $plan, $admin->id);
 
             $this->assertSame($type, $snapshot->report_type);
             $this->assertSame(true, $snapshot->immutable);
@@ -95,12 +94,12 @@ class RoadmapReportServiceTest extends TestCase
         $included = $this->createInitiative($admin, ['status' => 'approved', 'title' => 'Included']);
         $excluded = $this->createInitiative($admin, ['status' => 'approved', 'title' => 'Excluded']);
 
-        $plan = $this->plannerService->generateDraft(now()->year, now()->quarter, 'board_ceo', null, $admin->id);
+        $plan = $this->plannerService->generateDraft(now()->year, now()->quarter, 'board_ceo', $admin->id);
 
         // Keep only one initiative in the plan to verify filtering.
         $plan->items()->where('initiative_id', $excluded->id)->delete();
 
-        $snapshot = $this->reportService->generate('scoring_transparency', $plan->fresh(), null, $admin->id);
+        $snapshot = $this->reportService->generate('scoring_transparency', $plan->fresh(), $admin->id);
 
         $rows = $snapshot->payload['rows'] ?? [];
         $this->assertCount(1, $rows);

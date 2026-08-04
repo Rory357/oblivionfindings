@@ -3,6 +3,7 @@
 namespace App\Services\Operations;
 
 use App\Models\ServiceAgreement;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Service-agreement funding helpers used by the operations layer.
@@ -17,9 +18,15 @@ use App\Models\ServiceAgreement;
  */
 class FundingService
 {
-    public function getExpiringAgreements(int $organizationId, int $days = 30): \Illuminate\Database\Eloquent\Collection
+    public function getExpiringAgreements(int $days = 30): Collection
     {
-        return ServiceAgreement::where('organization_id', $organizationId)
+        return ServiceAgreement::query()
+            ->whereHas('client', fn ($clientQuery) => $clientQuery
+                ->whereNotNull('site_id')
+                ->whereHas('site', fn ($siteQuery) => $siteQuery
+                    ->active()
+                    ->notArchived()
+                    ->whereNull('archived_at')))
             ->where('status', 'active')
             ->whereNotNull('ends_at')
             ->where('ends_at', '<=', now()->addDays($days))
@@ -29,9 +36,15 @@ class FundingService
             ->get();
     }
 
-    public function getBudgetAlerts(int $organizationId, float $thresholdPercent = 80): \Illuminate\Database\Eloquent\Collection
+    public function getBudgetAlerts(float $thresholdPercent = 80): Collection
     {
-        return ServiceAgreement::where('organization_id', $organizationId)
+        return ServiceAgreement::query()
+            ->whereHas('client', fn ($clientQuery) => $clientQuery
+                ->whereNotNull('site_id')
+                ->whereHas('site', fn ($siteQuery) => $siteQuery
+                    ->active()
+                    ->notArchived()
+                    ->whereNull('archived_at')))
             ->where('status', 'active')
             ->where('total_budget', '>', 0)
             ->whereRaw('(budget_used / total_budget) * 100 >= ?', [$thresholdPercent])

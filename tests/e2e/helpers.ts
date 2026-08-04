@@ -29,28 +29,23 @@ export function seedSecurityDevicesOperationsReadinessFixtures() {
         deviceName: string;
     }>(`
 $admin = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->firstOrFail();
-$tenantId = (int) ($admin->organization_id ?? 1);
 $site = \\App\\Models\\Site::query()
-    ->where('tenant_id', $tenantId)
     ->where('archived', false)
     ->orderBy('id')
     ->first();
 
 if (! $site) {
     $site = \\App\\Models\\Site::factory()->create([
-        'tenant_id' => $tenantId,
         'name' => 'Playwright Technology Site',
     ]);
 }
 
 $device = \\App\\Domain\\SecurityDevices\\Models\\Device::withTrashed()
-    ->where('tenant_id', $tenantId)
     ->where('device_uid', 'PW-ESTATE-EDGE')
     ->first();
 
 if (! $device) {
     $device = new \\App\\Domain\\SecurityDevices\\Models\\Device([
-        'tenant_id' => $tenantId,
         'device_uid' => 'PW-ESTATE-EDGE',
     ]);
 } elseif ($device->trashed()) {

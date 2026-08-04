@@ -12,7 +12,6 @@ use App\Services\ControlRoom\ControlRoomReportService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
@@ -39,8 +38,8 @@ class ControlRoomStatsController extends Controller
             '7d' => now()->subDays(7),
             '30d' => now()->subDays(30),
         };
-        $isUnrestrictedPlatformUser = $siteAccess->isUnrestrictedPlatformUser($user);
-        $accessibleSiteIds = $isUnrestrictedPlatformUser
+        $canViewApplicationWide = $siteAccess->canBypass($user, $bypassPermissions);
+        $accessibleSiteIds = $canViewApplicationWide
             ? null
             : $siteAccess->accessibleSiteIds($user, $bypassPermissions);
         $slaMetrics = $this->reportService->slaCompliance($startDate, now(), $accessibleSiteIds);
@@ -68,7 +67,7 @@ class ControlRoomStatsController extends Controller
 
             $raw = $this->scopedAlerts($user, $siteAccess)
                 ->where('triggered_at', '>=', $startDate)
-                ->selectRaw($dateExpr . ' as bucket, COUNT(*) as count')
+                ->selectRaw($dateExpr.' as bucket, COUNT(*) as count')
                 ->groupByRaw($dateExpr)
                 ->pluck('count', 'bucket')
                 ->toArray();
@@ -85,14 +84,14 @@ class ControlRoomStatsController extends Controller
         } else {
             // Daily buckets
             $dateExpr = $driver === 'sqlite'
-                ? "DATE(triggered_at)"
-                : "DATE(triggered_at)";
+                ? 'DATE(triggered_at)'
+                : 'DATE(triggered_at)';
 
             $days = $period === '7d' ? 7 : 30;
 
             $raw = $this->scopedAlerts($user, $siteAccess)
                 ->where('triggered_at', '>=', $startDate)
-                ->selectRaw($dateExpr . ' as bucket, COUNT(*) as count')
+                ->selectRaw($dateExpr.' as bucket, COUNT(*) as count')
                 ->groupByRaw($dateExpr)
                 ->pluck('count', 'bucket')
                 ->toArray();
@@ -153,7 +152,7 @@ class ControlRoomStatsController extends Controller
             ->select(
                 'assigned_to_user_id',
                 DB::raw('COUNT(*) as alerts_handled'),
-                DB::raw($avgResponseExpr . ' as avg_response_minutes')
+                DB::raw($avgResponseExpr.' as avg_response_minutes')
             )
             ->groupBy('assigned_to_user_id')
             ->orderByDesc('alerts_handled')
@@ -169,9 +168,9 @@ class ControlRoomStatsController extends Controller
             'avg_response_minutes' => round((float) $op->avg_response_minutes, 1),
         ])->values()->toArray();
 
-        // Control Room shift counters are installation-wide snapshots and have
-        // no trustworthy site or tenant dimension.
-        $shiftComparison = $isUnrestrictedPlatformUser
+        // Control Room shift counters are application-wide snapshots and have
+        // no trustworthy Site dimension.
+        $shiftComparison = $canViewApplicationWide
             ? Shift::where('status', 'completed')
                 ->whereNotNull('ends_at')
                 ->orderByDesc('ends_at')

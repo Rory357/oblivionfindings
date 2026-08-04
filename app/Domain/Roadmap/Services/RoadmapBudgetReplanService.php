@@ -24,10 +24,9 @@ class RoadmapBudgetReplanService
         return $budget ? (float) $budget->total_budget : null;
     }
 
-    public function replanForBudgetCut(float $newEnvelope, ?int $tenantId = null): array
+    public function replanForBudgetCut(float $newEnvelope): array
     {
         $initiatives = Initiative::query()
-            ->forTenant($tenantId)
             ->whereIn('status', [
                 Initiative::STATUS_APPROVED,
                 Initiative::STATUS_PROPOSED,

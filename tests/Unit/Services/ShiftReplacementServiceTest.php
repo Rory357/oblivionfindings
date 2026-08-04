@@ -2,17 +2,23 @@
 
 namespace Tests\Unit\Services;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
+use App\Models\Permission;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
 use App\Models\ShiftReplacementRequest;
+use App\Models\Site;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
+use App\Services\Eligibility\EligibilityResult;
 use App\Services\ShiftReplacementService;
+use App\Services\ShiftStaffEligibilityService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class ShiftReplacementServiceTest extends TestCase
@@ -29,19 +35,39 @@ class ShiftReplacementServiceTest extends TestCase
 
     protected Shift $shift;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->site = Site::factory()->create();
+        $this->manager = User::factory()->create(['role' => 'admin']);
+        $this->currentStaff = User::factory()->frontlineWorker()->create();
+        $this->replacementStaff = User::factory()->frontlineWorker()->create();
+        foreach ([$this->manager, $this->currentStaff, $this->replacementStaff] as $staff) {
+            $this->assignToSite($staff, $this->site);
+        }
+        $this->grantPermissions($this->manager, ['shifts.manageAny', 'job_board.approve']);
+        $this->grantPermissions($this->currentStaff, ['shifts.update']);
+
+        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('evaluate')->andReturn(new EligibilityResult(
+                is_allowed: true,
+                blocking_reasons: [],
+                warnings: [],
+                checked_rules: [],
+                overrideable_warnings: [],
+            ));
+        });
         $this->service = app(ShiftReplacementService::class);
-        $this->manager = User::factory()->create();
-        $this->currentStaff = User::factory()->create();
-        $this->replacementStaff = User::factory()->create();
-        $client = Client::factory()->create();
+
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
         $serviceContext = ServiceContext::factory()->create();
 
         $this->shift = Shift::factory()->create([
             'client_id' => $client->id,
+            'site_id' => $this->site->id,
             'service_context_id' => $serviceContext->id,
             'user_id' => $this->currentStaff->id,
             'starts_at' => now()->addDay()->setTime(9, 0),
@@ -86,7 +112,6 @@ class ShiftReplacementServiceTest extends TestCase
         ]);
 
         $otherPosition = ShiftOpenPosition::query()->create([
-            'organization_id' => $this->manager->organization_id,
             'shift_id' => $this->shift->id,
             'replacement_request_id' => $replacement->id,
             'status' => 'open',
@@ -99,7 +124,10 @@ class ShiftReplacementServiceTest extends TestCase
         Notification::assertSentTo($this->currentStaff, AppEventNotification::class, function (AppEventNotification $notification) {
             return $notification->payload['title'] === 'Shift replacement claim submitted';
         });
+        $this->service->syncClaimFromOpenPosition($primaryPosition->fresh(['replacementRequest', 'claimer']));
+        Notification::assertSentToTimes($this->currentStaff, AppEventNotification::class, 1);
 
+        $this->service->approveFromOpenPosition($primaryPosition->fresh(['replacementRequest', 'claimer']), $this->manager);
         $this->service->approveFromOpenPosition($primaryPosition->fresh(['replacementRequest', 'claimer']), $this->manager);
 
         $replacement->refresh();
@@ -108,6 +136,7 @@ class ShiftReplacementServiceTest extends TestCase
         $this->assertSame(ShiftReplacementService::APPROVED, $replacement->status);
         $this->assertSame($this->manager->id, $replacement->approved_by);
         $this->assertSame('cancelled', $otherPosition->status);
+        Notification::assertSentToTimes($this->replacementStaff, AppEventNotification::class, 1);
     }
 
     public function test_cancel_replacement_updates_active_request_and_open_position(): void
@@ -165,5 +194,69 @@ class ShiftReplacementServiceTest extends TestCase
         $this->expectException(ValidationException::class);
 
         $this->service->approveFromOpenPosition($position->fresh(['replacementRequest', 'shift']), $this->manager);
+    }
+
+    public function test_claimant_must_still_be_currently_eligible_for_the_shift_site(): void
+    {
+        $replacement = $this->service->request($this->shift, $this->currentStaff, [
+            'reason' => 'Unavailable for shift',
+            'publish_to_job_board' => true,
+        ]);
+        $position = $replacement->openPosition()->firstOrFail();
+        $position->update([
+            'status' => 'claimed',
+            'claimed_by' => $this->replacementStaff->id,
+            'claimed_at' => now(),
+        ]);
+        $foreignSite = Site::factory()->create();
+        $this->replacementStaff->hrEmployeeProfile()->update([
+            'primary_site_id' => $foreignSite->id,
+            'secondary_site_ids' => [],
+        ]);
+
+        try {
+            $this->service->syncClaimFromOpenPosition($position->fresh(['replacementRequest', 'claimer']));
+            $this->fail('A claimant outside the Shift Site should not enter the replacement lifecycle.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'The selected staff member is not currently eligible to work at this Shift Site.',
+                $exception->errors()['replacement'][0] ?? null,
+            );
+        }
+
+        $this->assertDatabaseHas('shift_replacement_requests', [
+            'id' => $replacement->id,
+            'status' => ShiftReplacementService::REQUESTED,
+            'replacement_user_id' => null,
+        ]);
+    }
+
+    private function assignToSite(User $user, Site $site): void
+    {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'employee_number' => 'EMP-REPLACE-'.$user->id,
+            'work_email' => $user->email,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+    }
+
+    /** @param array<int, string> $keys */
+    private function grantPermissions(User $user, array $keys): void
+    {
+        foreach ($keys as $key) {
+            $permission = Permission::query()->firstOrCreate(
+                ['key' => $key],
+                ['description' => $key],
+            );
+            $user->permissionOverrides()->syncWithoutDetaching([
+                $permission->id => ['allowed' => true],
+            ]);
+        }
     }
 }

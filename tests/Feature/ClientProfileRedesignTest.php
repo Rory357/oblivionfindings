@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientOnboardingWorkflow;
 use App\Models\ClientTransportBooking;
 use App\Models\OpsConversation;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
@@ -34,7 +36,15 @@ class ClientProfileRedesignTest extends TestCase
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
-        $this->client = Client::factory()->create();
+        $site = Site::factory()->create();
+        $this->client = Client::factory()->create(['site_id' => $site->id]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'end_date' => null,
+        ]);
     }
 
     public function test_transport_booking_can_be_created_and_cancelled(): void
@@ -100,7 +110,9 @@ class ClientProfileRedesignTest extends TestCase
 
     public function test_transport_booking_rejects_other_clients_booking(): void
     {
-        $other = Client::factory()->create();
+        $other = Client::factory()->create([
+            'site_id' => $this->client->site_id,
+        ]);
         $booking = ClientTransportBooking::create([
             'client_id' => $other->id,
             'purpose' => 'Outing',

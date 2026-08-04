@@ -6,15 +6,20 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrFeedbackRequest;
 use App\Domain\Hr\Models\HrFeedbackResponse;
 use App\Domain\Hr\Models\HrFeedbackTemplate;
+use App\Domain\Hr\Models\HrPerformanceReview;
+use App\Domain\Hr\Notifications\FeedbackReminderNotification;
+use App\Domain\Hr\Notifications\FeedbackRequestedNotification;
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class FeedbackService
 {
-    /**
-     * Standard 360-feedback questions (used as fallback when no template is selected).
-     */
+    /** Standard application questions used when no template is selected. */
     public const FEEDBACK_QUESTIONS = [
         'communication' => 'How effectively does this person communicate?',
         'teamwork' => 'How well does this person collaborate with others?',
@@ -24,169 +29,264 @@ class FeedbackService
         'overall' => 'Overall, how would you rate their performance?',
     ];
 
-    /**
-     * Review types supported.
-     */
     public const REVIEW_TYPES = ['peer', 'manager', 'direct_report', 'self'];
 
+    public function __construct(
+        private readonly HrPerformanceAccessService $access,
+        private readonly HrCurrentStaffService $currentStaff,
+    ) {}
+
     /**
-     * Create 360-degree feedback requests for multiple reviewers.
+     * Create one pending request per exact current reviewer. Locking the
+     * canonical subject profile serializes concurrent fan-out and makes a
+     * repeated submission idempotent for the same open review cycle.
      *
-     * @return array<HrFeedbackRequest>
+     * @param  Collection<int, User>  $reviewers
+     * @return array<int, HrFeedbackRequest>
      */
     public function request360Feedback(
-        int $subjectUserId,
-        array $reviewerUserIds,
+        User $subject,
+        Collection $reviewers,
         string $reviewType,
-        ?int $performanceReviewId,
+        ?HrPerformanceReview $performanceReview,
         User $requester,
-        ?int $templateId = null,
+        ?HrFeedbackTemplate $template = null,
         ?string $dueDate = null,
     ): array {
-        $requests = DB::transaction(function () use ($subjectUserId, $reviewerUserIds, $reviewType, $performanceReviewId, $requester, $templateId, $dueDate) {
-            $tenantId = $requester->getAttribute('tenant_id')
-                ?? $requester->getAttribute('organization_id')
-                ?? HrEmployeeProfile::where('user_id', $requester->id)->value('tenant_id')
-                ?? HrEmployeeProfile::whereNotNull('tenant_id')->orderBy('id')->value('tenant_id')
-                ?? 1;
+        [$requests, $created] = DB::transaction(function () use (
+            $subject,
+            $reviewers,
+            $reviewType,
+            $performanceReview,
+            $requester,
+            $template,
+            $dueDate,
+        ): array {
+            $this->access->currentStaff($requester, $requester);
+            $subjectProfile = $this->access
+                ->applyCurrentProfileScope(HrEmployeeProfile::query(), $requester)
+                ->where('user_id', $subject->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-            // Resolve questions from template or use defaults
-            $questionsSnapshot = null;
-            if ($templateId) {
-                $template = HrFeedbackTemplate::find($templateId);
-                if ($template) {
-                    $questionsSnapshot = $template->questions;
+            $reviewerIds = $reviewers
+                ->map(fn (User $reviewer): int => (int) $reviewer->getKey())
+                ->unique()
+                ->sort()
+                ->values();
+            $lockedReviewers = $this->access
+                ->currentUserIds($requester)
+                ->whereIn('users.id', $reviewerIds)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+            if ($lockedReviewers->count() !== $reviewerIds->count()) {
+                throw (new ModelNotFoundException)->setModel(User::class);
+            }
+
+            $this->assertReviewerShape($subjectProfile->user_id, $reviewerIds, $reviewType);
+
+            $lockedReview = null;
+            if ($performanceReview) {
+                $lockedReview = $this->access
+                    ->applyHistoricalSubjectScope(HrPerformanceReview::query(), $requester)
+                    ->lockForUpdate()
+                    ->findOrFail($performanceReview->getKey());
+                if ((int) $lockedReview->employee_user_id !== (int) $subjectProfile->user_id) {
+                    throw ValidationException::withMessages([
+                        'performance_review_id' => 'The performance review must belong to the feedback subject.',
+                    ]);
                 }
             }
 
-            if (!$questionsSnapshot) {
-                // Convert hardcoded questions to array format
-                $questionsSnapshot = collect(self::FEEDBACK_QUESTIONS)
-                    ->map(fn ($question, $key) => ['key' => $key, 'question' => $question])
-                    ->values()
-                    ->all();
+            $lockedTemplate = null;
+            if ($template) {
+                $lockedTemplate = HrFeedbackTemplate::query()
+                    ->active()
+                    ->lockForUpdate()
+                    ->findOrFail($template->getKey());
             }
+            $questionsSnapshot = $this->questionsSnapshot($lockedTemplate);
+            $resolvedDueDate = $dueDate
+                ? Carbon::parse($dueDate)->toDateString()
+                : now()->addDays(14)->toDateString();
 
             $requests = [];
+            $created = [];
+            foreach ($reviewerIds as $reviewerId) {
+                $existing = HrFeedbackRequest::query()
+                    ->where('subject_user_id', $subjectProfile->user_id)
+                    ->where('reviewer_user_id', $reviewerId)
+                    ->where('review_type', $reviewType)
+                    ->when(
+                        $lockedReview,
+                        fn ($query) => $query->where('performance_review_id', $lockedReview->id),
+                        fn ($query) => $query->whereNull('performance_review_id'),
+                    )
+                    ->pending()
+                    ->first();
+                if ($existing) {
+                    $requests[] = $existing;
 
-            foreach ($reviewerUserIds as $reviewerUserId) {
-                $requests[] = HrFeedbackRequest::create([
-                    'tenant_id' => $tenantId,
-                    'subject_user_id' => $subjectUserId,
+                    continue;
+                }
+
+                $feedbackRequest = HrFeedbackRequest::query()->create([
+                    'subject_user_id' => $subjectProfile->user_id,
                     'requester_user_id' => $requester->id,
-                    'reviewer_user_id' => $reviewerUserId,
+                    'reviewer_user_id' => $reviewerId,
                     'review_type' => $reviewType,
-                    'performance_review_id' => $performanceReviewId,
-                    'template_id' => $templateId,
+                    'performance_review_id' => $lockedReview?->id,
+                    'template_id' => $lockedTemplate?->id,
                     'questions_snapshot' => $questionsSnapshot,
                     'status' => 'pending',
-                    'due_date' => $dueDate ? \Illuminate\Support\Carbon::parse($dueDate) : now()->addDays(14),
+                    'due_date' => $resolvedDueDate,
                 ]);
+                $requests[] = $feedbackRequest;
+                $created[] = $feedbackRequest;
             }
 
-            return $requests;
-        });
+            return [$requests, $created];
+        }, attempts: 1);
 
-        // Tell each reviewer they've been asked (best-effort, post-commit) — the
-        // request previously only surfaced if a manager later sent a reminder.
-        $subjectName = User::find($subjectUserId)?->name ?? 'a colleague';
-        foreach ($requests as $feedbackRequest) {
-            $reviewer = $feedbackRequest->reviewer;
-            if (! $reviewer) {
-                continue;
-            }
-            try {
-                $reviewer->notify(new \App\Domain\Hr\Notifications\FeedbackRequestedNotification($feedbackRequest, $subjectName));
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Failed to send feedback-requested notification', [
-                    'request_id' => $feedbackRequest->id,
-                    'reviewer_id' => $feedbackRequest->reviewer_user_id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+        foreach ($created as $feedbackRequest) {
+            DB::afterCommit(fn () => $this->notifyRequested($feedbackRequest, $subject->name));
         }
 
         return $requests;
     }
 
-    /**
-     * Send a reminder to the reviewer of a still-pending request.
-     *
-     * Pushes the due date back to "soon" if it had already lapsed so the
-     * request resurfaces in the reviewer's queue, and notifies them.
-     */
-    public function remind(HrFeedbackRequest $request): void
-    {
-        if ($request->status !== 'pending') {
-            return;
+    public function transition(
+        HrFeedbackRequest $feedbackRequest,
+        User $manager,
+        string $status,
+    ): HrFeedbackRequest {
+        if (! in_array($status, ['declined', 'expired'], true)) {
+            throw ValidationException::withMessages(['status' => 'Unsupported feedback transition.']);
         }
 
-        $reviewer = $request->reviewer;
-        if ($reviewer) {
-            $subjectName = $request->subject?->name ?? 'a colleague';
-            $reviewer->notify(new \App\Domain\Hr\Notifications\FeedbackReminderNotification($request, $subjectName));
+        return DB::transaction(function () use ($feedbackRequest, $manager, $status): HrFeedbackRequest {
+            $locked = $this->access
+                ->applyFeedbackSubjectScope(HrFeedbackRequest::query(), $manager)
+                ->lockForUpdate()
+                ->findOrFail($feedbackRequest->getKey());
+            if ($locked->status !== 'pending') {
+                throw ValidationException::withMessages([
+                    'status' => 'Only pending feedback requests can be changed.',
+                ]);
+            }
+
+            $locked->update(['status' => $status]);
+
+            return $locked->fresh();
+        }, attempts: 1);
+    }
+
+    public function remind(HrFeedbackRequest $feedbackRequest, User $manager): void
+    {
+        $notification = DB::transaction(function () use ($feedbackRequest, $manager): ?array {
+            $locked = $this->access
+                ->applyFeedbackSubjectScope(HrFeedbackRequest::query(), $manager)
+                ->with(['reviewer:id,name', 'subject:id,name'])
+                ->lockForUpdate()
+                ->findOrFail($feedbackRequest->getKey());
+            if ($locked->status !== 'pending') {
+                throw ValidationException::withMessages([
+                    'status' => 'Only pending feedback requests can be reminded.',
+                ]);
+            }
+            if (! $locked->reviewer || ! $this->currentStaff->isCurrent($locked->reviewer)) {
+                throw ValidationException::withMessages([
+                    'reviewer_user_id' => 'The assigned reviewer is no longer current staff.',
+                ]);
+            }
+
+            return [$locked, $locked->reviewer, $locked->subject?->name ?? 'a colleague'];
+        }, attempts: 1);
+
+        if ($notification) {
+            [$locked, $reviewer, $subjectName] = $notification;
+            DB::afterCommit(function () use ($locked, $reviewer, $subjectName): void {
+                try {
+                    $reviewer->notify(new FeedbackReminderNotification($locked, $subjectName));
+                } catch (\Throwable $exception) {
+                    Log::warning('Failed to send feedback reminder notification', [
+                        'request_id' => $locked->id,
+                        'reviewer_id' => $locked->reviewer_user_id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            });
         }
     }
 
-    /**
-     * Submit feedback responses and mark the request as completed.
-     */
-    public function submitFeedback(HrFeedbackRequest $request, array $responses): HrFeedbackRequest
-    {
-        return DB::transaction(function () use ($request, $responses) {
+    public function submitFeedback(
+        HrFeedbackRequest $feedbackRequest,
+        array $responses,
+        User $reviewer,
+    ): HrFeedbackRequest {
+        return DB::transaction(function () use ($feedbackRequest, $responses, $reviewer): HrFeedbackRequest {
+            $this->access->currentStaff($reviewer, $reviewer);
+            $locked = HrFeedbackRequest::query()
+                ->where('reviewer_user_id', $reviewer->id)
+                ->pending()
+                ->lockForUpdate()
+                ->findOrFail($feedbackRequest->getKey());
+
+            $expectedKeys = array_keys($locked->getQuestionsMap());
+            $submittedKeys = array_keys($responses);
+            sort($expectedKeys);
+            sort($submittedKeys);
+            if ($submittedKeys !== $expectedKeys) {
+                throw ValidationException::withMessages([
+                    'responses' => 'Answer every question in this feedback request exactly once.',
+                ]);
+            }
+
             foreach ($responses as $questionKey => $response) {
-                HrFeedbackResponse::create([
-                    'feedback_request_id' => $request->id,
+                HrFeedbackResponse::query()->create([
+                    'feedback_request_id' => $locked->id,
                     'question_key' => $questionKey,
-                    'rating' => $response['rating'] ?? null,
-                    'comment' => $response['comment'] ?? null,
+                    'rating' => $response['rating'],
+                    'comment' => filled($response['comment'] ?? null)
+                        ? trim((string) $response['comment'])
+                        : null,
                     'created_at' => now(),
                 ]);
             }
 
-            $request->update([
+            $locked->update([
                 'status' => 'completed',
                 'completed_at' => now(),
             ]);
 
-            return $request->load('responses');
-        });
+            return $locked->fresh()->load('responses');
+        }, attempts: 1);
     }
 
-    /**
-     * Get aggregated feedback summary for a subject user across all completed requests.
-     */
-    public function getFeedbackSummary(int $subjectUserId): array
+    public function getFeedbackSummary(User $subject): array
     {
-        $completedRequests = HrFeedbackRequest::where('subject_user_id', $subjectUserId)
+        $completedRequests = HrFeedbackRequest::query()
+            ->where('subject_user_id', $subject->id)
             ->completed()
             ->with('responses')
             ->get();
 
         if ($completedRequests->isEmpty()) {
-            return [
-                'total_reviews' => 0,
-                'questions' => [],
-            ];
+            return ['total_reviews' => 0, 'questions' => []];
         }
 
         $allResponses = $completedRequests->flatMap->responses;
-
-        // Build question labels from snapshots (use the first request's snapshot as canonical labels)
         $questionsMap = $completedRequests->first()->getQuestionsMap();
-
-        // Also gather any question keys from responses that might not be in the map
         $allKeys = $allResponses->pluck('question_key')->unique()->values();
-
         $questionSummaries = [];
         foreach ($allKeys as $key) {
             $questionResponses = $allResponses->where('question_key', $key);
             $ratings = $questionResponses->pluck('rating')->filter()->values();
             $comments = $questionResponses->pluck('comment')->filter()->values();
-
             $questionSummaries[$key] = [
                 'question' => $questionsMap[$key] ?? ucfirst(str_replace('_', ' ', $key)),
-                'average_rating' => $ratings->count() > 0 ? round($ratings->avg(), 2) : null,
+                'average_rating' => $ratings->isNotEmpty() ? round($ratings->avg(), 2) : null,
                 'rating_count' => $ratings->count(),
                 'min_rating' => $ratings->min(),
                 'max_rating' => $ratings->max(),
@@ -200,15 +300,76 @@ class FeedbackService
         ];
     }
 
-    /**
-     * Get pending feedback requests for a given reviewer user.
-     */
-    public function getPendingForUser(int $userId): Collection
+    /** @return Collection<int, HrFeedbackRequest> */
+    public function getPendingForUser(User $reviewer): Collection
     {
-        return HrFeedbackRequest::where('reviewer_user_id', $userId)
+        if (! $this->currentStaff->isCurrent($reviewer)) {
+            return collect();
+        }
+
+        return HrFeedbackRequest::query()
+            ->where('reviewer_user_id', $reviewer->id)
             ->pending()
             ->with(['subject:id,name', 'requester:id,name'])
             ->orderBy('due_date')
             ->get();
+    }
+
+    private function assertReviewerShape(int $subjectUserId, Collection $reviewerIds, string $reviewType): void
+    {
+        if ($reviewType === 'self' && $reviewerIds->all() !== [$subjectUserId]) {
+            throw ValidationException::withMessages([
+                'reviewer_user_ids' => 'A self assessment must be assigned only to its subject.',
+            ]);
+        }
+        if ($reviewType !== 'self' && $reviewerIds->contains($subjectUserId)) {
+            throw ValidationException::withMessages([
+                'reviewer_user_ids' => 'Choose the self review type when the subject is the reviewer.',
+            ]);
+        }
+    }
+
+    private function questionsSnapshot(?HrFeedbackTemplate $template): array
+    {
+        if (! $template) {
+            return collect(self::FEEDBACK_QUESTIONS)
+                ->map(fn (string $question, string $key): array => compact('key', 'question'))
+                ->values()
+                ->all();
+        }
+
+        $questions = collect($template->questions)
+            ->map(fn (mixed $question): array => [
+                'key' => trim((string) ($question['key'] ?? '')),
+                'question' => trim((string) ($question['question'] ?? '')),
+            ]);
+        if ($questions->isEmpty()
+            || $questions->contains(fn (array $question): bool => $question['key'] === '' || $question['question'] === '')
+            || $questions->pluck('key')->unique()->count() !== $questions->count()
+        ) {
+            throw ValidationException::withMessages([
+                'template_id' => 'The selected feedback template has invalid question definitions.',
+            ]);
+        }
+
+        return $questions->values()->all();
+    }
+
+    private function notifyRequested(HrFeedbackRequest $feedbackRequest, string $subjectName): void
+    {
+        $reviewer = $feedbackRequest->reviewer;
+        if (! $reviewer || ! $this->currentStaff->isCurrent($reviewer)) {
+            return;
+        }
+
+        try {
+            $reviewer->notify(new FeedbackRequestedNotification($feedbackRequest, $subjectName));
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to send feedback-requested notification', [
+                'request_id' => $feedbackRequest->id,
+                'reviewer_id' => $feedbackRequest->reviewer_user_id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 }

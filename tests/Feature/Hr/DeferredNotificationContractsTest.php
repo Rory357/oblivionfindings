@@ -9,6 +9,7 @@ use App\Domain\Hr\Notifications\GoalCompletedNotification;
 use App\Domain\Hr\Notifications\SupervisionNoteAddedNotification;
 use App\Domain\Hr\Notifications\WorkerComplianceExpiryNotification;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\StaffBackgroundCheck;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -19,18 +20,29 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
 
+    $this->site = Site::factory()->create(['name' => 'Deferred notification Site']);
+
     $this->hr = User::factory()->create([
         'role' => 'hr',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->firstOrFail()->id,
     ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'employee_number' => 'DEFERRED-HR',
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $this->hr->id,
+        'updated_by' => $this->hr->id,
+    ]);
 
     $this->employee = User::factory()->create([
         'role' => 'support_worker',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
     $this->employee->roles()->syncWithoutDetaching([
@@ -38,9 +50,12 @@ beforeEach(function () {
     ]);
 
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $this->employee->id,
         'employee_number' => 'DEFERRED-1',
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
         'is_active' => true,
         'created_by' => $this->hr->id,
         'updated_by' => $this->hr->id,
@@ -85,7 +100,6 @@ test('a goal completion transition notifies its manager once', function () {
     Notification::fake();
 
     $goal = HrGoal::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $this->employee->id,
         'created_by' => $this->hr->id,
         'status' => 'active',
@@ -106,13 +120,14 @@ test('a goal completion transition notifies its manager once', function () {
     Notification::assertSentToTimes($this->hr, GoalCompletedNotification::class, 1);
 });
 
-test('an announcement reply notifies its same-tenant author but not a self-reply', function () {
+test('an announcement reply notifies its author but not a self-reply', function () {
     Notification::fake();
 
     $announcement = HrAnnouncement::factory()->create([
-        'tenant_id' => 1,
         'created_by' => $this->hr->id,
         'status' => 'published',
+        'target_audience' => 'all',
+        'target_value' => null,
         'published_at' => now(),
     ]);
 
@@ -146,7 +161,6 @@ test('worker vetting and licence expiry reminders are stamped and deduplicated',
     ]);
 
     $driverEligibility = HrDriverEligibility::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->employee->id,
         'licence_expires_at' => now()->addDays(14)->toDateString(),
         'status' => 'eligible',

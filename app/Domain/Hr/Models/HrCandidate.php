@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Database\Factories\Hr\HrCandidateFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,11 +11,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HrCandidate extends Model
 {
-    use AuditableChanges, HasFactory, SoftDeletes;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
@@ -60,7 +62,7 @@ class HrCandidate extends Model
         return $this->hasMany(HrCandidateDocument::class, 'candidate_id');
     }
 
-    public function talentPoolMembership(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function talentPoolMembership(): HasOne
     {
         return $this->hasOne(HrTalentPool::class, 'candidate_id');
     }
@@ -83,11 +85,6 @@ class HrCandidate extends Model
     /* ------------------------------------------------------------------ */
     /*  Scopes */
     /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeActive($query)
     {

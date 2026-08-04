@@ -5,6 +5,7 @@ use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
@@ -13,13 +14,14 @@ function lifecycleProfile(): HrEmployeeProfile
     $user = User::factory()->create();
 
     return HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'employee_number' => 'EMP-LC-'.$user->id,
         'work_email' => $user->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
+        'primary_site_id' => test()->site->id,
+        'secondary_site_ids' => [],
         'start_date' => now()->addDays(10)->toDateString(),
         'is_active' => true,
     ]);
@@ -28,7 +30,6 @@ function lifecycleProfile(): HrEmployeeProfile
 function lifecycleChecklist(HrEmployeeProfile $profile): HrOnboardingChecklist
 {
     $checklist = HrOnboardingChecklist::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'template_key' => 'support_worker:all',
         'status' => 'pending',
@@ -51,9 +52,19 @@ function lifecycleChecklist(HrEmployeeProfile $profile): HrOnboardingChecklist
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'position_role' => 'hr',
+        'is_active' => true,
+        'start_date' => today()->subYear(),
+        'end_date' => null,
     ]);
 });
 
@@ -80,7 +91,15 @@ test('an ad-hoc task can be added then completed and reopened', function () {
 test('a task can be edited and reassigned', function () {
     $checklist = lifecycleChecklist(lifecycleProfile());
     $task = $checklist->tasks()->first();
-    $newOwner = User::factory()->create();
+    $newOwner = User::factory()->create(['approved_at' => now()]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $newOwner->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'is_active' => true,
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+    ]);
 
     $this->actingAs($this->hr)
         ->patch("/hr/onboarding/tasks/{$task->id}", [
@@ -131,7 +150,6 @@ test('a checklist can be marked complete and archived', function () {
 
 test('a template can be duplicated', function () {
     $template = HrOnboardingTemplate::query()->create([
-        'tenant_id' => 1,
         'role' => 'support_worker',
         'site_type' => 'all',
         'is_active' => true,

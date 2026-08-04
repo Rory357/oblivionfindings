@@ -17,7 +17,7 @@ use Carbon\CarbonInterface;
  * Windows are interpreted in the worker timezone (config('app.worker_timezone')).
  *
  * When the calendar is null or defines no working windows, both operations fall
- * back to plain continuous time — this is the v1 24/7 behaviour, so a tenant
+ * back to plain continuous time — this is the v1 24/7 behaviour, so an organisation
  * that never sets business hours is completely unaffected.
  *
  * Callers persisting a result to an Eloquent datetime column should ->utc() it

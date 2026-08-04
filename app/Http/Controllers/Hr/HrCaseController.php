@@ -2,21 +2,33 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrCaseEvent;
 use App\Domain\Hr\Models\HrDisciplinaryAction;
 use App\Domain\Hr\Notifications\HrCaseUpdateNotification;
+use App\Domain\Hr\Services\HrCaseAccessService;
+use App\Domain\Hr\Services\PeopleMutationLockService;
+use App\Http\Controllers\Controller;
 use App\Models\ClientIncident;
 use App\Models\User;
+use App\Services\References\ReferenceNumberGenerator;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class HrCaseController extends Controller
 {
-    use ResolvesHrTenant;
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly HrCaseAccessService $caseAccess,
+        private readonly PeopleMutationLockService $mutationLocks,
+    ) {}
 
     /**
      * Case type options shared by the index New-case wizard.
@@ -62,15 +74,13 @@ class HrCaseController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $search = trim((string) $request->query('q', ''));
         $slaWindow = trim((string) $request->query('sla_window', ''));
         $now = now();
         $next24Hours = now()->addDay();
 
-        $cases = HrCase::forTenant($tenantId)
+        $cases = $this->visibleCasesQuery($user)
             ->with(['subject:id,name', 'assignedTo:id,name'])
-            ->tap(fn ($q) => $this->applyCaseVisibilityScope($q, $user))
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->when($request->query('case_type'), fn ($q, $type) => $q->where('case_type', $type))
             ->when($request->query('severity'), fn ($q, $sev) => $q->where('severity', $sev))
@@ -132,16 +142,13 @@ class HrCaseController extends Controller
             ->orderByDesc('opened_at')
             ->paginate(20)
             ->withQueryString();
-
-        $openCasesQuery = HrCase::query()
-            ->forTenant($tenantId)
-            ->tap(fn ($q) => $this->applyCaseVisibilityScope($q, $user))
+        $openCasesQuery = $this->visibleCasesQuery($user)
             ->whereNotIn('status', ['closed', 'resolved']);
 
-        $activeDisciplinaryQuery = \App\Domain\Hr\Models\HrDisciplinaryAction::query()
-            ->where('tenant_id', $tenantId)
+        $activeDisciplinaryQuery = HrDisciplinaryAction::query()
             ->whereNotIn('stage', ['closed'])
-            ->whereHas('hrCase', fn ($query) => $query->whereNotIn('status', ['closed', 'resolved']));
+            ->whereHas('hrCase', fn (Builder $query) => $this->applyVisibleCaseScope($query, $user)
+                ->whereNotIn('status', ['closed', 'resolved']));
 
         $summary = [
             'open_cases' => (clone $openCasesQuery)->count(),
@@ -195,15 +202,14 @@ class HrCaseController extends Controller
             ],
             // New-case wizard data (managers only — the CTA is hidden otherwise).
             'staff' => $canManage
-                ? User::staff()
-                    ->whereIn('id', $this->hrStaffUserIdsForTenant($tenantId))
+                ? $this->visibleStaffQuery($user)
                     ->orderBy('name')
                     ->get(['id', 'name', 'email'])
                 : [],
             'caseTypes' => self::CASE_TYPE_OPTIONS,
             'severities' => self::SEVERITY_OPTIONS,
             'incidents' => $canManage
-                ? $this->incidentSummariesForTenant($tenantId)
+                ? $this->incidentSummariesForUser($user)
                 : [],
         ]);
     }
@@ -228,8 +234,7 @@ class HrCaseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $case->tenant_id);
+        $this->assertCanAccessCase($user, $case);
 
         return redirect()->route('hr.cases.show', ['case' => $case->id, 'new' => 'event']);
     }
@@ -243,23 +248,23 @@ class HrCaseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $case->tenant_id);
-        abort_unless($this->canViewCase($user, $case), 403);
+        $this->assertCanAccessCase($user, $case);
 
-        $case->load([
+        $canManageCases = $user->canDo('hr.cases.manage');
+        $canManageDisciplinary = $user->canDo('hr.disciplinary.manage');
+        $relations = [
             'subject:id,name,email',
             'reportedBy:id,name',
             'assignedTo:id,name',
             'events' => fn ($q) => $q->with('creator:id,name')->orderBy('occurred_at'),
-            'disciplinaryActions' => fn ($q) => $q->with([
+        ];
+        if ($canManageDisciplinary) {
+            $relations['disciplinaryActions'] = fn ($q) => $q->with([
                 'employee:id,name',
                 'investigator:id,name',
-            ])->orderByDesc('created_at'),
-        ]);
-
-        $canManageCases = $user->canDo('hr.cases.manage');
-        $canManageDisciplinary = $user->canDo('hr.disciplinary.manage');
+            ])->orderByDesc('created_at');
+        }
+        $case->load($relations);
 
         // Build a combined timeline from events and disciplinary milestones
         $timeline = $case->events
@@ -280,9 +285,8 @@ class HrCaseController extends Controller
         // Serialise disciplinary actions form-ready (input-formatted dates,
         // string ids, normalised checklist) so the Edit-disciplinary wizard on
         // this page can hydrate directly from the row.
-        $case->setRelation(
-            'disciplinaryActions',
-            $case->disciplinaryActions->map(fn (HrDisciplinaryAction $action) => [
+        $disciplinaryActions = $canManageDisciplinary
+            ? $case->disciplinaryActions->map(fn (HrDisciplinaryAction $action) => [
                 'id' => $action->id,
                 'employee_user_id' => (string) $action->employee_user_id,
                 'stage' => $action->stage,
@@ -310,16 +314,17 @@ class HrCaseController extends Controller
                 'employee' => $action->employee ? ['id' => $action->employee->id, 'name' => $action->employee->name] : null,
                 'investigator' => $action->investigator ? ['id' => $action->investigator->id, 'name' => $action->investigator->name] : null,
                 'created_at' => optional($action->created_at)->toIso8601String(),
-            ]),
-        );
+            ])
+            : collect();
+        $case->setRelation('disciplinaryActions', $disciplinaryActions);
 
         $canRunWizards = $canManageCases || $canManageDisciplinary;
 
         return Inertia::render('hr/cases/show', [
             'case' => $case,
             'timeline' => $timeline,
-            'linkedIncidents' => $this->incidentSummariesForTenant(
-                $tenantId,
+            'linkedIncidents' => $this->incidentSummariesForUser(
+                $user,
                 (array) ($case->linked_incident_ids ?? []),
             ),
             'can' => [
@@ -327,13 +332,12 @@ class HrCaseController extends Controller
                 'disciplinary' => $canManageDisciplinary,
                 // Assigned-only access is client-specific and cannot guarantee
                 // every linked incident will open; only emit a safe deep link
-                // for viewers with organisation-wide incident access.
+                // for viewers with application-wide incident access.
                 'view_incidents' => $user->canDo('incidents.viewAny'),
             ],
             // Wizard data (Add event / Add disciplinary / Edit disciplinary).
             'staff' => $canRunWizards
-                ? User::staff()
-                    ->whereIn('id', $this->hrStaffUserIdsForTenant($tenantId))
+                ? $this->visibleStaffQuery($user)
                     ->orderBy('name')
                     ->get(['id', 'name', 'email'])
                 : [],
@@ -356,20 +360,19 @@ class HrCaseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
-            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'user_id' => ['required', 'bail', 'integer', $this->visibleStaffRule($user)],
             'case_type' => ['required', 'string', 'in:grievance,disciplinary,investigation,welfare,complaint,other'],
             'severity' => ['required', 'string', 'in:low,medium,high,critical'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
-            'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
+            'assigned_to' => ['nullable', 'bail', 'integer', $this->visibleStaffRule($user)],
             'is_confidential' => ['boolean'],
-            'access_list' => ['nullable', 'array'],
-            'access_list.*' => ['integer', 'exists:users,id'],
-            'linked_incident_ids' => ['nullable', 'array'],
-            'linked_incident_ids.*' => ['integer', 'distinct', $this->sameTenantIncidentRule($tenantId)],
+            'access_list' => ['nullable', 'array', 'max:100'],
+            'access_list.*' => ['bail', 'integer', 'distinct', $this->visibleStaffRule($user)],
+            'linked_incident_ids' => ['nullable', 'array', 'max:100'],
+            'linked_incident_ids.*' => ['integer', 'distinct', $this->availableIncidentRule($user)],
         ]);
 
         // hr_cases.description is NOT NULL with no default; a description-less case
@@ -377,15 +380,35 @@ class HrCaseController extends Controller
         // via ConvertEmptyStringsToNull) would otherwise 500 on insert. Coerce to ''.
         $data['description'] = $data['description'] ?? '';
 
-        $case = HrCase::create([
-            'tenant_id' => $tenantId,
-            'case_number' => app(\App\Services\References\ReferenceNumberGenerator::class)->nextGlobal('HR', 5),
-            'status' => 'open',
-            'reported_by' => $user->id,
-            'opened_at' => now(),
-            'created_by' => $user->id,
-            ...$data,
-        ]);
+        $this->normalizeCaseSelectionIds($data);
+
+        $case = DB::transaction(function () use ($user, $data): HrCase {
+            $locks = $this->mutationLocks->lock([
+                $user->id,
+                $data['user_id'],
+                $data['assigned_to'] ?? null,
+                ...($data['access_list'] ?? []),
+            ]);
+            $actor = $locks['users']->get($user->id);
+            abort_unless($actor instanceof User && $actor->canDo('hr.cases.manage'), 403);
+
+            $freshSiteAccess = new UserSiteAccessService;
+            $this->assertAvailableCaseParticipants($actor, $data, $freshSiteAccess, true);
+            $this->assertAvailableIncidentIds(
+                $actor,
+                (array) ($data['linked_incident_ids'] ?? []),
+                $freshSiteAccess,
+            );
+
+            return HrCase::query()->create([
+                'case_number' => app(ReferenceNumberGenerator::class)->nextGlobal('HR', 5),
+                'status' => 'open',
+                'reported_by' => $actor->id,
+                'opened_at' => now(),
+                'created_by' => $actor->id,
+                ...$data,
+            ]);
+        });
 
         // Tell the owner they've picked up a case (skip self-assignment).
         $this->notifyCaseAssignee($case, $case->assigned_to !== null ? (int) $case->assigned_to : null, $user->id, 'assigned');
@@ -400,21 +423,20 @@ class HrCaseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $case->tenant_id);
+        $this->assertCanAccessCase($user, $case);
 
         $data = $request->validate([
             'case_type' => ['sometimes', 'string', 'in:grievance,disciplinary,investigation,welfare,complaint,other'],
             'severity' => ['sometimes', 'string', 'in:low,medium,high,critical'],
             'title' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
-            'status' => ['sometimes', 'string', 'in:open,under_investigation,awaiting_response,resolved,closed'],
-            'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
+            'status' => ['sometimes', 'string', 'in:open,under_investigation,awaiting_response,resolved'],
+            'assigned_to' => ['nullable', 'bail', 'integer', $this->visibleStaffRule($user)],
             'is_confidential' => ['boolean'],
-            'access_list' => ['nullable', 'array'],
-            'access_list.*' => ['integer', 'exists:users,id'],
-            'linked_incident_ids' => ['nullable', 'array'],
-            'linked_incident_ids.*' => ['integer', 'distinct', $this->sameTenantIncidentRule($tenantId)],
+            'access_list' => ['nullable', 'array', 'max:100'],
+            'access_list.*' => ['bail', 'integer', 'distinct', $this->visibleStaffRule($user)],
+            'linked_incident_ids' => ['nullable', 'array', 'max:100'],
+            'linked_incident_ids.*' => ['integer', 'distinct', $this->availableIncidentRule($user)],
         ]);
 
         // Coerce a null description (empty field → null via ConvertEmptyStringsToNull)
@@ -423,14 +445,51 @@ class HrCaseController extends Controller
             $data['description'] = '';
         }
 
-        $data['updated_by'] = $user->id;
+        $this->normalizeCaseSelectionIds($data);
 
-        $previousAssignee = $case->assigned_to !== null ? (int) $case->assigned_to : null;
+        [$case, $previousAssignee, $newAssignee] = DB::transaction(function () use ($user, $case, $data): array {
+            $locks = $this->mutationLocks->lock([
+                $user->id,
+                ...$this->casePeopleIds($case),
+                $data['assigned_to'] ?? null,
+                ...($data['access_list'] ?? []),
+            ]);
+            $actor = $locks['users']->get($user->id);
+            abort_unless($actor instanceof User && $actor->canDo('hr.cases.manage'), 403);
 
-        $case->update($data);
+            $lockedCase = HrCase::query()->whereKey($case->getKey())->lockForUpdate()->firstOrFail();
+            $freshSiteAccess = new UserSiteAccessService;
+            $freshCaseAccess = new HrCaseAccessService($freshSiteAccess);
+            $this->assertCanAccessCase($actor, $lockedCase, $freshCaseAccess);
+            if ($lockedCase->status === 'closed') {
+                throw ValidationException::withMessages([
+                    'case' => 'A closed HR case cannot be changed.',
+                ]);
+            }
+
+            $this->assertAvailableCaseParticipants($actor, $data, $freshSiteAccess, false);
+            if (array_key_exists('linked_incident_ids', $data)) {
+                $this->assertAvailableIncidentIds(
+                    $actor,
+                    (array) ($data['linked_incident_ids'] ?? []),
+                    $freshSiteAccess,
+                );
+            }
+
+            $previousAssignee = $lockedCase->assigned_to !== null ? (int) $lockedCase->assigned_to : null;
+            $lockedCase->update([
+                ...$data,
+                'updated_by' => $actor->id,
+            ]);
+
+            return [
+                $lockedCase->fresh(),
+                $previousAssignee,
+                $lockedCase->assigned_to !== null ? (int) $lockedCase->assigned_to : null,
+            ];
+        });
 
         // Notify only when ownership actually moves to a new person.
-        $newAssignee = $case->assigned_to !== null ? (int) $case->assigned_to : null;
         if ($newAssignee !== null && $newAssignee !== $previousAssignee) {
             $this->notifyCaseAssignee($case, $newAssignee, $user->id, 'reassigned');
         }
@@ -445,23 +504,38 @@ class HrCaseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $case->tenant_id);
+        $this->assertCanAccessCase($user, $case);
 
         $data = $request->validate([
             'event_type' => ['required', 'string', 'in:note,meeting,phone_call,letter,email,document,investigation_update,other'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
-            'occurred_at' => ['required', 'date'],
+            'occurred_at' => ['required', 'date', 'before_or_equal:now'],
             'document_path' => ['nullable', 'string', 'max:500'],
             'visibility' => ['nullable', 'string', 'in:internal,restricted,full'],
         ]);
 
-        HrCaseEvent::create([
-            'case_id' => $case->id,
-            'created_by' => $user->id,
-            ...$data,
-        ]);
+        DB::transaction(function () use ($user, $case, $data): void {
+            $locks = $this->mutationLocks->lock([
+                $user->id,
+                ...$this->casePeopleIds($case),
+            ]);
+            $actor = $locks['users']->get($user->id);
+            abort_unless($actor instanceof User && $actor->canDo('hr.cases.manage'), 403);
+
+            $lockedCase = HrCase::query()->whereKey($case->getKey())->lockForUpdate()->firstOrFail();
+            $this->assertCanAccessCase(
+                $actor,
+                $lockedCase,
+                new HrCaseAccessService(new UserSiteAccessService),
+            );
+
+            HrCaseEvent::query()->create([
+                'case_id' => $lockedCase->id,
+                'created_by' => $actor->id,
+                ...$data,
+            ]);
+        });
 
         return redirect()->back()->with('success', 'Event added to case timeline.');
     }
@@ -473,21 +547,52 @@ class HrCaseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $case->tenant_id);
+        $this->assertCanAccessCase($user, $case);
 
         $data = $request->validate([
             'outcome' => ['required', 'string', 'max:5000'],
             'outcome_type' => ['required', 'string', 'in:resolved,no_action,disciplinary,referred,withdrawn'],
         ]);
 
-        $case->update([
-            'status' => 'closed',
-            'outcome' => $data['outcome'],
-            'outcome_type' => $data['outcome_type'],
-            'closed_at' => now(),
-            'updated_by' => $user->id,
-        ]);
+        DB::transaction(function () use ($user, $case, $data): void {
+            $locks = $this->mutationLocks->lock([
+                $user->id,
+                ...$this->casePeopleIds($case),
+            ]);
+            $actor = $locks['users']->get($user->id);
+            abort_unless($actor instanceof User && $actor->canDo('hr.cases.manage'), 403);
+
+            $lockedCase = HrCase::query()->whereKey($case->getKey())->lockForUpdate()->firstOrFail();
+            $this->assertCanAccessCase(
+                $actor,
+                $lockedCase,
+                new HrCaseAccessService(new UserSiteAccessService),
+            );
+            if ($lockedCase->status === 'closed') {
+                throw ValidationException::withMessages([
+                    'case' => 'This HR case is already closed.',
+                ]);
+            }
+
+            $disciplinaryActions = HrDisciplinaryAction::query()
+                ->where('case_id', $lockedCase->id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get(['id', 'stage']);
+            if ($disciplinaryActions->contains(fn (HrDisciplinaryAction $action) => $action->stage !== 'closed')) {
+                throw ValidationException::withMessages([
+                    'case' => 'Close every disciplinary action before closing the HR case.',
+                ]);
+            }
+
+            $lockedCase->update([
+                'status' => 'closed',
+                'outcome' => $data['outcome'],
+                'outcome_type' => $data['outcome_type'],
+                'closed_at' => now(),
+                'updated_by' => $actor->id,
+            ]);
+        });
 
         return redirect()->back()->with('success', 'HR case closed.');
     }
@@ -499,8 +604,12 @@ class HrCaseController extends Controller
      * @param  array<int, int|string>|null  $incidentIds
      * @return Collection<int, array<string, mixed>>
      */
-    private function incidentSummariesForTenant(int $tenantId, ?array $incidentIds = null): Collection
+    private function incidentSummariesForUser(User $user, ?array $incidentIds = null): Collection
     {
+        if (Gate::forUser($user)->denies('viewAny', ClientIncident::class)) {
+            return collect();
+        }
+
         $ids = $incidentIds === null
             ? null
             : collect($incidentIds)
@@ -513,8 +622,15 @@ class HrCaseController extends Controller
             return collect();
         }
 
-        $incidents = ClientIncident::query()
-            ->whereHas('client', fn ($clients) => $clients->where('organization_id', $tenantId))
+        $incidents = ClientIncident::query();
+        if (! $user->canDo('incidents.viewAny')) {
+            $incidents->whereHas(
+                'client.supportWorkers',
+                fn ($workers) => $workers->whereKey($user->id),
+            );
+        }
+        $this->siteAccess->applyClientIncidentScope($incidents, $user);
+        $incidents = $incidents
             ->with('client:id,first_name,last_name')
             ->select([
                 'id',
@@ -531,7 +647,9 @@ class HrCaseController extends Controller
                 fn ($query) => $query->whereIn('id', $ids->all()),
                 fn ($query) => $query->orderByDesc('occurred_at')->limit(100),
             )
-            ->get();
+            ->get()
+            ->filter(fn (ClientIncident $incident) => Gate::forUser($user)->allows('view', $incident))
+            ->values();
 
         if ($ids !== null) {
             $positions = $ids->flip();
@@ -553,28 +671,176 @@ class HrCaseController extends Controller
     }
 
     /**
-     * Reject missing or cross-organisation incident ids on both create/update.
+     * Reject missing incidents and records hidden by the canonical incident policy.
      */
-    private function sameTenantIncidentRule(int $tenantId): \Closure
+    private function availableIncidentRule(User $user): \Closure
     {
-        return function (string $attribute, mixed $value, \Closure $fail) use ($tenantId): void {
-            $exists = is_numeric($value) && ClientIncident::query()
-                ->whereKey((int) $value)
-                ->whereHas('client', fn ($clients) => $clients->where('organization_id', $tenantId))
-                ->exists();
+        return function (string $attribute, mixed $value, \Closure $fail) use ($user): void {
+            $incident = is_numeric($value)
+                ? ClientIncident::query()->find((int) $value)
+                : null;
 
-            if (! $exists) {
-                $fail('The selected incident is not available to this organisation.');
+            $visibleAtApprovedSite = $incident !== null
+                && ClientIncident::query()
+                    ->whereKey($incident->id)
+                    ->tap(fn ($query) => $this->siteAccess->applyClientIncidentScope($query, $user))
+                    ->exists();
+
+            if (! $incident
+                || Gate::forUser($user)->denies('view', $incident)
+                || ! $visibleAtApprovedSite) {
+                $fail('The selected incident is not available.');
             }
         };
+    }
+
+    /** @param array<int, int|string> $incidentIds */
+    private function assertAvailableIncidentIds(
+        User $viewer,
+        array $incidentIds,
+        UserSiteAccessService $siteAccess,
+    ): void {
+        foreach ($incidentIds as $incidentId) {
+            $incident = is_numeric($incidentId)
+                ? ClientIncident::query()->find((int) $incidentId)
+                : null;
+            $visibleAtApprovedSite = $incident !== null
+                && ClientIncident::query()
+                    ->whereKey($incident->id)
+                    ->tap(fn ($query) => $siteAccess->applyClientIncidentScope($query, $viewer))
+                    ->exists();
+
+            if (! $incident
+                || Gate::forUser($viewer)->denies('view', $incident)
+                || ! $visibleAtApprovedSite) {
+                throw ValidationException::withMessages([
+                    'linked_incident_ids' => 'The selected incident is not available.',
+                ]);
+            }
+        }
+    }
+
+    private function visibleCasesQuery(User $viewer): Builder
+    {
+        return $this->applyVisibleCaseScope(HrCase::query(), $viewer);
+    }
+
+    private function applyVisibleCaseScope(Builder $query, User $viewer): Builder
+    {
+        return $this->caseAccess->applyVisibleCaseScope($query, $viewer);
+    }
+
+    private function visibleStaffQuery(
+        User $viewer,
+        ?UserSiteAccessService $siteAccess = null,
+    ): Builder {
+        return ($siteAccess ?? $this->siteAccess)->applyStaffScope(User::query(), $viewer);
+    }
+
+    private function visibleStaffRule(User $viewer): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) use ($viewer): void {
+            if (! is_numeric($value)
+                || ! $this->visibleStaffQuery($viewer)->whereKey((int) $value)->exists()) {
+                $fail('The selected staff member is not available.');
+            }
+        };
+    }
+
+    private function assertCanAccessCase(
+        User $viewer,
+        HrCase $case,
+        ?HrCaseAccessService $caseAccess = null,
+    ): void {
+        abort_unless(
+            ($caseAccess ?? $this->caseAccess)
+                ->applyVisibleCaseScope(HrCase::query(), $viewer)
+                ->whereKey($case->getKey())
+                ->exists(),
+            404,
+        );
+    }
+
+    /** @param array<string, mixed> $data */
+    private function normalizeCaseSelectionIds(array &$data): void
+    {
+        foreach (['access_list', 'linked_incident_ids'] as $field) {
+            if (! array_key_exists($field, $data) || $data[$field] === null) {
+                continue;
+            }
+
+            $data[$field] = collect((array) $data[$field])
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function assertAvailableCaseParticipants(
+        User $viewer,
+        array $data,
+        UserSiteAccessService $siteAccess,
+        bool $requireSubject,
+    ): void {
+        $errors = [];
+        if ($requireSubject || array_key_exists('user_id', $data)) {
+            $subjectId = $data['user_id'] ?? null;
+            if (! is_numeric($subjectId)
+                || ! $this->visibleStaffQuery($viewer, $siteAccess)->whereKey((int) $subjectId)->exists()) {
+                $errors['user_id'] = 'The selected staff member is not available.';
+            }
+        }
+
+        if (array_key_exists('assigned_to', $data) && $data['assigned_to'] !== null) {
+            $assigneeId = $data['assigned_to'];
+            if (! is_numeric($assigneeId)
+                || ! $this->visibleStaffQuery($viewer, $siteAccess)->whereKey((int) $assigneeId)->exists()) {
+                $errors['assigned_to'] = 'The selected staff member is not available.';
+            }
+        }
+
+        foreach ((array) ($data['access_list'] ?? []) as $accessId) {
+            if (! is_numeric($accessId)
+                || ! $this->visibleStaffQuery($viewer, $siteAccess)->whereKey((int) $accessId)->exists()) {
+                $errors['access_list'] = 'The selected staff member is not available.';
+                break;
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    /** @return array<int, int> */
+    private function casePeopleIds(HrCase $case): array
+    {
+        return collect([
+            $case->user_id,
+            $case->reported_by,
+            $case->assigned_to,
+            $case->created_by,
+            $case->updated_by,
+            ...((array) ($case->access_list ?? [])),
+        ])
+            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**
      * Notify a case's assigned owner that it has landed with them. Fires the
      * previously-dead HrCaseUpdateNotification (database-only — sensitive HR
      * data). Skips self-assignment and is best-effort so a notification failure
-     * never rolls back the case write. The assignee is always an authorised
-     * viewer (see canViewCase), so this can't leak a confidential case.
+     * never rolls back the case write. Assignees pass the current-staff/Site
+     * rule and are included in HrCaseAccessService's confidentiality predicate,
+     * so this cannot leak a confidential case.
      */
     protected function notifyCaseAssignee(HrCase $case, ?int $assigneeId, int $actorId, string $eventType): void
     {
@@ -590,59 +856,12 @@ class HrCaseController extends Controller
         try {
             $assignee->notify(new HrCaseUpdateNotification($case, $eventType));
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Failed to send HR case assignment notification', [
+            Log::warning('Failed to send HR case assignment notification', [
                 'case_id' => $case->id,
                 'assignee_id' => $assigneeId,
                 'error' => $e->getMessage(),
             ]);
         }
-    }
-
-    /**
-     * Confidential-case visibility: when a case is flagged is_confidential only
-     * the creator, the reporter, the assigned owner, users on the access_list,
-     * or a case manager (hr.cases.manage — the strongest existing HR-cases
-     * permission) may see it. Non-confidential cases are unrestricted.
-     */
-    protected function canViewCase(User $viewer, HrCase $case): bool
-    {
-        if (! $case->is_confidential) {
-            return true;
-        }
-
-        if ($viewer->canDo('hr.cases.manage')) {
-            return true;
-        }
-
-        $allowedIds = collect([$case->created_by, $case->reported_by, $case->assigned_to])
-            ->merge($case->access_list ?? [])
-            ->filter(fn ($id) => is_numeric($id))
-            ->map(fn ($id) => (int) $id);
-
-        return $allowedIds->contains((int) $viewer->id);
-    }
-
-    /**
-     * Query-side twin of {@see canViewCase} for lists/search: hides confidential
-     * cases the viewer is not the creator/reporter/owner of, not on the
-     * access_list of, and cannot manage.
-     */
-    protected function applyCaseVisibilityScope($query, User $viewer)
-    {
-        if ($viewer->canDo('hr.cases.manage')) {
-            return $query;
-        }
-
-        return $query->where(function ($inner) use ($viewer) {
-            $inner->where('is_confidential', false)
-                ->orWhereNull('is_confidential')
-                ->orWhere('created_by', $viewer->id)
-                ->orWhere('reported_by', $viewer->id)
-                ->orWhere('assigned_to', $viewer->id)
-                // access_list entries may be stored as ints or strings.
-                ->orWhereJsonContains('access_list', $viewer->id)
-                ->orWhereJsonContains('access_list', (string) $viewer->id);
-        });
     }
 
     protected function normalizeCaseEventVisibility(?string $visibility): string

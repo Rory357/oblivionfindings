@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\System;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\Staff;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -31,6 +33,16 @@ class UsersControllerTest extends TestCase
 
     public function test_system_users_index_renders_for_admin(): void
     {
+        $canonicalStaff = $this->userWithRole('support_worker');
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $canonicalStaff->id,
+            'primary_site_id' => Site::factory()->create()->id,
+            'is_active' => true,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
+        Staff::factory()->create(['user_id' => $this->supportWorker->id]);
+
         $this->actingAs($this->admin)
             ->get('/system/users')
             ->assertOk()
@@ -40,6 +52,7 @@ class UsersControllerTest extends TestCase
                 ->has('filters')
                 ->has('roles')
                 ->has('stats')
+                ->where('stats.staff', 1)
             );
     }
 
@@ -50,7 +63,7 @@ class UsersControllerTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_store_creates_staff_user_and_writes_audit_log(): void
+    public function test_store_fails_closed_for_staff_and_directs_creation_to_canonical_hr_intake(): void
     {
         $role = Role::where('name', 'support_worker')->firstOrFail();
 
@@ -67,21 +80,10 @@ class UsersControllerTest extends TestCase
                     'employee_id' => 'EMP-9001',
                 ],
             ])
-            ->assertRedirect(route('system.users.index', absolute: false));
+            ->assertSessionHasErrors('user_type');
 
-        $created = User::where('email', 'taylor.support@example.test')->firstOrFail();
-        $this->assertTrue($created->roles()->whereKey($role->id)->exists());
-        $this->assertDatabaseHas('staff', [
-            'user_id' => $created->id,
-            'employee_id' => 'EMP-9001',
-            'status' => 'active',
-        ]);
-        $this->assertDatabaseHas('audit_logs', [
-            'user_id' => $this->admin->id,
-            'auditable_type' => $created->getMorphClass(),
-            'auditable_id' => $created->id,
-            'action' => 'user.created',
-        ]);
+        $this->assertDatabaseMissing('users', ['email' => 'taylor.support@example.test']);
+        $this->assertDatabaseMissing('staff', ['employee_id' => 'EMP-9001']);
     }
 
     public function test_update_user_writes_audit_log(): void
@@ -130,10 +132,17 @@ class UsersControllerTest extends TestCase
         ]);
     }
 
-    public function test_suspend_user_writes_audit_log_and_suspends_staff_profile(): void
+    public function test_suspend_user_changes_login_access_without_mutating_employment_or_compatibility_status(): void
     {
         $target = $this->userWithRole('support_worker');
-        Staff::factory()->create([
+        $profile = HrEmployeeProfile::factory()->create([
+            'user_id' => $target->id,
+            'primary_site_id' => Site::factory()->create()->id,
+            'is_active' => true,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
+        $compatibilityProfile = Staff::factory()->create([
             'user_id' => $target->id,
             'status' => 'active',
         ]);
@@ -144,10 +153,8 @@ class UsersControllerTest extends TestCase
 
         $target->refresh();
         $this->assertNull($target->approved_at);
-        $this->assertDatabaseHas('staff', [
-            'user_id' => $target->id,
-            'status' => 'suspended',
-        ]);
+        $this->assertTrue($profile->refresh()->is_active);
+        $this->assertSame('active', $compatibilityProfile->refresh()->status);
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $this->admin->id,
             'auditable_type' => $target->getMorphClass(),
@@ -171,6 +178,49 @@ class UsersControllerTest extends TestCase
             'auditable_id' => $target->id,
             'action' => 'user.deleted',
         ]);
+    }
+
+    public function test_destroy_fails_closed_for_a_canonical_employee_record(): void
+    {
+        $target = $this->userWithRole('support_worker');
+        $profile = HrEmployeeProfile::factory()->create([
+            'user_id' => $target->id,
+            'primary_site_id' => Site::factory()->create()->id,
+            'is_active' => true,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->from("/system/users/{$target->id}")
+            ->delete("/system/users/{$target->id}")
+            ->assertSessionHasErrors('user');
+
+        $this->assertDatabaseHas('users', ['id' => $target->id]);
+        $this->assertDatabaseHas('hr_employee_profiles', ['id' => $profile->id]);
+    }
+
+    public function test_update_keeps_canonical_work_email_atomic_with_login_email(): void
+    {
+        $target = $this->userWithRole('support_worker');
+        $profile = HrEmployeeProfile::factory()->create([
+            'user_id' => $target->id,
+            'primary_site_id' => Site::factory()->create()->id,
+            'work_email' => $target->email,
+            'is_active' => true,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->put("/system/users/{$target->id}", [
+                'email' => 'canonical.worker@example.test',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame('canonical.worker@example.test', $target->refresh()->email);
+        $this->assertSame('canonical.worker@example.test', $profile->refresh()->work_email);
+        $this->assertSame($this->admin->id, $profile->updated_by);
     }
 
     public function test_session_termination_writes_audit_logs(): void

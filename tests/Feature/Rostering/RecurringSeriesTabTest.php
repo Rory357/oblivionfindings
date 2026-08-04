@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
@@ -9,9 +10,9 @@ use App\Models\ShiftSeries;
 use App\Models\Site;
 use App\Models\User;
 
-function seriesActorWith(array $permissionKeys): User
+function seriesActorWith(array $permissionKeys, ?Site $site = null): User
 {
-    $actor = User::factory()->create(['organization_id' => 1]);
+    $actor = User::factory()->create(['approved_at' => now()]);
     $role = Role::create([
         'name' => 'series-test-'.uniqid(),
         'label' => 'Series test',
@@ -27,6 +28,17 @@ function seriesActorWith(array $permissionKeys): User
     $role->permissions()->sync($ids);
     $actor->roles()->attach($role);
 
+    if ($site) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $actor->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+    }
+
     return $actor;
 }
 
@@ -34,7 +46,6 @@ function makeSeries(User $actor): ShiftSeries
 {
     $site = Site::factory()->create();
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
     ]);
 
@@ -83,21 +94,19 @@ it('keeps the standalone series page for managers without rostering workspace ac
 });
 
 it('duplicates a roster template with its shift rows', function () {
-    $actor = seriesActorWith(['roster_templates.create']);
     $site = Site::factory()->create();
+    $actor = seriesActorWith(['roster_templates.create'], $site);
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
     ]);
     $template = RosterTemplate::factory()->create([
-        'organization_id' => 1,
         'created_by' => $actor->id,
         'name' => 'North House weekdays',
     ]);
     RosterTemplateShift::factory()->count(3)->create([
-        'organization_id' => 1,
         'roster_template_id' => $template->id,
         'client_id' => $client->id,
+        'user_id' => null,
         'service_context_id' => null,
     ]);
 
@@ -110,4 +119,27 @@ it('duplicates a roster template with its shift rows', function () {
     expect($copy)->not->toBeNull();
     expect($copy->templateShifts()->count())->toBe(3);
     expect(RosterTemplate::count())->toBe(2);
+});
+
+it('denies duplicating a template whose rows reference an inaccessible Site', function () {
+    $accessibleSite = Site::factory()->create();
+    $outsideSite = Site::factory()->create();
+    $actor = seriesActorWith(['roster_templates.create'], $accessibleSite);
+    $outsideClient = Client::factory()->create(['site_id' => $outsideSite->id]);
+    $template = RosterTemplate::factory()->create([
+        'created_by' => $actor->id,
+        'name' => 'Outside Site pattern',
+    ]);
+    RosterTemplateShift::factory()->create([
+        'roster_template_id' => $template->id,
+        'client_id' => $outsideClient->id,
+        'user_id' => null,
+        'service_context_id' => null,
+    ]);
+
+    $this->actingAs($actor)
+        ->post(route('operations.rostering.templates.duplicate', $template))
+        ->assertForbidden();
+
+    expect(RosterTemplate::query()->where('name', 'Outside Site pattern (copy)')->exists())->toBeFalse();
 });

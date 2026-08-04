@@ -42,6 +42,8 @@ class SeedHrPermissionsSeeder extends Seeder
             // Assets
             'hr.assets.view' => 'View company assets',
             'hr.assets.manage' => 'Manage assets and assignments',
+            'hr.assets.viewUnassigned' => 'View application-wide unassigned HR equipment stock',
+            'hr.assets.viewAllSites' => 'View HR equipment assigned across all operational Sites',
 
             // Calendar
             'hr.calendar.view' => 'View company calendar',
@@ -125,7 +127,10 @@ class SeedHrPermissionsSeeder extends Seeder
             $this->command->warn('No admin role found. Permissions created but not assigned.');
         }
 
-        $this->attachPermissions('hr', array_keys($permissions));
+        $this->attachPermissions('hr', array_values(array_diff(
+            array_keys($permissions),
+            ['hr.assets.viewAllSites'],
+        )));
         $this->attachPermissions('provider_manager', [
             'hr.orgchart.view',
             'hr.positions.view',

@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Domain\Clinical;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,10 +16,13 @@ class HealthClinicalClientSummaryAccessTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
+        $this->site = Site::factory()->create(['is_active' => true]);
     }
 
     public function test_client_summary_enforces_assignment_for_assigned_only_roles(): void
@@ -25,12 +30,12 @@ class HealthClinicalClientSummaryAccessTest extends TestCase
         $clinicalLead = $this->createUserWithRole('clinical_lead');
         $assignedSupportWorker = $this->createUserWithRole('support_worker');
         $unassignedSupportWorker = $this->createUserWithRole('support_worker');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         $client->supportWorkers()->attach($assignedSupportWorker->id);
 
         $this->actingAs($clinicalLead)
-            ->get('/health-clinical/clients/' . $client->id . '/summary')
+            ->get('/health-clinical/clients/'.$client->id.'/summary')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('health-clinical/ClientSummary')
@@ -38,7 +43,7 @@ class HealthClinicalClientSummaryAccessTest extends TestCase
             );
 
         $this->actingAs($assignedSupportWorker)
-            ->get('/health-clinical/clients/' . $client->id . '/summary')
+            ->get('/health-clinical/clients/'.$client->id.'/summary')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('health-clinical/ClientSummary')
@@ -46,7 +51,7 @@ class HealthClinicalClientSummaryAccessTest extends TestCase
             );
 
         $this->actingAs($unassignedSupportWorker)
-            ->get('/health-clinical/clients/' . $client->id . '/summary')
+            ->get('/health-clinical/clients/'.$client->id.'/summary')
             ->assertForbidden();
     }
 
@@ -61,6 +66,14 @@ class HealthClinicalClientSummaryAccessTest extends TestCase
         if ($role) {
             $user->roles()->syncWithoutDetaching([$role->id]);
         }
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
 
         return $user;
     }

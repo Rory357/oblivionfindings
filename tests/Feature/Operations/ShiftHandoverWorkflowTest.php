@@ -200,11 +200,11 @@ class ShiftHandoverWorkflowTest extends TestCase
 
         $this->actingAs($this->incomingStaff)
             ->patch("/operations/handovers/{$handover->id}/acknowledge")
-            ->assertForbidden();
+            ->assertNotFound();
 
         $this->actingAs($this->otherStaff)
             ->patch("/operations/handovers/{$handover->id}/acknowledge")
-            ->assertForbidden();
+            ->assertNotFound();
 
         $this->assertDatabaseHas('shift_handovers', [
             'id' => $handover->id,

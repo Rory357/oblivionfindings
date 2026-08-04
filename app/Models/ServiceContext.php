@@ -50,17 +50,31 @@ class ServiceContext extends Model
         return $this->hasMany(Shift::class);
     }
 
-    public function scopeForOrganization(Builder $query, ?int $organizationId): Builder
+    public function scopeAvailableToSite(Builder $query, ?int $siteId): Builder
     {
-        if ($organizationId === null) {
-            return $query;
-        }
+        return $this->scopeAvailableToSites(
+            $query,
+            $siteId === null ? [] : [$siteId],
+        );
+    }
 
-        return $query->where(function (Builder $query) use ($organizationId) {
-            $query->whereNull('site_id')->orWhereHas(
-                'site',
-                fn (Builder $sites) => $sites->where('tenant_id', $organizationId),
-            );
+    /**
+     * @param  array<int, int>  $siteIds
+     */
+    public function scopeAvailableToSites(Builder $query, array $siteIds): Builder
+    {
+        $siteIds = collect($siteIds)
+            ->map(fn (mixed $siteId): int => (int) $siteId)
+            ->filter(fn (int $siteId): bool => $siteId > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        return $query->where(function (Builder $query) use ($siteIds): void {
+            $query->whereNull('site_id');
+            if ($siteIds !== []) {
+                $query->orWhereIn('site_id', $siteIds);
+            }
         });
     }
 

@@ -33,7 +33,6 @@ it('posts one balanced payroll journal with allocations when a payroll run is lo
     createPayrollJournalPostingTimesheet($hr, 'EMP-PGL-002', '2026-04-04 06:00:00');
 
     $run = app(PayrollExportService::class)->createRun(
-        tenantId: 1,
         periodStart: Carbon::parse('2026-04-01')->startOfDay(),
         periodEnd: Carbon::parse('2026-04-15')->endOfDay(),
         createdBy: $hr->id,
@@ -128,7 +127,6 @@ it('pays employee net pay, clearing accrued wages against the bank (idempotently
     createPayrollJournalPostingTimesheet($hr, 'EMP-NP-002', '2026-04-04 06:00:00');
 
     $run = app(PayrollExportService::class)->createRun(
-        tenantId: 1,
         periodStart: Carbon::parse('2026-04-01')->startOfDay(),
         periodEnd: Carbon::parse('2026-04-15')->endOfDay(),
         createdBy: $hr->id,

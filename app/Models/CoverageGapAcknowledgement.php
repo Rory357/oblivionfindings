@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CoverageGapAcknowledgement extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyOrganizationStorageContext;
 
     public const STATE_ACKED = 'acked';
 
@@ -17,7 +18,6 @@ class CoverageGapAcknowledgement extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'organization_id',
         'site_id',
         'coverage_requirement_id',
         'coverage_window_key',
@@ -36,11 +36,6 @@ class CoverageGapAcknowledgement extends Model
         'created_at' => 'datetime',
         'cleared_at' => 'datetime',
     ];
-
-    public function organization(): BelongsTo
-    {
-        return $this->belongsTo(Organization::class);
-    }
 
     public function site(): BelongsTo
     {

@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\Site;
 use Database\Factories\Hr\HrApplicationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class HrApplication extends Model
 {
-    use AuditableChanges, HasFactory;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {

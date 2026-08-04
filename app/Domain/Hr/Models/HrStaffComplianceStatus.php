@@ -3,18 +3,20 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
+use Database\Factories\HrStaffComplianceStatusFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrStaffComplianceStatus extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
-        return \Database\Factories\HrStaffComplianceStatusFactory::new();
+        return HrStaffComplianceStatusFactory::new();
     }
 
     protected $table = 'hr_staff_compliance_status';
@@ -55,7 +57,7 @@ class HrStaffComplianceStatus extends Model
     protected $appends = ['evidence_url'];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function user(): BelongsTo
@@ -79,7 +81,7 @@ class HrStaffComplianceStatus extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Accessors                                                          */
+    /*  Accessors */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -102,7 +104,7 @@ class HrStaffComplianceStatus extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeExpired($query)
@@ -122,10 +124,10 @@ class HrStaffComplianceStatus extends Model
     {
         return $query->where(function ($q) {
             $q->where('status', 'non_compliant')
-              ->orWhere(function ($q2) {
-                  $q2->whereNotNull('expires_at')
-                     ->where('expires_at', '<', now());
-              });
+                ->orWhere(function ($q2) {
+                    $q2->whereNotNull('expires_at')
+                        ->where('expires_at', '<', now());
+                });
         });
     }
 }

@@ -120,6 +120,21 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
                 'permission:fleet.viewAny|assets.viewAny|assets.viewAssigned',
             ])
             ->name('operations.clients.location.history');
+        Route::get('/clients/{client}/location/privacy-status', [ClientController::class, 'locationPrivacyStatus'])
+            ->whereNumber('client')
+            ->middleware([
+                'permission:assets.telemetry.view',
+                'permission:fleet.viewAny|assets.viewAny|assets.viewAssigned',
+            ])
+            ->name('operations.clients.location.privacy-status');
+        Route::post('/clients/{client}/location/export', [ClientController::class, 'exportLocationHistory'])
+            ->whereNumber('client')
+            ->middleware([
+                'permission:assets.telemetry.view',
+                'permission:assets.telemetry.export',
+                'permission:fleet.viewAny|assets.viewAny|assets.viewAssigned',
+            ])
+            ->name('operations.clients.location.export');
         Route::post('/clients/{client}/location/locate-now', [ClientController::class, 'locateNow'])
             ->whereNumber('client')
             ->middleware('permission:fleet.manage|assets.trackers.manage')
@@ -1295,14 +1310,15 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::post('/calendar-sync/{sync}/trigger', [CalendarSyncController::class, 'triggerSync'])->name('operations.calendar_sync.trigger');
 
     // -------------------------------------------------------------------------
-    // Geofence Zones (Phase 12)
+    // Geofence compatibility routes. The canonical register is asset_geofences;
+    // these routes remain only for old bookmarks and never write geofence_zones.
     // -------------------------------------------------------------------------
 
-    Route::middleware('permission:evv.viewAny')->group(function () {
+    Route::middleware('permission:evv.viewAny|geofences.viewAny|fleet.viewAny|assets.viewAny|assets.geofences.manage')->group(function () {
         Route::get('/geofences', [GeofenceController::class, 'index'])->name('operations.geofences.index');
         Route::get('/geofences/create', [GeofenceController::class, 'create'])->name('operations.geofences.create');
         Route::post('/geofences', [GeofenceController::class, 'store'])->name('operations.geofences.store');
-        Route::put('/geofences/{zone}', [GeofenceController::class, 'update'])->name('operations.geofences.update');
-        Route::delete('/geofences/{zone}', [GeofenceController::class, 'destroy'])->name('operations.geofences.destroy');
+        Route::put('/geofences/{zone}', [GeofenceController::class, 'update'])->whereNumber('zone')->name('operations.geofences.update');
+        Route::delete('/geofences/{zone}', [GeofenceController::class, 'destroy'])->whereNumber('zone')->name('operations.geofences.destroy');
     });
 });

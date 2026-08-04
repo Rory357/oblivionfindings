@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Hr\Concerns;
 
-use App\Domain\Hr\Models\HrDocumentSignature;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrLeaveRequest;
@@ -10,7 +9,9 @@ use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPublicHoliday;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrTimeEntry;
+use App\Domain\Hr\Services\ESignatureService;
 use App\Domain\Hr\Services\FeedService;
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Domain\Hr\Services\TimeTrackingService;
 use App\Models\Shift;
 use App\Models\User;
@@ -26,30 +27,33 @@ use Illuminate\Support\Str;
  */
 trait BuildsMyHrShell
 {
-    protected function myHrShellProps(User $user, int $tenantId): array
+    protected function myHrShellProps(User $user): array
     {
-        $profile = HrEmployeeProfile::where('tenant_id', $tenantId)
+        $profile = HrEmployeeProfile::query()
             ->where('user_id', $user->id)
+            ->active()
+            ->where(fn ($dates) => $dates->whereNull('start_date')->orWhereDate('start_date', '<=', today()))
+            ->where(fn ($dates) => $dates->whereNull('end_date')->orWhereDate('end_date', '>=', today()))
             ->with(['user:id,name,email,profile_photo_path', 'primarySite:id,name'])
             ->first();
 
         // ── Live clock (shared AttendanceService path; never a new endpoint) ──
-        $activeClock = HrTimeEntry::forTenant($tenantId)
+        $activeClock = HrTimeEntry::query()
             ->forUser($user->id)
             ->active()
             ->first(['id', 'clock_in', 'notes']);
 
-        $todayTotal = (float) HrTimeEntry::forTenant($tenantId)
+        $todayTotal = (float) HrTimeEntry::query()
             ->forUser($user->id)
             ->where('entry_date', now()->toDateString())
             ->whereNotNull('clock_out')
             ->sum('total_hours');
 
-        $weekly = app(TimeTrackingService::class)->getWeeklySummary($tenantId, $user->id);
+        $weekly = app(TimeTrackingService::class)->getWeeklySummary($user->id);
 
         // ── Next upcoming shift (read-only from Operations) ──
         $nextShift = Shift::where('user_id', $user->id)
-            ->visibleToFrontline($user->organization_id)
+            ->visibleToFrontline()
             ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
             ->where('starts_at', '>=', now())
             ->orderBy('starts_at')
@@ -57,49 +61,44 @@ trait BuildsMyHrShell
             ->first(['id', 'starts_at', 'ends_at', 'location', 'service_context_id']);
 
         // ── "Needs attention" counts (drive hero badges + tab count badges) ──
-        $pendingLeave = HrLeaveRequest::where('tenant_id', $tenantId)
+        $pendingLeave = HrLeaveRequest::query()
             ->where('user_id', $user->id)
             ->where('status', 'pending')
             ->count();
 
-        $docsToSign = HrDocumentSignature::forSigner($user->id)
-            ->pending()
-            ->count();
+        $docsToSign = app(ESignatureService::class)->getPendingForUser($user)->count();
 
         $policiesDue = HrPolicy::active()
-            ->where('tenant_id', $tenantId)
             ->where('requires_attestation', true)
             ->whereDoesntHave('attestations', fn ($q) => $q->where('user_id', $user->id))
             ->count();
 
-        $onesToAck = HrSupervisionNote::forTenant($tenantId)
-            ->forEmployee($user->id)
+        $onesToAck = HrSupervisionNote::forEmployee($user->id)
             ->where('is_visible_to_employee', true)
             ->where(fn ($q) => $q->whereNull('employee_acknowledged')->orWhere('employee_acknowledged', false))
             ->count();
 
-        $kudosThisMonth = HrKudos::where('tenant_id', $tenantId)
+        $kudosThisMonth = HrKudos::query()
             ->where('to_user_id', $user->id)
             ->where('created_at', '>=', now()->startOfMonth())
             ->count();
 
         // Teammate directory for the "Send kudos" wizard (hosted in the shell,
         // so it must be available on every page). Small list for a care org.
-        $teammates = HrEmployeeProfile::where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->whereNotNull('user_id')
-            ->where('user_id', '!=', $user->id)
-            ->with(['user:id,name', 'primarySite:id,name'])
-            ->orderBy('position_title')
+        $teammates = app(HrCurrentStaffService::class)
+            ->currentUsersQuery()
+            ->whereKeyNot($user->id)
+            ->with(['hrEmployeeProfile.primarySite:id,name'])
+            ->orderBy('name')
             ->limit(150)
             ->get()
-            ->map(fn (HrEmployeeProfile $p) => $p->user?->name ? [
-                'id' => $p->user_id,
-                'name' => $p->user->name,
-                'initials' => $this->myHrInitials($p->user->name),
-                'role' => $p->position_title,
-                'site' => $p->primarySite?->name,
-            ] : null)
+            ->map(fn (User $teammate) => [
+                'id' => $teammate->id,
+                'name' => $teammate->name,
+                'initials' => $this->myHrInitials($teammate->name),
+                'role' => $teammate->hrEmployeeProfile?->position_title,
+                'site' => $teammate->hrEmployeeProfile?->primarySite?->name,
+            ])
             ->filter()
             ->values()
             ->all();
@@ -143,13 +142,13 @@ trait BuildsMyHrShell
                 'onesToAck' => $onesToAck,
                 'kudosThisMonth' => $kudosThisMonth,
             ],
-            'calendar' => $this->myHrCalendarFeed($user, $tenantId, now()),
+            'calendar' => $this->myHrCalendarFeed($user, now()),
         ];
     }
 
     /**
      * A month of hero-footer calendar events for the viewing employee — their
-     * rostered shifts, approved leave, and the tenant's NZ public holidays.
+     * rostered shifts, approved leave, and the application's NZ public holidays.
      * The window spans the visible 6-week (Monday-first) grid so the leading /
      * trailing days of adjacent months carry their dots too. Reused verbatim by
      * the `GET /hr/my/calendar?month=YYYY-MM` paging endpoint, so a month-nav in
@@ -157,7 +156,7 @@ trait BuildsMyHrShell
      *
      * @return array{month: string, events: array<string, list<array<string, mixed>>>}
      */
-    protected function myHrCalendarFeed(User $user, int $tenantId, CarbonInterface $anchor): array
+    protected function myHrCalendarFeed(User $user, CarbonInterface $anchor): array
     {
         $month = $anchor->copy()->startOfMonth();
         $gridStart = $month->copy()->startOfWeek(CarbonInterface::MONDAY)->startOfDay();
@@ -171,7 +170,7 @@ trait BuildsMyHrShell
 
         // ── Rostered shifts (read-only from Operations) ──
         Shift::where('user_id', $user->id)
-            ->visibleToFrontline($user->organization_id)
+            ->visibleToFrontline()
             ->where('status', '!=', 'cancelled')
             ->whereBetween('starts_at', [$gridStart, $gridEnd])
             ->orderBy('starts_at')
@@ -191,7 +190,7 @@ trait BuildsMyHrShell
             });
 
         // ── Approved leave (expanded across each covered day) ──
-        HrLeaveRequest::forTenant($tenantId)
+        HrLeaveRequest::query()
             ->where('user_id', $user->id)
             ->approved()
             ->where('starts_at', '<=', $gridEnd)
@@ -216,9 +215,8 @@ trait BuildsMyHrShell
                 }
             });
 
-        // ── NZ public holidays (national + this tenant's regional set) ──
+        // ── NZ public holidays (the application catalogue) ──
         HrPublicHoliday::query()
-            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId))
             ->whereBetween('date', [$gridStart->toDateString(), $gridEnd->toDateString()])
             ->orderBy('date')
             ->get(['id', 'name', 'date'])

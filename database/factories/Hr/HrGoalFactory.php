@@ -13,10 +13,9 @@ class HrGoalFactory extends Factory
     public function definition(): array
     {
         $startDate = fake()->dateTimeBetween('-1 month', '+1 month');
-        $dueDate = (clone $startDate)->modify('+' . fake()->numberBetween(30, 180) . ' days');
+        $dueDate = (clone $startDate)->modify('+'.fake()->numberBetween(30, 180).' days');
 
         return [
-            'tenant_id' => 1,
             'user_id' => User::factory(),
             'title' => fake()->sentence(5),
             'goal_type' => fake()->randomElement(['individual', 'team', 'company']),

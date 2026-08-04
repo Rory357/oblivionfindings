@@ -3,15 +3,18 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExitInterview;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
 
 function makeImmutableExitInterview(User $manager): HrExitInterview
 {
-    $employee = User::factory()->create();
+    $employee = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
     $profile = HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $employee->id,
         'employee_number' => 'EXIT-LOCK-'.$employee->id,
         'work_email' => $employee->email,
@@ -20,10 +23,10 @@ function makeImmutableExitInterview(User $manager): HrExitInterview
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => Site::query()->firstOrFail()->id,
     ]);
 
     return HrExitInterview::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'interviewer_user_id' => $manager->id,
         'interview_date' => now()->toDateString(),
@@ -42,6 +45,13 @@ beforeEach(function () {
     $this->hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
+    ]);
+    $this->site = Site::factory()->create(['name' => 'Immutable Exit Interview Site']);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+        'start_date' => today()->subYear(),
     ]);
 });
 

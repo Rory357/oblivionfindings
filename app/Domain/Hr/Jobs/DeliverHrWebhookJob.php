@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Jobs;
 
 use App\Domain\Hr\Models\HrWebhookDelivery;
 use App\Domain\Hr\Models\HrWebhookEndpoint;
+use App\Domain\Hr\Services\HrWebhookHeaderPolicy;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -17,7 +18,7 @@ class DeliverHrWebhookJob implements ShouldQueue
 
     public function __construct(public int $deliveryId) {}
 
-    public function handle(): void
+    public function handle(HrWebhookHeaderPolicy $headerPolicy): void
     {
         $delivery = HrWebhookDelivery::query()->with('endpoint')->find($this->deliveryId);
         if (! $delivery) {
@@ -51,7 +52,6 @@ class DeliverHrWebhookJob implements ShouldQueue
             'id' => $delivery->event_uuid,
             'type' => $delivery->event_type,
             'occurred_at' => optional($delivery->created_at)->toIso8601String(),
-            'tenant_id' => $delivery->tenant_id,
             'data' => $delivery->payload ?? [],
         ];
 
@@ -67,9 +67,7 @@ class DeliverHrWebhookJob implements ShouldQueue
             'Accept' => 'application/json',
         ];
 
-        $customHeaders = collect($endpoint->headers ?? [])
-            ->filter(fn ($value, $key) => is_string($key) && is_string($value) && $key !== '')
-            ->all();
+        $customHeaders = $headerPolicy->safeForDelivery($endpoint->headers);
 
         $headers = array_merge($headers, $customHeaders);
 
@@ -78,18 +76,13 @@ class DeliverHrWebhookJob implements ShouldQueue
                 ->withHeaders($headers)
                 ->post($endpoint->target_url, $body);
 
-            $responseBody = $response->body();
-            $responseBody = is_string($responseBody)
-                ? mb_substr($responseBody, 0, 4000)
-                : null;
-
             if ($response->successful()) {
                 $delivery->update([
                     'status' => HrWebhookDelivery::STATUS_SUCCESS,
                     'delivered_at' => now(),
                     'failed_at' => null,
                     'response_code' => $response->status(),
-                    'response_body' => $responseBody,
+                    'response_body' => null,
                     'error_message' => null,
                 ]);
 
@@ -102,9 +95,22 @@ class DeliverHrWebhookJob implements ShouldQueue
                 return;
             }
 
-            $this->markFailure($delivery, $endpoint, $attempt, sprintf('HTTP %s: %s', $response->status(), $responseBody ?? 'No response body'), $response->status(), $responseBody);
+            $this->markFailure(
+                $delivery,
+                $endpoint,
+                $attempt,
+                "Webhook endpoint returned HTTP {$response->status()}.",
+                $response->status(),
+            );
         } catch (\Throwable $exception) {
-            $this->markFailure($delivery, $endpoint, $attempt, $exception->getMessage(), null, null);
+            report($exception);
+            $this->markFailure(
+                $delivery,
+                $endpoint,
+                $attempt,
+                'Webhook delivery failed before a response was received.',
+                null,
+            );
         }
 
         if ($attempt < (int) $delivery->max_attempts) {
@@ -118,7 +124,6 @@ class DeliverHrWebhookJob implements ShouldQueue
         int $attempt,
         string $error,
         ?int $responseCode,
-        ?string $responseBody
     ): void {
         $isFinal = $attempt >= (int) $delivery->max_attempts;
 
@@ -126,7 +131,7 @@ class DeliverHrWebhookJob implements ShouldQueue
             'status' => $isFinal ? HrWebhookDelivery::STATUS_FAILED : HrWebhookDelivery::STATUS_RETRYING,
             'failed_at' => $isFinal ? now() : null,
             'response_code' => $responseCode,
-            'response_body' => $responseBody,
+            'response_body' => null,
             'error_message' => mb_substr($error, 0, 2000),
         ]);
 

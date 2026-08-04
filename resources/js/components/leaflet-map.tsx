@@ -67,20 +67,68 @@ const SATELLITE_TILE_URL =
 const SATELLITE_TILE_ATTRIBUTION =
     '&copy; <a href="https://www.esri.com/">Esri</a>, Earthstar Geographics';
 
-// ── Marker styling helpers ──────────────────────────────────────────────────
+// ── Marker styling and safe HTML helpers ────────────────────────────────────
 
-function getMarkerColor(marker: MapMarker): string {
-    // 1. Explicit per-marker override always wins.
-    if (marker.color) return marker.color;
-    // 2. Type-based defaults are themable via CSS tokens.
+export function escapeMapHtml(value: string | number): string {
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function safeMarkerColor(value?: string): string | null {
+    const color = value?.trim();
+    if (!color) return null;
+
+    if (/^#[0-9a-f]{3,8}$/i.test(color)) return color;
+    if (/^(?:rgb|rgba|hsl|hsla)\([-0-9.,%\s]+\)$/i.test(color)) return color;
+    if (/^var\(--[a-z0-9_-]+(?:,\s*#[0-9a-f]{3,8})?\)$/i.test(color)) {
+        return color;
+    }
+    if (/^[a-z]+$/i.test(color) && !/^(?:url|expression)$/i.test(color)) {
+        return color;
+    }
+
+    return null;
+}
+
+export function getMapMarkerColor(marker: MapMarker): string {
+    const explicitColor = safeMarkerColor(marker.color);
+    if (explicitColor) return explicitColor;
+
+    // State takes precedence over asset type so an offline Asset is never
+    // presented with an ordinary category colour.
+    if (marker.status === 'moving' || marker.status === 'historical') {
+        return '#3b82f6';
+    }
+    if (marker.status === 'online' || marker.status === 'active') {
+        return '#22c55e';
+    }
+    if (marker.status === 'offline' || marker.status === 'lost') {
+        return '#ef4444';
+    }
+    if (marker.status === 'idle' || marker.status === 'maintenance') {
+        return '#eab308';
+    }
+    if (marker.status === 'degraded') return '#f59e0b';
+    if (marker.status === 'decommissioned') return '#64748b';
+    if (marker.status === 'in_stock') return '#6366f1';
+
     if (marker.type === 'house') return 'var(--map-marker-house, #8b5cf6)';
     if (marker.type === 'asset') return 'var(--map-marker-asset, #f59e0b)';
-    // 3. Status-based colours stay semantic — green=online, red=offline, etc.
-    if (marker.status === 'moving') return '#3b82f6'; // blue
-    if (marker.status === 'online') return '#22c55e'; // green
-    if (marker.status === 'offline') return '#ef4444'; // red
-    if (marker.status === 'idle') return '#eab308'; // yellow
-    return '#3b82f6'; // blue default
+
+    return '#3b82f6';
+}
+
+export function mapMarkerPopupHtml(marker: MapMarker): string {
+    const title = escapeMapHtml(marker.title ?? '');
+    const popup = marker.popup
+        ? `<div class="text-xs text-muted-foreground mt-1">${escapeMapHtml(marker.popup)}</div>`
+        : '';
+
+    return `<div class="text-sm font-medium">${title}</div>${popup}`;
 }
 
 const CAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>`;
@@ -89,13 +137,16 @@ function createVehicleDivIcon(
     leaflet: typeof import('leaflet'),
     marker: MapMarker,
 ) {
-    const color = getMarkerColor(marker);
-    const rotation = marker.heading ?? 0;
+    const color = getMapMarkerColor(marker);
+    const rotation = Number.isFinite(marker.heading) ? marker.heading : 0;
     const isMoving = marker.status === 'moving';
-    const label = marker.title ?? '';
+    const label = escapeMapHtml(marker.title ?? '');
+    const speed = Number.isFinite(marker.speed)
+        ? Math.max(0, marker.speed ?? 0)
+        : null;
     const speedBadge =
-        isMoving && marker.speed != null
-            ? `<div style="position:absolute;top:-8px;right:-8px;background:#3b82f6;color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:8px;white-space:nowrap;">${marker.speed} km/h</div>`
+        isMoving && speed != null
+            ? `<div style="position:absolute;top:-8px;right:-8px;background:#3b82f6;color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:8px;white-space:nowrap;">${speed} km/h</div>`
             : '';
     const pulse = isMoving
         ? `<div style="position:absolute;inset:-6px;border-radius:50%;border:2px solid ${color};animation:leaflet-pulse 1.5s ease-out infinite;"></div>`
@@ -125,7 +176,7 @@ function createDefaultDivIcon(
     leaflet: typeof import('leaflet'),
     marker: MapMarker,
 ) {
-    const color = getMarkerColor(marker);
+    const color = getMapMarkerColor(marker);
     const icons: Record<string, string> = {
         house: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
         asset: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>',
@@ -133,7 +184,7 @@ function createDefaultDivIcon(
     const svgIcon =
         icons[marker.type ?? ''] ??
         '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
-    const rotation = marker.heading ?? 0;
+    const rotation = Number.isFinite(marker.heading) ? marker.heading : 0;
 
     return leaflet.divIcon({
         className: 'leaflet-marker-custom',
@@ -374,24 +425,19 @@ export default function LeafletMap({
                     const icon = createDivIcon(L!, m);
                     const leafletMarker = L!.marker([m.lat, m.lng], { icon });
                     if (m.popup || m.title) {
-                        leafletMarker.bindPopup(
-                            `<div class="text-sm font-medium">${m.title ?? ''}</div>${m.popup ? `<div class="text-xs text-muted-foreground mt-1">${m.popup}</div>` : ''}`,
-                        );
+                        leafletMarker.bindPopup(mapMarkerPopupHtml(m));
                     }
                     if (onMarkerClick)
-                        leafletMarker.on('click', () =>
-                            onMarkerClick(m.id),
-                        );
+                        leafletMarker.on('click', () => onMarkerClick(m.id));
                     markersLayerRef.current.addLayer(leafletMarker);
                 } else {
                     const clusterIcon = createClusterIcon(
                         L!,
                         group.markers.length,
                     );
-                    const clusterMarker = L!.marker(
-                        [group.lat, group.lng],
-                        { icon: clusterIcon },
-                    );
+                    const clusterMarker = L!.marker([group.lat, group.lng], {
+                        icon: clusterIcon,
+                    });
                     clusterMarker.on('click', () => {
                         const bounds = L!.latLngBounds(
                             group.markers.map(
@@ -409,9 +455,7 @@ export default function LeafletMap({
                 const leafletMarker = L!.marker([m.lat, m.lng], { icon });
 
                 if (m.popup || m.title) {
-                    leafletMarker.bindPopup(
-                        `<div class="text-sm font-medium">${m.title ?? ''}</div>${m.popup ? `<div class="text-xs text-muted-foreground mt-1">${m.popup}</div>` : ''}`,
-                    );
+                    leafletMarker.bindPopup(mapMarkerPopupHtml(m));
                 }
 
                 if (onMarkerClick)
@@ -501,7 +545,7 @@ export default function LeafletMap({
                     fillOpacity: 0.1,
                     weight: 2,
                 });
-                if (gf.name) circle.bindPopup(gf.name);
+                if (gf.name) circle.bindPopup(escapeMapHtml(gf.name));
                 geofenceLayerRef.current.addLayer(circle);
             } else if (gf.type === 'polygon' && gf.coordinates?.length) {
                 const polygon = L!.polygon(
@@ -510,7 +554,7 @@ export default function LeafletMap({
                     ),
                     { color, fillColor: color, fillOpacity: 0.1, weight: 2 },
                 );
-                if (gf.name) polygon.bindPopup(gf.name);
+                if (gf.name) polygon.bindPopup(escapeMapHtml(gf.name));
                 geofenceLayerRef.current.addLayer(polygon);
             }
         });

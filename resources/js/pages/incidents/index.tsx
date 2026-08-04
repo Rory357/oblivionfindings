@@ -624,7 +624,7 @@ export default function IncidentsIndex({
                             <HeroMedallion icon={AlertTriangle} />
                             <div className="flex flex-col gap-1.5">
                                 <HeroStatusPill>
-                                    Incident register · synced just now
+                                    Incident register · operational worklist
                                 </HeroStatusPill>
                                 <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">
                                     Incidents

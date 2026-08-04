@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,12 +11,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CustomForm extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     protected $table = 'custom_forms';
 
     protected $fillable = [
-        'organization_id',
         'name',
         'description',
         'form_type',

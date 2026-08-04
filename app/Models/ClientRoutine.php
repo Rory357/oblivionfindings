@@ -4,14 +4,14 @@ namespace App\Models;
 
 use App\Contracts\Timeline\EmitsToTimeline;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClientRoutine extends Model implements EmitsToTimeline
 {
-    use AuditableChanges;
-    use SoftDeletes;
+    use AuditableChanges, SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     public const BLOCKS = [
         'morning' => 10,
@@ -27,7 +27,6 @@ class ClientRoutine extends Model implements EmitsToTimeline
 
     protected $fillable = [
         'client_id',
-        'organization_id',
         'time_block',
         'body',
         'display_order',

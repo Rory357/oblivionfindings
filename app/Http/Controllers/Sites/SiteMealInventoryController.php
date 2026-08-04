@@ -18,6 +18,8 @@ class SiteMealInventoryController extends Controller
 
     public function index(Site $site)
     {
+        $this->authorize('view', $site);
+
         $items = SiteMealInventoryItem::query()
             ->where('site_id', $site->id)
             ->with('product:id,name,category,default_unit,pack_size,pack_unit,cost_per_unit_cents,currency')
@@ -36,6 +38,7 @@ class SiteMealInventoryController extends Controller
 
     public function storeItem(Request $request, Site $site)
     {
+        $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.inventory.adjust'), 403);
 
         $data = $request->validate([
@@ -50,7 +53,6 @@ class SiteMealInventoryController extends Controller
         $item = SiteMealInventoryItem::firstOrCreate(
             ['site_id' => $site->id, 'product_id' => $data['product_id']],
             [
-                'tenant_id' => $site->tenant_id ?? auth()->user()?->tenant_id,
                 'unit' => $data['unit'],
                 'current_qty' => 0,
             ]
@@ -77,6 +79,7 @@ class SiteMealInventoryController extends Controller
 
     public function updateItem(Request $request, Site $site, SiteMealInventoryItem $item)
     {
+        $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.inventory.adjust'), 403);
         abort_unless($item->site_id === $site->id, 404);
 
@@ -94,6 +97,7 @@ class SiteMealInventoryController extends Controller
 
     public function destroyItem(Request $request, Site $site, SiteMealInventoryItem $item)
     {
+        $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.inventory.adjust'), 403);
         abort_unless($item->site_id === $site->id, 404);
         $item->delete();
@@ -102,6 +106,7 @@ class SiteMealInventoryController extends Controller
 
     public function adjust(Request $request, Site $site)
     {
+        $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.inventory.adjust'), 403);
 
         $data = $request->validate([
@@ -126,6 +131,7 @@ class SiteMealInventoryController extends Controller
 
     public function stocktake(Request $request, Site $site)
     {
+        $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.inventory.adjust'), 403);
 
         $data = $request->validate([
@@ -151,6 +157,8 @@ class SiteMealInventoryController extends Controller
 
     public function movements(Request $request, Site $site)
     {
+        $this->authorize('view', $site);
+
         $query = SiteMealInventoryMovement::query()
             ->where('site_id', $site->id)
             ->with(['product:id,name', 'performedBy:id,name'])

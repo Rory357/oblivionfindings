@@ -4,10 +4,13 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrDocumentSignature;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Notifications\SignatureOutcomeNotification;
 use App\Domain\Hr\Notifications\SignatureReminderNotification;
 use App\Domain\Hr\Notifications\SignatureRequestedNotification;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +22,9 @@ class ESignatureService
 {
     public function __construct(
         private readonly HrDocumentMergeService $mergeService,
+        private readonly HrDocumentAccessService $documentAccess,
+        private readonly HrCurrentStaffService $currentStaff,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     /**
@@ -26,18 +32,29 @@ class ESignatureService
      */
     public function requestSignature(HrDocument $document, int $signerUserId, int $requestedBy): HrDocumentSignature
     {
-        $this->assertRequestParticipantsInTenant($document, [$signerUserId, $requestedBy]);
+        try {
+            return DB::transaction(function () use ($document, $signerUserId, $requestedBy) {
+                $lockedDocument = HrDocument::query()
+                    ->lockForUpdate()
+                    ->findOrFail($document->getKey());
+                $this->assertRequestParticipantsAvailable($lockedDocument, [$signerUserId], $requestedBy);
+                $this->assertNoActiveRequests($lockedDocument, [$signerUserId]);
 
-        return DB::transaction(function () use ($document, $signerUserId, $requestedBy) {
-            return HrDocumentSignature::create([
-                'tenant_id' => $document->tenant_id,
-                'document_id' => $document->id,
-                'signer_user_id' => $signerUserId,
-                'status' => 'pending',
-                'requested_by' => $requestedBy,
-                'requested_at' => now(),
-            ]);
-        });
+                return HrDocumentSignature::create([
+                    'document_id' => $lockedDocument->id,
+                    'signer_user_id' => $signerUserId,
+                    'status' => 'pending',
+                    'requested_by' => $requestedBy,
+                    'requested_at' => now(),
+                ]);
+            }, attempts: 1);
+        } catch (QueryException $exception) {
+            if ($this->hasActiveRequests($document, [$signerUserId])) {
+                throw new \LogicException('A selected signer already has an active request for this document.');
+            }
+
+            throw $exception;
+        }
     }
 
     /**
@@ -53,24 +70,29 @@ class ESignatureService
      */
     public function sign(HrDocumentSignature $signature, string $signatureData, Request $request): HrDocumentSignature
     {
-        if ($signature->status !== 'pending') {
-            throw new \LogicException("Cannot sign a '{$signature->status}' signature request.");
-        }
+        $signatureData = $this->normalizeSignatureData($signatureData);
 
         $fresh = DB::transaction(function () use ($signature, $signatureData, $request) {
-            $signature->update([
+            $locked = HrDocumentSignature::query()
+                ->lockForUpdate()
+                ->findOrFail($signature->getKey());
+            if ($locked->status !== 'pending') {
+                throw new \LogicException("Cannot sign a '{$locked->status}' signature request.");
+            }
+
+            $locked->update([
                 'signature_data' => $signatureData,
                 'signed_at' => now(),
                 'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
+                'user_agent' => Str::limit((string) $request->userAgent(), 255, ''),
                 'status' => 'signed',
             ]);
 
-            $fresh = $signature->fresh();
+            $fresh = $locked->fresh();
             $this->finaliseIfComplete($fresh->document);
 
             return $fresh;
-        });
+        }, attempts: 1);
 
         $this->notifyRequesterOutcome($fresh, 'signed');
 
@@ -84,18 +106,21 @@ class ESignatureService
      */
     public function decline(HrDocumentSignature $signature, string $reason): HrDocumentSignature
     {
-        if ($signature->status !== 'pending') {
-            throw new \LogicException("Cannot decline a '{$signature->status}' signature request.");
-        }
-
         $fresh = DB::transaction(function () use ($signature, $reason) {
-            $signature->update([
+            $locked = HrDocumentSignature::query()
+                ->lockForUpdate()
+                ->findOrFail($signature->getKey());
+            if ($locked->status !== 'pending') {
+                throw new \LogicException("Cannot decline a '{$locked->status}' signature request.");
+            }
+
+            $locked->update([
                 'status' => 'declined',
                 'declined_reason' => $reason,
             ]);
 
-            return $signature->fresh();
-        });
+            return $locked->fresh();
+        }, attempts: 1);
 
         $this->notifyRequesterOutcome($fresh, 'declined');
 
@@ -111,35 +136,48 @@ class ESignatureService
      */
     public function bulkRequestSignatures(HrDocument $document, array $userIds, int $requestedBy, array $options = []): array
     {
-        $this->assertRequestParticipantsInTenant($document, [...$userIds, $requestedBy]);
-
-        $signatures = [];
+        $userIds = collect($userIds)->map(fn (mixed $id): int => (int) $id)->values()->all();
         $order = ($options['order'] ?? 'parallel') === 'sequential' ? 'sequential' : 'parallel';
         $dueAt = $options['due_at'] ?? null;
         $message = $options['message'] ?? null;
 
-        DB::transaction(function () use ($document, $userIds, $requestedBy, $order, $dueAt, $message, &$signatures) {
-            $index = 0;
-            foreach ($userIds as $userId) {
-                $signatures[] = HrDocumentSignature::create([
-                    'tenant_id' => $document->tenant_id,
-                    'document_id' => $document->id,
-                    'signer_user_id' => $userId,
-                    'status' => 'pending',
-                    'signing_order' => $order,
-                    'order_index' => $index++,
-                    'requested_by' => $requestedBy,
-                    'requested_at' => now(),
-                    'due_at' => $dueAt,
-                    'message' => $message,
+        try {
+            $signatures = DB::transaction(function () use ($document, $userIds, $requestedBy, $order, $dueAt, $message): array {
+                $lockedDocument = HrDocument::query()
+                    ->lockForUpdate()
+                    ->findOrFail($document->getKey());
+                $this->assertRequestParticipantsAvailable($lockedDocument, $userIds, $requestedBy);
+                $this->assertNoActiveRequests($lockedDocument, $userIds);
+
+                $signatures = [];
+                foreach ($userIds as $index => $userId) {
+                    $signatures[] = HrDocumentSignature::create([
+                        'document_id' => $lockedDocument->id,
+                        'signer_user_id' => $userId,
+                        'status' => 'pending',
+                        'signing_order' => $order,
+                        'order_index' => $index,
+                        'requested_by' => $requestedBy,
+                        'requested_at' => now(),
+                        'due_at' => $dueAt,
+                        'message' => $message,
+                    ]);
+                }
+
+                $lockedDocument->update([
+                    'sent_to_employee' => true,
+                    'sent_at' => now(),
                 ]);
+
+                return $signatures;
+            }, attempts: 1);
+        } catch (QueryException $exception) {
+            if ($this->hasActiveRequests($document, $userIds)) {
+                throw new \LogicException('A selected signer already has an active request for this document.');
             }
 
-            $document->update([
-                'sent_to_employee' => true,
-                'sent_at' => now(),
-            ]);
-        });
+            throw $exception;
+        }
 
         // After commit: tell each signer a document is waiting for them.
         // Best-effort — a notification hiccup never rolls back the requests.
@@ -173,46 +211,195 @@ class ESignatureService
         return $signatures;
     }
 
+    /** @param  list<int>  $userIds */
+    private function assertNoActiveRequests(HrDocument $document, array $userIds): void
+    {
+        if ($this->hasActiveRequests($document, $userIds)) {
+            throw new \LogicException('A selected signer already has an active request for this document.');
+        }
+    }
+
+    /** @param  list<int>  $userIds */
+    private function hasActiveRequests(HrDocument $document, array $userIds): bool
+    {
+        return HrDocumentSignature::query()
+            ->where('document_id', $document->getKey())
+            ->whereIn('signer_user_id', $userIds)
+            ->where('status', '!=', 'cancelled')
+            ->exists();
+    }
+
+    private function normalizeSignatureData(string $signatureData): string
+    {
+        $signatureData = trim($signatureData);
+        if ($signatureData === '') {
+            throw new \LogicException('The signature is empty.');
+        }
+
+        $prefix = 'data:image/png;base64,';
+        if (str_starts_with($signatureData, 'data:')) {
+            if (! str_starts_with($signatureData, $prefix)) {
+                throw new \LogicException('Only a PNG signature image is accepted.');
+            }
+
+            $decoded = base64_decode(substr($signatureData, strlen($prefix)), true);
+            if ($decoded === false
+                || strlen($decoded) > 350_000
+                || ! str_starts_with($decoded, "\x89PNG\r\n\x1a\n")) {
+                throw new \LogicException('The signature image is invalid or too large.');
+            }
+
+            return $signatureData;
+        }
+
+        if (Str::length($signatureData) > 200
+            || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $signatureData) === 1) {
+            throw new \LogicException('The typed signature is invalid or too long.');
+        }
+
+        return $signatureData;
+    }
+
     /**
      * @param  list<int>  $userIds
      */
-    private function assertRequestParticipantsInTenant(HrDocument $document, array $userIds): void
-    {
+    public function assertRequestParticipantsAvailable(
+        HrDocument $document,
+        array $userIds,
+        int $requestedBy,
+    ): void {
         $participantIds = collect($userIds)
             ->map(fn ($id) => (int) $id)
             ->unique()
             ->values();
-        $sameTenantCount = User::query()
+        if ($participantIds->count() !== count($userIds)) {
+            throw new \LogicException('Signature request participants are not available.');
+        }
+
+        $requester = User::query()->find($requestedBy);
+        $profile = HrEmployeeProfile::withTrashed()->find($document->employee_profile_id);
+        if (! $requester || ! $this->currentStaff->isCurrent($requester) || ! $profile) {
+            throw new \LogicException('Signature request participants are not available.');
+        }
+
+        $profileSiteIds = collect([
+            $profile->primary_site_id,
+            ...(array) ($profile->secondary_site_ids ?? []),
+        ])
+            ->filter(fn ($siteId) => is_numeric($siteId) && (int) $siteId > 0)
+            ->map(fn ($siteId) => (int) $siteId)
+            ->unique()
+            ->values();
+        $allowedSiteIds = $profileSiteIds
+            ->intersect($this->siteAccess->accessibleSiteIds($requester))
+            ->values()
+            ->all();
+        if ($allowedSiteIds === []) {
+            throw new \LogicException('Signature request participants are not available.');
+        }
+
+        $availableCount = $this->siteAccess
+            ->applyStaffScope(User::query(), $requester)
             ->whereIn('id', $participantIds->all())
-            ->where('organization_id', $document->tenant_id)
+            ->whereHas('hrEmployeeProfile', function ($query) use ($allowedSiteIds): void {
+                $query->where(function ($sites) use ($allowedSiteIds): void {
+                    $sites->whereIn('primary_site_id', $allowedSiteIds);
+                    foreach ($allowedSiteIds as $siteId) {
+                        $sites->orWhereJsonContains('secondary_site_ids', $siteId);
+                    }
+                });
+            })
             ->count();
 
-        if ($sameTenantCount !== $participantIds->count()) {
-            throw new \LogicException('Signature request participants must belong to the same organisation as the document.');
+        if ($availableCount !== $participantIds->count()) {
+            throw new \LogicException('Signature request participants are not available.');
+        }
+    }
+
+    public function participantIsAvailable(
+        HrDocument $document,
+        int $signerUserId,
+        User $requester,
+    ): bool {
+        try {
+            $this->assertRequestParticipantsAvailable($document, [$signerUserId], (int) $requester->id);
+
+            return true;
+        } catch (\LogicException) {
+            return false;
         }
     }
 
     /**
      * Get all pending signature requests for a user (signer side).
      */
-    public function getPendingForUser(int $userId, int $tenantId): Collection
+    public function getPendingForUser(User $user): Collection
     {
-        return HrDocumentSignature::forSigner($userId)
-            ->forTenant($tenantId)
+        if (! $this->currentStaff->isCurrent($user)) {
+            return collect();
+        }
+
+        $documentIds = $this->documentAccess
+            ->applySiteDocumentScope(HrDocument::query()->select('hr_documents.id'), $user);
+
+        $signatures = HrDocumentSignature::forSigner($user->id)
+            ->whereIn('document_id', $documentIds)
             ->pending()
             ->with(['document', 'requestedBy:id,name'])
             ->orderByDesc('requested_at')
             ->get();
+
+        return $this->concealUnavailableRequesters($signatures, $user);
+    }
+
+    /**
+     * Keep the signature request actionable while suppressing requester names
+     * that are outside the viewer's canonical historical Site boundary.
+     *
+     * @param  Collection<int, HrDocumentSignature>  $signatures
+     * @return Collection<int, HrDocumentSignature>
+     */
+    public function concealUnavailableRequesters(Collection $signatures, User $viewer): Collection
+    {
+        $requesterIds = $signatures
+            ->pluck('requested_by')
+            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        if ($requesterIds->isEmpty()) {
+            return $signatures;
+        }
+
+        $visibleRequesterIds = $this->siteAccess
+            ->applyHistoricalStaffSiteScope(User::query(), $viewer)
+            ->whereIn('users.id', $requesterIds->all())
+            ->pluck('users.id')
+            ->map(fn ($id) => (int) $id)
+            ->flip();
+
+        $signatures->each(function (HrDocumentSignature $signature) use ($visibleRequesterIds): void {
+            if (! $visibleRequesterIds->has((int) $signature->requested_by)) {
+                $signature->setRelation('requestedBy', null);
+            }
+        });
+
+        return $signatures;
     }
 
     private function notifyRequesterOutcome(HrDocumentSignature $signature, string $outcome): void
     {
-        $signature->loadMissing(['document', 'signer:id,name', 'requestedBy:id,name,organization_id']);
+        $signature->loadMissing(['document', 'signer:id,name', 'requestedBy:id,name']);
         $requester = $signature->requestedBy;
 
         if (! $requester
             || $requester->id === $signature->signer_user_id
-            || (int) $requester->organization_id !== (int) $signature->tenant_id) {
+            || ! $this->currentStaff->isCurrent($requester)
+            || ! $signature->document
+            || ! $this->documentAccess
+                ->applySiteDocumentScope(HrDocument::query(), $requester)
+                ->whereKey($signature->document->getKey())
+                ->exists()) {
             return;
         }
 
@@ -240,11 +427,18 @@ class ESignatureService
      */
     public function nudge(HrDocumentSignature $signature): void
     {
-        if ($signature->status !== 'pending') {
-            return;
-        }
+        $signature = DB::transaction(function () use ($signature): HrDocumentSignature {
+            $locked = HrDocumentSignature::query()
+                ->lockForUpdate()
+                ->findOrFail($signature->getKey());
+            if ($locked->status !== 'pending') {
+                throw new \LogicException("Cannot nudge a '{$locked->status}' signature request.");
+            }
 
-        $signature->update(['reminder_sent_at' => now()]);
+            $locked->update(['reminder_sent_at' => now()]);
+
+            return $locked->fresh();
+        }, attempts: 1);
 
         // Actually deliver the reminder. Previously nudge() only stamped the
         // timestamp, so the controller's "Reminder sent to signer" flash was a
@@ -275,16 +469,25 @@ class ESignatureService
      */
     public function resend(HrDocumentSignature $signature): HrDocumentSignature
     {
-        $signature->update([
-            'status' => 'pending',
-            'declined_reason' => null,
-            'signature_data' => null,
-            'signed_at' => null,
-            'requested_at' => now(),
-            'reminder_sent_at' => null,
-        ]);
+        $fresh = DB::transaction(function () use ($signature): HrDocumentSignature {
+            $locked = HrDocumentSignature::query()
+                ->lockForUpdate()
+                ->findOrFail($signature->getKey());
+            if ($locked->status !== 'declined') {
+                throw new \LogicException("Cannot resend a '{$locked->status}' signature request.");
+            }
 
-        $fresh = $signature->fresh();
+            $locked->update([
+                'status' => 'pending',
+                'declined_reason' => null,
+                'signature_data' => null,
+                'signed_at' => null,
+                'requested_at' => now(),
+                'reminder_sent_at' => null,
+            ]);
+
+            return $locked->fresh();
+        }, attempts: 1);
 
         // Re-notify the signer that the document is waiting again. resend() was
         // previously a silent status flip, so the "Signature request resent"
@@ -317,7 +520,18 @@ class ESignatureService
      */
     public function cancelForDocument(HrDocument $document): int
     {
-        return $document->signatures()->where('status', 'pending')->delete();
+        return DB::transaction(function () use ($document): int {
+            $pending = $document->signatures()
+                ->where('status', 'pending')
+                ->lockForUpdate()
+                ->get();
+
+            $pending->each(fn (HrDocumentSignature $signature) => $signature->update([
+                'status' => 'cancelled',
+            ]));
+
+            return $pending->count();
+        }, attempts: 1);
     }
 
     /**
@@ -326,7 +540,16 @@ class ESignatureService
      */
     public function finaliseIfComplete(HrDocument $document): void
     {
-        $signatures = $document->signatures()->get();
+        $document = HrDocument::query()
+            ->lockForUpdate()
+            ->findOrFail($document->getKey());
+        if ($document->signed_by_employee && $document->signed_document_path) {
+            return;
+        }
+
+        $signatures = $document->signatures()
+            ->where('status', '!=', 'cancelled')
+            ->get();
         if ($signatures->isEmpty()) {
             return;
         }
@@ -338,14 +561,32 @@ class ESignatureService
         $html = $this->buildCertificateHtml($document, $signatures, $hash);
         $pdf = $this->mergeService->renderPdf($html);
 
-        $path = "hr-documents/{$document->tenant_id}/{$document->employee_profile_id}/signed_{$document->id}_".now()->format('Ymd_His').'.pdf';
+        $path = "hr-documents/profiles/{$document->employee_profile_id}/signed_{$document->id}_".now()->format('Ymd_His').'.pdf';
         Storage::disk('private')->put($path, $pdf);
+        $previousPath = $document->signed_document_path;
 
-        $document->update([
-            'signed_by_employee' => true,
-            'signed_at' => now(),
-            'signed_document_path' => $path,
-        ]);
+        try {
+            if (DB::transactionLevel() > 0) {
+                DB::afterRollBack(fn () => Storage::disk('private')->delete($path));
+                if ($previousPath && $previousPath !== $path) {
+                    DB::afterCommit(fn () => Storage::disk('private')->delete($previousPath));
+                }
+            }
+
+            $document->update([
+                'signed_by_employee' => true,
+                'signed_at' => now(),
+                'signed_document_path' => $path,
+            ]);
+
+            if (DB::transactionLevel() === 0 && $previousPath && $previousPath !== $path) {
+                Storage::disk('private')->delete($previousPath);
+            }
+        } catch (\Throwable $exception) {
+            Storage::disk('private')->delete($path);
+
+            throw $exception;
+        }
     }
 
     private function documentHash(HrDocument $document): string

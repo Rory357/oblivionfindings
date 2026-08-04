@@ -24,11 +24,10 @@ class PayslipService
      * Reads the employee's pay configuration from their profile and uses
      * the NZ payroll calculator to compute all statutory deductions.
      *
-     * @param  HrEmployeeProfile  $profile      The employee profile
-     * @param  string             $periodStart   Pay period start date (Y-m-d)
-     * @param  string             $periodEnd     Pay period end date (Y-m-d)
-     * @param  array              $timeData      Time data: regular_hours, overtime_hours, allowances, deductions
-     * @return HrPayslip
+     * @param  HrEmployeeProfile  $profile  The employee profile
+     * @param  string  $periodStart  Pay period start date (Y-m-d)
+     * @param  string  $periodEnd  Pay period end date (Y-m-d)
+     * @param  array  $timeData  Time data: regular_hours, overtime_hours, allowances, deductions
      */
     public function generatePayslip(
         HrEmployeeProfile $profile,
@@ -66,12 +65,13 @@ class PayslipService
             grossOverride: $grossOverride,
         );
 
-        return HrPayslip::create([
-            'tenant_id' => $profile->tenant_id,
-            'employee_profile_id' => $profile->id,
+        $identity = [
             'user_id' => $profile->user_id,
             'pay_period_start' => $periodStart,
             'pay_period_end' => $periodEnd,
+        ];
+        $values = [
+            'employee_profile_id' => $profile->id,
             'gross_pay' => $result['gross_pay'],
             'regular_hours' => $regularHours,
             'overtime_hours' => $overtimeHours,
@@ -91,7 +91,26 @@ class PayslipService
             'kiwisaver_rate' => $kiwiSaverRate,
             'status' => 'draft',
             'created_by' => auth()->id(),
-        ]);
+        ];
+
+        return DB::transaction(function () use ($identity, $values): HrPayslip {
+            $payslip = HrPayslip::query()
+                ->where($identity)
+                ->lockForUpdate()
+                ->first();
+
+            if ($payslip?->status === 'paid') {
+                throw new \DomainException('A paid payslip cannot be regenerated.');
+            }
+
+            if ($payslip) {
+                $payslip->fill($values)->save();
+
+                return $payslip->fresh();
+            }
+
+            return HrPayslip::query()->create([...$identity, ...$values]);
+        });
     }
 
     /**
@@ -100,7 +119,6 @@ class PayslipService
      * Iterates through all run items, looks up employee profiles,
      * and generates individual payslips within a database transaction.
      *
-     * @param  HrPayrollRun  $run
      * @return Collection<int, HrPayslip>
      */
     public function generateBulkPayslips(HrPayrollRun $run): Collection
@@ -110,8 +128,8 @@ class PayslipService
             $payslips = collect();
 
             foreach ($items as $item) {
-                $profile = HrEmployeeProfile::where('user_id', $item->user_id)
-                    ->where('tenant_id', $run->tenant_id)
+                $profile = HrEmployeeProfile::query()
+                    ->where('user_id', $item->user_id)
                     ->first();
 
                 if (! $profile) {
@@ -150,7 +168,7 @@ class PayslipService
      * queued notification can't race the write. Deduped by payslip owner; rows
      * with no linked user are skipped.
      *
-     * @param  \Illuminate\Support\Collection<int, HrPayslip>  $payslips
+     * @param  Collection<int, HrPayslip>  $payslips
      */
     public function notifyEmployeesPayslipAvailable(Collection $payslips): void
     {
@@ -191,8 +209,7 @@ class PayslipService
      * Renders the payslip data into an HTML view and saves it as a file.
      * Uses a simple HTML approach for maximum compatibility.
      *
-     * @param  HrPayslip  $payslip
-     * @return string  Storage path of the generated file
+     * @return string Storage path of the generated file
      */
     public function generatePayslipPdf(HrPayslip $payslip): string
     {
@@ -206,8 +223,8 @@ class PayslipService
 
         $filename = sprintf(
             'payslips/%s/%s_%s_%s.pdf',
-            $payslip->tenant_id,
             $payslip->user_id,
+            $payslip->getKey(),
             $payslip->pay_period_start->format('Y-m-d'),
             $payslip->pay_period_end->format('Y-m-d'),
         );

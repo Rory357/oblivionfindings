@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\CoverageGapAcknowledgement;
-use App\Models\Site;
+use App\Models\SiteCoverageRequirement;
 use App\Services\AuditLogger;
 use App\Services\ShiftSignalService;
 use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
@@ -31,18 +32,15 @@ class CoverageGapController extends Controller
         $key = urldecode($key);
         $data = $this->validatedWindowPayload($request, false);
         $siteAccess->assertCanAccessSiteId($auth, (int) $data['site_id'], ['reports.viewAny']);
+        $this->assertRequirementBelongsToSite($data);
         $this->assertKeyMatchesPayload($key, $data);
 
-        $acknowledgement = CoverageGapAcknowledgement::query()
-            ->where('coverage_window_key', $key)
-            ->whereNull('cleared_at')
+        $activeAcknowledgements = $this->activeAcknowledgementsForWindow($key, $data);
+        $acknowledgement = (clone $activeAcknowledgements)
             ->latest('created_at')
             ->first();
 
-        CoverageGapAcknowledgement::query()
-            ->where('coverage_window_key', $key)
-            ->whereNull('cleared_at')
-            ->update(['cleared_at' => now()]);
+        $activeAcknowledgements->update(['cleared_at' => now()]);
 
         AuditLogger::log('rostering.coverage.clear', $acknowledgement, [
             'coverage_window_key' => $key,
@@ -67,17 +65,13 @@ class CoverageGapController extends Controller
         $key = urldecode($key);
         $data = $this->validatedWindowPayload($request, $state === CoverageGapAcknowledgement::STATE_DISMISSED);
         $siteAccess->assertCanAccessSiteId($auth, (int) $data['site_id'], ['reports.viewAny']);
+        $this->assertRequirementBelongsToSite($data);
         $this->assertKeyMatchesPayload($key, $data);
 
-        $site = Site::query()->findOrFail((int) $data['site_id']);
-
-        CoverageGapAcknowledgement::query()
-            ->where('coverage_window_key', $key)
-            ->whereNull('cleared_at')
+        $this->activeAcknowledgementsForWindow($key, $data)
             ->update(['cleared_at' => now()]);
 
         $acknowledgement = CoverageGapAcknowledgement::create([
-            'organization_id' => $site->organization_id ?? $auth->organization_id,
             'site_id' => (int) $data['site_id'],
             'coverage_requirement_id' => $data['coverage_requirement_id'] ?? null,
             'coverage_window_key' => $key,
@@ -131,6 +125,40 @@ class CoverageGapController extends Controller
                 'coverage_window_key' => 'This coverage action no longer matches the selected window.',
             ]);
         }
+    }
+
+    /** @param array<string, mixed> $data */
+    protected function assertRequirementBelongsToSite(array $data): void
+    {
+        $requirementId = $data['coverage_requirement_id'] ?? null;
+        if (! $requirementId) {
+            return;
+        }
+
+        abort_unless(
+            SiteCoverageRequirement::query()
+                ->whereKey((int) $requirementId)
+                ->where('site_id', (int) $data['site_id'])
+                ->exists(),
+            403,
+            UserSiteAccessService::DEFAULT_MESSAGE,
+        );
+    }
+
+    /** @param array<string, mixed> $data */
+    protected function activeAcknowledgementsForWindow(string $key, array $data): Builder
+    {
+        return CoverageGapAcknowledgement::query()
+            ->where('site_id', (int) $data['site_id'])
+            ->where('coverage_window_key', $key)
+            ->where('window_starts_at', Carbon::parse($data['window_starts_at']))
+            ->where('window_ends_at', Carbon::parse($data['window_ends_at']))
+            ->when(
+                $data['coverage_requirement_id'] ?? null,
+                fn (Builder $query, $requirementId) => $query->where('coverage_requirement_id', (int) $requirementId),
+                fn (Builder $query) => $query->whereNull('coverage_requirement_id'),
+            )
+            ->whereNull('cleared_at');
     }
 
     protected function respond(Request $request, array $payload)

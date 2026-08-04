@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class CarePlanSignOff extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyOrganizationStorageContext;
 
     /** Who can be recorded as agreeing to a plan. */
     public const PARTY_ROLES = ['client', 'whanau', 'eor_guardian', 'key_worker', 'nasc', 'other'];
@@ -16,7 +17,6 @@ class CarePlanSignOff extends Model
     public const METHODS = ['in_person', 'verbal', 'email', 'hui', 'portal'];
 
     protected $fillable = [
-        'organization_id',
         'care_plan_id',
         'party_role',
         'party_name',

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Operations;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientNote;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -16,6 +17,10 @@ use Inertia\Inertia;
  */
 class ReviewQueueController extends Controller
 {
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     public function index(Request $request)
     {
         abort_unless(
@@ -26,17 +31,22 @@ class ReviewQueueController extends Controller
         $siteFilter = $request->integer('site');
         $ageFilter = $request->string('age', '')->toString(); // '24h', '7d', '30d'
         $user = $request->user();
-        $organizationId = $user?->organization_id;
+        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(
+            $user,
+            ['clients.viewAny'],
+        );
 
-        $accessibleClientIds = Client::query()
-            ->when(
-                $organizationId !== null,
-                fn ($q) => $q->where(
-                    fn ($tenantQuery) => $tenantQuery
-                        ->whereNull('organization_id')
-                        ->orWhere('organization_id', $organizationId),
-                ),
-            )
+        if ($siteFilter) {
+            abort_unless(in_array($siteFilter, $accessibleSiteIds, true), 403);
+        }
+
+        $accessibleClients = Client::query();
+        $this->siteAccess->applyClientScope(
+            $accessibleClients,
+            $user,
+            ['clients.viewAny'],
+        );
+        $accessibleClientIds = $accessibleClients
             ->when(
                 ! $user?->canDo('clients.viewAny'),
                 fn ($q) => $q->whereHas(

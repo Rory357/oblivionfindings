@@ -45,23 +45,6 @@ class AssetGeofence extends Model
             ->withTimestamps();
     }
 
-    public function scopeForOrganization(Builder $query, ?int $organizationId): Builder
-    {
-        if ($organizationId === null) {
-            return $query;
-        }
-
-        return $query->where(function (Builder $query) use ($organizationId) {
-            $query->whereHas(
-                'site',
-                fn (Builder $sites) => $sites->where('tenant_id', $organizationId),
-            )->orWhereHas(
-                'asset.site',
-                fn (Builder $sites) => $sites->where('tenant_id', $organizationId),
-            );
-        });
-    }
-
     public function scopeEligibleForClientSite(Builder $query, ?int $siteId): Builder
     {
         if ($siteId === null) {

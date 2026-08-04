@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\Domain\Clinical;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\CarePlan;
 use App\Models\Client;
+use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
@@ -14,7 +17,7 @@ use Tests\TestCase;
 
 /**
  * The read-only Care Plans + Restraint lenses (link out to their systems of
- * record; org-scoped so no cross-tenant leak).
+ * record; Care Plans are scoped through canonical Client Site access).
  */
 class HealthClinicalLensTest extends TestCase
 {
@@ -38,23 +41,46 @@ class HealthClinicalLensTest extends TestCase
         return $user;
     }
 
-    public function test_care_plans_lens_renders_org_scoped_plans(): void
+    protected function siteScopedClinicalViewer(Site $site): User
     {
-        $lead = $this->userWithRole('clinical_lead');
-        $client = Client::factory()->create(['organization_id' => $lead->organization_id]);
+        $viewer = $this->userWithRole('support_worker');
+        $role = Role::query()->firstOrCreate(
+            ['name' => 'clinical_lens_site_scoped_'.$viewer->id],
+            ['label' => 'Clinical Lens Site Scoped', 'level' => 40, 'type' => 'custom'],
+        );
+        $role->permissions()->sync([
+            Permission::query()->where('key', 'clinical.dashboard')->firstOrFail()->id,
+        ]);
+        $viewer->roles()->syncWithoutDetaching([$role->id]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+
+        return $viewer->fresh(['roles', 'hrEmployeeProfile']);
+    }
+
+    public function test_care_plans_lens_renders_only_plans_at_visible_sites(): void
+    {
+        $visibleSite = Site::factory()->create();
+        $outsideSite = Site::factory()->create();
+        $lead = $this->siteScopedClinicalViewer($visibleSite);
+        $client = Client::factory()->create(['site_id' => $visibleSite->id]);
         CarePlan::create([
-            'organization_id' => $lead->organization_id,
             'client_id' => $client->id,
             'title' => 'Skin integrity plan',
             'status' => 'active',
             'plan_type' => 'health_plan',
             'created_by' => $lead->id,
         ]);
-        // A plan in another org must NOT appear.
+        $outsideClient = Client::factory()->create(['site_id' => $outsideSite->id]);
         CarePlan::create([
-            'organization_id' => $lead->organization_id + 999,
-            'client_id' => $client->id,
-            'title' => 'Other-org plan',
+            'client_id' => $outsideClient->id,
+            'title' => 'Outside Site plan',
             'status' => 'active',
             'plan_type' => 'health_plan',
             'created_by' => $lead->id,
@@ -66,6 +92,7 @@ class HealthClinicalLensTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('health-clinical/CarePlans')
                 ->has('plans', 1)
+                ->where('plans.0.title', 'Skin integrity plan')
                 ->has('stats')
                 ->has('kpis'));
     }

@@ -30,8 +30,8 @@ class ShiftCancellationService
         protected ShiftReplacementService $replacementService,
         protected CoverageReservationService $coverageReservationService,
         protected ShiftTimelineService $timelineService,
-    ) {
-    }
+        protected UserSiteAccessService $siteAccess,
+    ) {}
 
     /**
      * @return array{
@@ -65,7 +65,9 @@ class ShiftCancellationService
                 'medicationAdministrations',
                 'residentTransports.booking',
                 'incidents',
-                'outgoingHandovers:id,outgoing_shift_id,incoming_staff_id,status',
+                'outgoingHandovers' => fn ($query) => $this->siteAccess
+                    ->applyHandoverIntegrityScope($query->getQuery())
+                    ->select(['id', 'outgoing_shift_id', 'incoming_staff_id', 'status']),
                 'client:id,first_name,last_name,site_id',
                 'site:id,name,type',
                 'staff:id,name',
@@ -82,6 +84,7 @@ class ShiftCancellationService
             $this->coverageReservationService->releaseForShift($shift);
 
             ShiftOpenPosition::query()
+                ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionIntegrityScope($query))
                 ->where('shift_id', $shift->id)
                 ->whereIn('status', ['open', 'claimed'])
                 ->update(['status' => 'cancelled']);

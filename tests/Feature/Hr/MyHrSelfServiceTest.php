@@ -5,6 +5,8 @@ use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrKudosReaction;
 use App\Domain\Hr\Models\HrKudosReply;
 use App\Domain\Hr\Models\HrSupervisionNote;
+use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -12,36 +14,42 @@ use Database\Seeders\SeedHrPermissionsSeeder;
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
+    $this->site = Site::factory()->create(['name' => 'My HR Self Service Site']);
 
     $this->employee = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->employee->id,
         'employee_number' => 'EMP-SS-'.$this->employee->id,
         'work_email' => 'ss'.$this->employee->id.'@example.test',
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
     ]);
 
     $this->teammate = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
+
+    $supportWorkerRole = Role::query()->where('name', 'support_worker')->firstOrFail();
+    $this->employee->roles()->syncWithoutDetaching([$supportWorkerRole->id]);
+    $this->teammate->roles()->syncWithoutDetaching([$supportWorkerRole->id]);
+
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->teammate->id,
         'employee_number' => 'EMP-SS-'.$this->teammate->id,
         'work_email' => 'ss'.$this->teammate->id.'@example.test',
         'position_title' => 'Senior Support Worker',
         'position_role' => 'support_worker',
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
         'employment_type' => 'full_time',
         'start_date' => now()->subYears(2)->toDateString(),
         'is_active' => true,
@@ -50,7 +58,6 @@ beforeEach(function () {
 
 test('the 1:1s page renders and surfaces an employee-visible supervision note', function () {
     HrSupervisionNote::query()->create([
-        'tenant_id' => 1,
         'employee_user_id' => $this->employee->id,
         'supervisor_user_id' => $this->teammate->id,
         'session_date' => now()->subWeek()->toDateString(),
@@ -70,7 +77,6 @@ test('the 1:1s page renders and surfaces an employee-visible supervision note', 
 
 test('an employee-hidden supervision note is NOT surfaced on the 1:1s page', function () {
     HrSupervisionNote::query()->create([
-        'tenant_id' => 1,
         'employee_user_id' => $this->employee->id,
         'supervisor_user_id' => $this->teammate->id,
         'session_date' => now()->subWeek()->toDateString(),
@@ -88,7 +94,6 @@ test('an employee-hidden supervision note is NOT surfaced on the 1:1s page', fun
 
 test('an employee can acknowledge a 1:1 with a comment', function () {
     $note = HrSupervisionNote::query()->create([
-        'tenant_id' => 1,
         'employee_user_id' => $this->employee->id,
         'supervisor_user_id' => $this->teammate->id,
         'session_date' => now()->subWeek()->toDateString(),
@@ -112,7 +117,6 @@ test('an employee can acknowledge a 1:1 with a comment', function () {
 
 test('an employee cannot acknowledge a 1:1 that is not theirs', function () {
     $note = HrSupervisionNote::query()->create([
-        'tenant_id' => 1,
         'employee_user_id' => $this->teammate->id,
         'supervisor_user_id' => $this->employee->id,
         'session_date' => now()->subWeek()->toDateString(),
@@ -124,7 +128,7 @@ test('an employee cannot acknowledge a 1:1 that is not theirs', function () {
 
     $this->actingAs($this->employee)
         ->post("/hr/my/one/{$note->id}/acknowledge")
-        ->assertForbidden();
+        ->assertNotFound();
 });
 
 test('an employee can send kudos to a teammate via self-service', function () {
@@ -164,7 +168,6 @@ test('sending kudos rejects an unknown category', function () {
 function myHrMakeKudos(int $from, int $to): HrKudos
 {
     return HrKudos::query()->create([
-        'tenant_id' => 1,
         'from_user_id' => $from,
         'to_user_id' => $to,
         'category' => 'teamwork',
@@ -176,10 +179,10 @@ function myHrMakeKudos(int $from, int $to): HrKudos
 test('the overview surfaces received shout-outs with reactions + replies', function () {
     $kudos = myHrMakeKudos($this->teammate->id, $this->employee->id);
     HrKudosReaction::query()->create([
-        'tenant_id' => 1, 'kudos_id' => $kudos->id, 'user_id' => $this->teammate->id, 'emoji' => 'heart',
+        'kudos_id' => $kudos->id, 'user_id' => $this->teammate->id, 'emoji' => 'heart',
     ]);
     HrKudosReply::query()->create([
-        'tenant_id' => 1, 'kudos_id' => $kudos->id, 'user_id' => $this->employee->id, 'body' => 'Thanks!',
+        'kudos_id' => $kudos->id, 'user_id' => $this->employee->id, 'body' => 'Thanks!',
     ]);
 
     $response = $this->actingAs($this->employee)->get('/hr/my');
@@ -247,17 +250,17 @@ test('a party can reply on a kudos thread', function () {
 
 test('a non-party cannot reply on a kudos thread', function () {
     $outsider = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $outsider->id,
         'employee_number' => 'EMP-SS-'.$outsider->id,
         'work_email' => 'ss'.$outsider->id.'@example.test',
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,

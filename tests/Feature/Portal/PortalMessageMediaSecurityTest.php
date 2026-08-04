@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ClientPhoto;
@@ -12,7 +13,9 @@ use App\Models\OpsMessageReaction;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
+use App\Services\Operations\OpsMessageVisibilityService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -21,14 +24,37 @@ use Inertia\Testing\AssertableInertia as Assert;
 function makePortalMessageMediaUser(Client $client): User
 {
     $user = User::factory()->create([
-        'organization_id' => $client->organization_id,
         'role' => 'next_of_kin',
         'approved_at' => now(),
     ]);
+    $portalRole = Role::query()->firstOrCreate(
+        ['name' => 'next_of_kin'],
+        ['label' => 'Next of Kin', 'level' => 1, 'type' => 'system'],
+    );
+    $user->roles()->syncWithoutDetaching([$portalRole->id]);
 
     $client->portalUsers()->attach($user->id, ['relation' => 'next_of_kin']);
 
     return $user;
+}
+
+function makePortalMessageMediaClient(?Site $site = null): Client
+{
+    return Client::factory()->create([
+        'site_id' => ($site ?? Site::factory()->create())->id,
+    ]);
+}
+
+function assignPortalMessageMediaWorkerToSite(User $worker, Site $site): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $worker->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+    ]);
 }
 
 function grantPortalMessageMediaFamilyDisclosure(Client $client, User $user): void
@@ -79,13 +105,31 @@ function grantPortalMessageMediaStaffRole(User $user, array $permissions): void
     $user->roles()->sync([$role->id]);
 }
 
+function grantPortalMessageMediaWorkerPermissions(User $user): void
+{
+    $role = Role::query()->firstOrCreate(
+        ['name' => 'portal_message_worker_'.$user->id],
+        ['label' => 'Portal message worker', 'level' => 20, 'type' => 'custom'],
+    );
+    $permissions = collect(['progress_notes.viewAny', 'progress_notes.create'])
+        ->map(fn (string $key) => Permission::query()->firstOrCreate(
+            ['key' => $key],
+            [
+                'description' => $key,
+                'group' => 'operations',
+                'module' => 'Operations',
+            ],
+        ));
+    $role->permissions()->sync($permissions->pluck('id')->all());
+    $user->roles()->syncWithoutDetaching([$role->id]);
+}
+
 function makePortalMessageMediaConversation(
     Client $client,
     User $portalUser,
     ?User $worker = null,
 ): array {
     $conversation = OpsConversation::query()->create([
-        'organization_id' => $client->organization_id,
         'title' => 'Family chat',
         'conversation_type' => 'family',
         'client_id' => $client->id,
@@ -105,7 +149,6 @@ function makePortalMessageMediaConversation(
     }
 
     $message = OpsMessage::query()->create([
-        'organization_id' => $client->organization_id,
         'conversation_id' => $conversation->id,
         'sender_id' => $portalUser->id,
         'sender_type' => 'family',
@@ -126,8 +169,9 @@ function onePixelPortalMessageMediaPng(): string
 }
 
 it('binds every direct portal message mutation through its conversation client and participant', function (string $action) {
-    $owningClient = Client::factory()->create(['organization_id' => 1]);
-    $wrongClient = Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $owningClient = makePortalMessageMediaClient($site);
+    $wrongClient = makePortalMessageMediaClient($site);
     $user = makePortalMessageMediaUser($owningClient);
     $wrongClient->portalUsers()->attach($user->id, ['relation' => 'next_of_kin']);
     [, $message] = makePortalMessageMediaConversation($owningClient, $user);
@@ -152,7 +196,7 @@ it('binds every direct portal message mutation through its conversation client a
 })->with(['react', 'pin', 'archive']);
 
 it('denies direct message mutation to a linked portal user who is not a conversation participant', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makePortalMessageMediaClient();
     $participant = makePortalMessageMediaUser($client);
     $outsider = makePortalMessageMediaUser($client);
     [, $message] = makePortalMessageMediaConversation($client, $participant);
@@ -165,12 +209,12 @@ it('denies direct message mutation to a linked portal user who is not a conversa
 });
 
 it('rejects a message whose redundant client binding disagrees with its family conversation', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $otherClient = Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $client = makePortalMessageMediaClient($site);
+    $otherClient = makePortalMessageMediaClient($site);
     $user = makePortalMessageMediaUser($client);
     [$conversation] = makePortalMessageMediaConversation($client, $user);
     $message = OpsMessage::query()->create([
-        'organization_id' => $client->organization_id,
         'conversation_id' => $conversation->id,
         'sender_id' => $user->id,
         'sender_type' => 'family',
@@ -186,27 +230,55 @@ it('rejects a message whose redundant client binding disagrees with its family c
     expect((bool) $message->fresh()?->is_pinned)->toBeFalse();
 });
 
+it('keeps the newest canonical portal message when a newer mismatched row exists', function () {
+    $site = Site::factory()->create();
+    $client = makePortalMessageMediaClient($site);
+    $otherClient = makePortalMessageMediaClient($site);
+    $portalUser = makePortalMessageMediaUser($client);
+    [$conversation, $canonicalMessage] = makePortalMessageMediaConversation($client, $portalUser);
+    OpsMessage::query()->create([
+        'conversation_id' => $conversation->id,
+        'sender_id' => $portalUser->id,
+        'sender_type' => 'family',
+        'message_type' => 'text',
+        'content' => 'Newer mismatched provenance',
+        'client_id' => $otherClient->id,
+        'created_at' => now()->addMinute(),
+        'updated_at' => now()->addMinute(),
+    ]);
+
+    $this->actingAs($portalUser)
+        ->get("/portal/clients/{$client->id}/messages")
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('conversations.0.latest_message.id', $canonicalMessage->id)
+            ->where('conversations.0.latest_message.content', 'Hello'));
+});
+
 it('restricts new family conversations to eligible workers in the canonical client care team', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $otherSite = Site::factory()->create();
+    $client = makePortalMessageMediaClient($site);
     $portalUser = makePortalMessageMediaUser($client);
     $assignedWorker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
     $unassignedWorker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
     $foreignShiftWorker = User::factory()->create([
-        'organization_id' => 2,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
+    assignPortalMessageMediaWorkerToSite($assignedWorker, $site);
+    assignPortalMessageMediaWorkerToSite($unassignedWorker, $site);
+    assignPortalMessageMediaWorkerToSite($foreignShiftWorker, $otherSite);
     $client->supportWorkers()->attach($assignedWorker->id);
     Shift::factory()->create([
         'client_id' => $client->id,
+        'site_id' => $site->id,
         'user_id' => $foreignShiftWorker->id,
         'status' => 'scheduled',
         'starts_at' => now()->addDay(),
@@ -239,11 +311,79 @@ it('restricts new family conversations to eligible workers in the canonical clie
     expect($conversation)->not->toBeNull();
 });
 
+it('redacts unlinked portal and stale worker identities from every portal participant payload', function () {
+    $site = Site::factory()->create();
+    $client = makePortalMessageMediaClient($site);
+    $actor = makePortalMessageMediaUser($client);
+    $currentPortal = makePortalMessageMediaUser($client);
+    $unlinkedPortal = makePortalMessageMediaUser($client);
+    $currentWorker = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    $staleWorker = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    foreach ([$currentWorker, $staleWorker] as $worker) {
+        grantPortalMessageMediaWorkerPermissions($worker);
+        assignPortalMessageMediaWorkerToSite($worker, $site);
+        $client->supportWorkers()->attach($worker->id);
+    }
+
+    [$conversation] = makePortalMessageMediaConversation($client, $actor);
+    foreach ([$currentPortal, $unlinkedPortal, $currentWorker, $staleWorker] as $participant) {
+        OpsConversationParticipant::query()->create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $participant->id,
+            'role' => $participant->hasRole('next_of_kin') ? 'family' : 'staff',
+        ]);
+    }
+
+    // Preserve stale rows deliberately: the response layer must not trust
+    // historical participant storage as current authority.
+    $client->portalUsers()->detach($unlinkedPortal->id);
+    HrEmployeeProfile::query()
+        ->where('user_id', $staleWorker->id)
+        ->update(['end_date' => now()->subDay()->toDateString()]);
+
+    expect(app(OpsMessageVisibilityService::class)->unreadCount($unlinkedPortal))->toBe(0)
+        ->and(app(OpsMessageVisibilityService::class)->unreadCount($staleWorker))->toBe(0);
+
+    $expectedIds = collect([$actor->id, $currentPortal->id, $currentWorker->id])
+        ->sort()
+        ->values()
+        ->all();
+    $hasOnlyExpectedParticipants = fn ($participants): bool => collect($participants)
+        ->pluck('id')
+        ->sort()
+        ->values()
+        ->all() === $expectedIds;
+
+    $this->actingAs($actor)
+        ->get("/portal/clients/{$client->id}/messages")
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('conversations.0.participants', $hasOnlyExpectedParticipants));
+    $this->get("/portal/clients/{$client->id}/messages/{$conversation->id}")
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('activeConversation.participants', $hasOnlyExpectedParticipants)
+            ->where('conversations.0.participants', $hasOnlyExpectedParticipants));
+
+    $this->actingAs($unlinkedPortal)
+        ->get("/portal/clients/{$client->id}/messages/{$conversation->id}")
+        ->assertForbidden();
+    $this->actingAs($staleWorker)
+        ->get(route('operations.messages.show', $conversation))
+        ->assertForbidden();
+});
+
 it('stores all new gallery photos on private storage and emits only authenticated media URLs', function () {
     Storage::fake('public');
     Storage::fake('local');
 
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makePortalMessageMediaClient();
     $portalUser = makePortalMessageMediaUser($client);
 
     $this->actingAs($portalUser)
@@ -276,7 +416,7 @@ it('stores chat photos privately and strips public paths from the message payloa
     Storage::fake('public');
     Storage::fake('local');
 
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makePortalMessageMediaClient();
     $portalUser = makePortalMessageMediaUser($client);
     [$conversation] = makePortalMessageMediaConversation($client, $portalUser);
 
@@ -311,7 +451,7 @@ it('rejects active portal and chat upload formats', function (string $extension,
     Storage::fake('public');
     Storage::fake('local');
 
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makePortalMessageMediaClient();
     $portalUser = makePortalMessageMediaUser($client);
     [$conversation] = makePortalMessageMediaConversation($client, $portalUser);
 
@@ -337,8 +477,9 @@ it('serves private photo bytes only through client-bound disclosure-aware routes
     expect(Schema::hasColumn('client_photos', 'storage_disk'))->toBeTrue();
 
     Storage::fake('local');
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $wrongClient = Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $client = makePortalMessageMediaClient($site);
+    $wrongClient = makePortalMessageMediaClient($site);
     $owner = makePortalMessageMediaUser($client);
     $viewer = makePortalMessageMediaUser($client);
     $wrongClient->portalUsers()->attach($owner->id, ['relation' => 'next_of_kin']);
@@ -383,11 +524,11 @@ it('authorizes staff photo delivery against the client policy section and nested
     expect(Schema::hasColumn('client_photos', 'storage_disk'))->toBeTrue();
 
     Storage::fake('local');
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $wrongClient = Client::factory()->create(['organization_id' => 1]);
-    $uploader = User::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $client = makePortalMessageMediaClient($site);
+    $wrongClient = makePortalMessageMediaClient($site);
+    $uploader = User::factory()->create();
     $manager = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'manager',
         'approved_at' => now(),
     ]);
@@ -417,7 +558,7 @@ it('refuses to serve a legacy active image even when its row predates strict upl
     expect(Schema::hasColumn('client_photos', 'storage_disk'))->toBeTrue();
 
     Storage::fake('local');
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makePortalMessageMediaClient();
     $owner = makePortalMessageMediaUser($client);
     Storage::disk('local')->put('client-photos/private/active.svg', '<svg><script>alert(1)</script></svg>');
     $photo = ClientPhoto::query()->create([
@@ -442,8 +583,8 @@ it('migrates legacy public client photos idempotently only after byte verificati
 
     Storage::fake('public');
     Storage::fake('local');
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $uploader = User::factory()->create(['organization_id' => 1]);
+    $client = makePortalMessageMediaClient();
+    $uploader = User::factory()->create();
     Storage::disk('public')->put('client-photos/legacy/photo.png', 'original bytes');
     Storage::disk('public')->put('client-photos/legacy/thumb.jpg', 'thumbnail bytes');
     $photo = ClientPhoto::query()->create([
@@ -481,8 +622,8 @@ it('preserves the public source and row metadata when legacy media verification 
 
     Storage::fake('public');
     Storage::fake('local');
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $uploader = User::factory()->create(['organization_id' => 1]);
+    $client = makePortalMessageMediaClient();
+    $uploader = User::factory()->create();
     Storage::disk('public')->put('client-photos/legacy/conflict.png', 'trusted source');
     Storage::disk('local')->put('client-photos/legacy/conflict.png', 'different destination');
     $photo = ClientPhoto::query()->create([
@@ -507,8 +648,8 @@ it('refuses the schema rollback while private media metadata remains', function 
     $migrationPath = database_path('migrations/2026_07_10_000004_add_storage_disk_to_client_photos_table.php');
     expect(is_file($migrationPath))->toBeTrue();
 
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $uploader = User::factory()->create(['organization_id' => 1]);
+    $client = makePortalMessageMediaClient();
+    $uploader = User::factory()->create();
     ClientPhoto::query()->create([
         'client_id' => $client->id,
         'uploaded_by_user_id' => $uploader->id,

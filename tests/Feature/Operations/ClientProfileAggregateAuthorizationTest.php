@@ -1,11 +1,13 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientAssessment;
 use App\Models\ClientDocument;
 use App\Models\ClientPathPlan;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\Client\ActionsAggregator;
 
@@ -27,6 +29,22 @@ function grantClientProfileAggregatePermissions(User $user, array $permissions):
         Permission::query()->whereIn('key', $permissions)->pluck('id')->all(),
     );
     $user->roles()->syncWithoutDetaching([$role->id]);
+}
+
+function clientProfileAggregateUserAtSite(Site $site, array $permissions = []): User
+{
+    $user = User::factory()->create(['approved_at' => now()]);
+    grantClientProfileAggregatePermissions($user, $permissions);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+
+    return $user;
 }
 
 function seedRestrictedClientProfileAggregateRecords(Client $client, User $author): void
@@ -55,7 +73,6 @@ function seedRestrictedClientProfileAggregateRecords(Client $client, User $autho
     ]));
     ClientPathPlan::withoutEvents(fn () => ClientPathPlan::query()->create([
         'client_id' => $client->id,
-        'organization_id' => $client->organization_id,
         'dream' => 'Restricted PATH goal',
         'next_review_at' => now()->addDay(),
         'updated_by' => $author->id,
@@ -63,13 +80,13 @@ function seedRestrictedClientProfileAggregateRecords(Client $client, User $autho
 }
 
 it('does not leak restricted document assessment or PATH items to a finance-only viewer', function () {
-    $author = User::factory()->create(['organization_id' => 1]);
-    $viewer = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileAggregatePermissions($viewer, [
+    $site = Site::factory()->create();
+    $author = clientProfileAggregateUserAtSite($site);
+    $viewer = clientProfileAggregateUserAtSite($site, [
         'clients.viewAny',
         'client_funds.manage',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     seedRestrictedClientProfileAggregateRecords($client, $author);
 
     $items = app(ActionsAggregator::class)->forClient($client, $viewer);
@@ -78,22 +95,20 @@ it('does not leak restricted document assessment or PATH items to a finance-only
 });
 
 it('exposes aggregate contributors only with their owning section capability', function () {
-    $author = User::factory()->create(['organization_id' => 1]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $author = clientProfileAggregateUserAtSite($site);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     seedRestrictedClientProfileAggregateRecords($client, $author);
 
-    $documentViewer = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileAggregatePermissions($documentViewer, [
+    $documentViewer = clientProfileAggregateUserAtSite($site, [
         'clients.viewAny',
         'clients.update',
     ]);
-    $assessmentViewer = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileAggregatePermissions($assessmentViewer, [
+    $assessmentViewer = clientProfileAggregateUserAtSite($site, [
         'clients.viewAny',
         'clinical.assessments.viewAny',
     ]);
-    $pathViewer = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileAggregatePermissions($pathViewer, [
+    $pathViewer = clientProfileAggregateUserAtSite($site, [
         'clients.viewAny',
         'care_plans.viewAny',
     ]);
@@ -108,12 +123,12 @@ it('exposes aggregate contributors only with their owning section capability', f
 });
 
 it('reports overflow metadata from the bounded client actions endpoint', function () {
-    $viewer = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileAggregatePermissions($viewer, [
+    $site = Site::factory()->create();
+    $viewer = clientProfileAggregateUserAtSite($site, [
         'clients.viewAny',
         'clients.update',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
 
     ClientDocument::withoutEvents(function () use ($client, $viewer): void {
         foreach (range(1, 21) as $index) {

@@ -2,148 +2,197 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Domain\Monitoring\Enums\RuntimeMessageType;
+use App\Domain\Monitoring\Models\MonitoringOutbox;
+use App\Domain\Monitoring\Services\MonitoringOutboxPublisher;
 use App\Http\Controllers\Controller;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
-use App\Models\Site;
-use App\Services\Integration\AlertRoutingService;
-use App\Support\LegacyStorageContext;
+use App\Services\Integration\Contracts\WebhookVerificationCapability;
+use App\Services\Integration\Data\ProviderWebhookRequest;
+use App\Services\Integration\Exceptions\CapabilityUnavailable;
+use App\Services\Integration\Exceptions\WebhookRejected;
+use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Support\SafeOperationalData;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class WebhookReceiverController extends Controller
 {
+    public function __construct(
+        private readonly ?IntegrationAdapterRegistry $adapters = null,
+        private readonly ?MonitoringOutboxPublisher $outbox = null,
+    ) {}
+
     /**
      * Receive a webhook from an external provider.
      *
-     * This is the ONLY entry point for integration-originated events.
-     * The flow is:
-     *   1. Authenticate via X-Integration-Key header
-     *   2. Parse provider-specific payload
-     *   3. Deduplicate via source_event_id
-     *   4. Persist as IntegrationEvent
-     *   5. Route through AlertRoutingService → signal pipeline → ControlRoomAlert
+     * Verification is provider-owned and fail-closed. A successful request is
+     * staged as a signed monitoring event; projection and alert routing happen
+     * on the monitoring-events consumer, never in the HTTP request.
      */
     public function receive(Request $request, string $provider)
     {
+        if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $provider) !== 1) {
+            return response()->json(['error' => 'Webhook endpoint not found'], 404);
+        }
+
+        $registry = $this->adapters ?? app(IntegrationAdapterRegistry::class);
+        $publisher = $this->outbox ?? app(MonitoringOutboxPublisher::class);
+
         try {
-            // --- Step 1: Authenticate ---
-            $apiKey = $request->header('X-Integration-Key');
+            $capability = $registry->capability($provider, WebhookVerificationCapability::class);
+        } catch (CapabilityUnavailable|\RuntimeException) {
+            return response()->json(['error' => 'Webhook endpoint not found'], 404);
+        }
 
-            if (! $apiKey) {
-                return response()->json(['error' => 'Missing integration key'], 401);
-            }
+        if (! $capability instanceof WebhookVerificationCapability) {
+            return response()->json(['error' => 'Webhook endpoint not found'], 404);
+        }
 
-            // Quick-filter by last 4 characters, then decrypt to confirm
-            $last4 = substr($apiKey, -4);
-
-            $providerConnection = IntegrationProviderConnection::where('secret_last4', $last4)
-                ->where('provider', $provider)
+        try {
+            $providerConnection = IntegrationProviderConnection::query()
+                ->forProvider($provider)
                 ->connected()
-                ->get()
-                ->first(function (IntegrationProviderConnection $connection) use ($apiKey) {
-                    try {
-                        return decrypt($connection->secret_encrypted) === $apiKey;
-                    } catch (\Throwable $e) {
-                        Log::warning('WebhookReceiver: failed to decrypt provider connection', SafeOperationalData::logContext([
-                            'provider_connection_id' => $connection->id,
-                            'error_category' => SafeOperationalData::failureCategory($e),
-                        ]));
-
-                        return false;
-                    }
-                });
-
-            if (! $providerConnection) {
-                return response()->json(['error' => 'Invalid integration key'], 401);
+                ->first();
+            if ($providerConnection === null) {
+                return response()->json(['error' => 'Webhook rejected'], 401);
             }
 
-            // Verify webhook signature if X-Webhook-Signature header present
-            $signature = $request->header('X-Webhook-Signature');
-            if ($signature && $apiKey) {
-                $expectedSignature = hash_hmac('sha256', $request->getContent(), $apiKey);
-                if (! hash_equals($expectedSignature, $signature)) {
-                    return response()->json(['error' => 'Invalid signature'], 401);
+            $headers = [];
+            foreach ([
+                'X-Integration-Key',
+                'X-Webhook-Timestamp',
+                'X-Webhook-Nonce',
+                'X-Webhook-Signature',
+                'X-Msc-Request-Signature',
+                'X-Msc-Webhook-Uuid',
+                'X-Msc-Request-Timestamp',
+                'X-Msc-Request-Nonce',
+            ] as $name) {
+                $value = $request->header($name);
+                if (is_string($value)) {
+                    $headers[$name] = $value;
                 }
             }
 
-            $payload = $request->all();
+            $verified = $capability->verifyWebhook($providerConnection, new ProviderWebhookRequest(
+                body: $request->getContent(),
+                headers: $headers,
+                receivedAt: CarbonImmutable::now('UTC'),
+            ));
 
-            // --- Step 2: Parse provider-specific payload ---
-            $parsed = $this->parsePayload($provider, $payload);
-
-            // Ensure event_type is never empty — critical for signal classification
-            if (empty($parsed['event_type']) || $parsed['event_type'] === 'unknown') {
-                $parsed['event_type'] = $this->inferEventType($provider, $payload) ?? 'unknown';
-            }
-
-            $siteId = is_numeric($parsed['site_id'] ?? null) ? (int) $parsed['site_id'] : null;
-            if ($siteId === null || ! Site::query()->whereKey($siteId)->exists()) {
-                return response()->json(['error' => 'Unknown site'], 422);
-            }
-            if (! IntegrationSiteConfig::query()
+            $siteIds = collect($verified->events)
+                ->map(fn ($event): int => $event->siteId)
+                ->unique()
+                ->values();
+            $mappedSiteCount = IntegrationSiteConfig::query()
                 ->forProvider($provider)
                 ->active()
-                ->where('site_id', $siteId)
-                ->exists()) {
-                return response()->json(['error' => 'Site is not mapped for this provider'], 422);
+                ->whereIn('site_id', $siteIds)
+                ->whereHas('site')
+                ->distinct()
+                ->count('site_id');
+            if ($mappedSiteCount !== $siteIds->count()) {
+                return response()->json(['error' => 'Webhook Site is not mapped'], 422);
             }
 
-            // --- Step 3: Deduplicate ---
-            if (! empty($parsed['source_event_id'])) {
-                $existing = IntegrationEvent::where('provider', $provider)
-                    ->where('source_event_id', $parsed['source_event_id'])
-                    ->first();
+            $result = DB::transaction(function () use ($provider, $publisher, $verified): array {
+                $messageIds = [];
+                $duplicates = 0;
+                $existingEventId = null;
 
-                if ($existing) {
-                    return response()->json([
-                        'status' => 'duplicate',
-                        'event_id' => $existing->id,
-                    ], 200);
+                foreach ($verified->events as $event) {
+                    $existing = IntegrationEvent::query()
+                        ->where('provider', $provider)
+                        ->where('source_event_id', $event->sourceEventId)
+                        ->first();
+                    if ($existing !== null) {
+                        $duplicates++;
+                        $existingEventId ??= $existing->id;
+
+                        continue;
+                    }
+
+                    $source = "provider:{$provider}:site:{$event->siteId}:events";
+                    $idempotencyKey = 'event:'.hash('sha256', $provider.':'.$event->sourceEventId);
+                    $alreadyStaged = MonitoringOutbox::query()
+                        ->where('source', $source)
+                        ->where('idempotency_key', $idempotencyKey)
+                        ->exists();
+                    if ($alreadyStaged) {
+                        $duplicates++;
+
+                        continue;
+                    }
+
+                    $outbox = $publisher->stage(
+                        type: RuntimeMessageType::Event,
+                        stream: (string) config('monitoring.queues.events', 'monitoring-events'),
+                        source: $source,
+                        idempotencyKey: $idempotencyKey,
+                        payload: [
+                            'event_family' => 'provider_event',
+                            'site_id' => $event->siteId,
+                            'provider' => $provider,
+                            'source_app' => $event->sourceApp,
+                            'source_event_id' => $event->sourceEventId,
+                            'occurred_at' => $event->occurredAt->toIso8601String(),
+                            'severity' => $event->severity,
+                            'event_type' => $event->eventType,
+                            'normalized_payload' => $event->normalizedPayload,
+                            'body_hash' => $event->bodyHash,
+                        ],
+                    );
+                    $messageIds[] = $outbox->message_id;
                 }
-            } else {
-                Log::info('WebhookReceiver: no source_event_id — dedup check skipped', [
-                    'provider' => $provider,
-                    'event_type' => $parsed['event_type'],
-                ]);
+
+                return [
+                    'message_ids' => $messageIds,
+                    'duplicates' => $duplicates,
+                    'existing_event_id' => $existingEventId,
+                ];
+            });
+
+            $accepted = count($result['message_ids']);
+            $response = [
+                'status' => $accepted > 0 || $verified->ignoredCount > 0 ? 'accepted' : 'duplicate',
+                'accepted' => $accepted,
+                'duplicates' => $result['duplicates'],
+                'ignored' => $verified->ignoredCount,
+            ];
+            if ($result['message_ids'] !== []) {
+                $response['message_id'] = $result['message_ids'][0];
+            } elseif ($result['existing_event_id'] !== null) {
+                $response['event_id'] = $result['existing_event_id'];
             }
 
-            // --- Step 4: Persist the integration event ---
-            $event = IntegrationEvent::create([
-                'tenant_id' => LegacyStorageContext::id(),
-                'site_id' => $siteId,
+            return response()->json(
+                $response,
+                $accepted > 0 || $verified->ignoredCount > 0
+                    ? $verified->acknowledgementStatus
+                    : 200,
+            );
+        } catch (WebhookRejected $exception) {
+            Log::notice('Provider webhook rejected.', [
                 'provider' => $provider,
-                'source_app' => $parsed['source_app'] ?? $provider,
-                'source_event_id' => $parsed['source_event_id'],
-                'occurred_at' => $this->parseTimestamp($parsed['occurred_at']),
-                'received_at' => now(),
-                'severity' => $parsed['severity'] ?? IntegrationEvent::SEVERITY_INFO,
-                'event_type' => $parsed['event_type'],
-                'normalized_payload' => $parsed['normalized_payload'] ?? [],
-                'raw_payload' => $payload,
+                'reason_code' => $exception->reason,
             ]);
 
-            // --- Step 5: Route through signal pipeline ---
-            $routingService = app(AlertRoutingService::class);
-            $routingService->processEvent($event);
-
-            return response()->json([
-                'status' => 'accepted',
-                'event_id' => $event->id,
-            ], 200);
+            return response()->json(['error' => 'Webhook rejected'], $exception->httpStatus);
+        } catch (\InvalidArgumentException) {
+            return response()->json(['error' => 'Webhook rejected'], 422);
         } catch (\Throwable $e) {
-            Log::error('WebhookReceiver: unhandled error', SafeOperationalData::logContext([
+            Log::error('Provider webhook intake failed.', SafeOperationalData::logContext([
                 'provider' => $provider,
                 'error_category' => SafeOperationalData::failureCategory($e),
-                'payload_keys' => array_keys($request->all()),
             ]));
 
-            return response()->json([
-                'error' => 'Internal server error',
-            ], 500);
+            return response()->json(['error' => 'Webhook intake failed'], 500);
         }
     }
 

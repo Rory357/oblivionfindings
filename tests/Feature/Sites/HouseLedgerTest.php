@@ -3,12 +3,14 @@
 namespace Tests\Feature\Sites;
 
 use App\Domain\Finance\Jobs\ProcessFinancialEventJob;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\HouseLedger;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Sites\HouseLedgerService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
@@ -19,15 +21,18 @@ class HouseLedgerTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $supportWorker;
+
     protected Site $houseSite;
+
     protected Site $officeSite;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -98,7 +103,7 @@ class HouseLedgerTest extends TestCase
         $service = app(HouseLedgerService::class);
         $ledger = $service->getOrCreateLedger($this->houseSite);
 
-        $service->addEntry($ledger, [
+        $service->addEntry($this->houseSite, [
             'entry_type' => 'income',
             'category' => 'funding',
             'description' => 'April funding',
@@ -106,7 +111,7 @@ class HouseLedgerTest extends TestCase
             'entry_date' => '2026-04-15',
         ], $this->admin->id);
 
-        $service->addEntry($ledger, [
+        $service->addEntry($this->houseSite, [
             'entry_type' => 'expense',
             'category' => 'groceries',
             'description' => 'May groceries',
@@ -128,7 +133,7 @@ class HouseLedgerTest extends TestCase
         $ledger = $service->getOrCreateLedger($this->houseSite);
 
         // Add income first
-        $service->addEntry($ledger, [
+        $service->addEntry($this->houseSite, [
             'entry_type' => 'income',
             'category' => 'funding',
             'description' => 'Funding',
@@ -137,7 +142,7 @@ class HouseLedgerTest extends TestCase
         ], $this->admin->id);
 
         // Add expense
-        $service->addEntry($ledger, [
+        $service->addEntry($this->houseSite, [
             'entry_type' => 'expense',
             'category' => 'groceries',
             'description' => 'Weekly groceries',
@@ -152,9 +157,8 @@ class HouseLedgerTest extends TestCase
     public function test_running_balance_is_sequential(): void
     {
         $service = app(HouseLedgerService::class);
-        $ledger = $service->getOrCreateLedger($this->houseSite);
 
-        $entry1 = $service->addEntry($ledger, [
+        $entry1 = $service->addEntry($this->houseSite, [
             'entry_type' => 'income',
             'category' => 'funding',
             'description' => 'First deposit',
@@ -162,7 +166,7 @@ class HouseLedgerTest extends TestCase
             'entry_date' => '2026-02-20',
         ], $this->admin->id);
 
-        $entry2 = $service->addEntry($ledger, [
+        $entry2 = $service->addEntry($this->houseSite, [
             'entry_type' => 'expense',
             'category' => 'utilities',
             'description' => 'Power bill',
@@ -170,7 +174,7 @@ class HouseLedgerTest extends TestCase
             'entry_date' => '2026-02-20',
         ], $this->admin->id);
 
-        $entry3 = $service->addEntry($ledger, [
+        $entry3 = $service->addEntry($this->houseSite, [
             'entry_type' => 'income',
             'category' => 'funding',
             'description' => 'Top up',
@@ -209,10 +213,9 @@ class HouseLedgerTest extends TestCase
         Storage::fake('private');
 
         $service = app(HouseLedgerService::class);
-        $ledger = $service->getOrCreateLedger($this->houseSite);
         Storage::disk('private')->put('house-ledger/test-receipt.pdf', 'receipt-content');
 
-        $entry = $service->addEntry($ledger, [
+        $entry = $service->addEntry($this->houseSite, [
             'entry_type' => 'expense',
             'category' => 'groceries',
             'description' => 'Receipt attached',
@@ -237,10 +240,9 @@ class HouseLedgerTest extends TestCase
         Storage::fake('private');
 
         $service = app(HouseLedgerService::class);
-        $ledger = $service->getOrCreateLedger($this->houseSite);
         Storage::disk('private')->put('house-ledger/perm-receipt.pdf', 'receipt');
 
-        $entry = $service->addEntry($ledger, [
+        $entry = $service->addEntry($this->houseSite, [
             'entry_type' => 'expense',
             'category' => 'groceries',
             'description' => 'Permission-gated receipt',
@@ -268,23 +270,54 @@ class HouseLedgerTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_ledger_routes_reject_cross_tenant_sites(): void
+    public function test_attachment_route_rejects_entry_owned_by_a_different_site(): void
     {
-        $otherTenantSite = Site::factory()->create([
-            'tenant_id' => 2,
+        $otherSite = Site::factory()->create(['type' => 'house']);
+        $entry = app(HouseLedgerService::class)->addEntry($otherSite, [
+            'entry_type' => 'expense',
+            'category' => 'groceries',
+            'description' => 'Other Site receipt',
+            'amount' => 12.50,
+            'entry_date' => '2026-02-20',
+        ], $this->admin->id);
+
+        $this->actingAs($this->admin)
+            ->get("/sites/{$this->houseSite->id}/ledger/entries/{$entry->id}/download")
+            ->assertNotFound();
+    }
+
+    public function test_ledger_routes_reject_sites_outside_the_users_assigned_site_scope(): void
+    {
+        $siteScopedUser = User::factory()->create([
+            'role' => 'team_lead',
+            'approved_at' => now(),
+        ]);
+        $siteScopedUser->roles()->attach(Role::where('name', 'team_lead')->first());
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $siteScopedUser->id,
+            'primary_site_id' => $this->houseSite->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+        $outsideSite = Site::factory()->create([
             'type' => 'house',
         ]);
 
-        $this->actingAs($this->admin)
-            ->get("/sites/{$otherTenantSite->id}/ledger")
+        $this->actingAs($siteScopedUser)
+            ->get("/sites/{$this->houseSite->id}/ledger")
+            ->assertOk();
+
+        $this->actingAs($siteScopedUser)
+            ->get("/sites/{$outsideSite->id}/ledger")
             ->assertForbidden();
     }
 
     public function test_site_show_includes_inline_house_ledger_payload(): void
     {
         $service = app(HouseLedgerService::class);
-        $ledger = $service->getOrCreateLedger($this->houseSite);
-        $service->addEntry($ledger, [
+        $service->addEntry($this->houseSite, [
             'entry_type' => 'income',
             'category' => 'funding',
             'description' => 'Opening balance',

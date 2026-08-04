@@ -11,8 +11,10 @@ use RuntimeException;
 
 class FundingClaimJournalService
 {
+    private const APPLICATION_STORAGE_CONTEXT_ID = 1;
+
     /**
-     * GL account code -> FinAccount cache (per-request, keyed by orgId:code).
+     * GL account code -> FinAccount cache (per-request, keyed by storage context and code).
      *
      * @var array<string, FinAccount>
      */
@@ -50,6 +52,14 @@ class FundingClaimJournalService
         return DB::transaction(function () use ($claim) {
             $claim = FundingClaim::query()
                 ->with('serviceAgreement')
+                ->whereHas('client', fn ($clientQuery) => $clientQuery
+                    ->whereNotNull('site_id')
+                    ->whereHas('site', fn ($siteQuery) => $siteQuery
+                        ->active()
+                        ->notArchived()
+                        ->whereNull('archived_at')))
+                ->whereHas('serviceAgreement', fn ($agreementQuery) => $agreementQuery
+                    ->whereColumn('service_agreements.client_id', 'funding_claims.client_id'))
                 ->lockForUpdate()
                 ->findOrFail($claim->id);
 
@@ -63,7 +73,7 @@ class FundingClaimJournalService
                 );
             }
 
-            $orgId = $claim->organization_id;
+            $storageContextId = self::APPLICATION_STORAGE_CONTEXT_ID;
 
             // Determine the funder type from the linked service agreement
             $funderType = $this->resolveFunderType($claim);
@@ -76,7 +86,7 @@ class FundingClaimJournalService
 
             // DR Funder Receivable: total_amount
             if (bccomp((string) $claim->total_amount, '0', 2) > 0) {
-                $receivableAccount = $this->findAccountByCode($orgId, $receivableCode);
+                $receivableAccount = $this->findAccountByCode($storageContextId, $receivableCode);
                 $lines[] = [
                     'account_id' => $receivableAccount->id,
                     'description' => "{$receivableAccount->name}",
@@ -85,7 +95,7 @@ class FundingClaimJournalService
                 ];
 
                 // CR Funding Revenue: total_amount
-                $revenueAccount = $this->findAccountByCode($orgId, $revenueCode);
+                $revenueAccount = $this->findAccountByCode($storageContextId, $revenueCode);
                 $lines[] = [
                     'account_id' => $revenueAccount->id,
                     'description' => "{$revenueAccount->name}",
@@ -103,7 +113,7 @@ class FundingClaimJournalService
             $periodStart = $claim->period_start->toDateString();
             $periodEnd = $claim->period_end->toDateString();
 
-            $journal = $this->journalPostingService->createAndPost($orgId, [
+            $journal = $this->journalPostingService->createAndPost($storageContextId, [
                 'journal_date' => now()->toDateString(),
                 'type' => 'billing',
                 'source_type' => 'funding_claim',
@@ -127,6 +137,17 @@ class FundingClaimJournalService
 
     public function reverseFundingClaimJournal(FundingClaim $claim): ?FinJournal
     {
+        $claim = FundingClaim::query()
+            ->whereHas('client', fn ($clientQuery) => $clientQuery
+                ->whereNotNull('site_id')
+                ->whereHas('site', fn ($siteQuery) => $siteQuery
+                    ->active()
+                    ->notArchived()
+                    ->whereNull('archived_at')))
+            ->whereHas('serviceAgreement', fn ($agreementQuery) => $agreementQuery
+                ->whereColumn('service_agreements.client_id', 'funding_claims.client_id'))
+            ->findOrFail($claim->id);
+
         if ($claim->journal_id === null) {
             return null;
         }
@@ -168,22 +189,22 @@ class FundingClaimJournalService
      |  Helper: find a GL account by code (cached per request)
      | ------------------------------------------------------------------ */
 
-    public function findAccountByCode(?int $orgId, string $code): FinAccount
+    public function findAccountByCode(int $storageContextId, string $code): FinAccount
     {
-        $cacheKey = "{$orgId}:{$code}";
+        $cacheKey = "{$storageContextId}:{$code}";
 
         if (isset($this->accountCache[$cacheKey])) {
             return $this->accountCache[$cacheKey];
         }
 
-        $account = FinAccount::where('organization_id', $orgId)
+        $account = FinAccount::where('organization_id', $storageContextId)
             ->where('code', $code)
             ->where('is_active', true)
             ->first();
 
         if (! $account) {
             throw new RuntimeException(
-                "GL account with code '{$code}' not found (or inactive) for organisation #{$orgId}."
+                "GL account with code '{$code}' not found (or inactive) for the application storage context."
             );
         }
 

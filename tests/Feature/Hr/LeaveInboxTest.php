@@ -2,6 +2,7 @@
 
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Models\Client;
 use App\Models\Role;
 use App\Models\Shift;
 use App\Models\User;
@@ -14,16 +15,15 @@ beforeEach(function () {
 
     $this->hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->hr->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
-    $this->hr->setAttribute('tenant_id', 1);
+    $this->site = ensureCanonicalHrStaffProfile($this->hr);
 
     $this->staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
-    $this->staff->setAttribute('tenant_id', 1);
+    ensureCanonicalHrStaffProfile($this->staff, $this->site);
 });
 
 function makePending(User $staff, User $approver, int $offsetDays, array $overrides = []): HrLeaveRequest
 {
     return HrLeaveRequest::query()->create(array_merge([
-        'tenant_id' => 1,
         'user_id' => $staff->id,
         'leave_type' => 'annual',
         'period' => 'full_day',
@@ -58,7 +58,7 @@ test('the inbox is a cross-page queue: all_pending count reflects the true total
 
 test('inbox rows carry balance_impact with an insufficient flag', function () {
     HrLeaveBalance::query()->create([
-        'tenant_id' => 1, 'user_id' => $this->staff->id, 'leave_type' => 'annual', 'year' => now()->year,
+        'user_id' => $this->staff->id, 'leave_type' => 'annual', 'year' => now()->year,
         'balance_hours' => 8, 'accrued_hours' => 8, 'used_hours' => 0, 'pending_hours' => 32,
         'source' => 'system', 'last_synced_at' => now(), 'updated_by' => $this->hr->id,
     ]);
@@ -77,6 +77,8 @@ test('inbox rows surface a roster conflict when an overlapping shift exists', fu
 
     Shift::factory()->create([
         'user_id' => $this->staff->id,
+        'site_id' => $this->site->id,
+        'client_id' => Client::factory()->create(['site_id' => $this->site->id])->id,
         'starts_at' => now()->addDays(4)->setTime(7, 0),
         'ends_at' => now()->addDays(4)->setTime(15, 0),
         'status' => 'scheduled',

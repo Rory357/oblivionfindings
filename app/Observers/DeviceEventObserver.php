@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\SecurityDevices\Events\DeviceSignalPublished;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\ControlRoom\Device as ControlRoomDevice;
@@ -49,6 +50,7 @@ class DeviceEventObserver
 
     public function __construct(
         private readonly SignalProcessingService $processor,
+        private readonly CanonicalDeviceSiteResolver $siteResolver,
     ) {}
 
     public function created(DeviceEvent $event): void
@@ -70,12 +72,24 @@ class DeviceEventObserver
                 return;
             }
 
-            // Resolve the Control Room Device projection (optional).
-            // A missing projection is OK — the signal will still ingest with
-            // site/asset context left null; the rule engine still matches.
-            $controlRoomDevice = ControlRoomDevice::query()
+            $siteId = $this->siteResolver->resolve((int) $event->device_id);
+
+            // Retained Control Room Device rows enrich that workspace only.
+            // Native monitoring identity and Site scope never depend on one.
+            $controlRoomDevices = ControlRoomDevice::query()
                 ->where('canonical_device_id', $event->device_id)
-                ->first();
+                ->limit(2)
+                ->get(['id', 'site_id']);
+            if ($controlRoomDevices->contains(
+                fn (ControlRoomDevice $projection): bool => (int) $projection->site_id !== $siteId,
+            )) {
+                throw new \UnexpectedValueException(
+                    'Control Room Device projection conflicts with the canonical Site.',
+                );
+            }
+            $controlRoomDeviceId = $controlRoomDevices->count() === 1
+                ? (int) $controlRoomDevices->first()->id
+                : null;
 
             $signalTypeId = SignalType::where('code', $signalTypeCode)->value('id');
 
@@ -84,18 +98,22 @@ class DeviceEventObserver
                 'signal_type_code' => $signalTypeCode,
                 'signal_type_id' => $signalTypeId,
                 'severity_hint' => $event->severity ?: 'info',
+                'external_ref' => 'device_event_'.$event->id,
                 'payload' => $event->payload ?? [],
-                'normalized_data' => [
+                'normalized_data' => array_filter([
                     'device_event_id' => $event->id,
                     'canonical_device_id' => $event->device_id,
                     'source' => $event->source,
                     'original_event_type' => $event->event_type,
-                ],
+                    'monitor_correlation_key' => $this->monitorCorrelationKey($event),
+                    'legacy_monitoring_recovery' => data_get($event->payload, 'legacy_monitoring_recovery') === true
+                        ? true
+                        : null,
+                ], fn (mixed $value): bool => $value !== null),
                 'occurred_at' => $event->occurred_at,
                 'received_at' => now(),
-                'tenant_id' => $event->tenant_id ?? null,
-                'device_id' => $controlRoomDevice?->id,
-                'site_id' => $controlRoomDevice?->site_id,
+                'device_id' => $controlRoomDeviceId,
+                'site_id' => $siteId,
             ];
 
             $signal = $this->processor->ingest($payload);
@@ -130,5 +148,14 @@ class DeviceEventObserver
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    private function monitorCorrelationKey(DeviceEvent $event): ?string
+    {
+        $key = data_get($event->payload, 'monitor_correlation_key');
+
+        return is_string($key) && preg_match('/\A[a-f0-9]{64}\z/', $key) === 1
+            ? $key
+            : null;
     }
 }

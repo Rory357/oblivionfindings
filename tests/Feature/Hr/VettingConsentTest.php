@@ -2,6 +2,7 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\StaffBackgroundCheck;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -11,30 +12,39 @@ beforeEach(function () {
 
     // hr.vetting.* is granted to provider_manager via RbacSeeder.
     $this->manager = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'provider_manager',
         'approved_at' => now(),
     ]);
     $this->manager->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'provider_manager')->first()->id,
     ]);
+    $this->site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+    HrEmployeeProfile::query()->create([
+        'user_id' => $this->manager->id,
+        'employee_number' => 'EMP-'.$this->manager->id,
+        'work_email' => $this->manager->email,
+        'position_title' => 'Provider Manager',
+        'position_role' => 'provider_manager',
+        'employment_type' => 'full_time',
+        'primary_site_id' => $this->site->id,
+        'start_date' => now()->subYear()->toDateString(),
+        'is_active' => true,
+    ]);
 
     $this->worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
 
-    // assertStaffCheckTenantAccess requires the check's user to have a
-    // tenant-1 profile.
+    // The check target must be a current canonical staff member.
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'employee_number' => 'EMP-'.$this->worker->id,
         'work_email' => $this->worker->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
+        'primary_site_id' => $this->site->id,
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
     ]);

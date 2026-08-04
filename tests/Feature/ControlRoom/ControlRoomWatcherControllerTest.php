@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\ControlRoom;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\ControlRoom\AlertWatcher;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
@@ -19,6 +20,8 @@ class ControlRoomWatcherControllerTest extends TestCase
 
     protected User $other;
 
+    protected Site $site;
+
     protected ControlRoomAlert $alert;
 
     protected function setUp(): void
@@ -33,11 +36,22 @@ class ControlRoomWatcherControllerTest extends TestCase
         $this->other = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->other->roles()->attach(Role::where('name', 'admin')->first());
 
-        $site = Site::factory()->create([
-            'tenant_id' => $this->admin->organization_id,
+        $this->site = Site::factory()->create([
+            'name' => 'Control Room Watcher Site',
         ]);
+        foreach ([$this->admin, $this->other] as $user) {
+            HrEmployeeProfile::factory()->create([
+                'user_id' => $user->id,
+                'primary_site_id' => $this->site->id,
+                'secondary_site_ids' => [],
+                'start_date' => today()->subMonth(),
+                'end_date' => null,
+                'is_active' => true,
+            ]);
+        }
+
         $this->alert = ControlRoomAlert::factory()->open()->create([
-            'site_id' => $site->id,
+            'site_id' => $this->site->id,
         ]);
     }
 

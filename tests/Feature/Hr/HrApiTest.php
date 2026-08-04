@@ -5,11 +5,13 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPayrollRun;
+use App\Domain\Hr\Models\HrPayrollRunItem;
 use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -18,11 +20,14 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
 
+    $this->allowedSite = Site::factory()->create(['name' => 'Allowed API Site']);
+    $this->hiddenSite = Site::factory()->create(['name' => 'Hidden API Site']);
+
     $this->viewer = User::factory()->create([
         'role' => 'hr_api',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
+    profileFor($this->viewer, $this->allowedSite, 'API-VIEWER');
 
     $role = Role::query()->create([
         'name' => 'hr_api_viewer',
@@ -50,7 +55,6 @@ beforeEach(function () {
 test('hr api endpoints reject users without their required permissions', function () {
     $user = User::factory()->create([
         'role' => 'support_worker',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
 
@@ -70,52 +74,50 @@ test('hr api endpoints reject users without their required permissions', functio
     }
 });
 
-test('hr api endpoints are permissioned and tenant scoped', function () {
-    $tenantOneUser = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
-    $tenantTwoUser = User::factory()->create(['organization_id' => 2, 'approved_at' => now()]);
+test('hr api endpoints use canonical Site access and explicit application global permissions', function () {
+    $allowedUser = User::factory()->create([
+        'approved_at' => now(),
+    ]);
+    $hiddenUser = User::factory()->create([
+        'approved_at' => now(),
+    ]);
 
-    $tenantOneProfile = profileFor($tenantOneUser, 1, 'API-1');
-    $tenantTwoProfile = profileFor($tenantTwoUser, 2, 'API-2');
+    $allowedProfile = profileFor($allowedUser, $this->allowedSite, 'API-1');
+    $hiddenProfile = profileFor($hiddenUser, $this->hiddenSite, 'API-2');
 
     HrLeaveRequest::factory()->create([
-        'tenant_id' => 1,
-        'user_id' => $tenantOneUser->id,
+        'user_id' => $allowedUser->id,
         'leave_type' => 'annual',
         'status' => 'approved',
         'created_by' => $this->viewer->id,
     ]);
     HrLeaveRequest::factory()->create([
-        'tenant_id' => 2,
-        'user_id' => $tenantTwoUser->id,
+        'user_id' => $hiddenUser->id,
         'leave_type' => 'annual',
         'status' => 'approved',
         'created_by' => $this->viewer->id,
     ]);
 
     HrLeaveBalance::factory()->create([
-        'tenant_id' => 1,
-        'user_id' => $tenantOneUser->id,
+        'user_id' => $allowedUser->id,
         'leave_type' => 'annual',
         'balance_hours' => 40,
         'year' => 2026,
     ]);
     HrLeaveBalance::factory()->create([
-        'tenant_id' => 2,
-        'user_id' => $tenantTwoUser->id,
+        'user_id' => $hiddenUser->id,
         'leave_type' => 'annual',
         'balance_hours' => 80,
         'year' => 2026,
     ]);
 
     HrPosition::query()->create([
-        'tenant_id' => 1,
         'title' => 'API Position 1',
         'code' => 'API-POS-1',
         'employment_type' => 'full_time',
         'created_by' => $this->viewer->id,
     ]);
     HrPosition::query()->create([
-        'tenant_id' => 2,
         'title' => 'API Position 2',
         'code' => 'API-POS-2',
         'employment_type' => 'full_time',
@@ -123,7 +125,6 @@ test('hr api endpoints are permissioned and tenant scoped', function () {
     ]);
 
     $requirement = HrComplianceRequirement::query()->create([
-        'tenant_id' => 1,
         'code' => 'API-COMP',
         'name' => 'API Compliance',
         'category' => 'training',
@@ -134,7 +135,6 @@ test('hr api endpoints are permissioned and tenant scoped', function () {
         'updated_by' => $this->viewer->id,
     ]);
     $otherRequirement = HrComplianceRequirement::query()->create([
-        'tenant_id' => 2,
         'code' => 'API-COMP-2',
         'name' => 'API Compliance 2',
         'category' => 'training',
@@ -145,21 +145,18 @@ test('hr api endpoints are permissioned and tenant scoped', function () {
         'updated_by' => $this->viewer->id,
     ]);
     HrStaffComplianceStatus::query()->create([
-        'tenant_id' => 1,
-        'user_id' => $tenantOneUser->id,
+        'user_id' => $allowedUser->id,
         'requirement_id' => $requirement->id,
         'status' => 'compliant',
     ]);
     HrStaffComplianceStatus::query()->create([
-        'tenant_id' => 2,
-        'user_id' => $tenantTwoUser->id,
+        'user_id' => $hiddenUser->id,
         'requirement_id' => $otherRequirement->id,
         'status' => 'compliant',
     ]);
 
     HrTimeEntry::factory()->create([
-        'tenant_id' => 1,
-        'user_id' => $tenantOneUser->id,
+        'user_id' => $allowedUser->id,
         'entry_date' => '2026-06-10',
         'clock_in' => '2026-06-09 21:00:00',
         'clock_out' => '2026-06-10 05:00:00',
@@ -167,8 +164,7 @@ test('hr api endpoints are permissioned and tenant scoped', function () {
         'created_by' => $this->viewer->id,
     ]);
     HrTimeEntry::factory()->create([
-        'tenant_id' => 2,
-        'user_id' => $tenantTwoUser->id,
+        'user_id' => $hiddenUser->id,
         'entry_date' => '2026-06-10',
         'clock_in' => '2026-06-09 21:00:00',
         'clock_out' => '2026-06-10 05:00:00',
@@ -176,71 +172,108 @@ test('hr api endpoints are permissioned and tenant scoped', function () {
         'created_by' => $this->viewer->id,
     ]);
 
-    HrPayrollRun::factory()->create([
-        'tenant_id' => 1,
+    $allowedPayrollRun = HrPayrollRun::factory()->create([
         'period_start' => '2026-06-01',
         'period_end' => '2026-06-15',
         'status' => 'draft',
         'created_by' => $this->viewer->id,
     ]);
-    HrPayrollRun::factory()->create([
-        'tenant_id' => 2,
+    $hiddenPayrollRun = HrPayrollRun::factory()->create([
         'period_start' => '2026-06-01',
         'period_end' => '2026-06-15',
         'status' => 'draft',
         'created_by' => $this->viewer->id,
     ]);
+    HrPayrollRunItem::query()->create([
+        'payroll_run_id' => $allowedPayrollRun->id,
+        'user_id' => $allowedUser->id,
+    ]);
+    HrPayrollRunItem::query()->create([
+        'payroll_run_id' => $hiddenPayrollRun->id,
+        'user_id' => $hiddenUser->id,
+    ]);
+    $mixedPayrollRun = HrPayrollRun::factory()->create([
+        'period_start' => '2026-06-16',
+        'period_end' => '2026-06-30',
+        'status' => 'draft',
+        'created_by' => $this->viewer->id,
+    ]);
+    foreach ([$allowedUser, $hiddenUser] as $payrollUser) {
+        HrPayrollRunItem::query()->create([
+            'payroll_run_id' => $mixedPayrollRun->id,
+            'user_id' => $payrollUser->id,
+        ]);
+    }
 
-    $this->actingAs($this->viewer, 'sanctum')->getJson('/api/hr/employees')
+    $employees = $this->actingAs($this->viewer, 'sanctum')->getJson('/api/hr/employees')
         ->assertOk()
-        ->assertJsonPath('data.0.employee_number', 'API-1');
+        ->assertJsonCount(2, 'data');
+    expect(collect($employees->json('data'))->pluck('employee_number')->all())
+        ->toEqualCanonicalizing(['API-1', 'API-VIEWER']);
 
-    $this->actingAs($this->viewer, 'sanctum')->getJson("/api/hr/employees/{$tenantOneProfile->id}")
+    $this->actingAs($this->viewer, 'sanctum')->getJson("/api/hr/employees/{$allowedProfile->id}")
         ->assertOk()
         ->assertJsonPath('employee_number', 'API-1');
 
-    $this->actingAs($this->viewer, 'sanctum')->getJson("/api/hr/employees/{$tenantTwoProfile->id}")
+    $this->actingAs($this->viewer, 'sanctum')->getJson("/api/hr/employees/{$hiddenProfile->id}")
         ->assertNotFound();
 
-    $this->actingAs($this->viewer, 'sanctum')->getJson('/api/hr/leave/requests')
+    $leaveRequests = $this->actingAs($this->viewer, 'sanctum')->getJson('/api/hr/leave/requests')
         ->assertOk()
         ->assertJsonCount(1, 'data')
-        ->assertJsonPath('data.0.user_id', $tenantOneUser->id);
+        ->assertJsonPath('data.0.user_id', $allowedUser->id);
 
-    $this->actingAs($this->viewer, 'sanctum')->getJson("/api/hr/leave/balances/{$tenantOneUser->id}")
+    $this->actingAs($this->viewer, 'sanctum')->getJson("/api/hr/leave/balances/{$allowedUser->id}")
         ->assertOk()
         ->assertJsonCount(1)
-        ->assertJsonPath('0.user_id', $tenantOneUser->id);
+        ->assertJsonPath('0.user_id', $allowedUser->id);
 
-    $this->actingAs($this->viewer, 'sanctum')->getJson("/api/hr/leave/balances/{$tenantTwoUser->id}")
-        ->assertForbidden();
+    $this->actingAs($this->viewer, 'sanctum')->getJson("/api/hr/leave/balances/{$hiddenUser->id}")
+        ->assertNotFound();
 
-    $this->actingAs($this->viewer, 'sanctum')->getJson('/api/hr/positions')
+    $positions = $this->actingAs($this->viewer, 'sanctum')->getJson('/api/hr/positions')
         ->assertOk()
-        ->assertJsonPath('data.0.code', 'API-POS-1');
+        ->assertJsonCount(2, 'data');
+    expect(collect($positions->json('data'))->pluck('code')->all())
+        ->toEqualCanonicalizing(['API-POS-1', 'API-POS-2']);
 
-    $this->actingAs($this->viewer, 'sanctum')->getJson('/api/hr/compliance/status')
-        ->assertOk()
-        ->assertJsonCount(1, 'data')
-        ->assertJsonPath('data.0.user_id', $tenantOneUser->id);
-
-    $this->actingAs($this->viewer, 'sanctum')->getJson('/api/hr/time/entries?date_from=2026-06-01&date_to=2026-06-30')
+    $compliance = $this->actingAs($this->viewer, 'sanctum')->getJson('/api/hr/compliance/status')
         ->assertOk()
         ->assertJsonCount(1, 'data')
-        ->assertJsonPath('data.0.user_id', $tenantOneUser->id);
+        ->assertJsonPath('data.0.user_id', $allowedUser->id);
 
-    $this->actingAs($this->viewer, 'sanctum')->getJson('/api/hr/payroll/runs')
+    $timeEntries = $this->actingAs($this->viewer, 'sanctum')->getJson('/api/hr/time/entries?date_from=2026-06-01&date_to=2026-06-30')
         ->assertOk()
         ->assertJsonCount(1, 'data')
-        ->assertJsonPath('data.0.tenant_id', 1);
+        ->assertJsonPath('data.0.user_id', $allowedUser->id);
+
+    $payroll = $this->actingAs($this->viewer, 'sanctum')->getJson('/api/hr/payroll/runs')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $allowedPayrollRun->id);
+
+    $exportPermission = Permission::query()->where('key', 'hr.payroll.export')->firstOrFail();
+    $this->viewer->permissionOverrides()->syncWithoutDetaching([
+        $exportPermission->id => ['allowed' => true],
+    ]);
+    $applicationPayroll = $this->actingAs($this->viewer->fresh(), 'sanctum')
+        ->getJson('/api/hr/payroll/runs')
+        ->assertOk()
+        ->assertJsonCount(3, 'data');
+    expect(collect($applicationPayroll->json('data'))->pluck('id')->all())
+        ->toEqualCanonicalizing([
+            $allowedPayrollRun->id,
+            $hiddenPayrollRun->id,
+            $mixedPayrollRun->id,
+        ]);
 });
 
 test('hr api redacts a sensitive leave reason and never exposes the document path for a non-HR viewer', function () {
     // $this->viewer holds hr.leave.viewAny + approve, but NOT hr.leave.manage.
-    $staff = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $staff = User::factory()->create(['approved_at' => now()]);
+    profileFor($staff, $this->allowedSite, 'API-SENSITIVE');
 
     HrLeaveRequest::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $staff->id,
         'leave_type' => 'sick',
         'status' => 'pending',
@@ -261,11 +294,11 @@ test('hr api redacts a sensitive leave reason and never exposes the document pat
     expect($res->json('data.0'))->not->toHaveKey('supporting_doc_path');
 });
 
-function profileFor(User $user, int $tenantId, string $employeeNumber): HrEmployeeProfile
+function profileFor(User $user, Site $site, string $employeeNumber): HrEmployeeProfile
 {
     return HrEmployeeProfile::factory()->create([
-        'tenant_id' => $tenantId,
         'user_id' => $user->id,
+        'primary_site_id' => $site->id,
         'employee_number' => $employeeNumber,
         'work_email' => strtolower($employeeNumber).'@example.test',
         'position_title' => 'Support Worker',

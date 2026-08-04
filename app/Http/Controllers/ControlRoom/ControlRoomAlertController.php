@@ -1034,7 +1034,7 @@ class ControlRoomAlertController extends Controller
 
         if (! empty($data['site_id'])) {
             $siteAccess->assertCanAccessSiteId($user, (int) $data['site_id'], $bypassPermissions);
-        } elseif (! $siteAccess->isUnrestrictedPlatformUser($user)) {
+        } else {
             abort(403, 'A site is required when creating an alert.');
         }
 
@@ -1045,7 +1045,7 @@ class ControlRoomAlertController extends Controller
 
         if (! empty($data['asset_id'])) {
             $asset = Asset::query()
-                ->with('client:id,site_id,organization_id')
+                ->with('client:id,site_id')
                 ->find((int) $data['asset_id']);
 
             if (! $asset || ! $provenance->assetMatchesTuple($asset, $siteId, $clientId)) {
@@ -1057,7 +1057,7 @@ class ControlRoomAlertController extends Controller
 
         if (! empty($data['fleet_signal_id'])) {
             $signal = FleetSignal::query()
-                ->with('asset.client:id,site_id,organization_id')
+                ->with('asset.client:id,site_id')
                 ->find((int) $data['fleet_signal_id']);
 
             if (! $signal || ! $provenance->fleetSignalMatchesTuple(

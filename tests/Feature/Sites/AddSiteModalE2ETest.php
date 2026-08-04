@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Sites;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AssetGeofence;
 use App\Models\Role;
 use App\Models\Site;
@@ -30,6 +31,15 @@ class AddSiteModalE2ETest extends TestCase
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+        $existingSite = Site::factory()->create(['name' => 'Administration Base']);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $existingSite->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
     }
 
     public function test_modal_creates_a_ready_247_house(): void

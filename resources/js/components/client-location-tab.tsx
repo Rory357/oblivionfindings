@@ -7,12 +7,14 @@ import type {
     GeofenceStatus,
     Resident,
 } from '@/components/resident-tracking/types';
+import { GovernedLocationExportDialog } from '@/components/security-devices/governed-location-export-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { usePersonalLocationPrivacy } from '@/hooks/use-personal-location-privacy';
 import { formatDateTime, formatRelativeTime } from '@/lib/fleet-utils';
 import { Link, router } from '@inertiajs/react';
 import {
@@ -108,6 +110,10 @@ export type ClientLocationData = {
     } | null;
     geofences: Geofence[];
     geofenceStatus?: GeofenceStatus;
+    privacyStatusUrl?: string | null;
+    exportUrl?: string | null;
+    canExport?: boolean;
+    retentionDays?: number | null;
 };
 
 type Props = {
@@ -119,10 +125,6 @@ type Props = {
 };
 
 const REFRESH_INTERVAL = 30_000;
-
-function csvCell(value: unknown): string {
-    return `"${String(value ?? '').replace(/"/g, '""')}"`;
-}
 
 function displayLocation(loc: {
     lat: number;
@@ -163,6 +165,20 @@ export default function ClientLocationTab({
     const [lastUpdatedAt, setLastUpdatedAt] = useState<string>(
         new Date().toISOString(),
     );
+    const [exportOpen, setExportOpen] = useState(false);
+    const {
+        active: privacyActive,
+        checking: privacyChecking,
+        message: privacyMessage,
+        endAccess,
+    } = usePersonalLocationPrivacy({
+        statusUrl: location.privacyStatusUrl,
+        onAccessEnded: () => {
+            setShowHistory(false);
+            setHistoryLocations([]);
+            setExportOpen(false);
+        },
+    });
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -304,47 +320,30 @@ export default function ClientLocationTab({
         fetch(
             `/operations/clients/${clientId}/location/history?${params.toString()}`,
             {
+                cache: 'no-store',
                 headers: {
                     Accept: 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
                 },
             },
         )
-            .then((res) => res.json())
+            .then((res) => {
+                if (res.status === 403) {
+                    endAccess('Location access has ended.');
+                    throw new Error('Location access ended');
+                }
+                if (!res.ok)
+                    throw new Error('Location history could not be loaded');
+
+                return res.json();
+            })
             .then((data) => {
                 setHistoryLocations(data.locations ?? []);
                 setShowHistory(true);
             })
             .catch(() => setHistoryLocations([]))
             .finally(() => setLoadingHistory(false));
-    }, [clientId, dateFrom, dateTo]);
-
-    const handleExport = () => {
-        if (historyLocations.length === 0) return;
-        const csvHeader =
-            'Address,Latitude,Longitude,Timestamp,Speed,Battery\n';
-        const csvBody = historyLocations
-            .map((l) =>
-                [
-                    csvCell(l.address ?? ''),
-                    l.lat,
-                    l.lng,
-                    csvCell(l.timestamp ?? ''),
-                    l.speed ?? '',
-                    l.battery ?? '',
-                ].join(','),
-            )
-            .join('\n');
-        const blob = new Blob([csvHeader + csvBody], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `location-${clientName.replace(/\s+/g, '-')}-${new Date()
-            .toISOString()
-            .slice(0, 10)}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-    };
+    }, [clientId, dateFrom, dateTo, endAccess]);
 
     const handleLocateNow = useCallback(() => {
         if (!tracker?.locate_now_url) return;
@@ -363,6 +362,30 @@ export default function ClientLocationTab({
             },
         );
     }, [tracker?.acknowledge_panic_url]);
+
+    if (!privacyActive) {
+        return (
+            <div className="mt-4">
+                <Card>
+                    <CardContent className="flex items-start gap-3 p-5">
+                        <ShieldOff className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
+                        <div>
+                            <p className="font-medium">
+                                {privacyChecking
+                                    ? 'Checking location access'
+                                    : 'Location access is not active'}
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {privacyChecking
+                                    ? 'Current location, history and export stay hidden until consent and assignment access are confirmed.'
+                                    : `${privacyMessage ?? 'Tracking consent or the personal-tracker assignment is not active.'} Cached location data has been removed from this view.`}
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <div className="mt-4 space-y-4">
@@ -557,8 +580,17 @@ export default function ClientLocationTab({
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={handleExport}
-                                        disabled={historyLocations.length === 0}
+                                        onClick={() => setExportOpen(true)}
+                                        disabled={
+                                            !location.canExport ||
+                                            !location.exportUrl ||
+                                            historyLocations.length === 0
+                                        }
+                                        title={
+                                            location.canExport
+                                                ? 'Export with a recorded operational reason'
+                                                : 'Location export permission is required'
+                                        }
                                     >
                                         <Download className="mr-2 h-4 w-4" />
                                         Export CSV
@@ -634,6 +666,20 @@ export default function ClientLocationTab({
                     </CardContent>
                 </Card>
             )}
+            {location.exportUrl ? (
+                <GovernedLocationExportDialog
+                    open={exportOpen}
+                    onOpenChange={setExportOpen}
+                    exportUrl={location.exportUrl}
+                    subjectLabel={clientName}
+                    dateFrom={dateFrom}
+                    dateTo={dateTo}
+                    retentionDays={location.retentionDays}
+                    onAccessEnded={() =>
+                        endAccess('Location access has ended.')
+                    }
+                />
+            ) : null}
         </div>
     );
 }

@@ -26,8 +26,8 @@ import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
     FieldErr,
-    SelectInput,
     Segmented,
+    SelectInput,
     StepHead,
     SubHead,
     TilePicker,
@@ -41,7 +41,6 @@ import {
     type WizardStep,
 } from '@/components/wizard/shell';
 import { cn } from '@/lib/utils';
-import { CONTACT_TYPES } from '@/pages/sites/contacts/_helpers';
 import {
     NZ_REGION_OPTIONS,
     RESOURCE_TYPES,
@@ -50,6 +49,7 @@ import {
     deriveNzRegion,
     type SiteType,
 } from '@/pages/sites/_wizard';
+import { CONTACT_TYPES } from '@/pages/sites/contacts/_helpers';
 import { useForm, usePage } from '@inertiajs/react';
 import {
     Building2,
@@ -70,11 +70,10 @@ import {
     Sparkles,
     Star,
     Trash2,
-    UploadCloud,
     Users,
     Wallet,
 } from 'lucide-react';
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Reference data shape (Inertia `addSite` prop from SiteController)  */
@@ -156,7 +155,11 @@ export type SiteContactRow = {
     is_primary: boolean;
 };
 export type RoomRow = { name: string; notes: string; is_assignable: boolean };
-export type ResourceRow = { name: string; resource_type: string; capacity: string };
+export type ResourceRow = {
+    name: string;
+    resource_type: string;
+    capacity: string;
+};
 export type ZoneRow = { name: string; zone_type: string };
 export type ChecklistRow = {
     template_id: number;
@@ -244,19 +247,64 @@ type StepKey =
     | 'review';
 
 const STEPS: readonly (WizardStep & { key: StepKey })[] = [
-    { key: 'basics', label: 'Basics', icon: Building2, blurb: 'Type, name & lead' },
-    { key: 'location', label: 'Location', icon: MapPin, blurb: 'Address & geofence' },
-    { key: 'spaces', label: 'Spaces', icon: Package, blurb: 'Rooms, resources & zones' },
-    { key: 'rostering', label: 'Rostering', icon: CalendarClock, blurb: 'Coverage & credentials' },
+    {
+        key: 'basics',
+        label: 'Basics',
+        icon: Building2,
+        blurb: 'Type, name & lead',
+    },
+    {
+        key: 'location',
+        label: 'Location',
+        icon: MapPin,
+        blurb: 'Address & geofence',
+    },
+    {
+        key: 'spaces',
+        label: 'Spaces',
+        icon: Package,
+        blurb: 'Rooms, resources & zones',
+    },
+    {
+        key: 'rostering',
+        label: 'Rostering',
+        icon: CalendarClock,
+        blurb: 'Coverage & credentials',
+    },
     { key: 'contacts', label: 'Contacts', icon: Users, blurb: 'Who to call' },
-    { key: 'equipment', label: 'Medication', icon: Pill, blurb: 'Where meds are stored' },
-    { key: 'documents', label: 'Documents', icon: FileText, blurb: 'Files & certificates' },
-    { key: 'finance', label: 'Property & finance', icon: Wallet, blurb: 'Tenancy & budget' },
-    { key: 'review', label: 'Review', icon: CheckCircle2, blurb: 'Risk, safety & create' },
+    {
+        key: 'equipment',
+        label: 'Medication',
+        icon: Pill,
+        blurb: 'Where meds are stored',
+    },
+    {
+        key: 'documents',
+        label: 'Documents',
+        icon: FileText,
+        blurb: 'Files & certificates',
+    },
+    {
+        key: 'finance',
+        label: 'Property & finance',
+        icon: Wallet,
+        blurb: 'Tenancy & budget',
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        icon: CheckCircle2,
+        blurb: 'Risk, safety & create',
+    },
 ] as const;
 
 export function defaultGeofence(): GeofenceForm {
-    return { mode: 'radius', radius_m: 120, breach_type: 'both', is_active: true };
+    return {
+        mode: 'radius',
+        radius_m: 120,
+        breach_type: 'both',
+        is_active: true,
+    };
 }
 
 function initialForm(): SiteWizardForm {
@@ -434,12 +482,7 @@ export function AddSiteDialog(props: AddSiteDialogProps) {
     return props.isOpen ? <AddSiteBody {...props} /> : null;
 }
 
-function AddSiteBody({
-    isOpen,
-    onClose,
-    onSaved,
-    ...ref
-}: AddSiteDialogProps) {
+function AddSiteBody({ isOpen, onClose, onSaved, ...ref }: AddSiteDialogProps) {
     const page = usePage<{ flash?: { created_site_id?: number | null } }>();
     const form = useForm<SiteWizardForm>(initialForm());
     const { data, setData, processing } = form;
@@ -553,7 +596,11 @@ function AddSiteBody({
                 }
                 footerEnd={
                     <>
-                        <Button type="button" variant="outline" onClick={requestClose}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={requestClose}
+                        >
                             Cancel
                         </Button>
                         {isReview ? (
@@ -578,11 +625,13 @@ function AddSiteBody({
                                 >
                                     {processing ? (
                                         <>
-                                            <Loader2 className="h-4 w-4 animate-spin" /> Creating…
+                                            <Loader2 className="h-4 w-4 animate-spin" />{' '}
+                                            Creating…
                                         </>
                                     ) : (
                                         <>
-                                            <Check className="h-4 w-4" /> Create site
+                                            <Check className="h-4 w-4" /> Create
+                                            site
                                         </>
                                     )}
                                 </Button>
@@ -713,14 +762,14 @@ function StepBasics({ ctx }: { ctx: SiteStepCtx }) {
                 </div>
 
                 <Field
-                    label="Site lead / manager"
-                    hint="who's responsible for this site"
+                    label="Responsible staff member"
+                    hint="current approved staff accountable for this Site"
                     span
                 >
                     <SelectInput
                         value={data.primary_contact_user_id}
                         onChange={(v) => set('primary_contact_user_id', v)}
-                        placeholder="Select a lead…"
+                        placeholder="Select current staff…"
                         options={ref.users.map((u) => ({
                             value: String(u.id),
                             label: u.name,
@@ -738,7 +787,8 @@ function StepBasics({ ctx }: { ctx: SiteStepCtx }) {
                             Site is active and operational
                         </div>
                         <div className="mt-0.5 text-[13px] text-muted-foreground">
-                            Active sites lead the roster. You can deactivate later.
+                            Active sites lead the roster. You can deactivate
+                            later.
                         </div>
                     </div>
                 </div>
@@ -799,7 +849,10 @@ function StepLocation({ ctx }: { ctx: SiteStepCtx }) {
             patch.longitude = String(shape.center.lng);
         }
         if (shape.radius_m)
-            patch.geofence = { ...data.geofence, radius_m: Math.round(shape.radius_m) };
+            patch.geofence = {
+                ...data.geofence,
+                radius_m: Math.round(shape.radius_m),
+            };
         setMany(patch);
     };
 
@@ -833,7 +886,9 @@ function StepLocation({ ctx }: { ctx: SiteStepCtx }) {
                     <Field label="Address line 2">
                         <Input
                             value={data.address_line_2}
-                            onChange={(e) => set('address_line_2', e.target.value)}
+                            onChange={(e) =>
+                                set('address_line_2', e.target.value)
+                            }
                             placeholder="Apartment, unit (optional)"
                         />
                     </Field>
@@ -855,7 +910,12 @@ function StepLocation({ ctx }: { ctx: SiteStepCtx }) {
                             <Input
                                 value={data.postcode}
                                 onChange={(e) =>
-                                    set('postcode', e.target.value.replace(/\D/g, '').slice(0, 4))
+                                    set(
+                                        'postcode',
+                                        e.target.value
+                                            .replace(/\D/g, '')
+                                            .slice(0, 4),
+                                    )
                                 }
                                 placeholder="1010"
                             />
@@ -865,7 +925,10 @@ function StepLocation({ ctx }: { ctx: SiteStepCtx }) {
                                 value={data.region}
                                 onChange={(v) => set('region', v)}
                                 placeholder="Select region"
-                                options={NZ_REGION_OPTIONS.map((r) => ({ value: r, label: r }))}
+                                options={NZ_REGION_OPTIONS.map((r) => ({
+                                    value: r,
+                                    label: r,
+                                }))}
                             />
                         </Field>
                     </div>
@@ -873,7 +936,9 @@ function StepLocation({ ctx }: { ctx: SiteStepCtx }) {
                         <Textarea
                             rows={2}
                             value={data.access_instructions}
-                            onChange={(e) => set('access_instructions', e.target.value)}
+                            onChange={(e) =>
+                                set('access_instructions', e.target.value)
+                            }
                             placeholder="Lockbox code, parking, gate access…"
                         />
                     </Field>
@@ -887,12 +952,18 @@ function StepLocation({ ctx }: { ctx: SiteStepCtx }) {
                             <div className="overflow-hidden rounded-xl border border-border">
                                 <GeofenceDrawMap
                                     key={mapKey}
-                                    center={{ lat: lat as number, lng: lng as number }}
+                                    center={{
+                                        lat: lat as number,
+                                        lng: lng as number,
+                                    }}
                                     zoom={16}
                                     height={240}
                                     initialShape={{
                                         type: 'circle',
-                                        center: { lat: lat as number, lng: lng as number },
+                                        center: {
+                                            lat: lat as number,
+                                            lng: lng as number,
+                                        },
                                         radius_m: data.geofence.radius_m,
                                     }}
                                     onShapeChange={onShapeChange}
@@ -913,7 +984,9 @@ function StepLocation({ ctx }: { ctx: SiteStepCtx }) {
                                     max={500}
                                     step={10}
                                     value={data.geofence.radius_m}
-                                    onChange={(e) => setRadius(Number(e.target.value))}
+                                    onChange={(e) =>
+                                        setRadius(Number(e.target.value))
+                                    }
                                     onPointerUp={() => setMapKey((k) => k + 1)}
                                     onKeyUp={() => setMapKey((k) => k + 1)}
                                     className="w-full accent-primary"
@@ -926,7 +999,8 @@ function StepLocation({ ctx }: { ctx: SiteStepCtx }) {
                                     onChange={(v) =>
                                         set('geofence', {
                                             ...data.geofence,
-                                            breach_type: v as GeofenceForm['breach_type'],
+                                            breach_type:
+                                                v as GeofenceForm['breach_type'],
                                         })
                                     }
                                     options={BREACH_OPTIONS}
@@ -936,17 +1010,22 @@ function StepLocation({ ctx }: { ctx: SiteStepCtx }) {
                                 <Switch
                                     checked={data.geofence.is_active}
                                     onCheckedChange={(v) =>
-                                        set('geofence', { ...data.geofence, is_active: v })
+                                        set('geofence', {
+                                            ...data.geofence,
+                                            is_active: v,
+                                        })
                                     }
                                 />
                                 <span className="text-[13px] text-muted-foreground">
-                                    Geofence active (feeds breach alerts &amp; readiness)
+                                    Geofence active (feeds breach alerts &amp;
+                                    readiness)
                                 </span>
                             </label>
                         </>
                     ) : (
                         <div className="grid h-[240px] place-items-center rounded-xl border border-dashed border-border bg-muted/30 px-6 text-center text-[13px] text-muted-foreground">
-                            Search an address to drop a pin and draw the geofence here.
+                            Search an address to drop a pin and draw the
+                            geofence here.
                         </div>
                     )}
                 </div>
@@ -986,7 +1065,9 @@ function StepSpaces({ ctx }: { ctx: SiteStepCtx }) {
                             type="number"
                             min={0}
                             value={data.total_capacity}
-                            onChange={(e) => set('total_capacity', e.target.value)}
+                            onChange={(e) =>
+                                set('total_capacity', e.target.value)
+                            }
                             placeholder="e.g. 6"
                             className="max-w-[160px]"
                         />
@@ -1000,17 +1081,25 @@ function StepSpaces({ ctx }: { ctx: SiteStepCtx }) {
                         rows={data.resources}
                         onChange={(rows) => set('resources', rows)}
                         empty="No resources yet — add meeting rooms, offices or parking."
-                        makeEmpty={() => ({ name: '', resource_type: 'meeting_room', capacity: '' })}
+                        makeEmpty={() => ({
+                            name: '',
+                            resource_type: 'meeting_room',
+                            capacity: '',
+                        })}
                         renderRow={(row, update) => (
                             <div className="grid gap-2 sm:grid-cols-[1.5fr_1fr_0.8fr]">
                                 <Input
                                     value={row.name}
-                                    onChange={(e) => update({ name: e.target.value })}
+                                    onChange={(e) =>
+                                        update({ name: e.target.value })
+                                    }
                                     placeholder="Resource name"
                                 />
                                 <SelectInput
                                     value={row.resource_type}
-                                    onChange={(v) => update({ resource_type: v })}
+                                    onChange={(v) =>
+                                        update({ resource_type: v })
+                                    }
                                     placeholder="Type"
                                     options={RESOURCE_TYPES}
                                 />
@@ -1018,7 +1107,9 @@ function StepSpaces({ ctx }: { ctx: SiteStepCtx }) {
                                     type="number"
                                     min={0}
                                     value={row.capacity}
-                                    onChange={(e) => update({ capacity: e.target.value })}
+                                    onChange={(e) =>
+                                        update({ capacity: e.target.value })
+                                    }
                                     placeholder="Cap."
                                 />
                             </div>
@@ -1036,7 +1127,9 @@ function StepSpaces({ ctx }: { ctx: SiteStepCtx }) {
                             <div className="grid gap-2 sm:grid-cols-2">
                                 <Input
                                     value={row.name}
-                                    onChange={(e) => update({ name: e.target.value })}
+                                    onChange={(e) =>
+                                        update({ name: e.target.value })
+                                    }
                                     placeholder="Zone name"
                                 />
                                 <SelectInput
@@ -1055,25 +1148,39 @@ function StepSpaces({ ctx }: { ctx: SiteStepCtx }) {
                         rows={data.rooms}
                         onChange={(rows) => set('rooms', rows)}
                         empty="No rooms yet — add bedrooms and communal spaces like the lounge or kitchen."
-                        makeEmpty={() => ({ name: '', notes: '', is_assignable: true })}
+                        makeEmpty={() => ({
+                            name: '',
+                            notes: '',
+                            is_assignable: true,
+                        })}
                         renderRow={(row, update) => (
                             <div className="grid gap-2 sm:grid-cols-[1.3fr_1fr_1.3fr]">
                                 <Input
                                     value={row.name}
-                                    onChange={(e) => update({ name: e.target.value })}
+                                    onChange={(e) =>
+                                        update({ name: e.target.value })
+                                    }
                                     placeholder="e.g. Bedroom 1, Lounge"
                                 />
                                 <SelectInput
-                                    value={row.is_assignable ? 'bedroom' : 'communal'}
+                                    value={
+                                        row.is_assignable
+                                            ? 'bedroom'
+                                            : 'communal'
+                                    }
                                     onChange={(v) =>
-                                        update({ is_assignable: v === 'bedroom' })
+                                        update({
+                                            is_assignable: v === 'bedroom',
+                                        })
                                     }
                                     placeholder="Room type"
                                     options={ROOM_TYPE_OPTIONS}
                                 />
                                 <Input
                                     value={row.notes}
-                                    onChange={(e) => update({ notes: e.target.value })}
+                                    onChange={(e) =>
+                                        update({ notes: e.target.value })
+                                    }
                                     placeholder="Notes (optional)"
                                 />
                             </div>
@@ -1117,13 +1224,19 @@ function RepeatableSpaces<T>({
                 >
                     <div className="min-w-0 flex-1">
                         {renderRow(row, (patch) =>
-                            onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r))),
+                            onChange(
+                                rows.map((r, idx) =>
+                                    idx === i ? { ...r, ...patch } : r,
+                                ),
+                            ),
                         )}
                     </div>
                     <button
                         type="button"
                         aria-label={`Remove ${title.toLowerCase()}`}
-                        onClick={() => onChange(rows.filter((_, idx) => idx !== i))}
+                        onClick={() =>
+                            onChange(rows.filter((_, idx) => idx !== i))
+                        }
                         className="mt-1 text-muted-foreground hover:text-status-critical"
                     >
                         <Trash2 className="h-4 w-4" />
@@ -1184,7 +1297,8 @@ function StepContacts({ ctx }: { ctx: SiteStepCtx }) {
             <div className="grid gap-2.5">
                 {contacts.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-border p-3.5 text-center text-[13px] text-muted-foreground">
-                        No contacts yet. Add at least a site lead and an emergency contact.
+                        No contacts yet. Add at least a site lead and an
+                        emergency contact.
                     </div>
                 ) : null}
                 {contacts.map((c, i) => (
@@ -1204,23 +1318,31 @@ function StepContacts({ ctx }: { ctx: SiteStepCtx }) {
                             />
                             <Input
                                 value={c.name}
-                                onChange={(e) => update(i, { name: e.target.value })}
+                                onChange={(e) =>
+                                    update(i, { name: e.target.value })
+                                }
                                 placeholder="Full name"
                             />
                             <Input
                                 value={c.role}
-                                onChange={(e) => update(i, { role: e.target.value })}
+                                onChange={(e) =>
+                                    update(i, { role: e.target.value })
+                                }
                                 placeholder="Role (optional)"
                             />
                             <Input
                                 value={c.phone}
-                                onChange={(e) => update(i, { phone: e.target.value })}
+                                onChange={(e) =>
+                                    update(i, { phone: e.target.value })
+                                }
                                 placeholder="Phone"
                             />
                             <Input
                                 type="email"
                                 value={c.email}
-                                onChange={(e) => update(i, { email: e.target.value })}
+                                onChange={(e) =>
+                                    update(i, { email: e.target.value })
+                                }
                                 placeholder="Email (optional)"
                             />
                         </div>
@@ -1230,19 +1352,29 @@ function StepContacts({ ctx }: { ctx: SiteStepCtx }) {
                                 onClick={() => setPrimary(i)}
                                 className={cn(
                                     'inline-flex items-center gap-1.5 text-[13px] font-medium',
-                                    c.is_primary ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+                                    c.is_primary
+                                        ? 'text-primary'
+                                        : 'text-muted-foreground hover:text-foreground',
                                 )}
                             >
                                 <Star
-                                    className={cn('h-3.5 w-3.5', c.is_primary && 'fill-primary')}
+                                    className={cn(
+                                        'h-3.5 w-3.5',
+                                        c.is_primary && 'fill-primary',
+                                    )}
                                 />
-                                {c.is_primary ? 'Primary contact' : 'Set as primary'}
+                                {c.is_primary
+                                    ? 'Primary contact'
+                                    : 'Set as primary'}
                             </button>
                             <button
                                 type="button"
                                 aria-label="Remove contact"
                                 onClick={() =>
-                                    set('contacts', contacts.filter((_, idx) => idx !== i))
+                                    set(
+                                        'contacts',
+                                        contacts.filter((_, idx) => idx !== i),
+                                    )
                                 }
                                 className="text-muted-foreground hover:text-status-critical"
                             >
@@ -1252,7 +1384,12 @@ function StepContacts({ ctx }: { ctx: SiteStepCtx }) {
                     </div>
                 ))}
                 <div>
-                    <Button type="button" variant="outline" size="sm" onClick={add}>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={add}
+                    >
                         <Plus className="h-3.5 w-3.5" /> Add contact
                     </Button>
                 </div>
@@ -1278,7 +1415,9 @@ function StepEquipment({ ctx }: { ctx: SiteStepCtx }) {
                 <Field label="Medication storage location" span>
                     <Input
                         value={data.medication_storage_location}
-                        onChange={(e) => set('medication_storage_location', e.target.value)}
+                        onChange={(e) =>
+                            set('medication_storage_location', e.target.value)
+                        }
                         placeholder="e.g. Locked cabinet in the office"
                     />
                 </Field>
@@ -1318,10 +1457,15 @@ function StepDocuments({ ctx }: { ctx: SiteStepCtx }) {
     const update = (i: number, patch: Partial<SiteDocumentDraft>) =>
         set(
             'documents',
-            data.documents.map((d, idx) => (idx === i ? { ...d, ...patch } : d)),
+            data.documents.map((d, idx) =>
+                idx === i ? { ...d, ...patch } : d,
+            ),
         );
     const remove = (i: number) =>
-        set('documents', data.documents.filter((_, idx) => idx !== i));
+        set(
+            'documents',
+            data.documents.filter((_, idx) => idx !== i),
+        );
 
     return (
         <div>
@@ -1331,30 +1475,45 @@ function StepDocuments({ ctx }: { ctx: SiteStepCtx }) {
                 blurb="Drag in site certificates, the lease, evacuation plans and more."
             />
             <div className="grid gap-3">
-                <FileDropzone onFiles={addFiles} hint="PDF, Word, images — up to 50 MB each" />
+                <FileDropzone
+                    onFiles={addFiles}
+                    hint="PDF, Word, images — up to 50 MB each"
+                />
 
                 {/* Staged files */}
                 {data.documents.length > 0 ? (
                     <div className="grid gap-2">
                         {data.documents.map((d, i) => (
-                            <StagedFileCard key={i} file={d.file} onRemove={() => remove(i)}>
+                            <StagedFileCard
+                                key={i}
+                                file={d.file}
+                                onRemove={() => remove(i)}
+                            >
                                 <div className="grid gap-2 sm:grid-cols-[1.4fr_1fr_1fr]">
                                     <Input
                                         value={d.title}
-                                        onChange={(e) => update(i, { title: e.target.value })}
+                                        onChange={(e) =>
+                                            update(i, { title: e.target.value })
+                                        }
                                         placeholder="Title"
                                         className="h-8"
                                     />
                                     <SelectInput
                                         value={d.category}
-                                        onChange={(v) => update(i, { category: v })}
+                                        onChange={(v) =>
+                                            update(i, { category: v })
+                                        }
                                         placeholder="Category"
                                         options={DOCUMENT_CATEGORIES}
                                     />
                                     <Input
                                         type="date"
                                         value={d.expiry_date}
-                                        onChange={(e) => update(i, { expiry_date: e.target.value })}
+                                        onChange={(e) =>
+                                            update(i, {
+                                                expiry_date: e.target.value,
+                                            })
+                                        }
                                         className="h-8"
                                     />
                                 </div>
@@ -1399,8 +1558,16 @@ const ALL_WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri'];
 
 const PRESETS: { key: string; label: string; desc: string }[] = [
-    { key: '247', label: '24/7 staffed', desc: 'Day, evening & overnight, every day' },
-    { key: 'wakingnights', label: 'Waking nights', desc: 'Awake overnight cover, every night' },
+    {
+        key: '247',
+        label: '24/7 staffed',
+        desc: 'Day, evening & overnight, every day',
+    },
+    {
+        key: 'wakingnights',
+        label: 'Waking nights',
+        desc: 'Awake overnight cover, every night',
+    },
     { key: 'daysupport', label: 'Day support', desc: '7am–7pm, every day' },
     { key: 'office', label: 'Office hours', desc: 'Mon–Fri, 9–5' },
 ];
@@ -1415,21 +1582,87 @@ function presetRows(key: string): CoverageRule[] {
     };
     if (key === '247')
         return [
-            { ...base, name: 'Day cover', coverage_type: 'day', days: [...ALL_WEEK], starts_time: '07:00', ends_time: '15:00', minimum_staff: 2, shift_type: 'standard', allow_overstaffing: true, roles: { caregiver: 2, driver: 0, med_competent: 1 } },
-            { ...base, name: 'Evening cover', coverage_type: 'evening', days: [...ALL_WEEK], starts_time: '15:00', ends_time: '23:00', minimum_staff: 2, shift_type: 'standard', allow_overstaffing: true, roles: { caregiver: 2, driver: 0, med_competent: 1 } },
-            { ...base, name: 'Overnight cover', coverage_type: 'overnight', days: [...ALL_WEEK], starts_time: '23:00', ends_time: '07:00', minimum_staff: 1, shift_type: 'sleepover', allow_overstaffing: false, roles: { caregiver: 1, driver: 0, med_competent: 0 } },
+            {
+                ...base,
+                name: 'Day cover',
+                coverage_type: 'day',
+                days: [...ALL_WEEK],
+                starts_time: '07:00',
+                ends_time: '15:00',
+                minimum_staff: 2,
+                shift_type: 'standard',
+                allow_overstaffing: true,
+                roles: { caregiver: 2, driver: 0, med_competent: 1 },
+            },
+            {
+                ...base,
+                name: 'Evening cover',
+                coverage_type: 'evening',
+                days: [...ALL_WEEK],
+                starts_time: '15:00',
+                ends_time: '23:00',
+                minimum_staff: 2,
+                shift_type: 'standard',
+                allow_overstaffing: true,
+                roles: { caregiver: 2, driver: 0, med_competent: 1 },
+            },
+            {
+                ...base,
+                name: 'Overnight cover',
+                coverage_type: 'overnight',
+                days: [...ALL_WEEK],
+                starts_time: '23:00',
+                ends_time: '07:00',
+                minimum_staff: 1,
+                shift_type: 'sleepover',
+                allow_overstaffing: false,
+                roles: { caregiver: 1, driver: 0, med_competent: 0 },
+            },
         ];
     if (key === 'wakingnights')
         return [
-            { ...base, name: 'Waking night', coverage_type: 'overnight', days: [...ALL_WEEK], starts_time: '22:00', ends_time: '06:00', minimum_staff: 1, shift_type: 'standard', allow_overstaffing: false, roles: { caregiver: 1, driver: 0, med_competent: 0 } },
+            {
+                ...base,
+                name: 'Waking night',
+                coverage_type: 'overnight',
+                days: [...ALL_WEEK],
+                starts_time: '22:00',
+                ends_time: '06:00',
+                minimum_staff: 1,
+                shift_type: 'standard',
+                allow_overstaffing: false,
+                roles: { caregiver: 1, driver: 0, med_competent: 0 },
+            },
         ];
     if (key === 'daysupport')
         return [
-            { ...base, name: 'Day support', coverage_type: 'day', days: [...ALL_WEEK], starts_time: '07:00', ends_time: '19:00', minimum_staff: 1, shift_type: 'standard', allow_overstaffing: true, roles: { caregiver: 1, driver: 0, med_competent: 0 } },
+            {
+                ...base,
+                name: 'Day support',
+                coverage_type: 'day',
+                days: [...ALL_WEEK],
+                starts_time: '07:00',
+                ends_time: '19:00',
+                minimum_staff: 1,
+                shift_type: 'standard',
+                allow_overstaffing: true,
+                roles: { caregiver: 1, driver: 0, med_competent: 0 },
+            },
         ];
     if (key === 'office')
         return [
-            { ...base, name: 'Office hours', coverage_type: 'day', days: [...WEEKDAYS], starts_time: '09:00', ends_time: '17:00', minimum_staff: 1, shift_type: 'standard', allow_overstaffing: true, roles: emptyRoles() },
+            {
+                ...base,
+                name: 'Office hours',
+                coverage_type: 'day',
+                days: [...WEEKDAYS],
+                starts_time: '09:00',
+                ends_time: '17:00',
+                minimum_staff: 1,
+                shift_type: 'standard',
+                allow_overstaffing: true,
+                roles: emptyRoles(),
+            },
         ];
     return [];
 }
@@ -1455,7 +1688,8 @@ function groupCopiedCoverage(rows: AddSiteCopyableCoverage[]): CoverageRule[] {
     for (const r of rows) {
         const roles = emptyRoles();
         for (const rr of r.role_requirements ?? []) {
-            if (rr.key in roles) roles[rr.key as keyof typeof roles] = rr.minimum;
+            if (rr.key in roles)
+                roles[rr.key as keyof typeof roles] = rr.minimum;
         }
         const key = JSON.stringify([
             r.name,
@@ -1469,18 +1703,24 @@ function groupCopiedCoverage(rows: AddSiteCopyableCoverage[]): CoverageRule[] {
         ]);
         const existing = map.get(key);
         if (existing) {
-            if (!existing.days.includes(r.day_of_week)) existing.days.push(r.day_of_week);
+            if (!existing.days.includes(r.day_of_week))
+                existing.days.push(r.day_of_week);
         } else {
             map.set(key, {
                 name: r.name,
-                coverage_type: (r.coverage_type as CoverageRule['coverage_type']) ?? 'custom',
+                coverage_type:
+                    (r.coverage_type as CoverageRule['coverage_type']) ??
+                    'custom',
                 days: [r.day_of_week],
                 starts_time: r.starts_time,
                 ends_time: r.ends_time,
                 minimum_staff: r.minimum_staff,
-                shift_type: (r.shift_type as CoverageRule['shift_type']) ?? 'standard',
+                shift_type:
+                    (r.shift_type as CoverageRule['shift_type']) ?? 'standard',
                 allow_overstaffing: r.allow_overstaffing,
-                service_context_id: r.service_context_id ? String(r.service_context_id) : '',
+                service_context_id: r.service_context_id
+                    ? String(r.service_context_id)
+                    : '',
                 roles,
             });
         }
@@ -1492,9 +1732,19 @@ function groupCopiedCoverage(rows: AddSiteCopyableCoverage[]): CoverageRule[] {
     }));
 }
 
-function credentialKeyForName(name: string, catalogue: AddSiteCredential[]): string {
-    const hit = catalogue.find((c) => c.name.toLowerCase() === name.toLowerCase());
-    return hit ? hit.key : name.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 50);
+function credentialKeyForName(
+    name: string,
+    catalogue: AddSiteCredential[],
+): string {
+    const hit = catalogue.find(
+        (c) => c.name.toLowerCase() === name.toLowerCase(),
+    );
+    return hit
+        ? hit.key
+        : name
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '_')
+              .slice(0, 50);
 }
 
 /* ---- small controls ---- */
@@ -1516,7 +1766,9 @@ function Stepper({
     return (
         <div className="flex items-center justify-between gap-2">
             {label ? (
-                <span className="text-[13px] text-muted-foreground">{label}</span>
+                <span className="text-[13px] text-muted-foreground">
+                    {label}
+                </span>
             ) : null}
             <div className="inline-flex items-center gap-1">
                 <button
@@ -1553,7 +1805,9 @@ function DayChips({
     onChange: (days: string[]) => void;
 }) {
     const toggle = (k: string) =>
-        onChange(value.includes(k) ? value.filter((d) => d !== k) : [...value, k]);
+        onChange(
+            value.includes(k) ? value.filter((d) => d !== k) : [...value, k],
+        );
     return (
         <div className="inline-flex flex-wrap gap-1">
             {DAY_DEFS.map((d, i) => {
@@ -1599,7 +1853,8 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
         const credentials: CredentialRow[] = source.credentials.map((c) => ({
             key: credentialKeyForName(c.name, ref.credentialCatalogue),
             name: c.name,
-            category: c.category === 'recommended' ? 'recommended' : 'mandatory',
+            category:
+                c.category === 'recommended' ? 'recommended' : 'mandatory',
             expiry_period_months: c.expiry_period_months ?? '',
         }));
         ctx.setMany({
@@ -1615,12 +1870,18 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
             data.coverage.map((r, idx) => (idx === i ? { ...r, ...patch } : r)),
         );
     const removeRule = (i: number) =>
-        set('coverage', data.coverage.filter((_, idx) => idx !== i));
+        set(
+            'coverage',
+            data.coverage.filter((_, idx) => idx !== i),
+        );
 
     const toggleCredential = (cat: AddSiteCredential) => {
         const has = data.credentials.some((c) => c.key === cat.key);
         if (has) {
-            set('credentials', data.credentials.filter((c) => c.key !== cat.key));
+            set(
+                'credentials',
+                data.credentials.filter((c) => c.key !== cat.key),
+            );
         } else {
             set('credentials', [
                 ...data.credentials,
@@ -1636,7 +1897,9 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
     const updateCredential = (key: string, patch: Partial<CredentialRow>) =>
         set(
             'credentials',
-            data.credentials.map((c) => (c.key === key ? { ...c, ...patch } : c)),
+            data.credentials.map((c) =>
+                c.key === key ? { ...c, ...patch } : c,
+            ),
         );
 
     return (
@@ -1670,7 +1933,8 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
                 <div>
                     <SubHead icon={Sparkles}>Quick coverage presets</SubHead>
                     <p className="mt-1 text-[11px] text-muted-foreground">
-                        Tap one to add ready-made coverage rules, then tweak them below.
+                        Tap one to add ready-made coverage rules, then tweak
+                        them below.
                     </p>
                     <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                         {PRESETS.map((p) => (
@@ -1698,14 +1962,17 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
 
                 {/* Coverage requirements */}
                 <div>
-                    <SubHead icon={CalendarClock}>Coverage requirements</SubHead>
+                    <SubHead icon={CalendarClock}>
+                        Coverage requirements
+                    </SubHead>
                     {err('coverage_days') ? (
                         <FieldErr>{err('coverage_days')}</FieldErr>
                     ) : null}
                     <div className="mt-2 grid gap-3">
                         {data.coverage.length === 0 ? (
                             <div className="rounded-xl border border-dashed border-border p-5 text-center text-[13px] text-muted-foreground">
-                                No coverage rules yet — pick a preset above or add a custom rule.
+                                No coverage rules yet — pick a preset above or
+                                add a custom rule.
                             </div>
                         ) : null}
                         {data.coverage.map((rule, i) => (
@@ -1723,9 +1990,15 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={() => set('coverage', [...data.coverage, emptyCoverageRule()])}
+                                onClick={() =>
+                                    set('coverage', [
+                                        ...data.coverage,
+                                        emptyCoverageRule(),
+                                    ])
+                                }
                             >
-                                <Plus className="h-3.5 w-3.5" /> Add coverage rule
+                                <Plus className="h-3.5 w-3.5" /> Add coverage
+                                rule
                             </Button>
                         </div>
                     </div>
@@ -1733,10 +2006,14 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
 
                 {/* Required credentials */}
                 <div>
-                    <SubHead icon={ShieldCheck}>Required staff credentials</SubHead>
+                    <SubHead icon={ShieldCheck}>
+                        Required staff credentials
+                    </SubHead>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                         {ref.credentialCatalogue.map((cat) => {
-                            const on = data.credentials.some((c) => c.key === cat.key);
+                            const on = data.credentials.some(
+                                (c) => c.key === cat.key,
+                            );
                             return (
                                 <button
                                     key={cat.key}
@@ -1750,7 +2027,11 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
                                             : 'border-border bg-card text-foreground hover:border-primary/50',
                                     )}
                                 >
-                                    {on ? <Check className="h-3 w-3" /> : <Shield className="h-3 w-3" />}
+                                    {on ? (
+                                        <Check className="h-3 w-3" />
+                                    ) : (
+                                        <Shield className="h-3 w-3" />
+                                    )}
                                     {cat.name}
                                 </button>
                             );
@@ -1763,13 +2044,25 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
                                     key={c.key}
                                     className="grid items-center gap-2 rounded-lg border border-border bg-card/70 p-2.5 sm:grid-cols-[1.4fr_1.2fr_1fr]"
                                 >
-                                    <span className="text-[13px] font-semibold">{c.name}</span>
+                                    <span className="text-[13px] font-semibold">
+                                        {c.name}
+                                    </span>
                                     <Segmented
                                         value={c.category}
-                                        onChange={(v) => updateCredential(c.key, { category: v })}
+                                        onChange={(v) =>
+                                            updateCredential(c.key, {
+                                                category: v,
+                                            })
+                                        }
                                         options={[
-                                            { value: 'mandatory', label: 'Mandatory' },
-                                            { value: 'recommended', label: 'Recommended' },
+                                            {
+                                                value: 'mandatory',
+                                                label: 'Mandatory',
+                                            },
+                                            {
+                                                value: 'recommended',
+                                                label: 'Recommended',
+                                            },
                                         ]}
                                     />
                                     <div className="flex items-center gap-1.5">
@@ -1777,10 +2070,13 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
                                             type="number"
                                             min={0}
                                             max={120}
-                                            value={String(c.expiry_period_months ?? '')}
+                                            value={String(
+                                                c.expiry_period_months ?? '',
+                                            )}
                                             onChange={(e) =>
                                                 updateCredential(c.key, {
-                                                    expiry_period_months: e.target.value,
+                                                    expiry_period_months:
+                                                        e.target.value,
                                                 })
                                             }
                                             placeholder="—"
@@ -1795,7 +2091,6 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
                         </div>
                     ) : null}
                 </div>
-
             </div>
         </div>
     );
@@ -1835,7 +2130,10 @@ function CoverageCard({
 
             <div className="grid gap-3">
                 <Field label="Days">
-                    <DayChips value={rule.days} onChange={(days) => onChange({ days })} />
+                    <DayChips
+                        value={rule.days}
+                        onChange={(days) => onChange({ days })}
+                    />
                 </Field>
 
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -1843,7 +2141,10 @@ function CoverageCard({
                         <SelectInput
                             value={rule.coverage_type}
                             onChange={(v) =>
-                                onChange({ coverage_type: v as CoverageRule['coverage_type'] })
+                                onChange({
+                                    coverage_type:
+                                        v as CoverageRule['coverage_type'],
+                                })
                             }
                             placeholder="Type"
                             options={COVERAGE_TYPE_OPTIONS}
@@ -1853,7 +2154,9 @@ function CoverageCard({
                         <SelectInput
                             value={rule.shift_type}
                             onChange={(v) =>
-                                onChange({ shift_type: v as CoverageRule['shift_type'] })
+                                onChange({
+                                    shift_type: v as CoverageRule['shift_type'],
+                                })
                             }
                             placeholder="Shift type"
                             options={SHIFT_TYPE_OPTIONS}
@@ -1863,14 +2166,18 @@ function CoverageCard({
                         <Input
                             type="time"
                             value={rule.starts_time}
-                            onChange={(e) => onChange({ starts_time: e.target.value })}
+                            onChange={(e) =>
+                                onChange({ starts_time: e.target.value })
+                            }
                         />
                     </Field>
                     <Field label="End time">
                         <Input
                             type="time"
                             value={rule.ends_time}
-                            onChange={(e) => onChange({ ends_time: e.target.value })}
+                            onChange={(e) =>
+                                onChange({ ends_time: e.target.value })
+                            }
                         />
                     </Field>
                 </div>
@@ -1892,11 +2199,17 @@ function CoverageCard({
                             <Stepper
                                 key={rk.key}
                                 label={rk.label}
-                                value={rule.roles[rk.key as keyof CoverageRule['roles']] ?? 0}
+                                value={
+                                    rule.roles[
+                                        rk.key as keyof CoverageRule['roles']
+                                    ] ?? 0
+                                }
                                 min={0}
                                 max={12}
                                 onChange={(v) =>
-                                    onChange({ roles: { ...rule.roles, [rk.key]: v } })
+                                    onChange({
+                                        roles: { ...rule.roles, [rk.key]: v },
+                                    })
                                 }
                             />
                         ))}
@@ -1907,7 +2220,9 @@ function CoverageCard({
                     <label className="flex items-center gap-2.5">
                         <Switch
                             checked={rule.allow_overstaffing}
-                            onCheckedChange={(v) => onChange({ allow_overstaffing: v })}
+                            onCheckedChange={(v) =>
+                                onChange({ allow_overstaffing: v })
+                            }
                         />
                         <span className="text-[13px] text-muted-foreground">
                             Allow overstaffing
@@ -1917,7 +2232,9 @@ function CoverageCard({
                         <div className="min-w-[200px]">
                             <SelectInput
                                 value={rule.service_context_id}
-                                onChange={(v) => onChange({ service_context_id: v })}
+                                onChange={(v) =>
+                                    onChange({ service_context_id: v })
+                                }
                                 placeholder="Service (optional)"
                                 options={serviceContexts.map((s) => ({
                                     value: String(s.id),
@@ -1964,7 +2281,10 @@ function StepFinance({ ctx }: { ctx: SiteStepCtx }) {
                         <SelectInput
                             value={data.rent_frequency}
                             onChange={(v) =>
-                                set('rent_frequency', v as SiteWizardForm['rent_frequency'])
+                                set(
+                                    'rent_frequency',
+                                    v as SiteWizardForm['rent_frequency'],
+                                )
                             }
                             placeholder="Frequency"
                             options={RENT_FREQUENCIES}
@@ -1974,28 +2294,36 @@ function StepFinance({ ctx }: { ctx: SiteStepCtx }) {
                         <Input
                             type="date"
                             value={data.lease_start_date}
-                            onChange={(e) => set('lease_start_date', e.target.value)}
+                            onChange={(e) =>
+                                set('lease_start_date', e.target.value)
+                            }
                         />
                     </Field>
                     <Field label="Lease end" error={err('lease_end_date')}>
                         <Input
                             type="date"
                             value={data.lease_end_date}
-                            onChange={(e) => set('lease_end_date', e.target.value)}
+                            onChange={(e) =>
+                                set('lease_end_date', e.target.value)
+                            }
                             aria-invalid={!!err('lease_end_date')}
                         />
                     </Field>
                     <Field label="Landlord name">
                         <Input
                             value={data.landlord_name}
-                            onChange={(e) => set('landlord_name', e.target.value)}
+                            onChange={(e) =>
+                                set('landlord_name', e.target.value)
+                            }
                             placeholder="e.g. Acme Property"
                         />
                     </Field>
                     <Field label="Landlord contact">
                         <Input
                             value={data.landlord_contact}
-                            onChange={(e) => set('landlord_contact', e.target.value)}
+                            onChange={(e) =>
+                                set('landlord_contact', e.target.value)
+                            }
                             placeholder="Phone or email"
                         />
                     </Field>
@@ -2008,7 +2336,9 @@ function StepFinance({ ctx }: { ctx: SiteStepCtx }) {
                         min={0}
                         step="0.01"
                         value={data.weekly_food_budget}
-                        onChange={(e) => set('weekly_food_budget', e.target.value)}
+                        onChange={(e) =>
+                            set('weekly_food_budget', e.target.value)
+                        }
                         placeholder="0.00"
                         className="max-w-[200px]"
                     />
@@ -2048,8 +2378,17 @@ function RiskTile({
                 toneCls,
             )}
         >
-            <span className={cn('mt-0.5 shrink-0', on ? iconCls : 'text-muted-foreground')}>
-                {on ? <Check className="h-4 w-4" /> : <Shield className="h-4 w-4" />}
+            <span
+                className={cn(
+                    'mt-0.5 shrink-0',
+                    on ? iconCls : 'text-muted-foreground',
+                )}
+            >
+                {on ? (
+                    <Check className="h-4 w-4" />
+                ) : (
+                    <Shield className="h-4 w-4" />
+                )}
             </span>
             <span className="min-w-0">
                 <span className="block text-sm font-semibold">{title}</span>
@@ -2065,15 +2404,19 @@ function StepReview({ ctx }: { ctx: SiteStepCtx }) {
     const { data, set, ref, goToStep } = ctx;
     const showRisk = data.is_high_risk || data.is_high_needs;
     const leadName =
-        ref.users.find((u) => String(u.id) === data.primary_contact_user_id)?.name ?? null;
+        ref.users.find((u) => String(u.id) === data.primary_contact_user_id)
+            ?.name ?? null;
     const typeLabel =
         SITE_TYPES.find((t) => t.value === data.type)?.label ?? data.type;
-    const spaceCount = data.rooms.length + data.resources.length + data.zones.length;
+    const spaceCount =
+        data.rooms.length + data.resources.length + data.zones.length;
     const addr = [data.address_line_1, data.suburb, data.city, data.postcode]
         .filter(Boolean)
         .join(', ');
     const money = (v: string) =>
-        v ? `$${Number(v).toLocaleString('en-NZ', { minimumFractionDigits: 2 })}` : null;
+        v
+            ? `$${Number(v).toLocaleString('en-NZ', { minimumFractionDigits: 2 })}`
+            : null;
 
     return (
         <div>
@@ -2094,7 +2437,9 @@ function StepReview({ ctx }: { ctx: SiteStepCtx }) {
                     />
                     <RiskTile
                         on={data.is_high_needs}
-                        onToggle={() => set('is_high_needs', !data.is_high_needs)}
+                        onToggle={() =>
+                            set('is_high_needs', !data.is_high_needs)
+                        }
                         tone="warning"
                         title="High-needs site"
                         desc="Complex support needs — extra attention."
@@ -2106,7 +2451,9 @@ function StepReview({ ctx }: { ctx: SiteStepCtx }) {
                             <Textarea
                                 rows={2}
                                 value={data.risk_notes}
-                                onChange={(e) => set('risk_notes', e.target.value)}
+                                onChange={(e) =>
+                                    set('risk_notes', e.target.value)
+                                }
                                 placeholder="What's the risk, and how is it managed?"
                             />
                         </Field>
@@ -2114,7 +2461,9 @@ function StepReview({ ctx }: { ctx: SiteStepCtx }) {
                             <Input
                                 type="date"
                                 value={data.risk_review_date}
-                                onChange={(e) => set('risk_review_date', e.target.value)}
+                                onChange={(e) =>
+                                    set('risk_review_date', e.target.value)
+                                }
                             />
                         </Field>
                     </div>
@@ -2124,7 +2473,9 @@ function StepReview({ ctx }: { ctx: SiteStepCtx }) {
                     <Field label="Emergency / evacuation plan location" span>
                         <Input
                             value={data.emergency_plan_location}
-                            onChange={(e) => set('emergency_plan_location', e.target.value)}
+                            onChange={(e) =>
+                                set('emergency_plan_location', e.target.value)
+                            }
                             placeholder="e.g. Reception noticeboard"
                         />
                     </Field>
@@ -2140,7 +2491,11 @@ function StepReview({ ctx }: { ctx: SiteStepCtx }) {
 
                 {/* Summary */}
                 <div className="grid gap-3 sm:grid-cols-2">
-                    <ReviewCard icon={Building2} title="Basics" onEdit={() => goToStep('basics')}>
+                    <ReviewCard
+                        icon={Building2}
+                        title="Basics"
+                        onEdit={() => goToStep('basics')}
+                    >
                         <ReviewRow label="Type" value={typeLabel} />
                         <ReviewRow label="Name" value={data.name} />
                         <ReviewRow label="Lead" value={leadName} />
@@ -2149,7 +2504,11 @@ function StepReview({ ctx }: { ctx: SiteStepCtx }) {
                             value={data.is_active ? 'Active' : 'Inactive'}
                         />
                     </ReviewCard>
-                    <ReviewCard icon={MapPin} title="Location" onEdit={() => goToStep('location')}>
+                    <ReviewCard
+                        icon={MapPin}
+                        title="Location"
+                        onEdit={() => goToStep('location')}
+                    >
                         <ReviewRow label="Address" value={addr} />
                         <ReviewRow label="Region" value={data.region} />
                         <ReviewRow
@@ -2161,12 +2520,19 @@ function StepReview({ ctx }: { ctx: SiteStepCtx }) {
                             }
                         />
                     </ReviewCard>
-                    <ReviewCard icon={Package} title="Spaces" onEdit={() => goToStep('spaces')}>
+                    <ReviewCard
+                        icon={Package}
+                        title="Spaces"
+                        onEdit={() => goToStep('spaces')}
+                    >
                         <ReviewRow
                             label="Rooms / resources / zones"
                             value={spaceCount > 0 ? String(spaceCount) : null}
                         />
-                        <ReviewRow label="Total capacity" value={data.total_capacity} />
+                        <ReviewRow
+                            label="Total capacity"
+                            value={data.total_capacity}
+                        />
                     </ReviewCard>
                     <ReviewCard
                         icon={CalendarClock}
@@ -2175,7 +2541,11 @@ function StepReview({ ctx }: { ctx: SiteStepCtx }) {
                     >
                         <ReviewRow
                             label="Coverage rules"
-                            value={data.coverage.length > 0 ? String(data.coverage.length) : null}
+                            value={
+                                data.coverage.length > 0
+                                    ? String(data.coverage.length)
+                                    : null
+                            }
                         />
                         <ReviewRow
                             label="Credentials"
@@ -2193,11 +2563,19 @@ function StepReview({ ctx }: { ctx: SiteStepCtx }) {
                     >
                         <ReviewRow
                             label="Contacts"
-                            value={data.contacts.length > 0 ? String(data.contacts.length) : null}
+                            value={
+                                data.contacts.length > 0
+                                    ? String(data.contacts.length)
+                                    : null
+                            }
                         />
                         <ReviewRow
                             label="Assets linked"
-                            value={data.assets.length > 0 ? String(data.assets.length) : null}
+                            value={
+                                data.assets.length > 0
+                                    ? String(data.assets.length)
+                                    : null
+                            }
                         />
                         <ReviewRow
                             label="Medication storage"
@@ -2217,8 +2595,14 @@ function StepReview({ ctx }: { ctx: SiteStepCtx }) {
                                     : null
                             }
                         />
-                        <ReviewRow label="Lease" value={data.lease_start_date} />
-                        <ReviewRow label="Weekly food budget" value={money(data.weekly_food_budget)} />
+                        <ReviewRow
+                            label="Lease"
+                            value={data.lease_start_date}
+                        />
+                        <ReviewRow
+                            label="Weekly food budget"
+                            value={money(data.weekly_food_budget)}
+                        />
                     </ReviewCard>
                 </div>
             </div>
@@ -2252,7 +2636,8 @@ function SuccessPane({
                     </Button>
                     <Button
                         onClick={() => {
-                            if (siteId) window.location.href = `/sites/${siteId}`;
+                            if (siteId)
+                                window.location.href = `/sites/${siteId}`;
                             else onClose();
                         }}
                     >

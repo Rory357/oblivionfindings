@@ -13,13 +13,11 @@ beforeEach(function () {
     $this->seed(SeedHrPermissionsSeeder::class);
 
     $this->worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
 
     $this->profile = HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'employee_number' => 'EMP-PDF-'.$this->worker->id,
         'work_email' => 'pdf'.$this->worker->id.'@example.test',
@@ -34,7 +32,6 @@ beforeEach(function () {
 function makePdfPayslip(int $userId, int $profileId, array $overrides = []): HrPayslip
 {
     return HrPayslip::query()->create(array_merge([
-        'tenant_id' => 1,
         'user_id' => $userId,
         'employee_profile_id' => $profileId,
         'pay_period_start' => now()->startOfMonth()->toDateString(),

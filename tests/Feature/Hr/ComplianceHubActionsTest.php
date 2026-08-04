@@ -5,41 +5,45 @@ use App\Domain\Hr\Models\HrComplianceRequirement;
 use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Hr\Services\ComplianceMatrixService;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Notifications\ComplianceReminderNotification;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Notification;
 
-function makeProfile(User $user, string $title = 'Support Worker'): void
+function makeProfile(User $user, Site $site, string $title = 'Support Worker'): void
 {
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
-        'employee_number' => 'EMP-' . $user->id,
+        'employee_number' => 'EMP-'.$user->id,
         'work_email' => $user->email,
         'position_title' => $title,
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
     ]);
 }
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
+    $this->complianceHubSite = Site::factory()->create(['name' => 'Compliance Hub Site']);
 
     $this->hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
-    makeProfile($this->hr, 'HR Manager');
+    makeProfile($this->hr, $this->complianceHubSite, 'HR Manager');
     $hrRole = Role::query()->where('name', 'hr')->first();
     if ($hrRole) {
         $this->hr->roles()->syncWithoutDetaching([$hrRole->id]);
     }
 
     $this->staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
-    makeProfile($this->staff);
+    makeProfile($this->staff, $this->complianceHubSite);
 
     $this->requirement = HrComplianceRequirement::query()->create([
-        'tenant_id' => 1,
         'code' => 'FA-01',
         'name' => 'First Aid Certificate',
         'category' => 'Health & Safety',
@@ -74,7 +78,6 @@ test('record compliance status writes a manual row with notes', function () {
     $response->assertSessionHas('success');
 
     $this->assertDatabaseHas('hr_staff_compliance_status', [
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'requirement_id' => $this->requirement->id,
         'status' => 'compliant',
@@ -86,7 +89,6 @@ test('record compliance status writes a manual row with notes', function () {
 test('manual status survives a matrix re-evaluation', function () {
     // Assign the requirement to the staff role so evaluateStaff considers it.
     HrComplianceMatrix::query()->create([
-        'tenant_id' => 1,
         'requirement_id' => $this->requirement->id,
         'role' => 'support_worker',
         'site_type' => null,
@@ -98,7 +100,6 @@ test('manual status survives a matrix re-evaluation', function () {
     }
 
     HrStaffComplianceStatus::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'requirement_id' => $this->requirement->id,
         'status' => 'compliant',
@@ -107,7 +108,7 @@ test('manual status survives a matrix re-evaluation', function () {
         'expires_at' => now()->addYear()->toDateString(),
     ]);
 
-    app(\App\Domain\Hr\Services\ComplianceMatrixService::class)->evaluateStaff($this->staff->fresh());
+    app(ComplianceMatrixService::class)->evaluateStaff($this->staff->fresh());
 
     // Still compliant (not reset to not_started by the source sweep).
     $this->assertDatabaseHas('hr_staff_compliance_status', [
@@ -120,7 +121,6 @@ test('manual status survives a matrix re-evaluation', function () {
 
 test('waive lifts a hard-stop with an exemption reason', function () {
     $status = HrStaffComplianceStatus::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'requirement_id' => $this->requirement->id,
         'status' => 'expired',
@@ -142,7 +142,7 @@ test('waive lifts a hard-stop with an exemption reason', function () {
 
 test('bulk record writes statuses for many staff', function () {
     $other = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
-    makeProfile($other);
+    makeProfile($other, $this->complianceHubSite);
 
     $response = $this->actingAs($this->hr)->post('/hr/compliance/bulk-record', [
         'user_ids' => [$this->staff->id, $other->id],
@@ -185,7 +185,6 @@ test('assign creates matrix rows for roles', function () {
 
 test('staff export streams a csv', function () {
     HrStaffComplianceStatus::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'requirement_id' => $this->requirement->id,
         'status' => 'compliant',
@@ -199,7 +198,6 @@ test('staff export streams a csv', function () {
 
 test('an expired driver licence hard-stops shift assignment', function () {
     $req = HrComplianceRequirement::query()->create([
-        'tenant_id' => 1,
         'code' => 'DL-01',
         'name' => 'Valid Driver Licence',
         'category' => 'Eligibility',
@@ -209,7 +207,6 @@ test('an expired driver licence hard-stops shift assignment', function () {
         'created_by' => $this->hr->id,
     ]);
     HrComplianceMatrix::query()->create([
-        'tenant_id' => 1,
         'requirement_id' => $req->id,
         'role' => 'support_worker',
         'site_type' => null,
@@ -219,7 +216,6 @@ test('an expired driver licence hard-stops shift assignment', function () {
     $this->staff->roles()->syncWithoutDetaching([$supportRole->id]);
 
     HrDriverEligibility::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'licence_number' => 'AB123456',
         'licence_class' => '2',
@@ -227,7 +223,7 @@ test('an expired driver licence hard-stops shift assignment', function () {
         'status' => 'eligible',
     ]);
 
-    $result = app(\App\Domain\Hr\Services\ComplianceMatrixService::class)->canAssignToShift($this->staff->fresh());
+    $result = app(ComplianceMatrixService::class)->canAssignToShift($this->staff->fresh());
 
     expect($result['blocked'])->toBeTrue();
     expect(collect($result['failures'])->pluck('code'))->toContain('DL-01');
@@ -235,7 +231,6 @@ test('an expired driver licence hard-stops shift assignment', function () {
 
 test('a current driver licence does not hard-stop shift assignment', function () {
     $req = HrComplianceRequirement::query()->create([
-        'tenant_id' => 1,
         'code' => 'DL-01',
         'name' => 'Valid Driver Licence',
         'category' => 'Eligibility',
@@ -245,7 +240,6 @@ test('a current driver licence does not hard-stop shift assignment', function ()
         'created_by' => $this->hr->id,
     ]);
     HrComplianceMatrix::query()->create([
-        'tenant_id' => 1,
         'requirement_id' => $req->id,
         'role' => 'support_worker',
         'site_type' => null,
@@ -255,7 +249,6 @@ test('a current driver licence does not hard-stop shift assignment', function ()
     $this->staff->roles()->syncWithoutDetaching([$supportRole->id]);
 
     HrDriverEligibility::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'licence_number' => 'AB123456',
         'licence_class' => '2',
@@ -263,14 +256,13 @@ test('a current driver licence does not hard-stop shift assignment', function ()
         'status' => 'eligible',
     ]);
 
-    $result = app(\App\Domain\Hr\Services\ComplianceMatrixService::class)->canAssignToShift($this->staff->fresh());
+    $result = app(ComplianceMatrixService::class)->canAssignToShift($this->staff->fresh());
 
     expect(collect($result['failures'])->pluck('code'))->not->toContain('DL-01');
 });
 
 test('driver show page renders for a record', function () {
     $driver = HrDriverEligibility::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'licence_number' => 'AB123456',
         'licence_class' => '2',

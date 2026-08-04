@@ -1,9 +1,11 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientNote;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\Client\ActionsAggregator;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -31,7 +33,6 @@ function grantClientProfileBatchOnePermissions(User $user, array $permissionKeys
 function makeBatchOneNote(Client $client, User $author, array $attributes = []): ClientNote
 {
     return ClientNote::query()->create([
-        'organization_id' => $client->organization_id,
         'client_id' => $client->id,
         'user_id' => $author->id,
         'type' => 'daily_note',
@@ -46,10 +47,29 @@ function makeBatchOneNote(Client $client, User $author, array $attributes = []):
     ]);
 }
 
+function makeBatchOneClient(): Client
+{
+    return Client::factory()->create([
+        'site_id' => Site::factory()->create()->id,
+    ]);
+}
+
+function assignBatchOneWorkerToSite(User $worker, Site $site): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $worker->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+    ]);
+}
+
 it('shows only the current authors drafts in the profile and daily note endpoint', function () {
-    $viewer = User::factory()->create(['organization_id' => 1]);
-    $colleague = User::factory()->create(['organization_id' => 1]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $viewer = User::factory()->create();
+    $colleague = User::factory()->create();
+    $client = makeBatchOneClient();
     grantClientProfileBatchOnePermissions($viewer, [
         'clients.viewAny',
         'progress_notes.viewAny',
@@ -93,9 +113,63 @@ it('shows only the current authors drafts in the profile and daily note endpoint
         ->not->toContain($colleagueDraft->id);
 });
 
+it('keeps submitted private notes with their author and senior reviewers', function () {
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $author = User::factory()->create(['role' => 'support_worker']);
+    $colleague = User::factory()->create(['role' => 'support_worker']);
+    $reviewer = User::factory()->create(['role' => 'provider_manager']);
+
+    grantClientProfileBatchOnePermissions($author, [
+        'clients.viewAssigned',
+        'progress_notes.viewAny',
+        'progress_notes.create',
+    ]);
+    grantClientProfileBatchOnePermissions($colleague, [
+        'clients.viewAssigned',
+        'progress_notes.viewAny',
+    ]);
+    grantClientProfileBatchOnePermissions($reviewer, [
+        'clients.viewAny',
+        'progress_notes.viewAny',
+        'progress_notes.review',
+    ]);
+    assignBatchOneWorkerToSite($author, $site);
+    assignBatchOneWorkerToSite($colleague, $site);
+    $client->supportWorkers()->attach([$author->id, $colleague->id]);
+
+    $private = makeBatchOneNote($client, $author, [
+        'subject' => 'Private submitted note',
+        'is_private' => true,
+    ]);
+    $shared = makeBatchOneNote($client, $author, [
+        'subject' => 'Shared submitted note',
+        'is_private' => false,
+    ]);
+
+    foreach ([[$author, [$private->id, $shared->id]], [$reviewer, [$private->id, $shared->id]]] as [$viewer, $expectedIds]) {
+        $response = $this->actingAs($viewer)
+            ->getJson("/operations/clients/{$client->id}/daily-notes")
+            ->assertOk();
+
+        expect(collect($response->json('data'))->pluck('id')->sort()->values()->all())
+            ->toBe(collect($expectedIds)->sort()->values()->all());
+    }
+
+    $response = $this->actingAs($colleague)
+        ->getJson("/operations/clients/{$client->id}/daily-notes")
+        ->assertOk();
+
+    expect(collect($response->json('data'))->pluck('id')->all())
+        ->toBe([$shared->id])
+        ->and(ClientNote::query()->forUser(null)->count())->toBe(0)
+        ->and($private->getRawOriginal('organization_id'))->toBe(1)
+        ->and($private->toArray())->not->toHaveKey('organization_id');
+});
+
 it('lets an author resume and submit their own draft without granting submitted-note update authority', function () {
-    $author = User::factory()->create(['organization_id' => 1]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $author = User::factory()->create();
+    $client = makeBatchOneClient();
     grantClientProfileBatchOnePermissions($author, [
         'clients.viewAny',
         'progress_notes.viewAny',
@@ -139,9 +213,9 @@ it('lets an author resume and submit their own draft without granting submitted-
 });
 
 it('keeps a colleagues draft private from update delete flag and review operations', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    $author = User::factory()->create(['organization_id' => 1]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $manager = User::factory()->create();
+    $author = User::factory()->create();
+    $client = makeBatchOneClient();
     grantClientProfileBatchOnePermissions($manager, [
         'clients.viewAny',
         'progress_notes.viewAny',
@@ -178,8 +252,8 @@ it('keeps a colleagues draft private from update delete flag and review operatio
 });
 
 it('does not allow submitted notes to move backwards into draft state', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $manager = User::factory()->create();
+    $client = makeBatchOneClient();
     grantClientProfileBatchOnePermissions($manager, [
         'clients.viewAny',
         'progress_notes.viewAny',
@@ -199,8 +273,8 @@ it('does not allow submitted notes to move backwards into draft state', function
 });
 
 it('excludes drafts from review and follow-up projections', function () {
-    $reviewer = User::factory()->create(['organization_id' => 1]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $reviewer = User::factory()->create();
+    $client = makeBatchOneClient();
     grantClientProfileBatchOnePermissions($reviewer, [
         'clients.viewAny',
         'progress_notes.viewAny',
@@ -236,8 +310,8 @@ it('excludes drafts from review and follow-up projections', function () {
 });
 
 it('does not mutate unrelated client-note types through daily-note routes', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $manager = User::factory()->create();
+    $client = makeBatchOneClient();
     grantClientProfileBatchOnePermissions($manager, [
         'clients.viewAny',
         'progress_notes.viewAny',

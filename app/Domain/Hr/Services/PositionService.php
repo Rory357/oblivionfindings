@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPosition;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PositionService
 {
@@ -17,12 +18,13 @@ class PositionService
     public function updatePosition(HrPosition $position, array $data): HrPosition
     {
         $position->update($data);
+
         return $position->fresh();
     }
 
-    public function getVacancies(?int $tenantId): Collection
+    public function getVacancies(): Collection
     {
-        return HrPosition::forTenant($tenantId)
+        return HrPosition::query()
             ->active()
             ->whereColumn('current_headcount', '<', 'headcount_budget')
             ->get();
@@ -35,9 +37,9 @@ class PositionService
      *
      * @return Collection<int, HrPosition>
      */
-    public function getUnderstaffed(?int $tenantId): Collection
+    public function getUnderstaffed(): Collection
     {
-        return HrPosition::forTenant($tenantId)
+        return HrPosition::query()
             ->active()
             ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
             ->withSum(['requisitions as open_req_openings' => fn ($q) => $q->whereNotIn('status', ['closed'])], 'openings')
@@ -72,7 +74,7 @@ class PositionService
      * loop on any that are now fully staffed. Returns the number of requisitions
      * auto-closed (so the scheduled command can report it).
      */
-    public function syncAllHeadcounts(?int $tenantId): int
+    public function syncAllHeadcounts(): int
     {
         $counts = HrEmployeeProfile::where('is_active', true)
             ->whereNotNull('position_id')
@@ -81,7 +83,7 @@ class PositionService
             ->pluck('count', 'position_id');
 
         $closed = 0;
-        HrPosition::forTenant($tenantId)->each(function (HrPosition $position) use ($counts, &$closed) {
+        HrPosition::query()->each(function (HrPosition $position) use ($counts, &$closed) {
             $count = (int) $counts->get($position->id, 0);
             $position->update(['current_headcount' => $count]);
             $closed += $this->closeFilledRequisitions($position, $count);
@@ -118,7 +120,7 @@ class PositionService
             ]);
 
         if ($closed > 0) {
-            \Illuminate\Support\Facades\Log::info('hr.requisition.auto_closed', [
+            Log::info('hr.requisition.auto_closed', [
                 'position_id' => $position->id,
                 'position_title' => $position->title,
                 'closed' => $closed,
@@ -128,9 +130,9 @@ class PositionService
         return $closed;
     }
 
-    public function getDepartments(?int $tenantId): array
+    public function getDepartments(): array
     {
-        return HrPosition::forTenant($tenantId)
+        return HrPosition::query()
             ->active()
             ->whereNotNull('department')
             ->distinct()
@@ -140,9 +142,9 @@ class PositionService
             ->all();
     }
 
-    public function getPositionHierarchy(?int $tenantId): array
+    public function getPositionHierarchy(): array
     {
-        $positions = HrPosition::forTenant($tenantId)
+        $positions = HrPosition::query()
             ->active()
             ->with('employees:id,position_id,user_id', 'employees.user:id,name')
             ->get();

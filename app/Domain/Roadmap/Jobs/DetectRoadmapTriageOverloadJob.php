@@ -16,14 +16,12 @@ class DetectRoadmapTriageOverloadJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
-        public int $threshold = 100,
-        public ?int $tenantId = null
+        public int $threshold = 100
     ) {}
 
     public function handle(): void
     {
         $count = InitiativeSuggestion::query()
-            ->when($this->tenantId !== null, fn ($q) => $q->where('tenant_id', $this->tenantId))
             ->where('status', InitiativeSuggestion::STATUS_TRIAGE_PENDING)
             ->count();
 
@@ -36,7 +34,6 @@ class DetectRoadmapTriageOverloadJob implements ShouldQueue
             'title' => 'Roadmap triage overload',
             'body' => 'Roadmap suggestion inbox exceeded configured threshold.',
             'context' => [
-                'tenant_id' => $this->tenantId,
                 'pending_suggestions' => $count,
                 'threshold' => $this->threshold,
             ],

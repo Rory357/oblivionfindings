@@ -40,7 +40,6 @@ class HsRiskAssessmentService
 
         return DB::transaction(function () use ($data, $likelihood, $consequence, $inherent, $residualData) {
             $assessment = HsRiskAssessment::create(array_merge([
-                'organization_id' => $data['organization_id'] ?? null,
                 'reference_number' => HsRiskAssessment::generateReferenceNumber(),
                 'assessable_type' => $data['assessable_type'] ?? null,
                 'assessable_id' => $data['assessable_id'] ?? null,
@@ -137,7 +136,6 @@ class HsRiskAssessmentService
 
         return DB::transaction(function () use ($assessment, $newData) {
             $newAssessment = $this->create(array_merge([
-                'organization_id' => $assessment->organization_id,
                 'assessable_type' => $assessment->assessable_type,
                 'assessable_id' => $assessment->assessable_id,
                 'hs_event_id' => $assessment->hs_event_id,

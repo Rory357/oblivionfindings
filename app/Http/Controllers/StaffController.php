@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\FleetDriverSession;
 use App\Models\FleetDrivingMetric;
@@ -10,6 +11,7 @@ use App\Models\FleetTrip;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\UserSiteAccessService;
 use App\Services\WorkstreamService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -265,23 +267,30 @@ class StaffController extends Controller
             'profile.status' => ['nullable', 'in:active,on_leave,suspended,terminated'],
         ]);
 
-        $user->update([
-            'name' => $data['name'],
-            'email' => $data['email'],
-        ]);
-
-        // Sync RBAC roles (optional)
-        if (isset($data['role_ids'])) {
-            $user->roles()->sync($data['role_ids']);
-
-            // Keep legacy users.role in sync for existing UI checks
-            $first = $user->roles()->orderBy('id')->first();
-            $user->forceFill(['role' => $first?->name])->save();
-        }
-
-        // Staff profile
         $profileData = $data['profile'] ?? [];
-        $this->persistStaffProfile($user->id, $profileData);
+        $profile = $profileData !== []
+            ? $this->currentAccessibleProfile($auth, $user->id)
+            : null;
+
+        DB::transaction(function () use ($auth, $data, $profile, $profileData, $user): void {
+            $user->update([
+                'name' => $data['name'],
+                'email' => $data['email'],
+            ]);
+
+            // Sync RBAC roles (optional)
+            if (isset($data['role_ids'])) {
+                $user->roles()->sync($data['role_ids']);
+
+                // Keep legacy users.role in sync for existing UI checks
+                $first = $user->roles()->orderBy('id')->first();
+                $user->forceFill(['role' => $first?->name])->save();
+            }
+
+            if ($profile) {
+                $this->persistStaffProfile($profile, $user, $profileData, $auth->id);
+            }
+        });
 
         app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'staff', $user, null, [
             'title' => "Staff updated: {$user->name}",
@@ -404,9 +413,40 @@ class StaffController extends Controller
             return [];
         }
 
-        if (Schema::hasTable('staff') && Schema::hasColumn('staff', 'user_id')) {
+        $profiles = HrEmployeeProfile::withTrashed()
+            ->whereIn('user_id', $userIds)
+            ->get([
+                'user_id',
+                'position_title',
+                'department',
+                'employment_type',
+                'work_phone',
+                'start_date',
+                'is_active',
+            ])
+            ->mapWithKeys(fn (HrEmployeeProfile $profile) => [
+                $profile->user_id => [
+                    'phone' => $profile->work_phone,
+                    'job_title' => $profile->position_title,
+                    'department' => $profile->department,
+                    'employment_type' => $profile->employment_type,
+                    'work_phone' => $profile->work_phone,
+                    'mobile_phone' => null,
+                    'hire_date' => $profile->start_date?->toDateString(),
+                    'start_date' => $profile->start_date?->toDateString(),
+                    'status' => $profile->is_active ? 'active' : 'inactive',
+                    'is_active' => (bool) $profile->is_active,
+                ],
+            ])
+            ->all();
+
+        $missingUserIds = array_values(array_diff($userIds, array_keys($profiles)));
+
+        // Read-only compatibility for records awaiting a governed backfill into
+        // HrEmployeeProfile. StaffController never writes either legacy store.
+        if ($missingUserIds !== [] && Schema::hasTable('staff') && Schema::hasColumn('staff', 'user_id')) {
             $query = DB::table('staff')
-                ->whereIn('user_id', $userIds)
+                ->whereIn('user_id', $missingUserIds)
                 ->select($this->availableColumns('staff', [
                     'user_id',
                     'job_title',
@@ -421,7 +461,7 @@ class StaffController extends Controller
                 $query->whereNull('deleted_at');
             }
 
-            return $query
+            $profiles += $query
                 ->get()
                 ->mapWithKeys(fn ($profile) => [
                     $profile->user_id => [
@@ -440,9 +480,10 @@ class StaffController extends Controller
                 ->all();
         }
 
-        if (Schema::hasTable('staff_profiles') && Schema::hasColumn('staff_profiles', 'user_id')) {
-            return DB::table('staff_profiles')
-                ->whereIn('user_id', $userIds)
+        $missingUserIds = array_values(array_diff($userIds, array_keys($profiles)));
+        if ($missingUserIds !== [] && Schema::hasTable('staff_profiles') && Schema::hasColumn('staff_profiles', 'user_id')) {
+            $profiles += DB::table('staff_profiles')
+                ->whereIn('user_id', $missingUserIds)
                 ->select($this->availableColumns('staff_profiles', [
                     'user_id',
                     'phone',
@@ -466,108 +507,66 @@ class StaffController extends Controller
                 ->all();
         }
 
-        return [];
+        return $profiles;
     }
 
-    private function persistStaffProfile(int $userId, array $profileData): void
+    private function currentAccessibleProfile(User $actor, int $userId): HrEmployeeProfile
     {
-        $now = now();
+        $query = HrEmployeeProfile::query()->where('user_id', $userId);
+        app(UserSiteAccessService::class)->applyCurrentStaffProfileScope(
+            $query,
+            $actor,
+            ['sites.viewAll'],
+        );
 
-        if (Schema::hasTable('staff') && Schema::hasColumn('staff', 'user_id')) {
-            $existing = DB::table('staff')
-                ->where('user_id', $userId)
-                ->first($this->availableColumns('staff', [
-                    'job_title',
-                    'department',
-                    'work_phone',
-                    'mobile_phone',
-                    'hire_date',
-                    'status',
-                ]));
-
-            $status = $profileData['status'] ?? null;
-            if ($status === null && array_key_exists('is_active', $profileData)) {
-                $status = $profileData['is_active'] ? 'active' : 'inactive';
-            }
-
-            $hasGenericPhone = array_key_exists('phone', $profileData);
-            $genericPhone = $hasGenericPhone ? $profileData['phone'] : null;
-
-            $values = [
-                'job_title' => array_key_exists('job_title', $profileData)
-                    ? $profileData['job_title']
-                    : ($existing->job_title ?? null),
-                // The legacy staff table stores this UI field in `department`.
-                'department' => array_key_exists('department', $profileData)
-                    ? $profileData['department']
-                    : (array_key_exists('employment_type', $profileData)
-                        ? $profileData['employment_type']
-                        : ($existing->department ?? null)),
-                'work_phone' => array_key_exists('work_phone', $profileData)
-                    ? $profileData['work_phone']
-                    : ($hasGenericPhone ? $genericPhone : ($existing->work_phone ?? null)),
-                'mobile_phone' => array_key_exists('mobile_phone', $profileData)
-                    ? $profileData['mobile_phone']
-                    : ($hasGenericPhone ? $genericPhone : ($existing->mobile_phone ?? null)),
-                'hire_date' => $this->normalizeProfileDate(
-                    array_key_exists('hire_date', $profileData)
-                        ? $profileData['hire_date']
-                        : (array_key_exists('start_date', $profileData)
-                            ? $profileData['start_date']
-                            : ($existing->hire_date ?? null))
-                ),
-                'status' => $status ?? ($existing->status ?? 'active'),
-            ];
-
-            $this->updateOrInsertProfileRow('staff', $userId, $values, $now);
-
-            return;
-        }
-
-        if (Schema::hasTable('staff_profiles') && Schema::hasColumn('staff_profiles', 'user_id')) {
-            $values = [
-                'phone' => $profileData['phone']
-                    ?? $profileData['work_phone']
-                    ?? $profileData['mobile_phone']
-                    ?? null,
-                'job_title' => $profileData['job_title'] ?? null,
-                'employment_type' => $profileData['employment_type'] ?? ($profileData['department'] ?? null),
-                'start_date' => $this->normalizeProfileDate(
-                    $profileData['start_date'] ?? ($profileData['hire_date'] ?? null)
-                ),
-                'is_active' => array_key_exists('is_active', $profileData)
-                    ? (bool) $profileData['is_active']
-                    : (($profileData['status'] ?? 'active') === 'active'),
-            ];
-
-            $this->updateOrInsertProfileRow('staff_profiles', $userId, $values, $now);
-        }
+        return $query->firstOrFail();
     }
 
-    private function normalizeProfileDate(?string $value): ?string
+    /** @param array<string, mixed> $profileData */
+    private function persistStaffProfile(
+        HrEmployeeProfile $profile,
+        User $user,
+        array $profileData,
+        int $actorId,
+    ): void
     {
-        if ($value === null || $value === '') {
-            return null;
+        $values = [
+            'work_email' => $user->email,
+            'updated_by' => $actorId,
+        ];
+
+        if (array_key_exists('phone', $profileData)) {
+            $values['work_phone'] = $profileData['phone'];
+        } elseif (array_key_exists('work_phone', $profileData)) {
+            $values['work_phone'] = $profileData['work_phone'];
+        } elseif (array_key_exists('mobile_phone', $profileData)) {
+            $values['work_phone'] = $profileData['mobile_phone'];
         }
 
-        return Carbon::createFromFormat('Y-m-d', $value)->toDateString();
-    }
-
-    private function updateOrInsertProfileRow(string $table, int $userId, array $values, $timestamp): void
-    {
-        $query = DB::table($table)->where('user_id', $userId);
-
-        if ($query->exists()) {
-            $query->update(array_merge($values, ['updated_at' => $timestamp]));
-
-            return;
+        if (filled($profileData['job_title'] ?? null)) {
+            $values['position_title'] = $profileData['job_title'];
         }
 
-        DB::table($table)->insert(array_merge($values, [
-            'user_id' => $userId,
-            'created_at' => $timestamp,
-            'updated_at' => $timestamp,
-        ]));
+        if (array_key_exists('department', $profileData)) {
+            $values['department'] = $profileData['department'];
+        }
+
+        if (filled($profileData['employment_type'] ?? null)) {
+            $values['employment_type'] = $profileData['employment_type'];
+        }
+
+        $startDate = $profileData['start_date'] ?? ($profileData['hire_date'] ?? null);
+        if (filled($startDate)) {
+            $values['start_date'] = Carbon::createFromFormat('Y-m-d', $startDate)->toDateString();
+        }
+
+        if (array_key_exists('is_active', $profileData)) {
+            $values['is_active'] = (bool) $profileData['is_active'];
+        } elseif (array_key_exists('status', $profileData)) {
+            $values['is_active'] = $profileData['status'] === 'active';
+        }
+
+        $profile->fill($values)->save();
     }
 
     private function availableColumns(string $table, array $columns): array

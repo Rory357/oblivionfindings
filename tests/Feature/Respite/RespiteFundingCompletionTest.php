@@ -1,29 +1,43 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
-use App\Models\RespiteEvidencePack;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
+use App\Models\RespiteEvidencePack;
 use App\Models\RespiteReferral;
 use App\Models\RespiteStay;
 use App\Models\Role;
 use App\Models\ServiceAgreement;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
     $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->admin->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $this->admin->id,
+        'updated_by' => $this->admin->id,
+    ]);
 });
 
 test('booking request inherits referral funding and links an active service agreement', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     $referral = RespiteReferral::create([
         'client_id' => $client->id,
         'referrer_name' => 'NASC Coordinator',
@@ -67,7 +81,7 @@ test('booking request inherits referral funding and links an active service agre
 });
 
 test('approving a request carries funding and service agreement data onto the booking', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     $agreement = ServiceAgreement::factory()->create([
         'client_id' => $client->id,
         'status' => 'active',
@@ -107,7 +121,10 @@ test('approving a request carries funding and service agreement data onto the bo
 });
 
 test('booking readiness exposes funding as a typed segment', function () {
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     $pending = RespiteBooking::factory()->create([
+        'client_id' => $client->id,
+        'location_id' => $this->site->id,
         'funding_status' => 'pending_approval',
     ]);
 
@@ -119,6 +136,8 @@ test('booking readiness exposes funding as a typed segment', function () {
         && $segment['complete'] === false))->toBeTrue();
 
     $approved = RespiteBooking::factory()->create([
+        'client_id' => $client->id,
+        'location_id' => $this->site->id,
         'funding_status' => 'approved',
     ]);
 
@@ -132,7 +151,7 @@ test('booking readiness exposes funding as a typed segment', function () {
 test('discharge posts consumed respite nights to the linked service agreement once', function () {
     Carbon::setTestNow(Carbon::parse('2026-06-04 10:00:00'));
 
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     $agreement = ServiceAgreement::factory()->create([
         'client_id' => $client->id,
         'status' => 'active',
@@ -146,6 +165,7 @@ test('discharge posts consumed respite nights to the linked service agreement on
     ]);
     $booking = RespiteBooking::factory()->create([
         'client_id' => $client->id,
+        'location_id' => $this->site->id,
         'service_agreement_id' => $agreement->id,
         'status' => 'confirmed',
         'start_at' => Carbon::parse('2026-06-01 09:00:00'),
@@ -189,7 +209,10 @@ test('discharge posts consumed respite nights to the linked service agreement on
 });
 
 test('booking readiness gates cultural placement and restrictive setting evidence', function () {
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     $booking = RespiteBooking::factory()->create([
+        'client_id' => $client->id,
+        'location_id' => $this->site->id,
         'funding_status' => 'approved',
         'agreement_status' => 'waived',
         'cultural_snapshot' => [
@@ -224,7 +247,7 @@ test('booking readiness gates cultural placement and restrictive setting evidenc
 });
 
 test('lacks capacity clients require a welfare consent authority before booking confirmation', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     $consentType = ConsentType::factory()->create([
         'requires_capacity_assessment' => true,
     ]);
@@ -246,6 +269,7 @@ test('lacks capacity clients require a welfare consent authority before booking 
     ]);
     $booking = RespiteBooking::factory()->create([
         'client_id' => $client->id,
+        'location_id' => $this->site->id,
         'status' => 'pending',
     ]);
     $booking->forceFill([
@@ -285,7 +309,7 @@ test('lacks capacity clients require a welfare consent authority before booking 
 });
 
 test('the welfare consent-authority readiness segment blocks independently of the rights segment', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     $consentType = ConsentType::factory()->create([
         'requires_capacity_assessment' => true,
     ]);
@@ -308,6 +332,7 @@ test('the welfare consent-authority readiness segment blocks independently of th
 
     $booking = RespiteBooking::factory()->create([
         'client_id' => $client->id,
+        'location_id' => $this->site->id,
         'status' => 'pending',
     ]);
     // Everything valid EXCEPT the consent authority — and crucially the HDC rights fields ARE all
@@ -341,9 +366,10 @@ test('the welfare consent-authority readiness segment blocks independently of th
 });
 
 test('rights and informed consent are a readiness segment and a required evidence manifest item', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     $booking = RespiteBooking::factory()->create([
         'client_id' => $client->id,
+        'location_id' => $this->site->id,
         'status' => 'pending',
     ]);
     $booking->forceFill([
@@ -360,7 +386,7 @@ test('rights and informed consent are a readiness segment and a required evidenc
     expect($segments)->toHaveKey('consent_rights');
     expect($segments['consent_rights']['complete'])->toBeFalse();
 
-    $stay = \App\Models\RespiteStay::create([
+    $stay = RespiteStay::create([
         'booking_id' => $booking->id,
         'client_id' => $client->id,
         'status' => 'active',

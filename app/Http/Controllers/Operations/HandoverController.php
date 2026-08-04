@@ -17,8 +17,7 @@ class HandoverController extends Controller
     public function __construct(
         protected ShiftHandoverService $handoverService,
         protected HandoverPresenter $presenter,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {
@@ -43,7 +42,6 @@ class HandoverController extends Controller
         $canViewAny = $this->handoverService->canViewAny($auth);
 
         $handovers = ShiftHandover::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->tap(fn ($query) => $this->siteAccess()->applyHandoverScope($query, $auth, $this->handoverBypassPermissions()))
             ->with($this->presenter->mapEagerLoads())
             // Filter the week by the handover's effective date — its outgoing
@@ -100,7 +98,7 @@ class HandoverController extends Controller
         abort_unless($this->handoverService->canAccessWorkflow($auth), 403);
 
         $handover = ShiftHandover::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->tap(fn ($query) => $this->siteAccess()->applyHandoverScope($query, $auth, $this->handoverBypassPermissions()))
             ->with([
                 'outgoingShift.client:id,first_name,last_name',
                 'outgoingShift.staff:id,name',
@@ -192,7 +190,7 @@ class HandoverController extends Controller
         abort_unless($this->handoverService->canAccessWorkflow($auth), 403);
 
         $handover = ShiftHandover::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->tap(fn ($query) => $this->siteAccess()->applyHandoverScope($query, $auth, $this->handoverBypassPermissions()))
             ->with([
                 'outgoingShift:id,user_id,client_id,site_id,service_context_id,starts_at,ends_at,status',
                 'incomingShift:id,user_id,starts_at,ends_at,status',
@@ -239,6 +237,7 @@ class HandoverController extends Controller
         abort_unless($this->handoverService->canAccessWorkflow($auth), 403);
 
         $handover = ShiftHandover::query()
+            ->tap(fn ($query) => $this->siteAccess()->applyHandoverScope($query, $auth, $this->handoverBypassPermissions()))
             ->with([
                 'outgoingShift.client:id,first_name,last_name,site_id',
                 'outgoingShift.site:id,name,type',
@@ -247,7 +246,6 @@ class HandoverController extends Controller
                 'incomingShift:id,client_id,site_id,service_context_id,user_id,starts_at,ends_at,status',
                 'incomingShift.staff:id,name',
             ])
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($handover);
 
         $this->assertCanAccessHandover($auth, $handover);
@@ -265,7 +263,7 @@ class HandoverController extends Controller
         abort_unless($this->handoverService->canAccessWorkflow($auth), 403);
 
         $handover = ShiftHandover::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->tap(fn ($query) => $this->siteAccess()->applyHandoverScope($query, $auth, $this->handoverBypassPermissions()))
             ->with([
                 'incomingShift.staff:id,name',
                 'outgoingShift:id,user_id,client_id,site_id,service_context_id,starts_at,ends_at,status',
@@ -335,7 +333,7 @@ class HandoverController extends Controller
      */
     protected function handoverBypassPermissions(): array
     {
-        return ['shifts.manageAny', 'handovers.viewAny', 'reports.viewAny'];
+        return ['reports.viewAny'];
     }
 
     protected function assertCanAccessHandover(User $auth, ShiftHandover $handover): void

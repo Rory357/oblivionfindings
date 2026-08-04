@@ -12,18 +12,21 @@ use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Models\HrTalentPool;
+use App\Domain\Hr\Services\HrRecruitmentAccessService;
 use App\Domain\Hr\Services\RecruitmentAnalyticsService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class RecruitmentController extends Controller
 {
-    use ResolvesHrTenant;
+    public function __construct(
+        private readonly HrRecruitmentAccessService $access,
+    ) {}
 
     /** Active stages a candidate flows through, in order. */
     private const FLOW = [
@@ -55,23 +58,22 @@ class RecruitmentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $staleDays = (int) config('hr.recruitment.stale_stage_days', 14);
         $from = $request->filled('from') ? (string) $request->query('from') : null;
         $to = $request->filled('to') ? (string) $request->query('to') : null;
 
         return Inertia::render('hr/recruitment/index', [
-            'hero' => $this->buildHero($tenantId, $analytics),
-            'needs' => $this->buildNeeds($tenantId),
-            'candidates' => $this->buildCandidates($tenantId, $staleDays),
-            'requisitions' => $this->buildRequisitions($tenantId),
-            'interviews' => $this->buildInterviews($tenantId),
-            'offers' => $this->buildOffers($tenantId),
-            'analytics' => $this->buildAnalytics($tenantId, $analytics, $from, $to),
-            'kits' => $this->buildKits($tenantId),
-            'pool' => $this->buildPool($tenantId),
-            'email_templates' => $this->buildEmailTemplates($tenantId),
-            'support' => $this->buildSupport($tenantId),
+            'hero' => $this->buildHero($user, $analytics),
+            'needs' => $this->buildNeeds($user),
+            'candidates' => $this->buildCandidates($user, $staleDays),
+            'requisitions' => $this->buildRequisitions($user),
+            'interviews' => $this->buildInterviews($user),
+            'offers' => $this->buildOffers($user),
+            'analytics' => $this->buildAnalytics($user, $analytics, $from, $to),
+            'kits' => $this->buildKits(),
+            'pool' => $this->buildPool($user),
+            'email_templates' => $this->buildEmailTemplates(),
+            'support' => $this->buildSupport($user),
             'can' => [
                 'manage' => $user->canDo('hr.recruitment.manage'),
                 'manage_employees' => $user->canDo('hr.employees.manage'),
@@ -83,31 +85,30 @@ class RecruitmentController extends Controller
     /*  Hero */
     /* ------------------------------------------------------------------ */
 
-    private function buildHero(?int $tenantId, RecruitmentAnalyticsService $analytics): array
+    private function buildHero(User $viewer, RecruitmentAnalyticsService $analytics): array
     {
-        $openRequisitions = HrJobRequisition::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+        $scope = $this->access->scope($viewer);
+        $openRequisitions = $this->access->visibleRequisitions($viewer)
             ->whereIn('status', ['draft', 'published', 'paused'])
             ->count();
 
-        $activeCandidates = HrCandidate::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+        $activeCandidates = $this->access->visibleCandidates($viewer)
             ->whereNotIn('status', ['withdrawn', 'rejected', 'hired'])
             ->count();
 
         $interviewsThisWeek = HrInterview::query()
+            ->whereIn('application_id', $scope['application_ids'])
             ->where('status', 'scheduled')
             ->whereBetween('scheduled_at', [now()->startOfWeek(), now()->endOfWeek()])
             ->count();
 
-        $offersOut = HrOffer::query()
+        $offersOut = $this->access->visibleOffers($viewer)
             ->whereNotNull('sent_at')
             ->whereNull('response')
             ->count();
 
         // Funnel by active stage.
-        $byStatus = HrCandidate::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+        $byStatus = $this->access->visibleCandidates($viewer)
             ->selectRaw('status, count(*) as count')
             ->groupBy('status')
             ->pluck('count', 'status');
@@ -118,11 +119,11 @@ class RecruitmentController extends Controller
         }
 
         // Speed metrics.
-        $tth = collect($analytics->getTimeToHire($tenantId, 6));
+        $tth = collect($analytics->getTimeToHire($scope['application_ids'], 6));
         $timeToHire = (int) round((float) ($tth->avg('avg_days') ?? 0));
 
-        $respondedOffers = HrOffer::query()->whereNotNull('response')->count();
-        $acceptedOffers = HrOffer::query()->where('response', 'accepted')->count();
+        $respondedOffers = $this->access->visibleOffers($viewer)->whereNotNull('response')->count();
+        $acceptedOffers = $this->access->visibleOffers($viewer)->where('response', 'accepted')->count();
         $offerAccept = $respondedOffers > 0 ? (int) round(($acceptedOffers / $respondedOffers) * 100) : 0;
 
         return [
@@ -137,11 +138,12 @@ class RecruitmentController extends Controller
         ];
     }
 
-    private function buildNeeds(?int $tenantId): array
+    private function buildNeeds(User $viewer): array
     {
+        $scope = $this->access->scope($viewer);
         $needs = [];
 
-        $offersToApprove = HrOffer::query()
+        $offersToApprove = $this->access->visibleOffers($viewer)
             ->where('approval_status', 'pending_approval')
             ->whereNull('sent_at')
             ->whereNull('response')
@@ -150,7 +152,7 @@ class RecruitmentController extends Controller
             $needs[] = ['key' => 'offers_approval', 'label' => "{$offersToApprove} ".str('offer')->plural($offersToApprove).' to approve', 'tab' => 'offers'];
         }
 
-        $offersToSend = HrOffer::query()
+        $offersToSend = $this->access->visibleOffers($viewer)
             ->where('approval_status', 'approved')
             ->whereNull('sent_at')
             ->whereNull('response')
@@ -160,6 +162,7 @@ class RecruitmentController extends Controller
         }
 
         $interviewsToScore = HrInterview::query()
+            ->whereIn('application_id', $scope['application_ids'])
             ->where('status', 'completed')
             ->whereDoesntHave('scores')
             ->count();
@@ -167,8 +170,7 @@ class RecruitmentController extends Controller
             $needs[] = ['key' => 'score', 'label' => "{$interviewsToScore} ".str('interview')->plural($interviewsToScore).' to score', 'tab' => 'interviews'];
         }
 
-        $stuck = HrCandidate::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+        $stuck = $this->access->visibleCandidates($viewer)
             ->whereNotIn('status', ['withdrawn', 'rejected', 'hired'])
             ->whereNotNull('current_stage_entered_at')
             ->whereRaw('DATEDIFF(NOW(), current_stage_entered_at) > 7')
@@ -177,9 +179,8 @@ class RecruitmentController extends Controller
             $needs[] = ['key' => 'stuck', 'label' => "{$stuck} ".str('candidate')->plural($stuck).' stuck >7d', 'tab' => 'pipeline'];
         }
 
-        $dupIds = array_keys($this->duplicateHints($tenantId));
-        $duplicates = $dupIds === [] ? 0 : HrCandidate::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+        $dupIds = array_keys($this->duplicateHints($viewer));
+        $duplicates = $dupIds === [] ? 0 : $this->access->visibleCandidates($viewer)
             ->whereIn('id', $dupIds)
             ->whereNotIn('status', ['withdrawn', 'rejected', 'hired'])
             ->count();
@@ -194,10 +195,9 @@ class RecruitmentController extends Controller
     /*  Pipeline + board candidates */
     /* ------------------------------------------------------------------ */
 
-    private function buildCandidates(?int $tenantId, int $staleDays): array
+    private function buildCandidates(User $viewer, int $staleDays): array
     {
-        $candidates = HrCandidate::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+        $candidates = $this->access->visibleCandidates($viewer)
             ->whereNotIn('status', ['withdrawn', 'rejected', 'hired'])
             ->with(['applications' => fn ($q) => $q->select('id', 'candidate_id', 'requisition_id', 'position_title', 'status')
                 ->latest('id'), 'applications.requisition:id,title'])
@@ -217,7 +217,7 @@ class RecruitmentController extends Controller
             ->get()
             ->keyBy('candidate_id');
 
-        $dupHints = $this->duplicateHints($tenantId);
+        $dupHints = $this->duplicateHints($viewer);
 
         return $candidates->map(function (HrCandidate $c) use ($staleDays, $scoreByCandidate, $dupHints) {
             $app = $c->applications->first();
@@ -248,12 +248,13 @@ class RecruitmentController extends Controller
     /*  Requisitions */
     /* ------------------------------------------------------------------ */
 
-    private function buildRequisitions(?int $tenantId): array
+    private function buildRequisitions(User $viewer): array
     {
-        $reqs = HrJobRequisition::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+        $applicationIds = $this->access->scope($viewer)['application_ids'];
+        $reqs = $this->access->visibleRequisitions($viewer)
             ->with(['site:id,name', 'position:id,title', 'hiringManager:id,name'])
-            ->withCount('applications')
+            ->withCount(['applications' => fn (Builder $applications): Builder => $applications
+                ->whereIn('id', $applicationIds)])
             ->orderByRaw("FIELD(status, 'pending_approval', 'published', 'draft', 'paused', 'closed')")
             ->orderByDesc('created_at')
             ->limit(60)
@@ -292,12 +293,13 @@ class RecruitmentController extends Controller
     /*  Interviews */
     /* ------------------------------------------------------------------ */
 
-    private function buildInterviews(?int $tenantId): array
+    private function buildInterviews(User $viewer): array
     {
+        $applicationIds = $this->access->scope($viewer)['application_ids'];
         $week = HrInterview::query()
+            ->whereIn('application_id', $applicationIds)
             ->whereBetween('scheduled_at', [now()->startOfWeek(), now()->endOfWeek()->addDays(2)])
-            ->with(['application.candidate:id,first_name,last_name,tenant_id', 'application.interviewKit:id,name,criteria', 'scores:id,interview_id'])
-            ->when($tenantId !== null, fn ($q) => $q->whereHas('application.candidate', fn ($c) => $c->where('tenant_id', $tenantId)))
+            ->with(['application.candidate:id,first_name,last_name', 'application.interviewKit:id,name,criteria', 'scores:id,interview_id'])
             ->orderBy('scheduled_at')
             ->limit(40)
             ->get()
@@ -322,15 +324,17 @@ class RecruitmentController extends Controller
 
         return [
             'week' => $week,
-            'consensus' => $this->buildConsensus($tenantId),
+            'consensus' => $this->buildConsensus($viewer),
         ];
     }
 
-    private function buildConsensus(?int $tenantId): ?array
+    private function buildConsensus(User $viewer): ?array
     {
         // Most-recently-scored application's panel roll-up.
         $latestScore = HrInterviewScore::query()
-            ->with(['interview.application.candidate:id,first_name,last_name,tenant_id', 'interview.application:id,candidate_id,position_title'])
+            ->whereHas('interview', fn (Builder $interview): Builder => $interview
+                ->whereIn('application_id', $this->access->scope($viewer)['application_ids']))
+            ->with(['interview.application.candidate:id,first_name,last_name', 'interview.application:id,candidate_id,position_title'])
             ->latest('submitted_at')
             ->first();
 
@@ -389,11 +393,10 @@ class RecruitmentController extends Controller
     /*  Offers */
     /* ------------------------------------------------------------------ */
 
-    private function buildOffers(?int $tenantId): array
+    private function buildOffers(User $viewer): array
     {
-        $offers = HrOffer::query()
-            ->with(['application.candidate:id,first_name,last_name,tenant_id'])
-            ->when($tenantId !== null, fn ($q) => $q->whereHas('application.candidate', fn ($c) => $c->where('tenant_id', $tenantId)))
+        $offers = $this->access->visibleOffers($viewer)
+            ->with(['application.candidate:id,first_name,last_name'])
             ->latest('created_at')
             ->limit(60)
             ->get();
@@ -482,18 +485,18 @@ class RecruitmentController extends Controller
     /*  Analytics */
     /* ------------------------------------------------------------------ */
 
-    private function buildAnalytics(?int $tenantId, RecruitmentAnalyticsService $analytics, ?string $from = null, ?string $to = null): array
+    private function buildAnalytics(User $viewer, RecruitmentAnalyticsService $analytics, ?string $from = null, ?string $to = null): array
     {
-        $conversion = collect($analytics->getPipelineConversion($tenantId, $from, $to));
-        $sources = collect($analytics->getSourceEffectiveness($tenantId, $from, $to));
-        $tth = collect($analytics->getTimeToHire($tenantId, 6));
-        $velocity = collect($analytics->getHiringVelocity($tenantId));
-        $openPositions = collect($analytics->getOpenPositionsSummary($tenantId, $from, $to));
+        $scope = $this->access->scope($viewer);
+        $conversion = collect($analytics->getPipelineConversion($scope['candidate_ids'], $from, $to));
+        $sources = collect($analytics->getSourceEffectiveness($scope['candidate_ids'], $from, $to));
+        $tth = collect($analytics->getTimeToHire($scope['application_ids'], 6));
+        $velocity = collect($analytics->getHiringVelocity($scope['application_ids']));
+        $openPositions = collect($analytics->getOpenPositionsSummary($scope['application_ids'], $from, $to));
 
         $hiresThisMonth = (int) ($velocity->last()['count'] ?? 0);
         $avgTth = (int) round((float) ($tth->avg('avg_days') ?? 0));
-        $totalActive = HrCandidate::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+        $totalActive = $this->access->visibleCandidates($viewer)
             ->whereNotIn('status', ['withdrawn', 'rejected', 'hired'])
             ->count();
         $totalSourced = (int) $sources->sum('total');
@@ -539,7 +542,7 @@ class RecruitmentController extends Controller
     /*  Kits + pool */
     /* ------------------------------------------------------------------ */
 
-    private function buildEmailTemplates(?int $tenantId): array
+    private function buildEmailTemplates(): array
     {
         // Resilient to the deploy window where new code is live before the
         // migration has created the table — never 500 the whole hub for it.
@@ -548,7 +551,6 @@ class RecruitmentController extends Controller
         }
 
         return HrCandidateEmailTemplate::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->orderBy('name')
             ->limit(50)
             ->get(['id', 'name', 'subject', 'body'])
@@ -560,10 +562,9 @@ class RecruitmentController extends Controller
             ])->values()->all();
     }
 
-    private function buildKits(?int $tenantId): array
+    private function buildKits(): array
     {
         return HrInterviewKit::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->orderByDesc('is_active')
             ->orderBy('name')
             ->limit(40)
@@ -580,12 +581,12 @@ class RecruitmentController extends Controller
             ])->values()->all();
     }
 
-    private function buildPool(?int $tenantId): array
+    private function buildPool(User $viewer): array
     {
         // Durable talent pool — explicit hr_talent_pool membership (D5 / item 22),
         // not any non-empty tags. Membership survives candidate anonymisation.
         return HrTalentPool::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereIn('candidate_id', $this->access->scope($viewer)['candidate_ids'])
             ->with([
                 'candidate' => fn ($q) => $q->withTrashed()->select('id', 'first_name', 'last_name', 'deleted_at'),
                 'candidate.applications' => fn ($q) => $q->select('id', 'candidate_id', 'position_title')->latest('id'),
@@ -615,10 +616,9 @@ class RecruitmentController extends Controller
      *
      * @return array<int, 'email'|'name'> candidateId => reason
      */
-    private function duplicateHints(?int $tenantId): array
+    private function duplicateHints(User $viewer): array
     {
-        $rows = HrCandidate::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+        $rows = $this->access->visibleCandidates($viewer)
             ->get(['id', 'first_name', 'last_name', 'personal_email', 'personal_phone']);
 
         $byEmail = [];
@@ -654,29 +654,32 @@ class RecruitmentController extends Controller
         return $hints;
     }
 
-    private function buildSupport(?int $tenantId): array
+    private function buildSupport(User $viewer): array
     {
+        $scope = $this->access->scope($viewer);
         $sites = Site::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereIn('id', $scope['site_ids'])
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
             ->orderBy('name')
             ->get(['id', 'name']);
 
         $kits = HrInterviewKit::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'role']);
 
-        $managers = User::query()
-            ->when($this->hrStaffUserIdsForTenant($tenantId) !== [], fn ($q) => $q->whereIn('id', $this->hrStaffUserIdsForTenant($tenantId)))
-            ->orderBy('name')
-            ->limit(200)
-            ->get(['id', 'name', 'email']);
+        $managers = $this->access->currentUsers($viewer)
+            ->take(200)
+            ->map->only(['id', 'name', 'email'])
+            ->values();
 
         $positions = HrPosition::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->where('is_active', true)
-            ->with(['requisitions:id,position_id,status,openings'])
+            ->with(['requisitions' => fn (Builder $requisitions): Builder => $requisitions
+                ->whereIn('id', $scope['requisition_ids'])
+                ->select('id', 'position_id', 'status', 'openings')])
             ->orderBy('title')
             ->limit(200)
             ->get()
@@ -700,7 +703,7 @@ class RecruitmentController extends Controller
             'employment_types' => self::EMPLOYMENT_TYPES,
             'document_categories' => HrCandidateDocument::CATEGORIES ?? [],
             'stages' => self::FLOW,
-            'tags' => $this->buildTagVocabulary($tenantId),
+            'tags' => $this->buildTagVocabulary($viewer),
         ];
     }
 
@@ -710,10 +713,9 @@ class RecruitmentController extends Controller
      *
      * @return list<array{tag: string, count: int}>
      */
-    private function buildTagVocabulary(?int $tenantId): array
+    private function buildTagVocabulary(User $viewer): array
     {
-        $rows = HrCandidate::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+        $rows = $this->access->visibleCandidates($viewer)
             ->whereNotNull('tags')
             ->get(['id', 'tags']);
 

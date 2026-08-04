@@ -1,8 +1,8 @@
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import ResidentSidebar from '@/components/resident-tracking/resident-sidebar';
 import type { Resident } from '@/components/resident-tracking/types';
+import { GovernedLocationExportDialog } from '@/components/security-devices/governed-location-export-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,8 +16,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { usePersonalLocationPrivacy } from '@/hooks/use-personal-location-privacy';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatRelativeTime } from '@/lib/fleet-utils';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, router } from '@inertiajs/react';
 import {
     Battery,
@@ -31,6 +33,7 @@ import {
     Plug,
     Radio,
     ShieldAlert,
+    ShieldOff,
     Zap,
 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -71,6 +74,10 @@ type Props = {
         date_to?: string | null;
         event_types: string[];
     };
+    privacy_status_url: string;
+    export_url: string;
+    can_export: boolean;
+    retention_days: number;
 };
 
 const RANGE_PILLS = [
@@ -81,7 +88,13 @@ const RANGE_PILLS = [
     { value: 'custom', label: 'Custom' },
 ];
 
-const SAFETY_EVENTS = ['vehicle_sos', 'sos', 'man_down', 'battery_low', 'tamper'];
+const SAFETY_EVENTS = [
+    'vehicle_sos',
+    'sos',
+    'man_down',
+    'battery_low',
+    'tamper',
+];
 const IMPORTANT_MAP_EVENTS = new Set([
     ...SAFETY_EVENTS,
     'power_on',
@@ -93,7 +106,11 @@ const IMPORTANT_MAP_EVENTS = new Set([
 
 type MapPinMode = 'important' | 'balanced' | 'all';
 
-const MAP_PIN_OPTIONS: Array<{ value: MapPinMode; label: string; description: string }> = [
+const MAP_PIN_OPTIONS: Array<{
+    value: MapPinMode;
+    label: string;
+    description: string;
+}> = [
     {
         value: 'important',
         label: 'Important pins',
@@ -135,7 +152,11 @@ function eventTypeMeta(t: string | null): {
         case 'location_report':
             return { label: 'Location', icon: MapPin, tone: 'default' };
         default:
-            return { label: (t ?? 'Event').replace(/_/g, ' '), icon: MapPin, tone: 'default' };
+            return {
+                label: (t ?? 'Event').replace(/_/g, ' '),
+                icon: MapPin,
+                tone: 'default',
+            };
     }
 }
 
@@ -164,11 +185,10 @@ function displayLocation(location: Location): string {
     );
 }
 
-function csvCell(value: unknown): string {
-    return `"${String(value ?? '').replace(/"/g, '""')}"`;
-}
-
-function chargingStatusLabel(status?: string | null, externalPower?: boolean | null): string | null {
+function chargingStatusLabel(
+    status?: string | null,
+    externalPower?: boolean | null,
+): string | null {
     if (status === 'charging' || externalPower === true) return 'Charging';
     if (status === 'not_charging') return 'Not charging';
     if (status === 'stopped_charging') return 'Stopped charging';
@@ -178,9 +198,9 @@ function chargingStatusLabel(status?: string | null, externalPower?: boolean | n
 }
 
 function uniqueSortedIndices(indices: number[], total: number): number[] {
-    return [...new Set(indices.filter((index) => index >= 0 && index < total))].sort(
-        (a, b) => a - b,
-    );
+    return [
+        ...new Set(indices.filter((index) => index >= 0 && index < total)),
+    ].sort((a, b) => a - b);
 }
 
 function importantLocationIndices(locations: Location[]): number[] {
@@ -188,7 +208,10 @@ function importantLocationIndices(locations: Location[]): number[] {
     const important = [0, lastIndex];
 
     locations.forEach((location, index) => {
-        if (location.event_type && IMPORTANT_MAP_EVENTS.has(location.event_type)) {
+        if (
+            location.event_type &&
+            IMPORTANT_MAP_EVENTS.has(location.event_type)
+        ) {
             important.push(index);
         }
     });
@@ -196,9 +219,14 @@ function importantLocationIndices(locations: Location[]): number[] {
     return uniqueSortedIndices(important, locations.length);
 }
 
-function sampledLocationIndices(locations: Location[], sampleEvery = 10): number[] {
+function sampledLocationIndices(
+    locations: Location[],
+    sampleEvery = 10,
+): number[] {
     const important = importantLocationIndices(locations);
-    const sampled = locations.map((_, index) => index).filter((index) => index % sampleEvery === 0);
+    const sampled = locations
+        .map((_, index) => index)
+        .filter((index) => index % sampleEvery === 0);
 
     return uniqueSortedIndices([...important, ...sampled], locations.length);
 }
@@ -217,9 +245,14 @@ function mapPathIndices(locations: Location[], mode: MapPinMode): number[] {
 
     const maxPathPoints = mode === 'balanced' ? 120 : 80;
     const step = Math.max(1, Math.ceil(locations.length / maxPathPoints));
-    const sampled = locations.map((_, index) => index).filter((index) => index % step === 0);
+    const sampled = locations
+        .map((_, index) => index)
+        .filter((index) => index % step === 0);
 
-    return uniqueSortedIndices([...sampled, ...importantLocationIndices(locations)], locations.length);
+    return uniqueSortedIndices(
+        [...sampled, ...importantLocationIndices(locations)],
+        locations.length,
+    );
 }
 
 export default function ResidentTrackingHistory({
@@ -229,12 +262,29 @@ export default function ResidentTrackingHistory({
     locations,
     available_event_types,
     filters,
+    privacy_status_url,
+    export_url,
+    can_export,
+    retention_days,
 }: Props) {
-    const safeLocations = useMemo(() => locations ?? [], [locations]);
+    const {
+        active: privacyActive,
+        checking: privacyChecking,
+        message: privacyMessage,
+        endAccess,
+    } = usePersonalLocationPrivacy({ statusUrl: privacy_status_url });
+    const safeLocations = useMemo(
+        () => (privacyActive ? (locations ?? []) : []),
+        [locations, privacyActive],
+    );
     const safeAvailableTypes = available_event_types ?? [];
-    const availableSafetyTypes = SAFETY_EVENTS.filter((t) => safeAvailableTypes.includes(t));
+    const availableSafetyTypes = SAFETY_EVENTS.filter((t) =>
+        safeAvailableTypes.includes(t),
+    );
 
-    const [activeRange, setActiveRange] = useState<string>(filters.range ?? '24h');
+    const [activeRange, setActiveRange] = useState<string>(
+        filters.range ?? '24h',
+    );
     const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
     const [dateTo, setDateTo] = useState(filters.date_to ?? '');
     const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>(
@@ -242,18 +292,30 @@ export default function ResidentTrackingHistory({
     );
     const [timelineEventTypes, setTimelineEventTypes] = useState<string[]>([]);
     const [mapPinMode, setMapPinMode] = useState<MapPinMode>('important');
-    const [hoveredLocationIdx, setHoveredLocationIdx] = useState<number | null>(null);
-    const [activeLocationIdx, setActiveLocationIdx] = useState<number | null>(null);
+    const [hoveredLocationIdx, setHoveredLocationIdx] = useState<number | null>(
+        null,
+    );
+    const [activeLocationIdx, setActiveLocationIdx] = useState<number | null>(
+        null,
+    );
     const [mapExpanded, setMapExpanded] = useState(false);
+    const [exportOpen, setExportOpen] = useState(false);
     const timelineRef = useRef<HTMLDivElement | null>(null);
 
     const latestLocation = safeLocations[0] ?? null;
-    const firstLocation = safeLocations.length > 0 ? safeLocations[safeLocations.length - 1] : null;
+    const firstLocation =
+        safeLocations.length > 0
+            ? safeLocations[safeLocations.length - 1]
+            : null;
 
     const applyRange = useCallback(
         (
             range: string,
-            overrides: Partial<{ date_from: string; date_to: string; event_types: string[] }> = {},
+            overrides: Partial<{
+                date_from: string;
+                date_to: string;
+                event_types: string[];
+            }> = {},
         ) => {
             const params: Record<string, string> = { range };
             const eventTypes = overrides.event_types ?? selectedEventTypes;
@@ -266,10 +328,14 @@ export default function ResidentTrackingHistory({
                 if (from) params.date_from = from;
                 if (to) params.date_to = to;
             }
-            router.get(`/fleet-assets/resident-tracking/history/${client.id}`, params, {
-                preserveState: true,
-                preserveScroll: true,
-            });
+            router.get(
+                `/fleet-assets/resident-tracking/history/${client.id}`,
+                params,
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                },
+            );
         },
         [client.id, dateFrom, dateTo, selectedEventTypes],
     );
@@ -378,7 +444,10 @@ export default function ResidentTrackingHistory({
             .filter(({ location }) => {
                 if (timelineEventTypes.length === 0) return true;
 
-                return location.event_type !== null && timelineEventTypes.includes(location.event_type);
+                return (
+                    location.event_type !== null &&
+                    timelineEventTypes.includes(location.event_type)
+                );
             });
     }, [safeLocations, timelineEventTypes]);
 
@@ -393,44 +462,69 @@ export default function ResidentTrackingHistory({
     const handleMarkerClick = useCallback((id: string | number) => {
         const idx = typeof id === 'number' ? id : parseInt(String(id), 10);
         setActiveLocationIdx(idx);
-        const row = timelineRef.current?.querySelector(`[data-location-idx="${idx}"]`);
+        const row = timelineRef.current?.querySelector(
+            `[data-location-idx="${idx}"]`,
+        );
         if (row && row instanceof HTMLElement) {
             row.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }, []);
 
-    const handleExport = () => {
-        if (safeLocations.length === 0) return;
-        const csvHeader = 'Address,Latitude,Longitude,Timestamp,Speed,Battery,Event\n';
-        const csvBody = safeLocations
-            .map((l) =>
-                [
-                    csvCell(l.address ?? ''),
-                    l.lat,
-                    l.lng,
-                    csvCell(l.timestamp ?? ''),
-                    l.speed ?? '',
-                    l.battery ?? '',
-                    csvCell(l.event_type ?? ''),
-                ].join(','),
-            )
-            .join('\n');
-        const blob = new Blob([csvHeader + csvBody], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `location-history-${client?.name?.replace(/\s+/g, '-')}-${new Date()
-            .toISOString()
-            .slice(0, 10)}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-    };
+    if (!privacyActive) {
+        return (
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'Fleet & Assets', href: '/fleet-assets' },
+                    {
+                        title: 'Resident Tracking',
+                        href: '/fleet-assets/resident-tracking',
+                    },
+                    { title: client?.name ?? 'History', href: '#' },
+                ]}
+            >
+                <Head title={`Location History — ${client?.name ?? ''}`} />
+                <PageShell>
+                    <FleetCompactHero
+                        pill={`Resident tracking · ${client?.name ?? 'location history'}`}
+                        title="Location History"
+                        backHref="/fleet-assets/resident-tracking"
+                        backLabel="Tracking"
+                    />
+                    <Card>
+                        <CardContent className="flex items-start gap-3 p-5">
+                            <ShieldOff className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
+                            <div>
+                                <p className="font-medium">
+                                    {privacyChecking
+                                        ? 'Checking location access'
+                                        : 'Location access ended'}
+                                </p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    {privacyChecking
+                                        ? 'The map and history stay hidden until current consent and assignment access are confirmed.'
+                                        : `${privacyMessage ?? 'Tracking consent or the personal-tracker assignment is no longer active.'} Cached map, timeline and export data have been hidden.`}
+                                </p>
+                                {privacyChecking ? (
+                                    <p className="mt-2 text-xs text-muted-foreground">
+                                        Rechecking access…
+                                    </p>
+                                ) : null}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </PageShell>
+            </AppLayout>
+        );
+    }
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
-                { title: 'Resident Tracking', href: '/fleet-assets/resident-tracking' },
+                {
+                    title: 'Resident Tracking',
+                    href: '/fleet-assets/resident-tracking',
+                },
                 { title: client?.name ?? 'History', href: '#' },
             ]}
         >
@@ -444,16 +538,26 @@ export default function ResidentTrackingHistory({
                 />
 
                 {/* Header strip */}
-                <Card unstyled className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3">
+                <Card
+                    unstyled
+                    className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3"
+                >
                     <div className="flex items-center gap-3">
                         <img
-                            src={client?.photo ?? '/images/avatar-placeholder.svg'}
+                            src={
+                                client?.photo ??
+                                '/images/avatar-placeholder.svg'
+                            }
                             alt={client?.name ?? ''}
                             className="h-10 w-10 rounded-full border object-cover"
                         />
                         <div className="leading-tight">
-                            <div className="text-sm font-semibold">{client?.name ?? '—'}</div>
-                            <div className="text-xs text-muted-foreground">{client?.house ?? '—'}</div>
+                            <div className="text-sm font-semibold">
+                                {client?.name ?? '—'}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                {client?.house ?? '—'}
+                            </div>
                         </div>
                     </div>
                     <span className="hidden h-8 border-l sm:block" />
@@ -461,17 +565,26 @@ export default function ResidentTrackingHistory({
                         <div className="flex flex-wrap items-center gap-2">
                             <div className="flex items-center gap-1.5 text-sm">
                                 <Radio className="h-3.5 w-3.5 text-status-info" />
-                                <span className="font-medium">{tracker.name}</span>
+                                <span className="font-medium">
+                                    {tracker.name}
+                                </span>
                             </div>
-                            <Badge variant="outline" className="text-[10px] capitalize">
+                            <Badge
+                                variant="outline"
+                                className="text-[10px] capitalize"
+                            >
                                 {tracker.status}
                             </Badge>
                             {tracker.serial && (
-                                <span className="text-xs text-muted-foreground">{tracker.serial}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {tracker.serial}
+                                </span>
                             )}
                         </div>
                     ) : (
-                        <span className="text-sm text-muted-foreground">No tracker assigned</span>
+                        <span className="text-sm text-muted-foreground">
+                            No tracker assigned
+                        </span>
                     )}
                     {resident && (
                         <div className="ml-auto flex flex-wrap items-center gap-2 text-xs">
@@ -483,7 +596,10 @@ export default function ResidentTrackingHistory({
                             )}
                             {resident.battery_voltage_mv != null && (
                                 <span className="text-muted-foreground">
-                                    {(resident.battery_voltage_mv / 1000).toFixed(2)} V
+                                    {(
+                                        resident.battery_voltage_mv / 1000
+                                    ).toFixed(2)}{' '}
+                                    V
                                 </span>
                             )}
                             {residentChargingStatus && (
@@ -503,12 +619,14 @@ export default function ResidentTrackingHistory({
                             <Badge variant="outline" className="text-[10px]">
                                 {resident.geofence_status === 'in_zone'
                                     ? 'In Zone'
-                                    : resident.geofence_status === 'outside_zone'
+                                    : resident.geofence_status ===
+                                        'outside_zone'
                                       ? 'Outside'
                                       : 'Zone Unknown'}
                             </Badge>
                             <span className="text-muted-foreground">
-                                Last seen {formatRelativeTime(resident.last_seen_at)}
+                                Last seen{' '}
+                                {formatRelativeTime(resident.last_seen_at)}
                             </span>
                         </div>
                     )}
@@ -516,28 +634,34 @@ export default function ResidentTrackingHistory({
 
                 {/* Summary line */}
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{safeLocations.length}</span>
+                    <span className="font-medium text-foreground">
+                        {safeLocations.length}
+                    </span>
                     <span>points</span>
                     {firstLocation && latestLocation && (
                         <>
                             <span>·</span>
                             <span>
-                                from {formatDateTime(firstLocation.timestamp)} to{' '}
-                                {formatDateTime(latestLocation.timestamp)}
+                                from {formatDateTime(firstLocation.timestamp)}{' '}
+                                to {formatDateTime(latestLocation.timestamp)}
                             </span>
                         </>
                     )}
                     {latestLocation && (
                         <>
                             <span>·</span>
-                            <span>Live point {formatRelativeTime(latestLocation.timestamp)}</span>
+                            <span>
+                                Live point{' '}
+                                {formatRelativeTime(latestLocation.timestamp)}
+                            </span>
                         </>
                     )}
                     {safeLocations.length > 0 && (
                         <>
                             <span>·</span>
                             <span>
-                                {markers.length} of {safeLocations.length} pins shown
+                                {markers.length} of {safeLocations.length} pins
+                                shown
                             </span>
                         </>
                     )}
@@ -549,7 +673,11 @@ export default function ResidentTrackingHistory({
                         <Button
                             key={pill.value}
                             type="button"
-                            variant={activeRange === pill.value ? 'default' : 'outline'}
+                            variant={
+                                activeRange === pill.value
+                                    ? 'default'
+                                    : 'outline'
+                            }
                             size="sm"
                             className="h-8"
                             onClick={() => handleRangeClick(pill.value)}
@@ -579,7 +707,11 @@ export default function ResidentTrackingHistory({
                                 onChange={(e) => setDateTo(e.target.value)}
                                 className="h-8 w-36"
                             />
-                            <Button size="sm" className="h-8" onClick={() => applyRange('custom')}>
+                            <Button
+                                size="sm"
+                                className="h-8"
+                                onClick={() => applyRange('custom')}
+                            >
                                 Apply
                             </Button>
                         </div>
@@ -587,7 +719,11 @@ export default function ResidentTrackingHistory({
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-8 gap-1">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1"
+                            >
                                 <Filter className="h-3.5 w-3.5" />
                                 {selectedEventTypes.length === 0
                                     ? 'All events'
@@ -598,7 +734,8 @@ export default function ResidentTrackingHistory({
                             <DropdownMenuLabel className="flex items-center justify-between">
                                 Event types
                                 {selectedEventTypes.length > 0 && (
-                                    <Button unstyled
+                                    <Button
+                                        unstyled
                                         type="button"
                                         onClick={handleClearEventTypes}
                                         className="text-[10px] text-muted-foreground hover:underline"
@@ -609,7 +746,9 @@ export default function ResidentTrackingHistory({
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuCheckboxItem
-                                checked={SAFETY_EVENTS.every((t) => selectedEventTypes.includes(t))}
+                                checked={SAFETY_EVENTS.every((t) =>
+                                    selectedEventTypes.includes(t),
+                                )}
                                 onCheckedChange={handleSafetyOnly}
                             >
                                 <ShieldAlert className="mr-2 h-3.5 w-3.5 text-status-critical" />
@@ -628,7 +767,9 @@ export default function ResidentTrackingHistory({
                                     <DropdownMenuCheckboxItem
                                         key={t}
                                         checked={selectedEventTypes.includes(t)}
-                                        onCheckedChange={() => handleEventTypeToggle(t)}
+                                        onCheckedChange={() =>
+                                            handleEventTypeToggle(t)
+                                        }
                                     >
                                         <Icon className="mr-2 h-3.5 w-3.5" />
                                         {meta.label}
@@ -638,7 +779,10 @@ export default function ResidentTrackingHistory({
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    <Card unstyled className="flex flex-wrap items-center gap-1 rounded-md border bg-background p-1">
+                    <Card
+                        unstyled
+                        className="flex flex-wrap items-center gap-1 rounded-md border bg-background p-1"
+                    >
                         <span className="px-2 text-xs font-medium text-muted-foreground">
                             Map pins
                         </span>
@@ -646,7 +790,11 @@ export default function ResidentTrackingHistory({
                             <Button
                                 key={option.value}
                                 type="button"
-                                variant={mapPinMode === option.value ? 'default' : 'ghost'}
+                                variant={
+                                    mapPinMode === option.value
+                                        ? 'default'
+                                        : 'ghost'
+                                }
                                 size="sm"
                                 className="h-7 px-2 text-xs"
                                 aria-pressed={mapPinMode === option.value}
@@ -662,8 +810,13 @@ export default function ResidentTrackingHistory({
                         variant="outline"
                         size="sm"
                         className="ml-auto h-8 gap-1"
-                        onClick={handleExport}
-                        disabled={safeLocations.length === 0}
+                        onClick={() => setExportOpen(true)}
+                        disabled={!can_export || safeLocations.length === 0}
+                        title={
+                            can_export
+                                ? 'Export with a recorded operational reason'
+                                : 'Location export permission is required'
+                        }
                     >
                         <Download className="h-3.5 w-3.5" />
                         Export CSV
@@ -671,13 +824,17 @@ export default function ResidentTrackingHistory({
                 </div>
 
                 {/* Map + timeline grid */}
-                <div className={`grid gap-4 ${mapExpanded ? '' : 'lg:grid-cols-[3fr_2fr]'}`}>
+                <div
+                    className={`grid gap-4 ${mapExpanded ? '' : 'lg:grid-cols-[3fr_2fr]'}`}
+                >
                     <Card className="relative overflow-hidden">
                         <CardContent className="p-0">
                             {safeLocations.length === 0 ? (
                                 <div className="flex h-[600px] flex-col items-center justify-center text-muted-foreground">
                                     <MapPin className="h-10 w-10 opacity-30" />
-                                    <p className="mt-2 text-sm">No movement in this range</p>
+                                    <p className="mt-2 text-sm">
+                                        No movement in this range
+                                    </p>
                                     <Button
                                         size="sm"
                                         variant="outline"
@@ -703,10 +860,11 @@ export default function ResidentTrackingHistory({
                                     onMarkerClick={handleMarkerClick}
                                 />
                             )}
-                            <Button unstyled
+                            <Button
+                                unstyled
                                 type="button"
                                 onClick={() => setMapExpanded((v) => !v)}
-                                className="absolute right-3 top-3 z-[400] rounded-md border bg-background/90 p-1.5 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground"
+                                className="absolute top-3 right-3 z-[400] rounded-md border bg-background/90 p-1.5 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground"
                                 title={mapExpanded ? 'Restore' : 'Expand'}
                             >
                                 {mapExpanded ? (
@@ -722,16 +880,23 @@ export default function ResidentTrackingHistory({
                         <Card className="flex flex-col">
                             <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
                                 <div>
-                                    <div className="text-sm font-medium">Timeline</div>
+                                    <div className="text-sm font-medium">
+                                        Timeline
+                                    </div>
                                     {safeLocations.length > 0 && (
                                         <div className="text-xs text-muted-foreground">
-                                            {timelineLocations.length} of {safeLocations.length} shown
+                                            {timelineLocations.length} of{' '}
+                                            {safeLocations.length} shown
                                         </div>
                                     )}
                                 </div>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" size="sm" className="h-8 gap-1">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 gap-1"
+                                        >
                                             <Filter className="h-3.5 w-3.5" />
                                             {timelineEventTypes.length === 0
                                                 ? 'Timeline events'
@@ -742,9 +907,12 @@ export default function ResidentTrackingHistory({
                                         <DropdownMenuLabel className="flex items-center justify-between">
                                             Timeline events
                                             {timelineEventTypes.length > 0 && (
-                                                <Button unstyled
+                                                <Button
+                                                    unstyled
                                                     type="button"
-                                                    onClick={handleTimelineClear}
+                                                    onClick={
+                                                        handleTimelineClear
+                                                    }
                                                     className="text-[10px] text-muted-foreground hover:underline"
                                                 >
                                                     Clear
@@ -754,7 +922,9 @@ export default function ResidentTrackingHistory({
                                         <DropdownMenuSeparator />
                                         <DropdownMenuCheckboxItem
                                             checked={timelineSafetyOnlySelected}
-                                            onCheckedChange={handleTimelineSafetyOnly}
+                                            onCheckedChange={
+                                                handleTimelineSafetyOnly
+                                            }
                                         >
                                             <ShieldAlert className="mr-2 h-3.5 w-3.5 text-status-critical" />
                                             Safety only
@@ -772,9 +942,13 @@ export default function ResidentTrackingHistory({
                                             return (
                                                 <DropdownMenuCheckboxItem
                                                     key={t}
-                                                    checked={timelineEventTypes.includes(t)}
+                                                    checked={timelineEventTypes.includes(
+                                                        t,
+                                                    )}
                                                     onCheckedChange={() =>
-                                                        handleTimelineEventTypeToggle(t)
+                                                        handleTimelineEventTypeToggle(
+                                                            t,
+                                                        )
                                                     }
                                                 >
                                                     <Icon className="mr-2 h-3.5 w-3.5" />
@@ -800,73 +974,114 @@ export default function ResidentTrackingHistory({
                                     </div>
                                 ) : (
                                     <div className="divide-y">
-                                        {timelineLocations.map(({ location, index: idx }) => {
-                                            const meta = eventTypeMeta(location.event_type);
-                                            const Icon = meta.icon;
-                                            const isLive = idx === 0;
-                                            const isActive = activeLocationIdx === idx;
-                                            return (
-                                                <Button unstyled
-                                                    key={`${location.timestamp}-${idx}`}
-                                                    type="button"
-                                                    data-location-idx={idx}
-                                                    onMouseEnter={() => setHoveredLocationIdx(idx)}
-                                                    onMouseLeave={() =>
-                                                        setHoveredLocationIdx((cur) =>
-                                                            cur === idx ? null : cur,
-                                                        )
-                                                    }
-                                                    onClick={() =>
-                                                        setActiveLocationIdx(isActive ? null : idx)
-                                                    }
-                                                    className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40 ${
-                                                        isActive ? 'bg-primary/5' : ''
-                                                    }`}
-                                                >
-                                                    <div
-                                                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${toneClasses(meta.tone)}`}
+                                        {timelineLocations.map(
+                                            ({ location, index: idx }) => {
+                                                const meta = eventTypeMeta(
+                                                    location.event_type,
+                                                );
+                                                const Icon = meta.icon;
+                                                const isLive = idx === 0;
+                                                const isActive =
+                                                    activeLocationIdx === idx;
+                                                return (
+                                                    <Button
+                                                        unstyled
+                                                        key={`${location.timestamp}-${idx}`}
+                                                        type="button"
+                                                        data-location-idx={idx}
+                                                        onMouseEnter={() =>
+                                                            setHoveredLocationIdx(
+                                                                idx,
+                                                            )
+                                                        }
+                                                        onMouseLeave={() =>
+                                                            setHoveredLocationIdx(
+                                                                (cur) =>
+                                                                    cur === idx
+                                                                        ? null
+                                                                        : cur,
+                                                            )
+                                                        }
+                                                        onClick={() =>
+                                                            setActiveLocationIdx(
+                                                                isActive
+                                                                    ? null
+                                                                    : idx,
+                                                            )
+                                                        }
+                                                        className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40 ${
+                                                            isActive
+                                                                ? 'bg-primary/5'
+                                                                : ''
+                                                        }`}
                                                     >
-                                                        <Icon className="h-3.5 w-3.5" />
-                                                    </div>
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                            <span>{formatDateTime(location.timestamp)}</span>
-                                                            {isLive && (
+                                                        <div
+                                                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${toneClasses(meta.tone)}`}
+                                                        >
+                                                            <Icon className="h-3.5 w-3.5" />
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                                <span>
+                                                                    {formatDateTime(
+                                                                        location.timestamp,
+                                                                    )}
+                                                                </span>
+                                                                {isLive && (
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className="border-status-success/30 text-[10px] text-status-success"
+                                                                    >
+                                                                        Live
+                                                                    </Badge>
+                                                                )}
                                                                 <Badge
                                                                     variant="outline"
-                                                                    className="border-status-success/30 text-[10px] text-status-success"
+                                                                    className={`text-[10px] ${toneClasses(meta.tone)}`}
                                                                 >
-                                                                    Live
+                                                                    {meta.label}
                                                                 </Badge>
-                                                            )}
-                                                            <Badge
-                                                                variant="outline"
-                                                                className={`text-[10px] ${toneClasses(meta.tone)}`}
-                                                            >
-                                                                {meta.label}
-                                                            </Badge>
+                                                            </div>
+                                                            <p className="mt-0.5 truncate text-sm">
+                                                                {displayLocation(
+                                                                    location,
+                                                                )}
+                                                            </p>
+                                                            <div className="mt-0.5 flex items-center gap-3 text-[11px] text-muted-foreground">
+                                                                {location.address &&
+                                                                    location.coordinates && (
+                                                                        <span>
+                                                                            {
+                                                                                location.coordinates
+                                                                            }
+                                                                        </span>
+                                                                    )}
+                                                                {location.speed !=
+                                                                    null && (
+                                                                    <span className="flex items-center gap-1">
+                                                                        <Navigation className="h-3 w-3" />
+                                                                        {
+                                                                            location.speed
+                                                                        }{' '}
+                                                                        km/h
+                                                                    </span>
+                                                                )}
+                                                                {location.battery !=
+                                                                    null && (
+                                                                    <span>
+                                                                        {
+                                                                            location.battery
+                                                                        }
+                                                                        %
+                                                                        battery
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                        <p className="mt-0.5 truncate text-sm">
-                                                            {displayLocation(location)}
-                                                        </p>
-                                                        <div className="mt-0.5 flex items-center gap-3 text-[11px] text-muted-foreground">
-                                                            {location.address && location.coordinates && (
-                                                                <span>{location.coordinates}</span>
-                                                            )}
-                                                            {location.speed != null && (
-                                                                <span className="flex items-center gap-1">
-                                                                    <Navigation className="h-3 w-3" />
-                                                                    {location.speed} km/h
-                                                                </span>
-                                                            )}
-                                                            {location.battery != null && (
-                                                                <span>{location.battery}% battery</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </Button>
-                                            );
-                                        })}
+                                                    </Button>
+                                                );
+                                            },
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -887,6 +1102,17 @@ export default function ResidentTrackingHistory({
                     </Card>
                 )}
             </PageShell>
+            <GovernedLocationExportDialog
+                open={exportOpen}
+                onOpenChange={setExportOpen}
+                exportUrl={export_url}
+                subjectLabel={client?.name ?? 'this client'}
+                dateFrom={filters.date_from}
+                dateTo={filters.date_to}
+                eventTypes={selectedEventTypes}
+                retentionDays={retention_days}
+                onAccessEnded={() => endAccess('Location access has ended.')}
+            />
         </AppLayout>
     );
 }

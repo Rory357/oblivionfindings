@@ -8,7 +8,6 @@ use App\Models\ControlRoom\Device;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetSignal;
 use App\Models\HsEvent;
-use App\Models\Site;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
 use DomainException;
@@ -18,7 +17,7 @@ use DomainException;
  *
  * The alert's direct site/client fields are authoritative. Nested asset,
  * signal, and device records may enrich that alert only when they agree with
- * the same client/site/tenant tuple; contradictory legacy links are treated as
+ * the same client/Site tuple; contradictory legacy links are treated as
  * untrusted instead of becoming an alternate authorization path.
  */
 class ControlRoomAlertProvenanceService
@@ -71,6 +70,44 @@ class ControlRoomAlertProvenanceService
         return null;
     }
 
+    /**
+     * Resolve the canonical Security & Devices identity claimed by an alert.
+     * Native signals carry it directly; retained Control Room projections are
+     * accepted only as historical corroboration and conflicting claims fail
+     * closed.
+     */
+    public function authoritativeCanonicalDeviceId(ControlRoomAlert $alert): ?int
+    {
+        $contextDeviceId = data_get($alert->context, 'normalized_data.canonical_device_id');
+        $contextDeviceId = is_numeric($contextDeviceId) && (int) $contextDeviceId > 0
+            ? (int) $contextDeviceId
+            : null;
+
+        $projectionDeviceId = null;
+        if ($alert->device_id !== null) {
+            $loadedProjection = $alert->relationLoaded('device') ? $alert->device : null;
+            $projectionDeviceId = $loadedProjection && (int) $loadedProjection->id === (int) $alert->device_id
+                ? $loadedProjection->canonical_device_id
+                : Device::query()->whereKey($alert->device_id)->value('canonical_device_id');
+            $projectionDeviceId = is_numeric($projectionDeviceId) && (int) $projectionDeviceId > 0
+                ? (int) $projectionDeviceId
+                : null;
+
+            if ($projectionDeviceId === null) {
+                return null;
+            }
+        }
+
+        if ($contextDeviceId !== null
+            && $projectionDeviceId !== null
+            && $contextDeviceId !== $projectionDeviceId
+        ) {
+            return null;
+        }
+
+        return $contextDeviceId ?? $projectionDeviceId;
+    }
+
     public function clientMatchesAlert(ControlRoomAlert $alert): bool
     {
         $clientId = $this->authoritativeClientId($alert);
@@ -89,10 +126,7 @@ class ControlRoomAlertProvenanceService
 
     public function safeClient(ControlRoomAlert $alert): ?Client
     {
-        $alert->loadMissing([
-            'client:id,first_name,last_name,site_id,organization_id',
-            'client.site:id,tenant_id',
-        ]);
+        $alert->loadMissing('client:id,first_name,last_name,site_id');
 
         return $alert->client && $this->clientMatchesAlert($alert)
             ? $alert->client
@@ -103,7 +137,7 @@ class ControlRoomAlertProvenanceService
     {
         $alert->loadMissing([
             'asset:id,name,asset_tag,site_id,home_site_id,client_id',
-            'asset.client:id,site_id,organization_id',
+            'asset.client:id,site_id',
         ]);
 
         return $alert->asset && $this->assetMatchesAlert($alert, $alert->asset)
@@ -305,7 +339,7 @@ class ControlRoomAlertProvenanceService
             return false;
         }
 
-        $asset->loadMissing('client:id,site_id,organization_id');
+        $asset->loadMissing('client:id,site_id');
         $assetSiteId = $asset->site_id
             ?: $asset->client?->site_id
             ?: $asset->home_site_id;
@@ -333,7 +367,7 @@ class ControlRoomAlertProvenanceService
             return false;
         }
 
-        $signal->loadMissing('asset.client:id,site_id,organization_id');
+        $signal->loadMissing('asset.client:id,site_id');
 
         return $signal->asset !== null
             && $this->assetMatchesTuple($signal->asset, $siteId, $clientId);
@@ -414,9 +448,6 @@ class ControlRoomAlertProvenanceService
     ): void {
         $alertSiteId = $this->authoritativeSiteId($alert);
         $alertClientId = $this->authoritativeClientId($alert);
-        $siteTenantId = $alertSiteId === null
-            ? null
-            : Site::query()->whereKey($alertSiteId)->value('tenant_id');
 
         $clientMismatch = $alertClientId === null
             ? $event->client_id !== null
@@ -426,9 +457,6 @@ class ControlRoomAlertProvenanceService
 
         if ($alertSiteId === null
             || (int) $event->site_id !== $alertSiteId
-            || ! is_numeric($siteTenantId)
-            || ! is_numeric($event->organization_id)
-            || (int) $event->organization_id !== (int) $siteTenantId
             || $clientMismatch
             || $assetMismatch
             || ! $this->clientMatchesAlert($alert)
@@ -437,7 +465,7 @@ class ControlRoomAlertProvenanceService
             || ! $this->deviceMatchesAlert($alert)
         ) {
             throw new DomainException(
-                'H&S handover provenance conflict: the alert and H&S event do not share one client, site, and tenant ownership tuple.',
+                'H&S handover provenance conflict: the alert and H&S event do not share one Client/Site ownership tuple.',
             );
         }
     }
@@ -448,12 +476,6 @@ class ControlRoomAlertProvenanceService
             return false;
         }
 
-        $siteTenantId = $client->relationLoaded('site') && (int) $client->site?->id === $siteId
-            ? $client->site?->tenant_id
-            : Site::query()->whereKey($siteId)->value('tenant_id');
-
-        return is_numeric($siteTenantId)
-            && is_numeric($client->organization_id)
-            && (int) $siteTenantId === (int) $client->organization_id;
+        return true;
     }
 }

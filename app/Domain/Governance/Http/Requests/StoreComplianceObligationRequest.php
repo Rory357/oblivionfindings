@@ -21,7 +21,7 @@ class StoreComplianceObligationRequest extends FormRequest
             'requirements' => 'nullable|string',
             'frequency' => 'nullable|string|in:monthly,quarterly,annual,ad_hoc,event_driven',
             'due_date' => 'nullable|date',
-            'owner_id' => 'nullable|exists:users,id',
+            'owner_id' => 'nullable|integer|min:1',
             'priority' => 'nullable|string|in:low,medium,high,critical',
         ];
     }

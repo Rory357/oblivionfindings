@@ -7,6 +7,7 @@ use App\Domain\Hr\Services\LiveComplianceValidator;
 use App\Models\Role;
 use App\Models\StaffTrainingRecord;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 /**
  * Seam S7 — Training → Compliance. A `training_course` hard-stop compliance
@@ -21,7 +22,7 @@ use App\Models\User;
  * HrComplianceMatrix — the live validator is role-scoped (S6 lesson).
  */
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $supportRole = Role::query()->where('name', 'support_worker')->first();
@@ -30,7 +31,6 @@ beforeEach(function () {
     }
 
     $this->req = HrComplianceRequirement::query()->create([
-        'tenant_id' => 1,
         'code' => 'TRN-01',
         'name' => 'Manual Handling Training',
         'category' => 'Clinical',
@@ -40,7 +40,6 @@ beforeEach(function () {
         'created_by' => $this->staff->id,
     ]);
     HrComplianceMatrix::query()->create([
-        'tenant_id' => 1,
         'requirement_id' => $this->req->id,
         'role' => 'support_worker',
         'site_type' => null,

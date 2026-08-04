@@ -13,7 +13,6 @@ class SiteComplianceTemplate extends Model
     protected $table = 'site_compliance_templates';
 
     protected $fillable = [
-        'organization_id',
         'name',
         'category',
         'description',
@@ -44,15 +43,5 @@ class SiteComplianceTemplate extends Model
     public function scopeByCategory($query, string $category)
     {
         return $query->where('category', $category);
-    }
-
-    public function scopeForOrganization($query, ?int $orgId)
-    {
-        return $query->where(function ($q) use ($orgId) {
-            $q->whereNull('organization_id');
-            if ($orgId) {
-                $q->orWhere('organization_id', $orgId);
-            }
-        });
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\BehaviourSupportPlan;
 use App\Models\Client;
 use App\Models\DataBreachLog;
@@ -7,20 +8,34 @@ use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
 use App\Models\RespiteReferral;
 use App\Models\RespiteStay;
+use App\Models\RestraintEvent;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
     $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->admin->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $this->admin->id,
+        'updated_by' => $this->admin->id,
+    ]);
 });
 
 test('a referral can be declined with a reason', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     $referral = RespiteReferral::create([
         'client_id' => $client->id,
         'referrer_name' => 'GP — Dr Patel',
@@ -39,7 +54,7 @@ test('a referral can be declined with a reason', function () {
 });
 
 test('a booking request can be rejected with decision notes', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     $request = RespiteBookingRequest::create([
         'client_id' => $client->id,
         'requested_start' => now()->addDays(5),
@@ -56,9 +71,10 @@ test('a booking request can be rejected with decision notes', function () {
 });
 
 test('a stay can record cultural leave bed hold context', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     $booking = RespiteBooking::factory()->create([
         'client_id' => $client->id,
+        'location_id' => $this->site->id,
         'start_at' => now()->subDay(),
         'end_at' => now()->addDays(2),
     ]);
@@ -90,9 +106,10 @@ test('a stay can record cultural leave bed hold context', function () {
 });
 
 test('a privacy breach incident on a respite stay creates a breach log', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     $booking = RespiteBooking::factory()->create([
         'client_id' => $client->id,
+        'location_id' => $this->site->id,
         'start_at' => now()->subDay(),
         'end_at' => now()->addDays(2),
     ]);
@@ -124,9 +141,10 @@ test('a privacy breach incident on a respite stay creates a breach log', functio
 });
 
 test('recording a within-plan restraint auto-links the clients active behaviour support plan', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     $booking = RespiteBooking::factory()->create([
         'client_id' => $client->id,
+        'location_id' => $this->site->id,
         'status' => 'confirmed',
     ]);
     $stay = RespiteStay::create([
@@ -162,11 +180,11 @@ test('recording a within-plan restraint auto-links the clients active behaviour 
         ->assertRedirect()
         ->assertSessionHasNoErrors();
 
-    expect(\App\Models\RestraintEvent::firstOrFail()->behaviour_support_plan_id)->toBe($plan->id);
+    expect(RestraintEvent::firstOrFail()->behaviour_support_plan_id)->toBe($plan->id);
 });
 
 test('creating a booking request from a referral links it and advances the referral', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     $referral = RespiteReferral::create([
         'client_id' => $client->id,
         'referrer_name' => 'NASC — Waitematā',
@@ -203,7 +221,7 @@ test('creating a booking request from a referral links it and advances the refer
 });
 
 test('the legacy request create still lands on the request detail when not modal', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
 
     $response = $this->actingAs($this->admin)
         ->post('/respite/requests', [

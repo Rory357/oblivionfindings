@@ -32,6 +32,22 @@ class FundingClaimObserver
             return;
         }
 
+        $hasCanonicalOwnership = FundingClaim::query()
+            ->whereKey($claim->id)
+            ->whereHas('client', fn ($clientQuery) => $clientQuery
+                ->whereNotNull('site_id')
+                ->whereHas('site', fn ($siteQuery) => $siteQuery
+                    ->active()
+                    ->notArchived()
+                    ->whereNull('archived_at')))
+            ->whereHas('serviceAgreement', fn ($agreementQuery) => $agreementQuery
+                ->whereColumn('service_agreements.client_id', 'funding_claims.client_id'))
+            ->exists();
+
+        if (! $hasCanonicalOwnership) {
+            return;
+        }
+
         try {
             PostFundingClaimJournalJob::dispatch($claim);
         } catch (\Throwable $e) {

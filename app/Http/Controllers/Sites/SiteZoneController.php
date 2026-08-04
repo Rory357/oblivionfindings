@@ -22,7 +22,7 @@ class SiteZoneController extends Controller
                 'id' => $site->id,
                 'name' => $site->name,
             ],
-            'zones' => $zones->map(fn($z) => [
+            'zones' => $zones->map(fn ($z) => [
                 'id' => $z->id,
                 'name' => $z->name,
                 'description' => $z->description,
@@ -45,7 +45,6 @@ class SiteZoneController extends Controller
         SiteFacilityZone::create([
             ...$validated,
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'is_active' => true,
         ]);
 

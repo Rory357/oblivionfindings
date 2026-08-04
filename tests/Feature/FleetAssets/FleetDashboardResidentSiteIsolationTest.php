@@ -21,9 +21,11 @@ use App\Models\FleetTrip;
 use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Models\FleetWorkOrder;
+use App\Models\LocationHardware;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -32,10 +34,6 @@ use Tests\TestCase;
 class FleetDashboardResidentSiteIsolationTest extends TestCase
 {
     use RefreshDatabase;
-
-    private const ORGANIZATION_ID = 101;
-
-    private const OTHER_ORGANIZATION_ID = 202;
 
     private Site $localSite;
 
@@ -49,18 +47,16 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
         $this->travelTo(Carbon::parse('2026-07-14 19:30:00'));
 
         $this->localSite = Site::factory()->create([
-            'tenant_id' => self::ORGANIZATION_ID,
             'name' => 'Harbour House',
             'type' => 'house',
             'latitude' => -36.8509,
             'longitude' => 174.7645,
         ]);
         $this->foreignSite = Site::factory()->create([
-            'tenant_id' => self::ORGANIZATION_ID,
             'name' => 'Forest House',
             'type' => 'house',
             'latitude' => -36.8700,
@@ -83,7 +79,10 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
 
     public function test_dashboard_scopes_every_site_attributed_metric_and_detail_row(): void
     {
-        $user = $this->makeSiteUser($this->localSite, ['fleet.viewAny']);
+        $user = $this->makeSiteUser($this->localSite, [
+            'fleet.viewAny',
+            'securityDevices.devices.view',
+        ]);
         $ids = $this->seedDashboardSurfaces($user);
 
         $this->actingAs($user)
@@ -109,12 +108,14 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
                 ->where('stats.distance_mtd', 5)
                 ->where('stats.total_devices', 1)
                 ->where('stats.online_devices', 1)
+                ->where('can.view_technology', true)
                 ->where('asset_status_breakdown.active', 1)
                 ->missing('asset_status_breakdown.retired')
                 ->where('maintenance_stats.open', 1)
                 ->missing('maintenance_stats.in_progress')
                 ->has('recent_signals', 1)
                 ->where('recent_signals.0.id', $ids['local_signal'])
+                ->missing('recent_signals.0.payload')
                 ->has('after_hours_trips', 1)
                 ->where('after_hours_trips.0.id', $ids['local_trip'])
                 ->has('today_outings', 1)
@@ -123,12 +124,18 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
                 ->where('houses.0.id', $this->localSite->id)
                 ->has('fleet_by_site', 1)
                 ->where('fleet_by_site.0.id', $this->localSite->id)
+                ->missing('vehicles.0.trackers')
             );
     }
 
     public function test_explicit_fleet_manage_permission_bypasses_dashboard_site_scope(): void
     {
-        $manager = $this->makeSiteUser($this->localSite, ['fleet.viewAny', 'fleet.manage']);
+        $manager = $this->makeSiteUser($this->localSite, [
+            'fleet.viewAny',
+            'fleet.manage',
+            'securityDevices.devices.view',
+            'securityDevices.devices.viewAllSites',
+        ]);
         $this->seedDashboardSurfaces($manager);
 
         $this->actingAs($manager)
@@ -153,6 +160,7 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
                 ->where('stats.distance_mtd', 55)
                 ->where('stats.total_devices', 2)
                 ->where('stats.online_devices', 2)
+                ->where('can.view_technology', true)
                 ->where('asset_status_breakdown.active', 1)
                 ->where('asset_status_breakdown.retired', 1)
                 ->where('maintenance_stats.open', 1)
@@ -165,10 +173,34 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
             );
     }
 
+    public function test_dashboard_marks_device_metrics_restricted_without_security_devices_permission(): void
+    {
+        $user = $this->makeSiteUser($this->localSite, ['fleet.viewAny', 'assets.telemetry.view']);
+        $this->seedDashboardSurfaces($user);
+
+        $this->actingAs($user)
+            ->get('/fleet-assets')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('fleet-assets/dashboard')
+                ->where('can.view_technology', false)
+                ->where('stats.total_devices', null)
+                ->where('stats.online_devices', null)
+                ->where('stats.tracked_residents', null)
+                ->missing('vehicles.0.trackers')
+                ->missing('recent_signals.0.payload')
+            );
+    }
+
     public function test_resident_tracking_scopes_geofences_outings_and_assign_modal_identifiers(): void
     {
-        $user = $this->makeSiteUser($this->localSite, ['fleet.viewAny']);
+        $user = $this->makeSiteUser($this->localSite, [
+            'fleet.viewAny',
+            'assets.telemetry.view',
+            'clients.viewAssigned',
+        ]);
         $ids = $this->seedResidentTrackingSurfaces();
+        Client::query()->findOrFail($ids['local_client'])->supportWorkers()->attach($user->id);
 
         $this->actingAs($user)
             ->get('/fleet-assets/resident-tracking?new=1')
@@ -193,9 +225,15 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
             );
     }
 
-    public function test_explicit_fleet_manage_permission_bypasses_resident_tracking_scope(): void
+    public function test_cross_site_resident_tracking_requires_fleet_and_security_devices_permissions(): void
     {
-        $manager = $this->makeSiteUser($this->localSite, ['fleet.viewAny', 'fleet.manage']);
+        $manager = $this->makeSiteUser($this->localSite, [
+            'fleet.viewAny',
+            'fleet.manage',
+            'assets.telemetry.view',
+            'clients.viewAny',
+            'securityDevices.devices.viewAllSites',
+        ], 'manager');
         $this->seedResidentTrackingSurfaces();
 
         $this->actingAs($manager)
@@ -214,14 +252,23 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
 
     public function test_resident_history_rejects_foreign_client_unless_fleet_manage_is_explicit(): void
     {
-        $user = $this->makeSiteUser($this->localSite, ['fleet.viewAny']);
-        $manager = $this->makeSiteUser($this->localSite, ['fleet.viewAny', 'fleet.manage']);
+        $user = $this->makeSiteUser($this->localSite, ['fleet.viewAny', 'assets.telemetry.view']);
+        $manager = $this->makeSiteUser($this->localSite, [
+            'fleet.viewAny',
+            'fleet.manage',
+            'assets.telemetry.view',
+            'clients.viewAny',
+            'securityDevices.devices.viewAllSites',
+        ], 'manager');
         $foreignClient = Client::factory()->create([
-            'organization_id' => self::ORGANIZATION_ID,
             'site_id' => $this->foreignSite->id,
             'status' => 'active',
         ]);
-        $this->createTrackingConsent($foreignClient);
+        $foreignConsent = $this->createTrackingConsent($foreignClient);
+        $foreignDevice = Device::factory()->tracking()->create([
+            'device_uid' => 'FOREIGN-HISTORY-TRACKER',
+        ]);
+        $this->assignDeviceToClient($foreignDevice, $foreignClient, $foreignConsent);
 
         $this->actingAs($user)
             ->get("/fleet-assets/resident-tracking/history/{$foreignClient->id}")
@@ -259,118 +306,87 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
             );
     }
 
-    public function test_fleet_manage_is_tenant_wide_but_never_installation_wide(): void
+    public function test_dashboard_fleet_manage_is_application_wide_across_operational_sites(): void
     {
-        $manager = $this->makeSiteUser($this->localSite, ['fleet.viewAny', 'fleet.manage']);
+        $manager = $this->makeSiteUser($this->localSite, [
+            'fleet.viewAny',
+            'fleet.manage',
+            'securityDevices.devices.view',
+            'securityDevices.devices.viewAllSites',
+        ]);
         $this->seedDashboardSurfaces($manager);
-        $this->seedResidentTrackingSurfaces();
 
-        $outsideSite = Site::factory()->create([
-            'tenant_id' => self::OTHER_ORGANIZATION_ID,
-            'name' => 'Outside Tenant House',
+        $remoteSite = Site::factory()->create([
+            'name' => 'Remote House',
             'type' => 'house',
             'latitude' => -36.9000,
             'longitude' => 174.8000,
         ]);
-        $outsideVehicle = Asset::factory()->vehicle()->create([
-            'site_id' => $outsideSite->id,
-            'home_site_id' => $outsideSite->id,
-            'name' => 'Outside Tenant Van',
+        $remoteVehicle = Asset::factory()->vehicle()->create([
+            'site_id' => $remoteSite->id,
+            'home_site_id' => $remoteSite->id,
+            'name' => 'Remote Van',
             'status' => 'active',
         ]);
         FleetVehicleStateSnapshot::query()->create([
-            'asset_id' => $outsideVehicle->id,
+            'asset_id' => $remoteVehicle->id,
             'last_seen_at' => now(),
             'latitude' => -36.90,
             'longitude' => 174.80,
             'status' => 'online',
         ]);
-        $outsideGeofence = $this->createGeofence('Outside tenant fence', $outsideVehicle, $outsideSite);
-        $outsideClient = Client::factory()->create([
-            'organization_id' => self::OTHER_ORGANIZATION_ID,
-            'site_id' => $outsideSite->id,
-            'status' => 'active',
+        $remoteDevice = Device::factory()->tracking()->create([
+            'device_uid' => 'REMOTE-TRACKER',
+            'last_seen_at' => now(),
         ]);
-        $outsideDevice = Device::factory()->tracking()->create([
-            'tenant_id' => self::OTHER_ORGANIZATION_ID,
-            'device_uid' => 'OUTSIDE-TENANT-TRACKER',
-        ]);
-        $this->assignDeviceToClient($outsideDevice, $outsideClient);
-        $outsideOuting = $this->createActiveOuting($outsideVehicle, null, 'Outside tenant outing');
-        $outsideOuting->clients()->attach($outsideClient->id);
+        $this->linkDeviceToVehicle($remoteDevice, $remoteVehicle);
 
         $this->actingAs($manager)
             ->get('/fleet-assets')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('fleet-assets/dashboard')
-                ->has('vehicles', 2)
-                ->has('houses', 2)
-                ->has('fleet_by_site', 2)
-                ->where('stats.total_devices', 4)
-                ->where('stats.online_devices', 4)
+                ->has('vehicles', 3)
+                ->has('houses', 3)
+                ->has('fleet_by_site', 3)
+                ->where('stats.total_devices', 3)
+                ->where('stats.online_devices', 3)
                 ->where('vehicles', fn ($vehicles) => collect($vehicles)
                     ->pluck('id')
-                    ->doesntContain($outsideVehicle->id))
+                    ->contains($remoteVehicle->id))
             );
-
-        $this->actingAs($manager)
-            ->get('/fleet-assets/map')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('fleet-assets/map')
-                ->where('vehicle_markers', fn ($markers) => collect($markers)
-                    ->pluck('id')
-                    ->doesntContain($outsideVehicle->id))
-                ->where('house_markers', fn ($houses) => collect($houses)
-                    ->pluck('id')
-                    ->doesntContain($outsideSite->id))
-                ->where('geofences', fn ($geofences) => collect($geofences)
-                    ->pluck('id')
-                    ->doesntContain($outsideGeofence->id))
-            );
-
-        $this->actingAs($manager)
-            ->get('/fleet-assets/resident-tracking?new=1')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('fleet-assets/resident-tracking/index')
-                ->where('residents', fn ($residents) => collect($residents)
-                    ->pluck('client_id')
-                    ->doesntContain($outsideClient->id))
-                ->where('active_outings', fn ($outings) => collect($outings)
-                    ->pluck('id')
-                    ->doesntContain($outsideOuting->id))
-                ->where('assign.clients', fn ($clients) => collect($clients)
-                    ->pluck('id')
-                    ->doesntContain($outsideClient->id))
-            );
-
-        $this->actingAs($manager)
-            ->get("/fleet-assets/resident-tracking/history/{$outsideClient->id}")
-            ->assertForbidden();
     }
 
-    public function test_resident_tracker_mutations_are_tenant_scoped_and_consent_fails_closed(): void
+    public function test_resident_tracker_mutations_require_device_site_access_and_consent(): void
     {
-        $manager = $this->makeSiteUser($this->localSite, ['fleet.viewAny', 'fleet.manage']);
+        $manager = $this->makeSiteUser($this->localSite, [
+            'fleet.viewAny',
+            'fleet.manage',
+            'assets.telemetry.view',
+            'clients.viewAny',
+            'securityDevices.devices.viewUnassigned',
+        ], 'manager');
         $localClient = Client::factory()->create([
-            'organization_id' => self::ORGANIZATION_ID,
             'site_id' => $this->localSite->id,
             'status' => 'active',
         ]);
-        $outsideSite = Site::factory()->create(['tenant_id' => self::OTHER_ORGANIZATION_ID]);
+        $outsideSite = Site::factory()->create();
         $outsideClient = Client::factory()->create([
-            'organization_id' => self::OTHER_ORGANIZATION_ID,
             'site_id' => $outsideSite->id,
             'status' => 'active',
         ]);
+        $localHardware = LocationHardware::query()->create([
+            'site_id' => $this->localSite->id,
+            'provider' => 'manual',
+            'category' => LocationHardware::CATEGORY_TRACKER,
+            'name' => 'Local mutation tracker hardware',
+            'status' => LocationHardware::STATUS_ONLINE,
+        ]);
         $localDevice = Device::factory()->tracking()->inStock()->create([
-            'tenant_id' => self::ORGANIZATION_ID,
             'device_uid' => 'LOCAL-MUTATION-TRACKER',
+            'legacy_location_hardware_id' => $localHardware->id,
         ]);
         $outsideDevice = Device::factory()->tracking()->create([
-            'tenant_id' => self::OTHER_ORGANIZATION_ID,
             'device_uid' => 'OUTSIDE-MUTATION-TRACKER',
         ]);
         $this->assignDeviceToClient($outsideDevice, $outsideClient);
@@ -441,9 +457,13 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
 
     public function test_resident_location_surfaces_fail_closed_after_tracking_consent_is_withdrawn(): void
     {
-        $manager = $this->makeSiteUser($this->localSite, ['fleet.viewAny', 'fleet.manage']);
+        $manager = $this->makeSiteUser($this->localSite, [
+            'fleet.viewAny',
+            'fleet.manage',
+            'assets.telemetry.view',
+            'clients.viewAny',
+        ], 'manager');
         $client = Client::factory()->create([
-            'organization_id' => self::ORGANIZATION_ID,
             'site_id' => $this->localSite->id,
             'status' => 'active',
         ]);
@@ -452,7 +472,6 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
             'withdrawn_at' => now()->subMinute(),
         ]);
         $device = Device::factory()->tracking()->create([
-            'tenant_id' => self::ORGANIZATION_ID,
             'device_uid' => 'WITHDRAWN-CONSENT-TRACKER',
         ]);
         $this->assignDeviceToClient($device, $client, $consent);
@@ -480,14 +499,17 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
 
     public function test_withdrawn_tracking_consent_excludes_recent_alerts_hero_counts_and_wandering_payload(): void
     {
-        $manager = $this->makeSiteUser($this->localSite, ['fleet.viewAny', 'fleet.manage']);
+        $manager = $this->makeSiteUser($this->localSite, [
+            'fleet.viewAny',
+            'fleet.manage',
+            'assets.telemetry.view',
+            'clients.viewAny',
+        ], 'manager');
         $withdrawnClient = Client::factory()->create([
-            'organization_id' => self::ORGANIZATION_ID,
             'site_id' => $this->localSite->id,
             'status' => 'active',
         ]);
         $consentedClient = Client::factory()->create([
-            'organization_id' => self::ORGANIZATION_ID,
             'site_id' => $this->localSite->id,
             'status' => 'active',
         ]);
@@ -497,7 +519,6 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
         ]);
         $activeConsent = $this->createTrackingConsent($consentedClient);
         $withdrawnDevice = Device::factory()->tracking()->create([
-            'tenant_id' => self::ORGANIZATION_ID,
             'device_uid' => 'WITHDRAWN-ALERT-TRACKER',
             'latitude' => -36.8111,
             'longitude' => 174.8111,
@@ -508,7 +529,6 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
             ],
         ]);
         $consentedDevice = Device::factory()->tracking()->create([
-            'tenant_id' => self::ORGANIZATION_ID,
             'device_uid' => 'CONSENTED-ALERT-TRACKER',
             'latitude' => -36.8222,
             'longitude' => 174.8222,
@@ -563,17 +583,20 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
 
     public function test_resident_tracking_rejects_mixed_outing_provenance_and_redacts_foreign_nested_asset(): void
     {
-        $user = $this->makeSiteUser($this->localSite, ['fleet.viewAny']);
+        $user = $this->makeSiteUser($this->localSite, [
+            'fleet.viewAny',
+            'assets.telemetry.view',
+            'clients.viewAssigned',
+        ]);
         $localClient = Client::factory()->create([
-            'organization_id' => self::ORGANIZATION_ID,
             'site_id' => $this->localSite->id,
             'status' => 'active',
         ]);
         $otherSiteClient = Client::factory()->create([
-            'organization_id' => self::ORGANIZATION_ID,
             'site_id' => $this->foreignSite->id,
             'status' => 'active',
         ]);
+        $localClient->supportWorkers()->attach($user->id);
 
         $valid = $this->createActiveOuting($this->localVehicle, null, 'Valid local outing');
         $valid->clients()->attach($localClient->id);
@@ -678,7 +701,6 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
 
         foreach ([$this->localVehicle, $this->foreignVehicle] as $vehicle) {
             FleetServiceSchedule::query()->create([
-                'tenant_id' => self::ORGANIZATION_ID,
                 'asset_id' => $vehicle->id,
                 'name' => 'Scheduled service',
                 'next_due_at' => now()->addDays(10),
@@ -696,13 +718,11 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
         $this->createSignal($this->foreignVehicle, 'foreign-signal');
 
         $localDevice = Device::factory()->tracking()->create([
-            'tenant_id' => self::ORGANIZATION_ID,
             'device_uid' => 'LOCAL-DASHBOARD-DEVICE',
             'name' => 'Local dashboard tracker',
             'last_seen_at' => now(),
         ]);
         $foreignDevice = Device::factory()->tracking()->create([
-            'tenant_id' => self::ORGANIZATION_ID,
             'device_uid' => 'FOREIGN-DASHBOARD-DEVICE',
             'name' => 'Foreign dashboard tracker',
             'last_seen_at' => now(),
@@ -729,14 +749,12 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
     private function seedResidentTrackingSurfaces(): array
     {
         $localClient = Client::factory()->create([
-            'organization_id' => self::ORGANIZATION_ID,
             'site_id' => $this->localSite->id,
             'first_name' => 'Local',
             'last_name' => 'Resident',
             'status' => 'active',
         ]);
         $foreignClient = Client::factory()->create([
-            'organization_id' => self::ORGANIZATION_ID,
             'site_id' => $this->foreignSite->id,
             'first_name' => 'Foreign',
             'last_name' => 'Resident',
@@ -752,13 +770,11 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
         $foreignOuting->clients()->attach($foreignClient->id);
 
         $localAssigned = Device::factory()->tracking()->create([
-            'tenant_id' => self::ORGANIZATION_ID,
             'device_uid' => 'LOCAL-ASSIGNED-TRACKER',
             'name' => 'Local assigned tracker',
             'serial_number' => 'SERIAL-LOCAL-ASSIGNED',
         ]);
         $foreignAssigned = Device::factory()->tracking()->create([
-            'tenant_id' => self::ORGANIZATION_ID,
             'device_uid' => 'FOREIGN-ASSIGNED-TRACKER',
             'name' => 'Foreign assigned tracker',
             'serial_number' => 'SERIAL-FOREIGN-ASSIGNED',
@@ -767,13 +783,11 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
         $this->assignDeviceToClient($foreignAssigned, $foreignClient, $this->createTrackingConsent($foreignClient));
 
         $localSpare = Device::factory()->tracking()->inStock()->create([
-            'tenant_id' => self::ORGANIZATION_ID,
             'device_uid' => 'LOCAL-SPARE-TRACKER',
             'name' => 'Local spare tracker',
             'serial_number' => 'SERIAL-LOCAL-SPARE',
         ]);
         $foreignSpare = Device::factory()->tracking()->inStock()->create([
-            'tenant_id' => self::ORGANIZATION_ID,
             'device_uid' => 'FOREIGN-SPARE-TRACKER',
             'name' => 'Foreign spare tracker',
             'serial_number' => 'SERIAL-FOREIGN-SPARE',
@@ -793,7 +807,6 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
     private function createActiveOuting(Asset $vehicle, ?User $actor, string $title): FleetOuting
     {
         return FleetOuting::query()->create([
-            'tenant_id' => $vehicle->site?->tenant_id,
             'title' => $title,
             'destination' => 'Community centre',
             'purpose' => 'Community participation',
@@ -877,8 +890,7 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
         Device $device,
         Client $client,
         ?ClientConsent $consent = null,
-    ): void
-    {
+    ): void {
         DeviceAssignment::query()->create([
             'device_id' => $device->id,
             'assignable_type' => 'client',
@@ -925,21 +937,17 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
     /**
      * @param  array<int, string>  $permissions
      */
-    private function makeSiteUser(Site $site, array $permissions): User
+    private function makeSiteUser(Site $site, array $permissions, string $role = 'support_worker'): User
     {
         $user = User::factory()->create([
-            'organization_id' => $site->tenant_id,
             'approved_at' => now(),
-            'role' => 'support_worker',
+            'role' => $role,
         ]);
 
-        HrEmployeeProfile::query()->create([
-            'tenant_id' => $site->tenant_id,
+        HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,
-            'employee_number' => 'EMP-FLEET-'.$user->id,
-            'work_email' => $user->email,
             'position_title' => 'Support Worker',
-            'position_role' => 'support_worker',
+            'position_role' => $role,
             'employment_type' => 'full_time',
             'start_date' => now()->subMonth()->toDateString(),
             'is_active' => true,

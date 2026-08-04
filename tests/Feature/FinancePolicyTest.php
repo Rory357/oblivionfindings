@@ -31,8 +31,7 @@ test('finance role can access finance dashboard', function () {
 
     $response = $this->actingAs($user)->get('/finance');
 
-    expect($response->status())->toBeIn([200, 302]);
-    expect($response->status())->not->toBe(403);
+    $response->assertOk();
 });
 
 // ─── Support worker role CANNOT access finance dashboard ───────────────
@@ -85,8 +84,7 @@ test('auditor can view finance dashboard', function () {
 
     $response = $this->actingAs($user)->get('/finance');
 
-    expect($response->status())->toBeIn([200, 302]);
-    expect($response->status())->not->toBe(403);
+    $response->assertOk();
 });
 
 test('auditor can view chart of accounts', function () {
@@ -140,8 +138,7 @@ test('admin can access finance dashboard', function () {
 
     $response = $this->actingAs($user)->get('/finance');
 
-    expect($response->status())->toBeIn([200, 302]);
-    expect($response->status())->not->toBe(403);
+    $response->assertOk();
 });
 
 test('admin can access chart of accounts', function () {

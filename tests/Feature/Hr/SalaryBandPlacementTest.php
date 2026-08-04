@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrSalaryBand;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -10,29 +11,35 @@ use Database\Seeders\SeedHrPermissionsSeeder;
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
+    $this->site = Site::factory()->create(['name' => 'Salary band placement Site']);
 
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
     ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'position_role' => 'hr_manager',
+        'is_active' => true,
+    ]);
 });
 
-function makeBandPlacementProfile(int $tenantId, string $role, ?float $annual): HrEmployeeProfile
+function makeBandPlacementProfile(string $role, ?float $annual): HrEmployeeProfile
 {
     static $n = 0;
     $n++;
 
     return HrEmployeeProfile::query()->create([
-        'tenant_id' => $tenantId,
-        'user_id' => User::factory()->create(['organization_id' => 1, 'approved_at' => now()])->id,
+        'user_id' => User::factory()->create(['approved_at' => now()])->id,
         'employee_number' => 'EMP-BAND-'.$n,
         'work_email' => 'band'.$n.'@example.test',
         'position_title' => 'Support Worker',
         'position_role' => $role,
+        'primary_site_id' => Site::query()->value('id'),
         'employment_type' => 'full_time',
         'annual_salary' => $annual,
         'start_date' => now()->subYear()->toDateString(),
@@ -42,7 +49,6 @@ function makeBandPlacementProfile(int $tenantId, string $role, ?float $annual): 
 
 test('bands page exposes true compa-ratio aggregates and per-band placements', function () {
     HrSalaryBand::query()->create([
-        'tenant_id' => 1,
         'created_by' => $this->hr->id,
         'position_role' => 'support_worker',
         'band_name' => 'Band A',
@@ -55,9 +61,9 @@ test('bands page exposes true compa-ratio aggregates and per-band placements', f
         'effective_from' => now()->subMonth()->toDateString(),
     ]);
 
-    makeBandPlacementProfile(1, 'support_worker', 60000); // in band, compa 1.0
-    makeBandPlacementProfile(1, 'support_worker', 45000); // under band
-    makeBandPlacementProfile(1, 'support_worker', 80000); // over band
+    makeBandPlacementProfile('support_worker', 60000); // in band, compa 1.0
+    makeBandPlacementProfile('support_worker', 45000); // under band
+    makeBandPlacementProfile('support_worker', 80000); // over band
 
     $this->actingAs($this->hr)
         ->get('/hr/compensation/bands')
@@ -91,7 +97,6 @@ test('expenses index exposes the mileage rate + categories for the claim dialog'
 
 test('the pay-review builder receives active bands for placement', function () {
     HrSalaryBand::query()->create([
-        'tenant_id' => 1,
         'created_by' => $this->hr->id,
         'position_role' => 'support_worker',
         'band_name' => 'Band A',
@@ -146,7 +151,6 @@ test('storing a band with min greater than mid is rejected', function () {
 
 test('updating a band cannot set max below the existing mid', function () {
     $band = HrSalaryBand::query()->create([
-        'tenant_id' => 1,
         'created_by' => $this->hr->id,
         'position_role' => 'support_worker',
         'band_name' => 'Band A',
@@ -169,7 +173,6 @@ test('updating a band cannot set max below the existing mid', function () {
 
 test('partial update sending only effective_to before effective_from is rejected', function () {
     $band = HrSalaryBand::query()->create([
-        'tenant_id' => 1,
         'created_by' => $this->hr->id,
         'position_role' => 'support_worker',
         'band_name' => 'Band A',
@@ -194,7 +197,6 @@ test('partial update sending only effective_to before effective_from is rejected
 
 test('export streams a salary-bands csv', function () {
     HrSalaryBand::query()->create([
-        'tenant_id' => 1,
         'created_by' => $this->hr->id,
         'position_role' => 'support_worker',
         'band_name' => 'Band A',

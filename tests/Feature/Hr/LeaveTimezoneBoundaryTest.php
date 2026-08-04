@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\LeaveService;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\Eligibility\Rules\AvailabilityRule;
 use Illuminate\Support\Facades\DB;
@@ -12,22 +13,22 @@ beforeEach(function () {
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
 
     $this->staff = User::factory()->create([
         'role' => 'support_worker',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
+    $this->site = Site::factory()->create(['name' => 'Leave timezone Site']);
+    ensureCanonicalHrStaffProfile($this->hr, $this->site);
 
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'employee_number' => 'LEAVE-TZ-001',
         'work_email' => "leave-tz-{$this->staff->id}@example.test",
         'position_role' => 'support_worker',
+        'primary_site_id' => $this->site->id,
         'hours_per_week' => 40,
         'created_by' => $this->hr->id,
         'updated_by' => $this->hr->id,
@@ -53,7 +54,6 @@ test('leave dates are stored as worker local day bounds in UTC for roster blocki
 
     $insideLeave = Shift::factory()->create([
         'user_id' => $this->staff->id,
-        'organization_id' => 1,
         'starts_at' => '2026-06-14 21:00:00',
         'ends_at' => '2026-06-15 05:00:00',
         'created_by' => $this->hr->id,
@@ -61,7 +61,6 @@ test('leave dates are stored as worker local day bounds in UTC for roster blocki
 
     $beforeLeave = Shift::factory()->create([
         'user_id' => $this->staff->id,
-        'organization_id' => 1,
         'starts_at' => '2026-06-13 21:00:00',
         'ends_at' => '2026-06-14 05:00:00',
         'created_by' => $this->hr->id,

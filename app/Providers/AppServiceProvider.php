@@ -6,27 +6,80 @@ use App\Domain\Finance\Events\JournalPosted;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Monitoring\Adapters\DnsProbeAdapter;
+use App\Domain\Monitoring\Adapters\HttpProbeAdapter;
+use App\Domain\Monitoring\Adapters\IcmpProbeAdapter;
+use App\Domain\Monitoring\Adapters\SnmpV3ProbeAdapter;
+use App\Domain\Monitoring\Adapters\SshInventoryProbeAdapter;
+use App\Domain\Monitoring\Adapters\TcpProbeAdapter;
+use App\Domain\Monitoring\Adapters\TlsProbeAdapter;
+use App\Domain\Monitoring\Adapters\WinRmInventoryProbeAdapter;
 use App\Domain\Monitoring\Contracts\ApprovedProbeScopeProvider;
+use App\Domain\Monitoring\Contracts\CollectorCertificateIssuer;
 use App\Domain\Monitoring\Contracts\CommandDispatchPort;
+use App\Domain\Monitoring\Contracts\CredentialLeaseProvider;
 use App\Domain\Monitoring\Contracts\DnsResolver;
+use App\Domain\Monitoring\Contracts\DnsTransport;
 use App\Domain\Monitoring\Contracts\EnvelopeSigner;
+use App\Domain\Monitoring\Contracts\HttpTransport;
+use App\Domain\Monitoring\Contracts\IcmpTransport;
 use App\Domain\Monitoring\Contracts\ProbeScopeResolver;
+use App\Domain\Monitoring\Contracts\RestoreDependencyProbe;
+use App\Domain\Monitoring\Contracts\SnapshotStore;
+use App\Domain\Monitoring\Contracts\TcpTransport;
+use App\Domain\Monitoring\Contracts\TimeSeriesStore;
+use App\Domain\Monitoring\Contracts\TlsTransport;
+use App\Domain\Monitoring\Discovery\Adapters\NetworkSeedDiscoveryAdapter;
+use App\Domain\Monitoring\Discovery\Contracts\DiscoveryAdapter;
+use App\Domain\Monitoring\Discovery\Contracts\DiscoveryThrottle;
+use App\Domain\Monitoring\Discovery\Services\NativeDiscoveryTokenBucket;
 use App\Domain\Monitoring\Enums\RuntimeMessageType;
+use App\Domain\Monitoring\Handlers\EventEnvelopeHandler;
 use App\Domain\Monitoring\Handlers\ObservationEnvelopeHandler;
+use App\Domain\Monitoring\Handlers\TopologyProjectionEnvelopeHandler;
+use App\Domain\Monitoring\Protocols\Flow\FlowTemplateRegistry;
+use App\Domain\Monitoring\Protocols\RemoteInventory\NativeSshConnectionFactory;
+use App\Domain\Monitoring\Protocols\RemoteInventory\NativeWinRmHttpClient;
+use App\Domain\Monitoring\Protocols\RemoteInventory\SshConnectionFactory;
+use App\Domain\Monitoring\Protocols\RemoteInventory\WinRmHttpClient;
+use App\Domain\Monitoring\Protocols\Snmp\EloquentSnmpCompatibilityAuthorizer;
+use App\Domain\Monitoring\Protocols\Snmp\NativeSnmpTransport;
+use App\Domain\Monitoring\Protocols\Snmp\SnmpCompatibilityAuthorizer;
+use App\Domain\Monitoring\Protocols\Snmp\SnmpTransport;
 use App\Domain\Monitoring\Services\CanonicalProbeScopeResolver;
 use App\Domain\Monitoring\Services\CidrMatcher;
+use App\Domain\Monitoring\Services\DiscoveryApprovedProbeScopeProvider;
 use App\Domain\Monitoring\Services\EgressPolicy;
-use App\Domain\Monitoring\Services\RejectingApprovedProbeScopeProvider;
-use App\Domain\Monitoring\Services\RejectingCommandDispatchPort;
-use App\Domain\Monitoring\Services\RejectingDnsResolver;
+use App\Domain\Monitoring\Services\NativeDnsResolver;
+use App\Domain\Monitoring\Services\ProbeAdapterRegistry;
 use App\Domain\Monitoring\Services\RuntimeEnvelopeHandlerRegistry;
 use App\Domain\Monitoring\Services\SodiumEnvelopeSigner;
+use App\Domain\Monitoring\Transports\NativeDnsTransport;
+use App\Domain\Monitoring\Transports\NativeHttpTransport;
+use App\Domain\Monitoring\Transports\NativeIcmpTransport;
+use App\Domain\Monitoring\Transports\NativeTcpTransport;
+use App\Domain\Monitoring\Transports\NativeTlsTransport;
 use App\Domain\Roadmap\Events\InitiativeScored;
 use App\Domain\Roadmap\Events\QuarterlyPlanPublished;
+use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerLeaseIssuer;
+use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerRestoreProbe;
+use App\Domain\SecurityDevices\Credentials\Services\GovernedCredentialLeaseBroker;
+use App\Domain\SecurityDevices\Credentials\Services\HashicorpVaultLeaseIssuer;
+use App\Domain\SecurityDevices\Credentials\Services\UnavailableSecretManagerLeaseIssuer;
+use App\Domain\SecurityDevices\Management\Adapters\QueclinkTrackingCommandAdapter;
+use App\Domain\SecurityDevices\Management\Adapters\UnifiAccessCommandAdapter;
+use App\Domain\SecurityDevices\Management\Contracts\CommandHttpTransport;
+use App\Domain\SecurityDevices\Management\Services\CommandExecutionAdapterRegistry;
+use App\Domain\SecurityDevices\Management\Services\GovernedCommandDispatchService;
+use App\Domain\SecurityDevices\Management\Transports\NativeCommandHttpTransport;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Events\FleetSignalEmitted;
 use App\Events\FleetWanderingAlertTriggered;
+use App\Infrastructure\Monitoring\InfluxDbTimeSeriesStore;
+use App\Infrastructure\Monitoring\LaravelSnapshotStore;
+use App\Infrastructure\Monitoring\NativeRestoreDependencyProbe;
+use App\Infrastructure\Monitoring\OpenSslCollectorCertificateIssuer;
 use App\Listeners\Finance\AllocatePayrollCosts;
 use App\Listeners\Finance\LogJournalPosted;
 use App\Listeners\Governance\LogQuarterlyPlanPublished;
@@ -116,6 +169,15 @@ use App\Services\Catering\DeliveryProviders\DeliveryProviderManager;
 use App\Services\Integration\Adapters\MilesightAdapter;
 use App\Services\Integration\Adapters\QueclinkAdapter;
 use App\Services\Integration\Adapters\UnifiAdapter;
+use App\Services\Integration\Contracts\ConnectionHealthCapability;
+use App\Services\Integration\Contracts\DeviceSyncCapability;
+use App\Services\Integration\Contracts\EventCollectionCapability;
+use App\Services\Integration\Contracts\InventoryDiscoveryCapability;
+use App\Services\Integration\Contracts\ObservationCollectionCapability;
+use App\Services\Integration\Contracts\SnapshotCollectionCapability;
+use App\Services\Integration\Contracts\TopologyCollectionCapability;
+use App\Services\Integration\Contracts\WebhookVerificationCapability;
+use App\Services\Integration\Data\IntegrationCapabilityManifest;
 use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Services\Notifications\ExpoPushProvider;
 use App\Services\Notifications\FailingPushProvider;
@@ -143,20 +205,83 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(ApprovedProbeScopeProvider::class, RejectingApprovedProbeScopeProvider::class);
-        $this->app->bind(CommandDispatchPort::class, RejectingCommandDispatchPort::class);
-        $this->app->bind(DnsResolver::class, RejectingDnsResolver::class);
+        $this->app->bind(ApprovedProbeScopeProvider::class, DiscoveryApprovedProbeScopeProvider::class);
+        $this->app->bind(CommandDispatchPort::class, GovernedCommandDispatchService::class);
+        $this->app->singleton(
+            CommandExecutionAdapterRegistry::class,
+            fn ($app): CommandExecutionAdapterRegistry => new CommandExecutionAdapterRegistry(
+                $app->tagged('device-command-adapters'),
+            ),
+        );
+        $this->app->bind(CommandHttpTransport::class, NativeCommandHttpTransport::class);
+        $this->app->tag([
+            UnifiAccessCommandAdapter::class,
+            QueclinkTrackingCommandAdapter::class,
+        ], 'device-command-adapters');
+        $this->app->bind(CredentialLeaseProvider::class, GovernedCredentialLeaseBroker::class);
+        $this->app->singleton(SecretManagerLeaseIssuer::class, function ($app): SecretManagerLeaseIssuer {
+            return match ((string) config('monitoring.credentials.driver', 'unavailable')) {
+                'vault' => $app->make(HashicorpVaultLeaseIssuer::class),
+                default => $app->make(UnavailableSecretManagerLeaseIssuer::class),
+            };
+        });
+        $this->app->singleton(SecretManagerRestoreProbe::class, function ($app): SecretManagerRestoreProbe {
+            return match ((string) config('monitoring.credentials.driver', 'unavailable')) {
+                'vault' => $app->make(HashicorpVaultLeaseIssuer::class),
+                default => $app->make(UnavailableSecretManagerLeaseIssuer::class),
+            };
+        });
+        $this->app->bind(CollectorCertificateIssuer::class, OpenSslCollectorCertificateIssuer::class);
+        $this->app->bind(DnsResolver::class, NativeDnsResolver::class);
+        $this->app->bind(DnsTransport::class, NativeDnsTransport::class);
+        $this->app->bind(DiscoveryAdapter::class, NetworkSeedDiscoveryAdapter::class);
+        $this->app->bind(DiscoveryThrottle::class, NativeDiscoveryTokenBucket::class);
         $this->app->bind(EnvelopeSigner::class, SodiumEnvelopeSigner::class);
+        $this->app->bind(HttpTransport::class, NativeHttpTransport::class);
+        $this->app->bind(IcmpTransport::class, NativeIcmpTransport::class);
         $this->app->bind(ProbeScopeResolver::class, CanonicalProbeScopeResolver::class);
+        $this->app->bind(RestoreDependencyProbe::class, NativeRestoreDependencyProbe::class);
+        $this->app->bind(SnapshotStore::class, LaravelSnapshotStore::class);
+        $this->app->bind(TcpTransport::class, NativeTcpTransport::class);
+        $this->app->bind(TimeSeriesStore::class, InfluxDbTimeSeriesStore::class);
+        $this->app->bind(TlsTransport::class, NativeTlsTransport::class);
+        $this->app->bind(SnmpCompatibilityAuthorizer::class, EloquentSnmpCompatibilityAuthorizer::class);
+        $this->app->bind(SnmpTransport::class, NativeSnmpTransport::class);
+        $this->app->bind(SshConnectionFactory::class, NativeSshConnectionFactory::class);
+        $this->app->bind(WinRmHttpClient::class, NativeWinRmHttpClient::class);
+        $this->app->singleton(FlowTemplateRegistry::class);
         $this->app->singleton(EgressPolicy::class, fn ($app) => new EgressPolicy(
             $app->make(CidrMatcher::class),
             $app->make(DnsResolver::class),
             $app->make(ProbeScopeResolver::class),
-            config('monitoring.egress'),
+            array_merge((array) config('monitoring.egress'), [
+                'external_heartbeat' => (array) config('monitoring.external_heartbeat'),
+            ]),
         ));
         $this->app->singleton(RuntimeEnvelopeHandlerRegistry::class, fn ($app) => new RuntimeEnvelopeHandlerRegistry([
-            RuntimeMessageType::Observation->value => $app->make(ObservationEnvelopeHandler::class),
+            RuntimeMessageType::Observation->value => [
+                1 => $app->make(ObservationEnvelopeHandler::class),
+                2 => $app->make(ObservationEnvelopeHandler::class),
+            ],
+            RuntimeMessageType::Event->value => [
+                1 => $app->make(EventEnvelopeHandler::class),
+                2 => $app->make(EventEnvelopeHandler::class),
+            ],
+            RuntimeMessageType::Projection->value => [
+                1 => $app->make(TopologyProjectionEnvelopeHandler::class),
+                2 => $app->make(TopologyProjectionEnvelopeHandler::class),
+            ],
         ]));
+        $this->app->singleton(ProbeAdapterRegistry::class, fn ($app) => new ProbeAdapterRegistry(
+            $app->make(IcmpProbeAdapter::class),
+            $app->make(TcpProbeAdapter::class),
+            $app->make(DnsProbeAdapter::class),
+            $app->make(HttpProbeAdapter::class),
+            $app->make(TlsProbeAdapter::class),
+            $app->make(SnmpV3ProbeAdapter::class),
+            $app->make(SshInventoryProbeAdapter::class),
+            $app->make(WinRmInventoryProbeAdapter::class),
+        ));
 
         // On Windows + Herd, the `mysql` client binary isn't on PATH by
         // default, but Laravel's MigrateCommand shells out to it when
@@ -170,14 +295,67 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(IntegrationAdapterRegistry::class, function () {
             $registry = new IntegrationAdapterRegistry;
-            $registry->register('unifi', UnifiAdapter::class);
+            $registry->register('unifi', UnifiAdapter::class, new IntegrationCapabilityManifest(
+                provider: 'unifi',
+                version: '1.5',
+                capabilities: [
+                    ConnectionHealthCapability::class,
+                    InventoryDiscoveryCapability::class,
+                    DeviceSyncCapability::class,
+                    ObservationCollectionCapability::class,
+                    SnapshotCollectionCapability::class,
+                    EventCollectionCapability::class,
+                    TopologyCollectionCapability::class,
+                    WebhookVerificationCapability::class,
+                ],
+                requiredPermissions: [
+                    'securityDevices.integrations.view',
+                    'securityDevices.integrations.manage',
+                ],
+                sensitivityLabels: ['provider_credentials', 'device_identifiers', 'operational_observations', 'event_metadata', 'site_topology', 'configuration_snapshots'],
+                pageLimit: 200,
+                minimumIntervalSeconds: 60,
+                backfillLimit: 5000,
+            ));
             $registry->register(
                 QueclinkAdapter::PROVIDER_SLUG,
                 QueclinkAdapter::class,
+                new IntegrationCapabilityManifest(
+                    provider: QueclinkAdapter::PROVIDER_SLUG,
+                    version: '1.1',
+                    capabilities: [],
+                    requiredPermissions: [
+                        'securityDevices.integrations.view',
+                        'securityDevices.integrations.manage',
+                    ],
+                    sensitivityLabels: ['provider_credentials'],
+                    pageLimit: 100,
+                    minimumIntervalSeconds: 300,
+                    backfillLimit: 1000,
+                ),
             );
             $registry->register(
                 MilesightAdapter::PROVIDER_SLUG,
                 MilesightAdapter::class,
+                new IntegrationCapabilityManifest(
+                    provider: MilesightAdapter::PROVIDER_SLUG,
+                    version: '1.3',
+                    capabilities: [
+                        ConnectionHealthCapability::class,
+                        InventoryDiscoveryCapability::class,
+                        DeviceSyncCapability::class,
+                        ObservationCollectionCapability::class,
+                        WebhookVerificationCapability::class,
+                    ],
+                    requiredPermissions: [
+                        'securityDevices.integrations.view',
+                        'securityDevices.integrations.manage',
+                    ],
+                    sensitivityLabels: ['provider_credentials', 'device_identifiers', 'operational_observations', 'event_metadata'],
+                    pageLimit: 100,
+                    minimumIntervalSeconds: 300,
+                    backfillLimit: 1000,
+                ),
             );
 
             return $registry;

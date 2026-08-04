@@ -2,19 +2,19 @@
 
 namespace App\Domain\Hr\Services;
 
-use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
+use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrPerformanceReview;
-use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Notifications\ComplianceExpiryNotification;
+use App\Domain\Hr\Notifications\DevelopmentGoalCompletedNotification;
 use App\Domain\Hr\Notifications\ExpenseApprovedNotification;
 use App\Domain\Hr\Notifications\ExpenseRejectedNotification;
 use App\Domain\Hr\Notifications\ExpenseSubmittedNotification;
-use App\Domain\Hr\Notifications\DevelopmentGoalCompletedNotification;
 use App\Domain\Hr\Notifications\GoalCompletedNotification;
 use App\Domain\Hr\Notifications\HrAssetAlertNotification;
 use App\Domain\Hr\Notifications\LeaveApprovedNotification;
@@ -27,11 +27,17 @@ use App\Domain\Hr\Notifications\ReviewReadyForAcknowledgementNotification;
 use App\Domain\Hr\Notifications\ReviewSignedOffNotification;
 use App\Domain\Hr\Notifications\SupervisionAcknowledgedNotification;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 class HrNotificationService
 {
+    public function __construct(
+        private readonly HrCurrentStaffService $currentStaff,
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     /**
      * Notify the employee's manager (or all users with hr.leave.approve) about a new leave request.
      */
@@ -61,7 +67,7 @@ class HrNotificationService
     {
         $employee = $request->user ?? User::find($request->user_id);
 
-        if ($employee) {
+        if ($employee && app(HrLeaveAccessService::class)->isCurrentStaff($employee)) {
             try {
                 $employee->notify(new LeaveApprovedNotification($request));
             } catch (\Throwable $e) {
@@ -88,12 +94,17 @@ class HrNotificationService
             $assigned = $request->escalated_to && $request->escalated_to !== $request->user_id
                 ? User::find($request->escalated_to)
                 : null;
-            $recipients = $assigned
+            $eligibleAssigned = $assigned
+                && $request->user
+                && app(HrLeaveAccessService::class)->isEligibleApprover($request->user, $assigned);
+            $recipients = $eligibleAssigned
                 ? collect([$assigned])
                 : $this->getLeaveApprovers($request);
         } else {
             // Manager/admin cancel → tell the employee.
-            $recipients = collect([$request->user ?? User::find($request->user_id)])->filter();
+            $recipients = collect([$request->user ?? User::find($request->user_id)])
+                ->filter(fn (?User $employee): bool => $employee !== null
+                    && app(HrLeaveAccessService::class)->isCurrentStaff($employee));
         }
 
         foreach ($recipients as $recipient) {
@@ -116,7 +127,7 @@ class HrNotificationService
     {
         $employee = $request->user ?? User::find($request->user_id);
 
-        if ($employee) {
+        if ($employee && app(HrLeaveAccessService::class)->isCurrentStaff($employee)) {
             try {
                 $employee->notify(new LeaveDeclinedNotification($request));
             } catch (\Throwable $e) {
@@ -185,6 +196,10 @@ class HrNotificationService
         $status->loadMissing(['user', 'requirement']);
 
         $employee = $status->user;
+        if (! $employee || ! $this->currentStaff->isCurrent($employee)) {
+            return;
+        }
+
         $requirementData = [
             'name' => $status->requirement?->name ?? 'Unknown Requirement',
             'requirement_code' => $status->requirement?->code ?? null,
@@ -192,26 +207,21 @@ class HrNotificationService
         ];
 
         // Notify the employee
-        if ($employee) {
-            try {
-                $employee->notify(new ComplianceExpiryNotification($employee, $requirementData));
-            } catch (\Throwable $e) {
-                Log::warning('Failed to send compliance expiry notification to employee', [
-                    'status_id' => $status->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+        try {
+            $employee->notify(new ComplianceExpiryNotification($employee, $requirementData));
+        } catch (\Throwable $e) {
+            Log::warning('Failed to send compliance expiry notification to employee', [
+                'status_id' => $status->id,
+                'error' => $e->getMessage(),
+            ]);
         }
 
-        // Notify HR users with compliance management permissions
-        $hrUsers = $this->getUsersWithPermission(['hr.compliance.manage'], $status->tenant_id);
+        // Notify current HR users who may see this employee's Site.
+        $hrUsers = $this->currentRecipientsForSubject(['hr.compliance.manage'], $employee);
         foreach ($hrUsers as $hrUser) {
-            if ($hrUser->id === $employee?->id) {
-                continue;
-            }
             try {
                 $hrUser->notify(new ComplianceExpiryNotification(
-                    $employee ?? $hrUser,
+                    $employee,
                     $requirementData,
                 ));
             } catch (\Throwable $e) {
@@ -230,8 +240,12 @@ class HrNotificationService
     public function notifyExpenseSubmitted(HrExpenseClaim $claim): void
     {
         $claim->loadMissing('user');
+        $employee = $claim->user;
+        if (! $employee || ! $this->currentStaff->isCurrent($employee)) {
+            return;
+        }
 
-        $approvers = $this->getUsersWithPermission(['hr.expenses.approve'], $claim->tenant_id);
+        $approvers = $this->currentRecipientsForSubject(['hr.expenses.approve'], $employee);
 
         foreach ($approvers as $approver) {
             try {
@@ -253,7 +267,7 @@ class HrNotificationService
     {
         $employee = $claim->user ?? User::find($claim->user_id);
 
-        if ($employee) {
+        if ($employee && $this->currentStaff->isCurrent($employee)) {
             try {
                 $employee->notify(new ExpenseApprovedNotification($claim));
             } catch (\Throwable $e) {
@@ -272,7 +286,7 @@ class HrNotificationService
     {
         $employee = $claim->user ?? User::find($claim->user_id);
 
-        if ($employee) {
+        if ($employee && $this->currentStaff->isCurrent($employee)) {
             try {
                 $employee->notify(new ExpenseRejectedNotification($claim));
             } catch (\Throwable $e) {
@@ -428,14 +442,19 @@ class HrNotificationService
      */
     protected function getLeaveApprovers(HrLeaveRequest $request): Collection
     {
-        return $this->getUsersWithPermission(['hr.leave.approve'], $request->tenant_id)
-            ->reject(fn (User $u) => $u->id === $request->user_id);
+        $request->loadMissing('user');
+        if (! $request->user) {
+            return collect();
+        }
+
+        return app(HrLeaveAccessService::class)->eligibleApprovers($request->user);
     }
 
     /**
      * Deliver HR asset attention alerts (warranty / overdue / repair / leaver) to
-     * every user who can manage assets in the alert's tenant. Suppresses repeats
-     * per the alert's dedupe scope: 'once' = never re-send the same key, 'daily' =
+     * current asset managers who can still access the alert's complete Site
+     * provenance. Suppresses repeats per the alert's dedupe scope: 'once' =
+     * never re-send the same key, 'daily' =
      * at most one per day (so ongoing states keep nudging until resolved).
      *
      * @param  array<int,array<string,mixed>>  $alerts
@@ -453,9 +472,10 @@ class HrNotificationService
         }
 
         $sent = 0;
+        $access = app(HrAssetAccessService::class);
 
         foreach ($alerts as $alert) {
-            foreach ($recipients as $recipient) {
+            foreach ($recipients->filter(fn (User $recipient): bool => $access->canReceiveAlert($recipient, $alert)) as $recipient) {
                 $query = $recipient->notifications()
                     ->where('type', HrAssetAlertNotification::class)
                     ->where('data->dedupe_key', $alert['dedupe_key']);
@@ -511,30 +531,37 @@ class HrNotificationService
     }
 
     /**
-     * Get all users who have any of the supplied permissions, optionally scoped to a tenant.
+     * Resolve current permission holders who may see the subject through their
+     * canonical Site assignments. Effective permission checks preserve direct
+     * allow and explicit-deny precedence after the candidate query is narrowed.
      *
      * @param  array<int, string>  $permissions
+     * @return Collection<int, User>
      */
-    protected function getUsersWithPermission(array $permissions, ?int $tenantId): Collection
+    protected function currentRecipientsForSubject(array $permissions, User $subject): Collection
     {
-        // Users are tenanted by `organization_id` (there is no users.tenant_id);
-        // the HR domain's tenant id == the user's organization id.
-        return User::query()
-            ->when($tenantId, fn ($q) => $q->where('organization_id', $tenantId))
+        if ($permissions === [] || ! $this->currentStaff->isCurrent($subject)) {
+            return collect();
+        }
+
+        return $this->currentStaff->currentUsersQuery()
+            ->whereKeyNot($subject->getKey())
             ->where(function ($query) use ($permissions) {
-                // Inside whereHas() the closure receives a plain Eloquent Builder,
-                // not the BelongsToMany relation, so wherePivot() is NOT available —
-                // it would fall through to dynamicWhere() and emit a bogus
-                // `where pivot = ?`. Reference the pivot column explicitly instead.
                 $query->whereHas('roles.permissions', fn ($permissionQuery) => $permissionQuery->whereIn('key', $permissions))
-                    ->orWhereHas('permissionOverrides', fn ($permissionQuery) => $permissionQuery
-                        ->whereIn('permissions.key', $permissions)
-                        ->where('permission_user.allowed', true));
+                    ->orWhereHas('permissionOverrides', fn ($permissionQuery) => $permissionQuery->whereIn(
+                        'permissions.key',
+                        $permissions,
+                    ));
             })
-            ->whereDoesntHave('permissionOverrides', fn ($permissionQuery) => $permissionQuery
-                ->whereIn('permissions.key', $permissions)
-                ->where('permission_user.allowed', false))
+            ->with(['roles.permissions', 'permissionOverrides', 'hrEmployeeProfile'])
             ->distinct()
-            ->get();
+            ->get()
+            ->filter(fn (User $candidate): bool => collect($permissions)->contains(
+                fn (string $permission): bool => $candidate->canDo($permission),
+            ))
+            ->filter(fn (User $candidate): bool => $this->siteAccess
+                ->applyStaffScope(User::query()->whereKey($subject->getKey()), $candidate)
+                ->exists())
+            ->values();
     }
 }

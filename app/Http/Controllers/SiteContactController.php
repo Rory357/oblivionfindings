@@ -6,16 +6,20 @@ use App\Models\Site;
 use App\Models\SiteContact;
 use App\Services\AuditLogger;
 use App\Services\NotificationService;
+use App\Services\Sites\SiteContactService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class SiteContactController extends Controller
 {
+    public function __construct(private readonly SiteContactService $contacts) {}
+
     public function store(Request $request, Site $site)
     {
         $this->authorize('update', $site);
 
         $data = $request->validate([
-            'type' => ['nullable', 'string', 'max:60'],
+            'type' => ['required', 'string', Rule::in(SiteContact::TYPES)],
             'name' => ['required', 'string', 'max:255'],
             'role' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:60'],
@@ -24,16 +28,7 @@ class SiteContactController extends Controller
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        $isPrimary = (bool) ($data['is_primary'] ?? false);
-        if ($isPrimary) {
-            SiteContact::query()->where('site_id', $site->id)->update(['is_primary' => false]);
-        }
-
-        $contact = SiteContact::create(array_merge($data, [
-            'tenant_id' => $site->tenant_id,
-            'site_id' => $site->id,
-            'is_primary' => $isPrimary,
-        ]));
+        $contact = $this->contacts->create($site, $data);
 
         AuditLogger::log('sites.contacts.create', $contact, ['site_id' => $site->id]);
 
@@ -49,10 +44,8 @@ class SiteContactController extends Controller
     public function update(Request $request, Site $site, SiteContact $contact)
     {
         $this->authorize('update', $site);
-        abort_unless($contact->site_id === $site->id, 404);
-
         $data = $request->validate([
-            'type' => ['nullable', 'string', 'max:60'],
+            'type' => ['required', 'string', Rule::in(SiteContact::TYPES)],
             'name' => ['required', 'string', 'max:255'],
             'role' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:60'],
@@ -61,15 +54,7 @@ class SiteContactController extends Controller
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        $isPrimary = (bool) ($data['is_primary'] ?? false);
-        if ($isPrimary) {
-            SiteContact::query()
-                ->where('site_id', $site->id)
-                ->whereKeyNot($contact->id)
-                ->update(['is_primary' => false]);
-        }
-
-        $contact->update(array_merge($data, ['is_primary' => $isPrimary]));
+        $contact = $this->contacts->update($site, (int) $contact->id, $data);
 
         AuditLogger::log('sites.contacts.update', $contact, ['site_id' => $site->id]);
 
@@ -85,10 +70,8 @@ class SiteContactController extends Controller
     public function destroy(Request $request, Site $site, SiteContact $contact)
     {
         $this->authorize('update', $site);
-        abort_unless($contact->site_id === $site->id, 404);
-
         $name = $contact->name;
-        $contact->delete();
+        $contact = $this->contacts->delete($site, (int) $contact->id);
 
         AuditLogger::log('sites.contacts.delete', $site, ['site_id' => $site->id, 'name' => $name]);
 

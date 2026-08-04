@@ -3,7 +3,9 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
+use Database\Factories\Hr\HrOnboardingChecklistFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,11 +13,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrOnboardingChecklist extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Hr\HrOnboardingChecklistFactory::new();
+        return HrOnboardingChecklistFactory::new();
     }
 
     protected $fillable = [
@@ -36,7 +38,7 @@ class HrOnboardingChecklist extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function employeeProfile(): BelongsTo

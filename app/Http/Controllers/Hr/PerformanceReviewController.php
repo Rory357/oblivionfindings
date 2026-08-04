@@ -2,26 +2,33 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Concerns\ServesPrivateAttachments;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
-use App\Http\Requests\Hr\StorePerformanceReviewRequest;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrProbationReview;
 use App\Domain\Hr\Models\HrSuccessionCandidate;
 use App\Domain\Hr\Services\HrNotificationService;
+use App\Domain\Hr\Services\HrPerformanceAccessService;
+use App\Domain\Hr\Services\HrSuccessionAccessService;
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Hr\StorePerformanceReviewRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Throwable;
 
 class PerformanceReviewController extends Controller
 {
-    use ResolvesHrTenant;
     use ServesPrivateAttachments;
+
+    public function __construct(
+        private readonly HrPerformanceAccessService $access,
+        private readonly HrSuccessionAccessService $successionAccess,
+    ) {}
 
     /**
      * List all performance reviews.
@@ -31,30 +38,29 @@ class PerformanceReviewController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $search = trim((string) $request->query('q', ''));
 
-        $reviews = HrPerformanceReview::with(['employee:id,name', 'reviewer:id,name'])
-            ->where('tenant_id', $tenantId)
+        $allReviews = $this->access->applyHistoricalSubjectScope(HrPerformanceReview::query(), $user);
+        $reviews = (clone $allReviews)
+            ->with(['employee:id,name', 'reviewer:id,name'])
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->when($request->query('employee'), fn ($q, $empId) => $q->where('employee_user_id', $empId))
             ->when($search !== '', fn ($q) => $q->where(function ($q2) use ($search) {
                 $q2->whereHas('employee', fn ($e) => $e->where('name', 'like', "%{$search}%"))
-                   ->orWhereHas('reviewer', fn ($e) => $e->where('name', 'like', "%{$search}%"));
+                    ->orWhereHas('reviewer', fn ($e) => $e->where('name', 'like', "%{$search}%"));
             }))
             ->orderByDesc('created_at')
             ->paginate(20)
             ->withQueryString();
 
-        $probationReviews = HrProbationReview::with(['employee:id,name', 'reviewer:id,name'])
-            ->where('tenant_id', $tenantId)
+        $probationReviews = $this->access
+            ->applyHistoricalSubjectScope(HrProbationReview::query(), $user)
+            ->with(['employee:id,name', 'reviewer:id,name'])
             ->orderByDesc('review_date')
             ->limit(20)
             ->get();
 
         // Summary stats
-        $allReviews = HrPerformanceReview::where('tenant_id', $tenantId);
         $totalCount = (clone $allReviews)->count();
         $completedCount = (clone $allReviews)->whereIn('status', ['completed', 'signed_off'])->count();
         $overdueCount = (clone $allReviews)->whereIn('status', ['draft', 'scheduled', 'in_progress'])
@@ -64,7 +70,7 @@ class PerformanceReviewController extends Controller
         $draftCount = (clone $allReviews)->where('status', 'draft')->count();
 
         // Rating distribution
-        $ratingDistribution = HrPerformanceReview::where('tenant_id', $tenantId)
+        $ratingDistribution = (clone $allReviews)
             ->whereIn('status', ['completed', 'signed_off'])
             ->whereNotNull('overall_rating')
             ->selectRaw('overall_rating as rating, COUNT(*) as count')
@@ -78,7 +84,7 @@ class PerformanceReviewController extends Controller
         ]);
 
         // Status distribution
-        $statusDistribution = HrPerformanceReview::where('tenant_id', $tenantId)
+        $statusDistribution = (clone $allReviews)
             ->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
             ->pluck('count', 'status');
@@ -101,7 +107,7 @@ class PerformanceReviewController extends Controller
                 'status' => $request->query('status'),
                 'q' => $search,
             ],
-            'staff' => $this->reviewStaff($tenantId),
+            'staff' => $this->reviewStaff($user),
             'reviewTypes' => $this->reviewTypeOptions(),
             'can' => [
                 'manage' => $user->canDo('hr.performance.manage'),
@@ -109,15 +115,13 @@ class PerformanceReviewController extends Controller
         ]);
     }
 
-    /** Staff selectable in the review wizard (tenant-scoped). */
-    private function reviewStaff(int $tenantId)
+    /** Current staff selectable in the review wizard. */
+    private function reviewStaff(User $viewer)
     {
-        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
-
-        return User::staff()
-            ->when($staffIds !== [], fn ($query) => $query->whereIn('id', $staffIds))
+        return $this->access
+            ->currentUserIds($viewer)
             ->orderBy('name')
-            ->get(['id', 'name', 'email']);
+            ->get(['users.id', 'users.name', 'users.email']);
     }
 
     /** Review-type options for the wizard. */
@@ -149,11 +153,9 @@ class PerformanceReviewController extends Controller
     public function show(Request $request, HrPerformanceReview $review)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
-
-        $review->load(['employee:id,name', 'reviewer:id,name', 'reviewGoals.goal:id,title']);
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $review = $this->access->performanceReview($user, $review)
+            ->load(['employee:id,name', 'reviewer:id,name', 'reviewGoals.goal:id,title']);
 
         $canManage = $user->canDo('hr.performance.manage');
 
@@ -176,7 +178,7 @@ class PerformanceReviewController extends Controller
                     'rating' => null,
                     'goal' => null,
                 ])->all(),
-            'nextSteps' => $this->nextStepsFor($review, $canManage, $tenantId),
+            'nextSteps' => $this->nextStepsFor($review, $canManage, $user),
             'can' => [
                 'manage' => $canManage,
             ],
@@ -189,15 +191,15 @@ class PerformanceReviewController extends Controller
      * CTA into the existing PIP / succession flows when the review outcome
      * warrants it and no equivalent process is already underway.
      *
-     * @return array{action: string, employee_profile_id?: int, staff: array<int, array{value: int, label: string}>, successionEmployees?: array<int, array{value: int, label: string}>}|null
+     * @return array{action: string, staff: array<int, array{value: int, label: string}>}|null
      */
-    private function nextStepsFor(HrPerformanceReview $review, bool $canManage, int $tenantId): ?array
+    private function nextStepsFor(HrPerformanceReview $review, bool $canManage, User $viewer): ?array
     {
         if (! $canManage || $review->status !== 'signed_off' || $review->overall_rating === null) {
             return null;
         }
 
-        $staffOptions = fn () => $this->reviewStaff($tenantId)
+        $staffOptions = fn () => $this->reviewStaff($viewer)
             ->map(fn ($u) => ['value' => $u->id, 'label' => $u->name])
             ->values()
             ->all();
@@ -220,17 +222,21 @@ class PerformanceReviewController extends Controller
 
         // Strong outcome → succession nomination (unless already a candidate).
         if ($review->overall_rating >= 4) {
-            $profile = HrEmployeeProfile::where('tenant_id', $tenantId)
+            $profile = $this->access
+                ->applyCurrentProfileScope(HrEmployeeProfile::query(), $viewer)
                 ->where('user_id', $review->employee_user_id)
-                ->where('is_active', true)
                 ->first(['id']);
 
             if (! $profile) {
                 return null;
             }
 
-            $isCandidate = HrSuccessionCandidate::where('employee_profile_id', $profile->id)
-                ->whereHas('successionPlan', fn ($q) => $q->where('is_active', true))
+            $isCandidate = HrSuccessionCandidate::query()
+                ->where('employee_profile_id', $profile->id)
+                ->whereIn(
+                    'succession_plan_id',
+                    $this->successionAccess->visiblePlans($viewer)->active()->select('id'),
+                )
                 ->exists();
 
             if ($isCandidate) {
@@ -239,16 +245,7 @@ class PerformanceReviewController extends Controller
 
             return [
                 'action' => 'succession',
-                'employee_profile_id' => $profile->id,
                 'staff' => $staffOptions(),
-                'successionEmployees' => HrEmployeeProfile::where('tenant_id', $tenantId)
-                    ->where('is_active', true)
-                    ->with('user:id,name')
-                    ->orderBy('user_id')
-                    ->limit(500)
-                    ->get(['id', 'user_id'])
-                    ->map(fn ($p) => ['value' => $p->id, 'label' => $p->user?->name ?? 'Unknown'])
-                    ->all(),
             ];
         }
 
@@ -263,6 +260,7 @@ class PerformanceReviewController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $this->access->performanceReview($user, $review);
 
         return redirect()->route('hr.performance.reviews.index');
     }
@@ -273,21 +271,23 @@ class PerformanceReviewController extends Controller
     public function store(StorePerformanceReviewRequest $request)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $data = $request->validated();
+        $this->access->currentStaff($user, $user);
+        $employee = $this->access->currentStaff($user, (int) $data['employee_user_id']);
 
-        $review = HrPerformanceReview::create([
-            'tenant_id' => $tenantId,
-            'reviewer_user_id' => $user->id,
-            'status' => 'draft',
-            'created_by' => $user->id,
-            ...$data,
-        ]);
+        DB::transaction(function () use ($data, $employee, $user): void {
+            $review = HrPerformanceReview::query()->create([
+                ...$data,
+                'employee_user_id' => $employee->id,
+                'reviewer_user_id' => $user->id,
+                'status' => 'draft',
+                'created_by' => $user->id,
+            ]);
 
-        if (array_key_exists('goals', $data)) {
-            $review->syncReviewGoals($data['goals'] ?? []);
-        }
+            if (array_key_exists('goals', $data)) {
+                $review->syncReviewGoals($data['goals'] ?? []);
+            }
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Performance review created.');
     }
@@ -299,8 +299,8 @@ class PerformanceReviewController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
+        $this->access->currentStaff($user, $user);
+        $this->access->performanceReview($user, $review);
 
         // A signed-off review is locked — no further edits via the generic update.
         abort_if($review->status === 'signed_off', 422, 'This review is signed off and locked.');
@@ -309,7 +309,6 @@ class PerformanceReviewController extends Controller
             'review_type' => ['sometimes', 'string', 'in:annual,mid_year,quarterly,ad_hoc'],
             'review_period_start' => ['sometimes', 'date'],
             'review_period_end' => ['sometimes', 'date'],
-            'status' => ['sometimes', 'string', 'in:draft,in_progress,completed,signed_off'],
             'overall_rating' => ['nullable', 'integer', 'min:1', 'max:5'],
             'strengths' => ['nullable', 'string', 'max:5000'],
             'development_areas' => ['nullable', 'string', 'max:5000'],
@@ -317,27 +316,23 @@ class PerformanceReviewController extends Controller
             'goals.*' => ['string', 'max:500'],
             'training_recommendations' => ['nullable', 'array'],
             'training_recommendations.*' => ['string', 'max:500'],
-            'employee_comments' => ['nullable', 'string', 'max:5000'],
-            'employee_signed_off' => ['nullable', 'boolean'],
-            'manager_signed_off' => ['nullable', 'boolean'],
             'next_review_date' => ['nullable', 'date'],
         ]);
 
-        if (isset($data['employee_signed_off']) && $data['employee_signed_off'] && ! $review->employee_signed_off) {
-            $data['employee_signed_off_at'] = now();
-        }
-
-        if (isset($data['manager_signed_off']) && $data['manager_signed_off'] && ! $review->manager_signed_off) {
-            $data['manager_signed_off_at'] = now();
-        }
-
         $data['updated_by'] = $user->id;
 
-        $review->update($data);
+        DB::transaction(function () use ($data, $review, $user): void {
+            $locked = $this->access
+                ->applyHistoricalSubjectScope(HrPerformanceReview::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($review->getKey());
+            abort_if($locked->status === 'signed_off', 422, 'This review is signed off and locked.');
+            $locked->update($data);
 
-        if (array_key_exists('goals', $data)) {
-            $review->syncReviewGoals($data['goals'] ?? []);
-        }
+            if (array_key_exists('goals', $data)) {
+                $locked->syncReviewGoals($data['goals'] ?? []);
+            }
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Performance review updated.');
     }
@@ -349,12 +344,17 @@ class PerformanceReviewController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
+        $this->access->currentStaff($user, $user);
+        $this->access->performanceReview($user, $review);
 
-        abort_unless(in_array($review->status, ['draft', 'in_progress'], true), 422, 'Only draft reviews can be submitted.');
-
-        $review->update(['status' => 'in_progress', 'updated_by' => $user->id]);
+        DB::transaction(function () use ($review, $user): void {
+            $locked = $this->access
+                ->applyHistoricalSubjectScope(HrPerformanceReview::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($review->getKey());
+            abort_unless($locked->status === 'draft', 422, 'Only draft reviews can be submitted.');
+            $locked->update(['status' => 'in_progress', 'updated_by' => $user->id]);
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Review submitted for sign-off.');
     }
@@ -366,31 +366,43 @@ class PerformanceReviewController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
-
-        abort_if($review->status === 'signed_off', 422, 'This review is already signed off.');
+        $this->access->currentStaff($user, $user);
+        $this->access->performanceReview($user, $review);
 
         $data = $request->validate([
             'decision' => ['required', 'string', 'in:approve,return'],
-            'comment' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        if ($data['decision'] === 'return') {
-            $review->update([
-                'status' => 'in_progress',
+        $approved = DB::transaction(function () use ($data, $review, $user): bool {
+            $locked = $this->access
+                ->applyHistoricalSubjectScope(HrPerformanceReview::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($review->getKey());
+            abort_if($locked->status === 'signed_off', 422, 'This review is already signed off.');
+            abort_unless(in_array($locked->status, ['in_progress', 'completed'], true), 422, 'Only submitted reviews can be signed off.');
+
+            if ($data['decision'] === 'return') {
+                $locked->update([
+                    'status' => 'in_progress',
+                    'updated_by' => $user->id,
+                ]);
+
+                return false;
+            }
+
+            $locked->update([
+                'status' => 'signed_off',
+                'manager_signed_off' => true,
+                'manager_signed_off_at' => $locked->manager_signed_off_at ?? now(),
                 'updated_by' => $user->id,
             ]);
 
+            return true;
+        }, attempts: 1);
+
+        if (! $approved) {
             return redirect()->back()->with('success', 'Review returned for edits.');
         }
-
-        $review->update([
-            'status' => 'signed_off',
-            'manager_signed_off' => true,
-            'manager_signed_off_at' => $review->manager_signed_off_at ?? now(),
-            'updated_by' => $user->id,
-        ]);
 
         // The employee is now the waiting party — tell them to acknowledge.
         app(HrNotificationService::class)->notifyReviewReadyForAcknowledgement($review->fresh());
@@ -405,21 +417,34 @@ class PerformanceReviewController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        // Either the review subject, or a manager acting on their behalf.
-        abort_unless(
-            $review->employee_user_id === $user->id || $user->canDo('hr.performance.manage'),
-            403,
-        );
+        $this->access->currentStaff($user, $user);
+        $data = $request->validate([
+            'employee_comments' => ['nullable', 'string', 'max:5000'],
+        ]);
 
-        if (! $review->employee_signed_off) {
-            $review->update([
+        $changed = DB::transaction(function () use ($data, $review, $user): bool {
+            $locked = $this->access
+                ->applyHistoricalSubjectScope(HrPerformanceReview::query(), $user)
+                ->whereKey($review->getKey())
+                ->where('employee_user_id', $user->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless($locked->status === 'signed_off' && $locked->manager_signed_off, 422, 'Only a manager-signed review can be acknowledged.');
+
+            if ($locked->employee_signed_off) {
+                return false;
+            }
+
+            $locked->update([
+                'employee_comments' => $data['employee_comments'] ?? $locked->employee_comments,
                 'employee_signed_off' => true,
                 'employee_signed_off_at' => now(),
             ]);
 
-            // Match the My HR acknowledge path: let the reviewer know it's closed
-            // out. (The self-service /hr/my flow already fires this; the hub path
-            // was silent.)
+            return true;
+        }, attempts: 1);
+
+        if ($changed) {
             app(HrNotificationService::class)->notifyReviewSignedOff($review->fresh());
         }
 
@@ -433,16 +458,34 @@ class PerformanceReviewController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $review->tenant_id);
+        $this->access->currentStaff($user, $user);
+        $review = $this->access->performanceReview($user, $review);
         abort_if($review->status === 'signed_off', 422, 'This review is signed off and locked.');
 
         $request->validate(['file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:10240']]);
 
-        if ($review->evidence_path) {
-            Storage::disk('private')->delete($review->evidence_path);
-        }
         $path = $request->file('file')->store('hr/performance-reviews/'.$review->id, 'private');
-        $review->update(['evidence_path' => $path]);
+        try {
+            DB::transaction(function () use ($path, $review, $user): void {
+                $locked = $this->access
+                    ->applyHistoricalSubjectScope(HrPerformanceReview::query(), $user)
+                    ->lockForUpdate()
+                    ->findOrFail($review->getKey());
+                abort_if($locked->status === 'signed_off', 422, 'This review is signed off and locked.');
+                $oldPath = $locked->evidence_path;
+                $locked->update(['evidence_path' => $path, 'updated_by' => $user->id]);
+
+                DB::afterCommit(function () use ($oldPath, $path): void {
+                    if ($oldPath && $oldPath !== $path) {
+                        Storage::disk('private')->delete($oldPath);
+                    }
+                });
+            }, attempts: 1);
+        } catch (Throwable $exception) {
+            Storage::disk('private')->delete($path);
+
+            throw $exception;
+        }
 
         return redirect()->back()->with('success', 'Evidence uploaded.');
     }
@@ -453,8 +496,22 @@ class PerformanceReviewController extends Controller
     public function downloadEvidence(Request $request, HrPerformanceReview $review)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.view'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $review->tenant_id);
+        abort_unless($user, 403);
+
+        if ((int) $review->employee_user_id === (int) $user->id) {
+            $this->access->currentStaff($user, $user);
+            $review = HrPerformanceReview::query()
+                ->where('employee_user_id', $user->id)
+                ->findOrFail($review->getKey());
+        } else {
+            abort_unless($user->canDo('hr.performance.view'), 404);
+            $this->access->currentStaff($user, $user);
+            $review = $this->access->performanceReview($user, $review);
+            abort_unless(
+                $user->canDo('hr.performance.manage') || $review->reviewer_user_id === $user->id,
+                404,
+            );
+        }
         abort_unless($review->evidence_path, 404);
 
         return $this->streamPrivateAttachment(
@@ -473,10 +530,10 @@ class PerformanceReviewController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->access->currentStaff($user, $user);
 
         $data = $request->validate([
-            'employee_user_id' => ['required', 'integer', 'exists:users,id'],
+            'employee_user_id' => ['required', 'integer'],
             'review_number' => ['required', 'integer', 'min:1'],
             'review_date' => ['required', 'date'],
             'status' => ['required', 'string', 'in:scheduled,completed,extended,passed,failed'],
@@ -487,28 +544,23 @@ class PerformanceReviewController extends Controller
             'extension_weeks' => ['nullable', 'integer', 'min:1', 'max:52'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
+        $employee = $this->access->currentStaff($user, (int) $data['employee_user_id']);
 
-        HrProbationReview::create([
-            'tenant_id' => $tenantId,
-            'reviewer_user_id' => $user->id,
-            'created_by' => $user->id,
-            ...$data,
-        ]);
+        DB::transaction(function () use ($data, $employee, $user): void {
+            HrProbationReview::query()->create([
+                ...$data,
+                'employee_user_id' => $employee->id,
+                'reviewer_user_id' => $user->id,
+                'created_by' => $user->id,
+            ]);
 
-        // Audit fix (round 2, item 1b): an "extend" recommendation actually
-        // moves the employee's probation end date — previously the review was
-        // recorded but hr_employee_profiles.probation_end_date never changed,
-        // so the extension existed only on paper. Base: the current
-        // probation_end_date (fallback: the review date when none was set).
-        // Clearing the reminder stamp lets hr:probation-reminders fire again
-        // for the new end date.
-        if (($data['recommendation'] ?? null) === 'extend' && ! empty($data['extension_weeks'])) {
-            $profile = HrEmployeeProfile::query()
-                ->where('tenant_id', $tenantId)
-                ->where('user_id', $data['employee_user_id'])
-                ->first();
-
-            if ($profile) {
+            // The profile extension and review are one atomic employment fact.
+            if (($data['recommendation'] ?? null) === 'extend' && ! empty($data['extension_weeks'])) {
+                $profile = $this->access
+                    ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
+                    ->where('user_id', $employee->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
                 $base = $profile->probation_end_date ?? Carbon::parse($data['review_date']);
                 $profile->forceFill([
                     'probation_end_date' => $base->copy()->addWeeks((int) $data['extension_weeks'])->toDateString(),
@@ -516,7 +568,7 @@ class PerformanceReviewController extends Controller
                     'updated_by' => $user->id,
                 ])->save();
             }
-        }
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Probation review recorded.');
     }
@@ -528,8 +580,8 @@ class PerformanceReviewController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
+        $this->access->currentStaff($user, $user);
+        $this->access->probationReview($user, $review);
 
         $data = $request->validate([
             'review_date' => ['sometimes', 'date'],
@@ -540,14 +592,15 @@ class PerformanceReviewController extends Controller
             'recommendation' => ['nullable', 'string', 'in:pass,extend,fail'],
             'extension_weeks' => ['nullable', 'integer', 'min:1', 'max:52'],
             'notes' => ['nullable', 'string', 'max:5000'],
-            'employee_acknowledged' => ['nullable', 'boolean'],
         ]);
 
-        if (isset($data['employee_acknowledged']) && $data['employee_acknowledged'] && ! $review->employee_acknowledged) {
-            $data['employee_acknowledged_at'] = now();
-        }
-
-        $review->update($data);
+        DB::transaction(function () use ($data, $review, $user): void {
+            $locked = $this->access
+                ->applyHistoricalSubjectScope(HrProbationReview::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($review->getKey());
+            $locked->update($data);
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Probation review updated.');
     }

@@ -10,8 +10,11 @@ use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Site;
 use App\Models\TimelineEvent;
+use App\Services\Integration\Contracts\ConnectionHealthCapability;
+use App\Services\Integration\Contracts\DeviceSyncCapability;
+use App\Services\Integration\Contracts\EventCollectionCapability;
+use App\Services\Integration\Contracts\InventoryDiscoveryCapability;
 use App\Services\Integration\IntegrationAdapterRegistry;
-use App\Support\LegacyStorageContext;
 use App\Support\SafeOperationalData;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -32,7 +35,7 @@ class SiteIntegrationController extends Controller
                 'site_id' => (int) $config->site_id,
                 'provider' => $config->provider,
                 'status' => in_array($config->status, [
-                    IntegrationSiteConfig::STATUS_TENANT_ONLY,
+                    IntegrationSiteConfig::STATUS_LOCAL_ONLY,
                     IntegrationSiteConfig::STATUS_HYBRID,
                     IntegrationSiteConfig::STATUS_DISCONNECTED,
                 ], true) ? $config->status : 'unknown',
@@ -44,7 +47,7 @@ class SiteIntegrationController extends Controller
 
         $siteSecrets = IntegrationSiteSecret::query()
             ->where('site_id', $site->id)
-            ->with('site:id,name,tenant_id')
+            ->with('site:id,name')
             ->get()
             ->map(fn (IntegrationSiteSecret $secret): array => $siteCredentialsPresenter->project($secret))
             ->values();
@@ -100,7 +103,7 @@ class SiteIntegrationController extends Controller
 
         $mappedId = $validated['mapped_external_site_id'] ?? null;
         $isActive = $validated['is_active'] ?? ! empty($mappedId);
-        $status = $mappedId ? IntegrationSiteConfig::STATUS_HYBRID : IntegrationSiteConfig::STATUS_TENANT_ONLY;
+        $status = $mappedId ? IntegrationSiteConfig::STATUS_HYBRID : IntegrationSiteConfig::STATUS_LOCAL_ONLY;
 
         $existingConfig = IntegrationSiteConfig::where('site_id', $site->id)
             ->where('provider', $provider)
@@ -124,7 +127,6 @@ class SiteIntegrationController extends Controller
                 'provider' => $provider,
             ],
             [
-                'tenant_id' => LegacyStorageContext::id(),
                 'mapped_external_site_id' => $mappedId,
                 'mapped_external_site_name' => $validated['mapped_external_site_name'] ?? null,
                 'status' => $status,
@@ -148,12 +150,11 @@ class SiteIntegrationController extends Controller
             return redirect()->back()->with('error', 'No provider connection is configured for this integration.');
         }
 
-        if (! $registry->has($provider)) {
-            return redirect()->back()->with('error', 'No adapter registered for this integration provider.');
+        if (! $registry->hasCapability($provider, InventoryDiscoveryCapability::class)) {
+            return redirect()->back()->with('error', 'Inventory discovery is not available for this provider.');
         }
 
         $syncLog = IntegrationSyncLog::create([
-            'tenant_id' => LegacyStorageContext::id(),
             'provider' => $provider,
             'site_id' => $site->id,
             'action' => 'discover_sites',
@@ -162,9 +163,10 @@ class SiteIntegrationController extends Controller
         ]);
 
         try {
-            $sites = $registry->resolve($provider)->discoverSites($providerConnection);
+            $adapter = $registry->capability($provider, InventoryDiscoveryCapability::class);
+            assert($adapter instanceof InventoryDiscoveryCapability);
+            $sites = $adapter->discoverSites($providerConnection);
             $hosts = [];
-            $adapter = $registry->resolve($provider);
             if (method_exists($adapter, 'discoverHosts')) {
                 try {
                     $hosts = $adapter->discoverHosts($providerConnection);
@@ -229,11 +231,13 @@ class SiteIntegrationController extends Controller
             return redirect()->back()->with('error', 'No provider connection is configured for this integration.');
         }
 
-        if (! $registry->has($provider)) {
-            return redirect()->back()->with('error', 'No adapter registered for this integration provider.');
+        if (! $registry->hasCapability($provider, ConnectionHealthCapability::class)) {
+            return redirect()->back()->with('error', 'Connection testing is not available for this provider.');
         }
 
-        $isConnected = $registry->resolve($provider)->testConnection($providerConnection);
+        $adapter = $registry->capability($provider, ConnectionHealthCapability::class);
+        assert($adapter instanceof ConnectionHealthCapability);
+        $isConnected = $adapter->testConnection($providerConnection);
 
         $providerConnection->update([
             'status' => $isConnected
@@ -254,8 +258,8 @@ class SiteIntegrationController extends Controller
     {
         $this->authorize('update', $site);
 
-        if (! $registry->has($provider)) {
-            return redirect()->back()->with('error', 'No adapter registered for this integration provider.');
+        if (! $registry->hasCapability($provider, DeviceSyncCapability::class)) {
+            return redirect()->back()->with('error', 'Device sync is not available for this provider.');
         }
 
         $siteConfig = IntegrationSiteConfig::query()
@@ -278,7 +282,6 @@ class SiteIntegrationController extends Controller
         }
 
         $syncLog = IntegrationSyncLog::create([
-            'tenant_id' => LegacyStorageContext::id(),
             'provider' => $provider,
             'site_id' => $site->id,
             'action' => 'sync_devices',
@@ -287,7 +290,9 @@ class SiteIntegrationController extends Controller
         ]);
 
         try {
-            $result = $registry->resolve($provider)->syncDevices($siteConfig, $providerConnection);
+            $adapter = $registry->capability($provider, DeviceSyncCapability::class);
+            assert($adapter instanceof DeviceSyncCapability);
+            $result = $adapter->syncDevices($siteConfig, $providerConnection);
 
             $syncLog->update([
                 'items_processed' => $result->processed,
@@ -338,9 +343,7 @@ class SiteIntegrationController extends Controller
     {
         $this->authorize('update', $site);
 
-        if (! $registry->has($provider)) {
-            return redirect()->back()->with('error', 'No adapter registered for this integration provider.');
-        }
+        abort_unless($registry->hasCapability($provider, EventCollectionCapability::class), 404);
 
         $siteConfig = IntegrationSiteConfig::firstOrCreate(
             [
@@ -348,8 +351,7 @@ class SiteIntegrationController extends Controller
                 'provider' => $provider,
             ],
             [
-                'tenant_id' => LegacyStorageContext::id(),
-                'status' => IntegrationSiteConfig::STATUS_TENANT_ONLY,
+                'status' => IntegrationSiteConfig::STATUS_LOCAL_ONLY,
                 'is_active' => true,
             ]
         );
@@ -387,7 +389,14 @@ class SiteIntegrationController extends Controller
         }
 
         try {
-            $events = $registry->resolve($provider)->pullEvents($siteConfig, $providerConnection, $since);
+            $adapter = $registry->capability($provider, EventCollectionCapability::class);
+            assert($adapter instanceof EventCollectionCapability);
+            $events = $adapter->collectEvents(
+                $siteConfig,
+                $providerConnection,
+                $since?->toISOString(),
+                $registry->manifest($provider)->pageLimit,
+            )->items;
             $created = 0;
             $updated = 0;
 
@@ -396,6 +405,12 @@ class SiteIntegrationController extends Controller
                 if (! $sourceId) {
                     continue;
                 }
+                $normalized = is_array($event['normalized_payload'] ?? null)
+                    ? $event['normalized_payload']
+                    : [];
+                $summary = is_string($normalized['summary'] ?? null)
+                    ? $normalized['summary']
+                    : 'UniFi Access event';
 
                 $model = TimelineEvent::updateOrCreate(
                     [
@@ -407,13 +422,13 @@ class SiteIntegrationController extends Controller
                         'type' => 'unifi_access',
                         'actor_user_id' => $request->user()?->id,
                         'site_id' => $site->id,
-                        'subject' => $event['summary'] ?? 'UniFi Access event',
-                        'body' => $event['summary'] ?? null,
+                        'subject' => $summary,
+                        'body' => $summary,
                         'meta' => [
                             'event_type' => $event['event_type'] ?? null,
-                            'door' => $event['door_name'] ?? null,
-                            'user' => $event['user_name'] ?? null,
-                            'direction' => $event['direction'] ?? null,
+                            'door' => $normalized['door_name'] ?? null,
+                            'user' => $normalized['actor_name'] ?? null,
+                            'direction' => $normalized['direction'] ?? null,
                             'provider' => $provider,
                         ],
                         'visibility' => 'internal',
@@ -462,7 +477,6 @@ class SiteIntegrationController extends Controller
                 'capability' => $capability,
             ],
             [
-                'tenant_id' => LegacyStorageContext::id(),
                 'base_url' => $validated['base_url'] ?? null,
                 'secret_encrypted' => Crypt::encryptString($validated['secret']),
                 'is_enabled' => $validated['is_enabled'] ?? true,

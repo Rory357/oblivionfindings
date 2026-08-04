@@ -2,16 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use App\Services\ShiftSafetyInvariantService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ShiftHandover extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'outgoing_shift_id',
         'incoming_shift_id',
         'client_id',

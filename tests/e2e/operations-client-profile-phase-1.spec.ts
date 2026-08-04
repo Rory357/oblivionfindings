@@ -268,7 +268,6 @@ $client = \\App\\Models\\Client::query()->findOrFail(${clientId});
 $author = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->firstOrFail();
 \\App\\Models\\ClientNote::query()->create([
     'client_id' => $client->id,
-    'organization_id' => $client->organization_id,
     'user_id' => $author->id,
     'type' => 'daily_note',
     'category' => 'activity',

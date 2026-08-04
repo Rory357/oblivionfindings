@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\AuditLog;
 use App\Models\Client;
-use App\Models\User;
 use App\Support\SafeOperationalData;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -45,11 +44,6 @@ class AuditLogger
             $actorId = $meta['actor_id'];
         }
 
-        $actor = $user;
-        if ($actor === null && $actorId !== null) {
-            $actor = User::query()->find($actorId);
-        }
-
         $protectRequestContext = SafeOperationalData::protectsRequestContext($auditable);
         $clientId = null;
         if ($auditable instanceof Client) {
@@ -60,31 +54,16 @@ class AuditLogger
             $clientId = $meta['client_id'];
         }
 
-        $client = $auditable instanceof Client
-            ? $auditable
-            : ($clientId ? Client::query()->find($clientId) : null);
-
         $canonicalScope = $protectRequestContext && $auditable !== null
             ? SafeOperationalData::auditScope($auditable)
             : [];
-        if ($protectRequestContext) {
-            $organizationId = $canonicalScope['organization_id'] ?? $canonicalScope['tenant_id'] ?? null;
-        } else {
-            $organizationId = $meta['organization_id'] ?? null;
-            $organizationId ??= $auditable?->getAttribute('organization_id');
-            $organizationId ??= $auditable?->getAttribute('tenant_id');
-            $organizationId ??= $client?->organization_id;
-            $organizationId ??= $actor?->organization_id;
-        }
-        $organizationId = is_numeric($organizationId) ? (int) $organizationId : null;
 
-        unset($meta['organization_id']);
+        unset($meta['organization_id'], $meta['tenant_id']);
         if ($protectRequestContext && $auditable !== null) {
             $meta = SafeOperationalData::auditMeta($meta, $auditable, $canonicalScope);
         }
 
         AuditLog::create([
-            'organization_id' => $organizationId,
             'user_id' => $actorId,
             'client_id' => $clientId,
             'action' => $action,

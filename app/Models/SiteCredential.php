@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,8 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SiteCredential extends Model
 {
-    use HasFactory;
-    use AuditableChanges;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
         'site_id',
@@ -49,7 +49,7 @@ class SiteCredential extends Model
 
     public function hasTotp(): bool
     {
-        return !empty($this->totp_secret_encrypted);
+        return ! empty($this->totp_secret_encrypted);
     }
 
     public function site(): BelongsTo

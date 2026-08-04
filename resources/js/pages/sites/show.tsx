@@ -28,6 +28,10 @@ import {
     PageTabs,
     type PageTabItem,
 } from '@/components/page';
+import {
+    SiteTechnologyProjectionPanel,
+    type SiteTechnologyProjection,
+} from '@/components/sites/site-technology-projection';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -111,6 +115,7 @@ import {
 import {
     lazy,
     Suspense,
+    useEffect,
     useMemo,
     useRef,
     useState,
@@ -653,11 +658,16 @@ type Props = {
         }>;
     }>;
     credentialCount?: number;
-    hardwareCount?: number;
+    technology?: SiteTechnologyProjection | null;
     typePlan?: SiteTypePlanSummary | null;
-    integrationStatus?: Array<{ provider: string; status: string }>;
     can_edit: boolean;
-    can?: { createAsset?: boolean };
+    can?: {
+        createAsset?: boolean;
+        linkClient?: boolean;
+        createClient?: boolean;
+        viewTechnology?: boolean;
+        viewHardwarePlacement?: boolean;
+    };
     fleet?: SiteFleetData;
     checklistsData?: ChecklistsData;
     inspectionsSummary?: InspectionsSummary;
@@ -891,7 +901,8 @@ function DerivedContactRow({
                             Not set
                         </span>
                         {emptyCta && onAdd && (
-                            <Button unstyled
+                            <Button
+                                unstyled
                                 type="button"
                                 onClick={onAdd}
                                 className="text-sm font-medium text-primary hover:underline"
@@ -949,9 +960,8 @@ export default function SiteShow({
     coverageRequirements = [],
     coveragePreview = [],
     credentialCount = 0,
-    hardwareCount = 0,
+    technology,
     typePlan = null,
-    integrationStatus = [],
     can_edit,
     can: assetCan,
     fleet,
@@ -1147,6 +1157,27 @@ export default function SiteShow({
         }
     };
 
+    const [technologyLoaded, setTechnologyLoaded] = useState(
+        technology !== undefined,
+    );
+    const [technologyLoading, setTechnologyLoading] = useState(false);
+    useEffect(() => {
+        if (
+            activeTab !== 'technology' ||
+            technologyLoaded ||
+            technologyLoading
+        ) {
+            return;
+        }
+
+        setTechnologyLoading(true);
+        router.reload({
+            only: ['technology'],
+            onSuccess: () => setTechnologyLoaded(true),
+            onFinish: () => setTechnologyLoading(false),
+        });
+    }, [activeTab, technologyLoaded, technologyLoading]);
+
     const TypePlanTabIcon =
         site.type === 'head_office'
             ? Building2
@@ -1318,19 +1349,16 @@ export default function SiteShow({
             hidden: !canSeeVendorsCredentials,
         },
         {
-            value: 'hardware',
-            label: 'Hardware',
+            value: 'technology',
+            label: 'Technology',
             icon: Cpu,
             overflowable: true,
-            badge:
-                hardwareCount > 0 ? (
-                    <Badge
-                        variant="outline"
-                        className="ml-1 px-1.5 py-0 text-xs"
-                    >
-                        {hardwareCount}
-                    </Badge>
-                ) : undefined,
+            hidden: !assetCan?.viewTechnology,
+            badge: technology?.summary.attention_devices ? (
+                <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                    {technology.summary.attention_devices}
+                </Badge>
+            ) : undefined,
         },
         {
             value: 'type-plan',
@@ -1567,7 +1595,7 @@ export default function SiteShow({
                                                 }
                                             >
                                                 <Pencil className="h-3 w-3" />
-                                                Edit site line
+                                                Edit phone & email
                                             </Button>
                                         )}
                                     </CardHeader>
@@ -1601,6 +1629,12 @@ export default function SiteShow({
                                                 setContactInfoOpen(true)
                                             }
                                             testId="site-contact-row-email"
+                                        />
+                                        <ContactRow
+                                            icon={UserCog}
+                                            label="Responsible staff member"
+                                            value={site.primary_contact?.name}
+                                            testId="site-contact-row-responsible-staff"
                                         />
                                         <DerivedContactRow
                                             icon={User}
@@ -2111,7 +2145,11 @@ export default function SiteShow({
                                 availableClients={availableClients}
                                 summary={clientsSummary}
                                 rooms={typeSpecificData.rooms ?? []}
-                                can_edit={can_edit}
+                                canEditSite={can_edit}
+                                canLinkExisting={Boolean(assetCan?.linkClient)}
+                                canCreateClient={Boolean(
+                                    assetCan?.createClient,
+                                )}
                             />
                         </TabsContent>
 
@@ -3958,91 +3996,30 @@ export default function SiteShow({
                             </TabsContent>
                         )}
 
-                        {/* Hardware Tab */}
-                        <TabsContent value="hardware">
-                            <Card>
-                                <CardContent className="p-6">
-                                    <div className="mb-4 flex items-center justify-between">
-                                        <div>
-                                            <h3 className="flex items-center gap-2 font-medium">
-                                                <Cpu className="h-4 w-4" />
-                                                Location Hardware &
-                                                Configuration
-                                            </h3>
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                {hardwareCount} device
-                                                {hardwareCount !== 1
-                                                    ? 's'
-                                                    : ''}{' '}
-                                                registered
-                                                {integrationStatus.length >
-                                                    0 && (
-                                                    <>
-                                                        {' '}
-                                                        ·{' '}
-                                                        {
-                                                            integrationStatus.length
-                                                        }{' '}
-                                                        integration
-                                                        {integrationStatus.length !==
-                                                        1
-                                                            ? 's'
-                                                            : ''}{' '}
-                                                        active
-                                                    </>
-                                                )}
-                                            </p>
-                                        </div>
-                                        <Button asChild>
-                                            <Link
-                                                href={`/sites/${site.id}/hardware`}
-                                            >
-                                                Manage Hardware
-                                            </Link>
-                                        </Button>
-                                    </div>
-                                    {integrationStatus.length > 0 && (
-                                        <div className="mb-4 flex gap-2">
-                                            {integrationStatus.map((i) => (
-                                                <Badge
-                                                    key={i.provider}
-                                                    variant="outline"
-                                                    className={
-                                                        i.status === 'hybrid'
-                                                            ? 'border-status-success/30 text-status-success'
-                                                            : i.status ===
-                                                                'tenant_only'
-                                                              ? 'border-status-info/30 text-status-info'
-                                                              : 'border-border/30 text-muted-foreground'
-                                                    }
-                                                >
-                                                    {i.provider
-                                                        .charAt(0)
-                                                        .toUpperCase() +
-                                                        i.provider.slice(1)}
-                                                    :{' '}
-                                                    {i.status.replace('_', ' ')}
-                                                </Badge>
-                                            ))}
-                                        </div>
-                                    )}
-                                    {hardwareCount === 0 &&
-                                        integrationStatus.length === 0 && (
-                                            <div className="py-8 text-center text-muted-foreground">
-                                                <Cpu className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                                <p>
-                                                    No hardware registered for
-                                                    this site
-                                                </p>
-                                                <p className="mt-1 text-sm">
-                                                    Add devices manually or
-                                                    connect an integration to
-                                                    auto-discover hardware
-                                                </p>
-                                            </div>
-                                        )}
-                                </CardContent>
-                            </Card>
+                        {/* Technology Tab */}
+                        <TabsContent value="technology">
+                            {technology ? (
+                                <SiteTechnologyProjectionPanel
+                                    siteId={site.id}
+                                    data={technology}
+                                    canViewHardwarePlacement={
+                                        !!assetCan?.viewHardwarePlacement
+                                    }
+                                />
+                            ) : technologyLoading || !technologyLoaded ? (
+                                <Card>
+                                    <CardContent className="p-8 text-center text-sm text-muted-foreground">
+                                        Loading Site technology…
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                <Card>
+                                    <CardContent className="p-8 text-center text-sm text-muted-foreground">
+                                        Site technology is unavailable for this
+                                        record.
+                                    </CardContent>
+                                </Card>
+                            )}
                         </TabsContent>
 
                         {/* Type Plan Tab */}
@@ -4825,14 +4802,18 @@ function ClientsTab({
     availableClients,
     summary,
     rooms,
-    can_edit,
+    canEditSite,
+    canLinkExisting,
+    canCreateClient,
 }: {
     site: Site;
     clients: ClientLite[];
     availableClients: AvailableClient[];
     summary?: ClientsSummary;
     rooms: NonNullable<TypeSpecificData['rooms']>;
-    can_edit: boolean;
+    canEditSite: boolean;
+    canLinkExisting: boolean;
+    canCreateClient: boolean;
 }) {
     const [dialog, setDialog] = useState<{
         mode: ClientDialogMode;
@@ -4842,7 +4823,8 @@ function ClientsTab({
     const closeDialog = () => setDialog({ mode: null, target: null });
 
     const isHouse = site.type === 'house';
-    const canAssignRoom = isHouse && can_edit && rooms.length > 0;
+    const canAssignRoom = isHouse && canEditSite && rooms.length > 0;
+    const canAddClient = canLinkExisting || canCreateClient;
 
     const stats = summary ?? {
         total: clients.length,
@@ -4866,7 +4848,7 @@ function ClientsTab({
                             overview or jump to the full profile.
                         </p>
                     </div>
-                    {can_edit && (
+                    {canAddClient && (
                         <Button
                             size="sm"
                             onClick={() =>
@@ -4920,10 +4902,10 @@ function ClientsTab({
                                 No clients linked yet
                             </p>
                             <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-                                Link an existing client from your organisation
-                                or quick-create a new one for this site.
+                                Link an unassigned client or create a new Client
+                                Profile for this Site.
                             </p>
-                            {can_edit && (
+                            {canAddClient && (
                                 <Button
                                     size="sm"
                                     className="mt-4"
@@ -4945,7 +4927,7 @@ function ClientsTab({
                                 <ClientCard
                                     key={c.id}
                                     client={c}
-                                    canEdit={can_edit}
+                                    canEdit={canLinkExisting}
                                     canAssignRoom={canAssignRoom}
                                     onShow={() =>
                                         setDialog({
@@ -4977,6 +4959,8 @@ function ClientsTab({
                     <AddClientDialog
                         siteId={site.id}
                         availableClients={availableClients}
+                        canLinkExisting={canLinkExisting}
+                        canCreateClient={canCreateClient}
                         isOpen
                         onClose={closeDialog}
                     />
@@ -4987,7 +4971,7 @@ function ClientsTab({
                     <ShowClientDialog
                         client={dialog.target}
                         siteId={site.id}
-                        canManage={can_edit}
+                        canManage={canLinkExisting}
                         canAssignRoom={canAssignRoom}
                         isOpen
                         onClose={closeDialog}
@@ -5120,7 +5104,8 @@ function ClientCard({
                     </div>
                 </div>
                 {canEdit && (
-                    <Button unstyled
+                    <Button
+                        unstyled
                         type="button"
                         onClick={(e) => {
                             e.stopPropagation();
@@ -5148,7 +5133,8 @@ function ClientCard({
                         <span className="truncate">
                             Room: {client.room.name}
                             {canAssignRoom && onAssignRoom && (
-                                <Button unstyled
+                                <Button
+                                    unstyled
                                     type="button"
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -5161,7 +5147,8 @@ function ClientCard({
                             )}
                         </span>
                     ) : canAssignRoom && onAssignRoom ? (
-                        <Button unstyled
+                        <Button
+                            unstyled
                             type="button"
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -5742,7 +5729,10 @@ function RoomSection({
                 </h4>
             </div>
             {count === 0 ? (
-                <Card unstyled className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-background/40 py-8 text-center">
+                <Card
+                    unstyled
+                    className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-background/40 py-8 text-center"
+                >
                     <Icon className={`h-5 w-5 ${iconCls} opacity-60`} />
                     <p className="mt-2 text-xs font-medium">{empty.label}</p>
                     <p className="mt-1 max-w-xs text-[11px] text-muted-foreground">
@@ -5890,11 +5880,17 @@ function BedroomCard({
             </div>
 
             {!isAssignable ? (
-                <Card unstyled className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-xs text-muted-foreground">
+                <Card
+                    unstyled
+                    className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-xs text-muted-foreground"
+                >
                     Shared space — no client occupant
                 </Card>
             ) : occupant ? (
-                <Card unstyled className="flex items-center gap-2 rounded-lg border bg-background/40 px-2 py-1.5">
+                <Card
+                    unstyled
+                    className="flex items-center gap-2 rounded-lg border bg-background/40 px-2 py-1.5"
+                >
                     <Avatar className="size-8">
                         {occupant.profile_photo_url && (
                             <AvatarImage
@@ -5916,7 +5912,10 @@ function BedroomCard({
                     </div>
                 </Card>
             ) : (
-                <Card unstyled className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-xs text-muted-foreground">
+                <Card
+                    unstyled
+                    className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-xs text-muted-foreground"
+                >
                     No occupant
                 </Card>
             )}
@@ -6317,7 +6316,7 @@ function CoverageRequirementsTab({
     return (
         <div className="space-y-4">
             <div className="grid gap-4 xl:grid-cols-[1.25fr_0.95fr]">
-                <Card className="via-primary/10 overflow-hidden border-primary/60 bg-gradient-to-br from-white to-status-info-bg/70">
+                <Card className="overflow-hidden border-primary/60 bg-gradient-to-br from-white via-primary/10 to-status-info-bg/70">
                     <CardHeader className="pb-3">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>

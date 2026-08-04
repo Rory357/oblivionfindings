@@ -4,20 +4,22 @@ use App\Domain\Finance\Models\FinInvoice;
 use App\Models\BillingEntry;
 use App\Models\Client;
 use App\Models\Invoice;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\Operations\BillingService;
 
 it('creates FinInvoice records from operational billing entries without writing legacy invoices', function () {
+    $site = Site::factory()->create();
     $client = Client::factory()->create([
-        'organization_id' => 1,
+        'site_id' => $site->id,
         'first_name' => 'Ari',
         'last_name' => 'Mason',
     ]);
-    $staff = User::factory()->create(['organization_id' => 1]);
+    $staff = User::factory()->create();
 
     $pendingEntry = BillingEntry::create([
-        'organization_id' => 1,
         'client_id' => $client->id,
+        'site_id' => $site->id,
         'staff_id' => $staff->id,
         'service_date' => '2026-05-01',
         'hours' => 2,
@@ -27,8 +29,8 @@ it('creates FinInvoice records from operational billing entries without writing 
         'status' => 'pending',
     ]);
     $approvedEntry = BillingEntry::create([
-        'organization_id' => 1,
         'client_id' => $client->id,
+        'site_id' => $site->id,
         'staff_id' => $staff->id,
         'service_date' => '2026-05-02',
         'hours' => 1.5,
@@ -40,7 +42,6 @@ it('creates FinInvoice records from operational billing entries without writing 
 
     $invoice = app(BillingService::class)->generateInvoice(
         [$pendingEntry->id, $approvedEntry->id],
-        1,
         $staff->id,
     );
 

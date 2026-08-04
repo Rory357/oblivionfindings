@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\AssetGeofence;
@@ -45,10 +46,9 @@ function grantClientLocationAssetPermissions(User $user, array $permissionKeys):
     $user->roles()->attach($role->id);
 }
 
-function makeClientLocationAssetSite(int $tenantId, string $name): Site
+function makeClientLocationAssetSite(string $name): Site
 {
     return Site::factory()->create([
-        'tenant_id' => $tenantId,
         'name' => $name,
         'is_active' => true,
     ]);
@@ -58,7 +58,6 @@ function makeClientLocationAssetRoom(Site $site, string $name): SiteHouseRoom
 {
     return SiteHouseRoom::query()->create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'name' => $name,
         'is_active' => true,
         'is_assignable' => true,
@@ -67,12 +66,10 @@ function makeClientLocationAssetRoom(Site $site, string $name): SiteHouseRoom
 }
 
 function makeClientLocationAssetHardware(
-    int $tenantId,
     ?Site $site,
     string $name,
 ): LocationHardware {
     return LocationHardware::query()->create([
-        'tenant_id' => $tenantId,
         'site_id' => $site?->id,
         'provider' => 'queclink',
         'category' => LocationHardware::CATEGORY_TRACKER,
@@ -84,37 +81,60 @@ function makeClientLocationAssetHardware(
 }
 
 function makeClientLocationAssetTracker(
-    int $tenantId,
     string $name,
-    ?LocationHardware $legacyHardware = null,
+    ?LocationHardware $hardware = null,
 ): Device {
     return Device::factory()->tracking()->create([
-        'tenant_id' => $tenantId,
         'name' => $name,
         'provider' => 'queclink',
-        'legacy_location_hardware_id' => $legacyHardware?->id,
+        'legacy_location_hardware_id' => $hardware?->id,
     ]);
+}
+
+function makeClientLocationAssetStaff(
+    Site $site,
+    array $permissionKeys,
+    array $attributes = [],
+): User {
+    $user = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+        ...$attributes,
+    ]);
+    grantClientLocationAssetPermissions($user, $permissionKeys);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'position_role' => 'support_worker',
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $user->id,
+        'updated_by' => $user->id,
+    ]);
+
+    return $user;
 }
 
 function grantClientLocationAssetTrackingConsent(Client $client, User $actor): ClientConsent
 {
     $consentType = ConsentType::query()->firstOrCreate(
         ['name' => 'Asset Location Tracking (Safety)'],
-        ConsentType::factory()->make()->only([
-            'category',
-            'description',
-            'purpose',
-            'legal_basis',
-            'is_mandatory',
-            'requires_capacity_assessment',
-            'allows_withdrawal',
-            'withdrawal_notice_days',
-            'validity_period_days',
-            'renewal_required',
-            'renewal_reminder_days',
-            'version',
-            'active',
-        ]),
+        [
+            'category' => 'safety',
+            'description' => 'Consent to location monitoring of a personal tracker for safety.',
+            'purpose' => 'Client personal safety location tracking',
+            'legal_basis' => 'consent',
+            'is_mandatory' => false,
+            'requires_capacity_assessment' => false,
+            'allows_withdrawal' => true,
+            'validity_period_days' => 365,
+            'renewal_required' => true,
+            'renewal_reminder_days' => 30,
+            'version' => 1,
+            'active' => true,
+        ],
     );
 
     return ClientConsent::query()->create([
@@ -132,25 +152,24 @@ function grantClientLocationAssetTrackingConsent(Client $client, User $actor): C
 }
 
 it('denies finance and client-only viewers all staff location actions and tracker payloads', function () {
-    $user = User::factory()->create(['organization_id' => 1]);
-    grantClientLocationAssetPermissions($user, [
+    $site = makeClientLocationAssetSite('Finance Hidden Home');
+    $user = makeClientLocationAssetStaff($site, [
         'clients.viewAny',
         'client_funds.manage',
     ]);
 
-    $site = makeClientLocationAssetSite(1, 'Finance Hidden Home');
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
         'status' => 'active',
     ]);
-    $hardware = makeClientLocationAssetHardware(1, $site, 'Hidden Tracker Shadow');
-    $device = makeClientLocationAssetTracker(1, 'Hidden Canonical Tracker', $hardware);
+    $hardware = makeClientLocationAssetHardware($site, 'Hidden Tracker Shadow');
+    $device = makeClientLocationAssetTracker('Hidden Canonical Tracker', $hardware);
     DeviceAssignment::query()->create([
         'device_id' => $device->id,
         'assignable_type' => DeviceAssignment::TARGET_CLIENT,
         'assignable_id' => $client->id,
         'assigned_at' => now(),
+        'assigned_by_user_id' => $user->id,
     ]);
     ClientPersonalAsset::query()->create([
         'client_id' => $client->id,
@@ -178,16 +197,15 @@ it('denies finance and client-only viewers all staff location actions and tracke
 });
 
 it('separates telemetry visibility from tracker command management', function () {
-    $site = makeClientLocationAssetSite(1, 'Tracking Home');
+    $site = makeClientLocationAssetSite('Tracking Home');
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
         'status' => 'active',
     ]);
-    $consentActor = User::factory()->create(['organization_id' => 1]);
-    grantClientLocationAssetTrackingConsent($client, $consentActor);
-    $hardware = makeClientLocationAssetHardware(1, $site, 'Resident Tracker Shadow');
-    $device = makeClientLocationAssetTracker(1, 'Resident Tracker', $hardware);
+    $consentActor = makeClientLocationAssetStaff($site, []);
+    $consent = grantClientLocationAssetTrackingConsent($client, $consentActor);
+    $hardware = makeClientLocationAssetHardware($site, 'Resident Tracker Shadow');
+    $device = makeClientLocationAssetTracker('Resident Tracker', $hardware);
     $device->forceFill([
         'imei' => '861106050009901',
         'device_uid' => '861106050009901',
@@ -198,17 +216,17 @@ it('separates telemetry visibility from tracker command management', function ()
         'assignable_type' => DeviceAssignment::TARGET_CLIENT,
         'assignable_id' => $client->id,
         'assigned_at' => now(),
+        'assigned_by_user_id' => $consentActor->id,
+        'consent_id' => $consent->id,
     ]);
     QueclinkDevice::query()->create([
         'imei' => $device->imei,
         'device_id' => $device->id,
-        'tenant_id' => 1,
         'status' => QueclinkDevice::STATUS_PAIRED,
         'model_hint' => 'GL30MEU',
     ]);
 
-    $telemetryOnly = User::factory()->create(['organization_id' => 1]);
-    grantClientLocationAssetPermissions($telemetryOnly, [
+    $telemetryOnly = makeClientLocationAssetStaff($site, [
         'clients.viewAny',
         'assets.telemetry.view',
     ]);
@@ -217,8 +235,7 @@ it('separates telemetry visibility from tracker command management', function ()
         ->get("/operations/clients/{$client->id}/location/history")
         ->assertForbidden();
 
-    $viewer = User::factory()->create(['organization_id' => 1]);
-    grantClientLocationAssetPermissions($viewer, [
+    $viewer = makeClientLocationAssetStaff($site, [
         'clients.viewAny',
         'assets.viewAny',
         'assets.telemetry.view',
@@ -235,7 +252,6 @@ it('separates telemetry visibility from tracker command management', function ()
             ->missing('location.tracker.acknowledge_panic_url'));
 
     $untrackedClient = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
         'status' => 'active',
     ]);
@@ -251,11 +267,7 @@ it('separates telemetry visibility from tracker command management', function ()
     $this->post("/operations/clients/{$client->id}/location/acknowledge-panic")
         ->assertForbidden();
 
-    $assignedReader = User::factory()->create([
-        'organization_id' => 1,
-        'role' => 'support_worker',
-    ]);
-    grantClientLocationAssetPermissions($assignedReader, [
+    $assignedReader = makeClientLocationAssetStaff($site, [
         'clients.viewAssigned',
         'assets.viewAssigned',
         'assets.telemetry.view',
@@ -266,8 +278,7 @@ it('separates telemetry visibility from tracker command management', function ()
         ->get("/operations/clients/{$client->id}/location/history")
         ->assertOk();
 
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientLocationAssetPermissions($manager, [
+    $manager = makeClientLocationAssetStaff($site, [
         'clients.viewAny',
         'assets.viewAny',
         'assets.telemetry.view',
@@ -283,7 +294,7 @@ it('separates telemetry visibility from tracker command management', function ()
             ->has('location.tracker.acknowledge_panic_url'));
     $this->from("/operations/clients/{$client->id}?tab=location")
         ->post("/operations/clients/{$client->id}/location/locate-now")
-        ->assertRedirect("/operations/clients/{$client->id}?tab=location")
+        ->assertRedirect("/security-devices/devices/{$device->id}?section=management&action=tracking.location_refresh")
         ->assertSessionHas('success');
     $this->from("/operations/clients/{$client->id}?tab=location")
         ->post("/operations/clients/{$client->id}/location/acknowledge-panic")
@@ -294,14 +305,13 @@ it('separates telemetry visibility from tracker command management', function ()
 });
 
 it('does not expose telemetry to fleet or asset viewers without the telemetry capability', function () {
-    $site = makeClientLocationAssetSite(1, 'Telemetry Restricted Home');
+    $site = makeClientLocationAssetSite('Telemetry Restricted Home');
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
         'status' => 'active',
     ]);
-    $hardware = makeClientLocationAssetHardware(1, $site, 'Telemetry Restricted Shadow');
-    $device = makeClientLocationAssetTracker(1, 'Telemetry Restricted Tracker', $hardware);
+    $hardware = makeClientLocationAssetHardware($site, 'Telemetry Restricted Shadow');
+    $device = makeClientLocationAssetTracker('Telemetry Restricted Tracker', $hardware);
     DeviceAssignment::query()->create([
         'device_id' => $device->id,
         'assignable_type' => DeviceAssignment::TARGET_CLIENT,
@@ -317,8 +327,7 @@ it('does not expose telemetry to fleet or asset viewers without the telemetry ca
         'ownership' => 'client',
     ]);
 
-    $viewer = User::factory()->create(['organization_id' => 1]);
-    grantClientLocationAssetPermissions($viewer, [
+    $viewer = makeClientLocationAssetStaff($site, [
         'clients.viewAny',
         'fleet.viewAny',
         'assets.viewAny',
@@ -336,9 +345,10 @@ it('does not expose telemetry to fleet or asset viewers without the telemetry ca
         ->assertForbidden();
 });
 
-it('uses the canonical client site for tracking and picker queries while ignoring legacy partition ids', function () {
-    $user = User::factory()->create(['organization_id' => 2]);
-    grantClientLocationAssetPermissions($user, [
+it('uses the canonical client site and device assignment for tracking and picker queries', function () {
+    $clientSite = makeClientLocationAssetSite('Canonical Client Home');
+    $otherSite = makeClientLocationAssetSite('Other Client Home');
+    $user = makeClientLocationAssetStaff($clientSite, [
         'clients.viewAny',
         'clients.update',
         'assets.viewAny',
@@ -346,14 +356,11 @@ it('uses the canonical client site for tracking and picker queries while ignorin
         'assets.trackers.manage',
     ]);
 
-    $clientSite = makeClientLocationAssetSite(501, 'Canonical Client Home');
-    $hiddenSite = makeClientLocationAssetSite(501, 'Hidden Same-Legacy-Partition Home');
     $client = Client::factory()->create([
-        'organization_id' => 2,
         'site_id' => $clientSite->id,
         'status' => 'active',
     ]);
-    grantClientLocationAssetTrackingConsent($client, $user);
+    $consent = grantClientLocationAssetTrackingConsent($client, $user);
 
     $clientFence = AssetGeofence::query()->create([
         'site_id' => $clientSite->id,
@@ -364,31 +371,33 @@ it('uses the canonical client site for tracking and picker queries while ignorin
         'is_active' => true,
     ]);
     AssetGeofence::query()->create([
-        'site_id' => $hiddenSite->id,
-        'name' => 'Same legacy partition must not leak',
+        'site_id' => $otherSite->id,
+        'name' => 'Other Site must not leak',
         'type' => 'circle',
         'scope' => 'house',
         'shape' => ['lat' => -36.9, 'lng' => 174.8, 'radius_m' => 100],
         'is_active' => true,
     ]);
 
-    $assignedTracker = makeClientLocationAssetTracker(999, 'Canonically Assigned Tracker');
+    $assignedTracker = makeClientLocationAssetTracker('Canonically Assigned Tracker');
     DeviceAssignment::query()->create([
         'device_id' => $assignedTracker->id,
         'assignable_type' => DeviceAssignment::TARGET_CLIENT,
         'assignable_id' => $client->id,
         'assigned_at' => now(),
+        'assigned_by_user_id' => $user->id,
+        'consent_id' => $consent->id,
     ]);
 
-    $clientHardware = makeClientLocationAssetHardware(701, $clientSite, 'Canonical Picker Shadow');
-    $clientAvailable = makeClientLocationAssetTracker(801, 'Canonical Available Tracker', $clientHardware);
-    $hiddenHardware = makeClientLocationAssetHardware(701, $hiddenSite, 'Hidden Picker Shadow');
-    $hiddenAvailable = makeClientLocationAssetTracker(801, 'Hidden Available Tracker', $hiddenHardware);
+    $clientHardware = makeClientLocationAssetHardware($clientSite, 'Canonical Picker Shadow');
+    $clientAvailable = makeClientLocationAssetTracker('Canonical Available Tracker', $clientHardware);
+    $otherHardware = makeClientLocationAssetHardware($otherSite, 'Other Site Picker Shadow');
+    $otherAvailable = makeClientLocationAssetTracker('Other Site Available Tracker', $otherHardware);
 
     $this->actingAs($user)
         ->get("/operations/clients/{$client->id}")
         ->assertOk()
-        ->assertInertia(function (Assert $page) use ($assignedTracker, $clientAvailable, $clientFence, $clientSite, $hiddenAvailable, $hiddenSite): void {
+        ->assertInertia(function (Assert $page) use ($assignedTracker, $clientAvailable, $clientFence, $clientSite, $otherAvailable, $otherSite): void {
             $props = $page->toArray()['props'];
 
             expect(data_get($props, 'location.tracker.name'))
@@ -397,27 +406,25 @@ it('uses the canonical client site for tracking and picker queries while ignorin
                 ->toBe([(string) $clientFence->id])
                 ->and(collect($props['available_trackers'])->pluck('id')->all())
                 ->toBe([$clientAvailable->id])
-                ->not->toContain($hiddenAvailable->id)
+                ->not->toContain($otherAvailable->id)
                 ->and(collect($props['asset_locations'])->pluck('id')->all())
                 ->toBe([$clientSite->id])
-                ->not->toContain($hiddenSite->id);
+                ->not->toContain($otherSite->id);
         });
 });
 
 it('does not emit tracker choices to ordinary client editors and rejects direct tracker injection', function () {
-    $user = User::factory()->create(['organization_id' => 1]);
-    grantClientLocationAssetPermissions($user, [
+    $site = makeClientLocationAssetSite('Editor Home');
+    $user = makeClientLocationAssetStaff($site, [
         'clients.viewAny',
         'clients.update',
     ]);
-    $site = makeClientLocationAssetSite(1, 'Editor Home');
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
         'status' => 'active',
     ]);
-    $hardware = makeClientLocationAssetHardware(1, $site, 'Editor Hidden Shadow');
-    $device = makeClientLocationAssetTracker(1, 'Editor Hidden Tracker', $hardware);
+    $hardware = makeClientLocationAssetHardware($site, 'Editor Hidden Shadow');
+    $device = makeClientLocationAssetTracker('Editor Hidden Tracker', $hardware);
 
     $this->actingAs($user)
         ->get("/operations/clients/{$client->id}")
@@ -438,34 +445,31 @@ it('does not emit tracker choices to ordinary client editors and rejects direct 
     expect(ClientPersonalAsset::query()->count())->toBe(0);
 });
 
-it('enforces the canonical client site on asset writes and persists eligible trackers despite legacy partition mismatches', function () {
-    $user = User::factory()->create(['organization_id' => 1]);
-    grantClientLocationAssetPermissions($user, [
+it('enforces the canonical client site on asset writes and persists eligible linked trackers', function () {
+    $localSite = makeClientLocationAssetSite('Local Inventory Home');
+    $otherSite = makeClientLocationAssetSite('Other Inventory Home');
+    $thirdSite = makeClientLocationAssetSite('Third Inventory Home');
+    $user = makeClientLocationAssetStaff($localSite, [
         'clients.viewAny',
         'clients.update',
         'assets.trackers.manage',
     ]);
 
-    $localSite = makeClientLocationAssetSite(1, 'Local Inventory Home');
-    $otherLocalSite = makeClientLocationAssetSite(1, 'Other Local Home');
-    $foreignSite = makeClientLocationAssetSite(2, 'Foreign Inventory Home');
     $localRoom = makeClientLocationAssetRoom($localSite, 'Local Room');
-    $mismatchedRoom = makeClientLocationAssetRoom($otherLocalSite, 'Wrong Local Room');
-    $foreignRoom = makeClientLocationAssetRoom($foreignSite, 'Foreign Room');
+    $mismatchedRoom = makeClientLocationAssetRoom($otherSite, 'Wrong Site Room');
+    $thirdSiteRoom = makeClientLocationAssetRoom($thirdSite, 'Third Site Room');
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $localSite->id,
         'status' => 'active',
     ]);
 
-    $localHardware = makeClientLocationAssetHardware(1, $localSite, 'Eligible Shadow');
-    $eligibleDevice = makeClientLocationAssetTracker(801, 'Eligible Tracker', $localHardware);
-    $localHardware->update(['tenant_id' => 701]);
-    $samePartitionHiddenHardware = makeClientLocationAssetHardware(1, $otherLocalSite, 'Hidden Same Partition Shadow');
-    $samePartitionHiddenDevice = makeClientLocationAssetTracker(1, 'Hidden Same Partition Tracker', $samePartitionHiddenHardware);
-    $foreignHardware = makeClientLocationAssetHardware(2, $foreignSite, 'Foreign Shadow');
-    $foreignDevice = makeClientLocationAssetTracker(2, 'Foreign Tracker', $foreignHardware);
-    $unbridgedDevice = makeClientLocationAssetTracker(1, 'Unbridged Tracker');
+    $localHardware = makeClientLocationAssetHardware($localSite, 'Eligible Shadow');
+    $eligibleDevice = makeClientLocationAssetTracker('Eligible Tracker', $localHardware);
+    $otherSiteHardware = makeClientLocationAssetHardware($otherSite, 'Other Site Shadow');
+    $otherSiteDevice = makeClientLocationAssetTracker('Other Site Tracker', $otherSiteHardware);
+    $thirdSiteHardware = makeClientLocationAssetHardware($thirdSite, 'Third Site Shadow');
+    $thirdSiteDevice = makeClientLocationAssetTracker('Third Site Tracker', $thirdSiteHardware);
+    $unbridgedDevice = makeClientLocationAssetTracker('Unbridged Tracker');
 
     $basePayload = ['name' => 'Inventory item'];
     $returnUrl = "/operations/clients/{$client->id}?tab=personal_assets";
@@ -473,14 +477,14 @@ it('enforces the canonical client site on asset writes and persists eligible tra
     $this->actingAs($user)
         ->from($returnUrl)
         ->post("/operations/clients/{$client->id}/personal-assets", $basePayload + [
-            'site_id' => $foreignSite->id,
-            'room_id' => $foreignRoom->id,
+            'site_id' => $thirdSite->id,
+            'room_id' => $thirdSiteRoom->id,
         ])
         ->assertSessionHasErrors(['site_id', 'room_id']);
 
     $this->from($returnUrl)
         ->post("/operations/clients/{$client->id}/personal-assets", $basePayload + [
-            'site_id' => $otherLocalSite->id,
+            'site_id' => $otherSite->id,
         ])
         ->assertSessionHasErrors('site_id');
 
@@ -495,7 +499,7 @@ it('enforces the canonical client site on asset writes and persists eligible tra
         ->post("/operations/clients/{$client->id}/personal-assets", $basePayload + [
             'site_id' => $localSite->id,
             'room_id' => $localRoom->id,
-            'tracker_hardware_id' => $samePartitionHiddenDevice->id,
+            'tracker_hardware_id' => $otherSiteDevice->id,
         ])
         ->assertSessionHasErrors('tracker_hardware_id');
 
@@ -503,7 +507,7 @@ it('enforces the canonical client site on asset writes and persists eligible tra
         ->post("/operations/clients/{$client->id}/personal-assets", $basePayload + [
             'site_id' => $localSite->id,
             'room_id' => $localRoom->id,
-            'tracker_hardware_id' => $foreignDevice->id,
+            'tracker_hardware_id' => $thirdSiteDevice->id,
         ])
         ->assertSessionHasErrors('tracker_hardware_id');
 
@@ -533,12 +537,12 @@ it('enforces the canonical client site on asset writes and persists eligible tra
 });
 
 it('records multiple personal asset status transitions with actor and source context', function () {
-    $user = User::factory()->create(['organization_id' => 1]);
-    grantClientLocationAssetPermissions($user, [
+    $site = makeClientLocationAssetSite('Asset Status Home');
+    $user = makeClientLocationAssetStaff($site, [
         'clients.viewAny',
         'clients.update',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $asset = ClientPersonalAsset::query()->create([
         'client_id' => $client->id,
         'name' => 'Mobility scooter',
@@ -578,12 +582,12 @@ it('records multiple personal asset status transitions with actor and source con
 });
 
 it('rolls back a personal asset status endpoint when timeline emission fails', function () {
-    $user = User::factory()->create(['organization_id' => 1]);
-    grantClientLocationAssetPermissions($user, [
+    $site = makeClientLocationAssetSite('Asset Status Rollback Home');
+    $user = makeClientLocationAssetStaff($site, [
         'clients.viewAny',
         'clients.update',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $asset = ClientPersonalAsset::query()->create([
         'client_id' => $client->id,
         'name' => 'Communication tablet',
@@ -607,12 +611,12 @@ it('rolls back a personal asset status endpoint when timeline emission fails', f
 });
 
 it('rolls back a full personal asset update when timeline emission fails', function () {
-    $user = User::factory()->create(['organization_id' => 1]);
-    grantClientLocationAssetPermissions($user, [
+    $site = makeClientLocationAssetSite('Asset Update Rollback Home');
+    $user = makeClientLocationAssetStaff($site, [
         'clients.viewAny',
         'clients.update',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $asset = ClientPersonalAsset::query()->create([
         'client_id' => $client->id,
         'name' => 'Powered wheelchair',
@@ -631,7 +635,7 @@ it('rolls back a full personal asset update when timeline emission fails', funct
     expect(fn () => $this->actingAs($user)
         ->put("/operations/clients/{$client->id}/personal-assets/{$asset->id}", [
             'name' => $asset->name,
-            'notes' => 'Unauthorized partial commit',
+            'notes' => 'Must not commit partially',
             'status' => 'damaged',
         ]))->toThrow(RuntimeException::class, 'Timeline unavailable');
 
@@ -643,12 +647,12 @@ it('rolls back a full personal asset update when timeline emission fails', funct
 it('preserves the original personal asset photo and removes the replacement when timeline emission fails', function () {
     Storage::fake('public');
 
-    $user = User::factory()->create(['organization_id' => 1]);
-    grantClientLocationAssetPermissions($user, [
+    $site = makeClientLocationAssetSite('Asset Photo Rollback Home');
+    $user = makeClientLocationAssetStaff($site, [
         'clients.viewAny',
         'clients.update',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $originalPath = "clients/{$client->id}/assets/original.jpg";
     Storage::disk('public')->put($originalPath, 'original photo');
     $asset = ClientPersonalAsset::query()->create([
@@ -681,28 +685,40 @@ it('preserves the original personal asset photo and removes the replacement when
 });
 
 it('acknowledges only open client panic alerts through the canonical lifecycle', function () {
-    $site = makeClientLocationAssetSite(1, 'Panic Lifecycle Home');
+    $site = makeClientLocationAssetSite('Panic Lifecycle Home');
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
         'status' => 'active',
     ]);
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientLocationAssetPermissions($manager, [
+    $manager = makeClientLocationAssetStaff($site, [
         'clients.viewAny',
         'assets.viewAny',
         'assets.telemetry.view',
         'assets.trackers.manage',
     ]);
-    grantClientLocationAssetTrackingConsent($client, $manager);
+    $consent = grantClientLocationAssetTrackingConsent($client, $manager);
+    $hardware = makeClientLocationAssetHardware($site, 'Panic Tracker Shadow');
+    $device = makeClientLocationAssetTracker('Panic Tracker', $hardware);
+    DeviceAssignment::query()->create([
+        'device_id' => $device->id,
+        'assignable_type' => DeviceAssignment::TARGET_CLIENT,
+        'assignable_id' => $client->id,
+        'assigned_at' => now(),
+        'assigned_by_user_id' => $manager->id,
+        'consent_id' => $consent->id,
+    ]);
 
     $openAlert = ControlRoomAlert::factory()->open()->create([
         'client_id' => $client->id,
+        'site_id' => $site->id,
         'source' => 'tracker',
+        'created_by_user_id' => $manager->id,
     ]);
     $triagingAlert = ControlRoomAlert::factory()->triaging()->create([
         'client_id' => $client->id,
+        'site_id' => $site->id,
         'source' => 'resident_tracker',
+        'created_by_user_id' => $manager->id,
     ]);
     $definition = SlaDefinition::query()->create([
         'name' => 'Client panic acknowledgement',

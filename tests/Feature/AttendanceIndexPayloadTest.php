@@ -2,14 +2,18 @@
 
 use App\Domain\Hr\Models\HrAttendanceBreakEvent;
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ShiftHandover;
+use App\Models\Site;
 use App\Models\User;
 use Carbon\Carbon;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->worker = User::factory()->create([
         'role' => 'support_worker',
@@ -31,6 +35,16 @@ beforeEach(function () {
         ->mapWithKeys(fn (Permission $p) => [$p->id => ['allowed' => true]])
         ->all();
     $this->manager->permissionOverrides()->syncWithoutDetaching($overrides);
+
+    $this->site = Site::factory()->create();
+    $this->client = Client::factory()->create(['site_id' => $this->site->id]);
+    foreach ([$this->worker, $this->manager] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+        ]);
+    }
 });
 
 function openSessionFor(User $user, array $attributes = []): HrAttendanceSession
@@ -155,6 +169,7 @@ test('the open session carries its break state and tracked break events', functi
 
 test('handovers involving the user are listed with an incoming flag', function () {
     $incoming = ShiftHandover::factory()->create([
+        'client_id' => $this->client->id,
         'incoming_staff_id' => $this->worker->id,
         'incoming_shift_id' => null,
     ]);
@@ -173,11 +188,13 @@ test('handovers involving the user are listed with an incoming flag', function (
 
 test('handovers follow the viewed staff member when a manager filters', function () {
     $workerHandover = ShiftHandover::factory()->create([
+        'client_id' => $this->client->id,
         'incoming_staff_id' => $this->worker->id,
         'incoming_shift_id' => null,
     ]);
     // The manager's own handover must NOT appear while viewing the worker.
     ShiftHandover::factory()->create([
+        'client_id' => $this->client->id,
         'outgoing_staff_id' => $this->manager->id,
     ]);
 

@@ -76,7 +76,7 @@ export type CredentialFormValues = {
     label: string;
     username: string;
     url: string;
-    // Free-form to allow tenant-defined custom types from the registry.
+    // Free-form to allow application-defined custom types from the catalogue.
     credential_type: string;
     value: string;
     notes: string;
@@ -1093,7 +1093,7 @@ function CredentialFormFields({
     const type = (form.data as CredentialFormValues).credential_type;
     const word = secretWord(type);
 
-    // Tile set from the tenant registry (active types), falling back to the
+    // Tile set from the application catalogue (active types), falling back to the
     // built-in defaults. Always include the credential's current type so
     // editing a now-hidden/custom type still shows it selected.
     const baseTiles: TileOption[] =

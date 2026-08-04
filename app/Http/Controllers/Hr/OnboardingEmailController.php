@@ -5,9 +5,10 @@ namespace App\Http\Controllers\Hr;
 use App\Domain\Hr\Models\HrOnboardingEmail;
 use App\Domain\Hr\Services\OnboardingEmailService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreOnboardingEmailRequest;
+use App\Mail\Hr\OnboardingTemplateMail;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
 /**
@@ -16,8 +17,6 @@ use Illuminate\Support\Facades\Mail;
  */
 class OnboardingEmailController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         private readonly OnboardingEmailService $emailService,
     ) {}
@@ -31,7 +30,6 @@ class OnboardingEmailController extends Controller
         $data = $request->validated();
 
         HrOnboardingEmail::create([
-            'tenant_id' => $this->resolveHrTenantIdForUser($user),
             'template_name' => $data['template_name'],
             'subject' => $data['subject'],
             'body' => $data['body'],
@@ -48,9 +46,12 @@ class OnboardingEmailController extends Controller
      */
     public function update(StoreOnboardingEmailRequest $request, HrOnboardingEmail $email)
     {
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($request->user()), $email->tenant_id);
-
-        $email->update($request->validated());
+        DB::transaction(function () use ($email, $request): void {
+            HrOnboardingEmail::query()
+                ->lockForUpdate()
+                ->findOrFail($email->getKey())
+                ->update($request->validated());
+        });
 
         return redirect()->back()->with('success', 'Onboarding email template updated.');
     }
@@ -62,9 +63,9 @@ class OnboardingEmailController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $email->tenant_id);
-
-        $email->delete();
+        DB::transaction(function () use ($email): void {
+            HrOnboardingEmail::query()->lockForUpdate()->findOrFail($email->getKey())->delete();
+        });
 
         return redirect()->back()->with('success', 'Onboarding email template deleted.');
     }
@@ -77,8 +78,6 @@ class OnboardingEmailController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $email->tenant_id);
-
         $recipient = $user->email;
         if (! $recipient) {
             return redirect()->back()->with('error', 'Your account has no email address to send a test to.');
@@ -89,7 +88,7 @@ class OnboardingEmailController extends Controller
         $body = $this->emailService->render($email->body, $sample);
 
         try {
-            Mail::to($recipient)->send(new \App\Mail\Hr\OnboardingTemplateMail($subject, $body));
+            Mail::to($recipient)->send(new OnboardingTemplateMail($subject, $body));
         } catch (\Throwable $exception) {
             return redirect()->back()->with('error', 'Could not send the test email: '.$exception->getMessage());
         }

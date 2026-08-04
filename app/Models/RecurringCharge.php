@@ -2,18 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class RecurringCharge extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     protected $table = 'recurring_charges';
 
     protected $fillable = [
-        'organization_id',
         'client_id',
         'service_agreement_id',
         'name',

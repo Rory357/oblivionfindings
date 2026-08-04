@@ -9,26 +9,36 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPolicyAttestation;
+use App\Domain\Hr\Services\ESignatureService;
+use App\Domain\Hr\Services\HrDocumentAccessService;
 use App\Domain\Hr\Services\HrDocumentMergeService;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Models\User;
+use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\QueryException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class HrDocumentController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         private readonly HrDocumentMergeService $mergeService,
+        private readonly HrDocumentAccessService $documentAccess,
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly ESignatureService $signatureService,
     ) {}
 
     /**
@@ -40,29 +50,47 @@ class HrDocumentController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.view'), 403);
-
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $canManage = $user->canDo('hr.documents.manage');
+        $canManageSignatures = $canManage || $user->canDo('hr.signatures.manage');
 
         /** @var EloquentCollection<int, HrDocument> $records */
-        $records = HrDocument::query()
+        $records = $this->documentAccess->applyReadableDocumentScope(HrDocument::query(), $user)
             ->with([
                 'employeeProfile:id,user_id,employee_number',
                 'employeeProfile.user:id,name',
                 'template:id,name,category,version',
                 'creator:id,name',
                 'signatures.signer:id,name',
+                'signatures.requestedBy:id,name',
             ])
-            ->when($tenantId !== null, fn (Builder $query) => $query->where('tenant_id', $tenantId))
             ->orderByDesc('created_at')
             ->get();
+        $records->each(function (HrDocument $document) use ($canManageSignatures, $user): void {
+            if (! $canManageSignatures) {
+                $document->setRelation('signatures', new EloquentCollection);
+
+                return;
+            }
+
+            $document->setRelation(
+                'signatures',
+                $document->signatures
+                    ->filter(fn (HrDocumentSignature $signature) => $signature->status !== 'cancelled'
+                        && $this->signatureService
+                            ->participantIsAvailable($document, (int) $signature->signer_user_id, $user))
+                    ->values(),
+            );
+        });
+        $this->signatureService->concealUnavailableRequesters(
+            $records->flatMap(fn (HrDocument $document) => $document->signatures),
+            $user,
+        );
 
         $documents = $records->map(fn (HrDocument $document) => $this->mapDocument($document))->values();
 
         $signatureRequests = $this->mapSignatureRequests($records);
 
         $templates = HrDocumentTemplate::query()
-            ->when($tenantId !== null, fn (Builder $query) => $query->where('tenant_id', $tenantId))
             ->orderBy('name')
             ->get()
             ->map(fn (HrDocumentTemplate $template) => [
@@ -77,10 +105,8 @@ class HrDocumentController extends Controller
             ])
             ->values();
 
-        $employees = HrEmployeeProfile::query()
+        $employees = $this->documentAccess->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
             ->with('user:id,name')
-            ->when($tenantId !== null, fn (Builder $query) => $query->where('tenant_id', $tenantId))
-            ->where('is_active', true)
             ->orderBy('employee_number')
             ->get(['id', 'user_id', 'employee_number'])
             ->map(fn (HrEmployeeProfile $profile) => [
@@ -107,7 +133,7 @@ class HrDocumentController extends Controller
             'documents' => $documents,
             'signatureRequests' => $signatureRequests->values(),
             'templates' => $templates,
-            'policies' => $this->policySummary($tenantId),
+            'policies' => $this->policySummary($user),
             'employees' => $employees,
             'categories' => $this->documentCategories(),
             'stats' => [
@@ -127,7 +153,7 @@ class HrDocumentController extends Controller
                 'manage' => $canManage,
                 'policies_view' => $user->canDo('hr.policies.view'),
                 'policies_manage' => $user->canDo('hr.policies.manage'),
-                'signatures_manage' => $user->canDo('hr.signatures.manage') || $canManage,
+                'signatures_manage' => $canManageSignatures,
             ],
         ]);
     }
@@ -187,7 +213,7 @@ class HrDocumentController extends Controller
      * Group signature rows by document into sender-side tracking cards.
      *
      * @param  EloquentCollection<int, HrDocument>  $records
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     * @return Collection<int, array<string, mixed>>
      */
     private function mapSignatureRequests(EloquentCollection $records)
     {
@@ -220,7 +246,7 @@ class HrDocumentController extends Controller
                     'overdue' => $status === 'awaiting' && $dueDate !== null && $dueDate->lt($today),
                     'requested_by' => $signatures->first()?->requestedBy?->name
                         ?? $document->creator?->name ?? 'System',
-                    'progress' => $signedCount . ' of ' . $signatures->count() . ' signed',
+                    'progress' => $signedCount.' of '.$signatures->count().' signed',
                     'signed_count' => $signedCount,
                     'signer_count' => $signatures->count(),
                     'signed_at' => optional($signatures->max('signed_at'))
@@ -231,7 +257,7 @@ class HrDocumentController extends Controller
                     'signers' => $signatures->map(fn (HrDocumentSignature $s) => [
                         'id' => $s->id,
                         'user_id' => $s->signer_user_id,
-                        'name' => $s->signer?->name ?? ('User #' . $s->signer_user_id),
+                        'name' => $s->signer?->name ?? ('User #'.$s->signer_user_id),
                         'initials' => $this->initials($s->signer?->name ?? '?'),
                         'status' => $s->status,
                     ])->values(),
@@ -246,21 +272,20 @@ class HrDocumentController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
-    private function policySummary(?int $tenantId): array
+    private function policySummary(User $viewer): array
     {
-        $activeEmployees = HrEmployeeProfile::query()
-            ->when($tenantId !== null, fn (Builder $query) => $query->where('tenant_id', $tenantId))
-            ->where('is_active', true)
-            ->count();
+        $visibleStaffIds = $this->siteAccess
+            ->applyStaffScope(User::query()->select('users.id'), $viewer)
+            ->pluck('id');
+        $activeEmployees = $visibleStaffIds->count();
 
         $policies = HrPolicy::query()
-            ->when($tenantId !== null, fn (Builder $query) => $query->where('tenant_id', $tenantId))
             ->where('is_active', true)
             ->with('currentVersion')
             ->orderBy('title')
             ->get();
 
-        return $policies->map(function (HrPolicy $policy) use ($activeEmployees) {
+        return $policies->map(function (HrPolicy $policy) use ($activeEmployees, $visibleStaffIds) {
             $requires = (bool) $policy->requires_attestation;
             $total = $requires ? $activeEmployees : 0;
 
@@ -269,6 +294,7 @@ class HrDocumentController extends Controller
                 $attested = HrPolicyAttestation::query()
                     ->where('policy_id', $policy->id)
                     ->where('policy_version_id', $policy->currentVersion->id)
+                    ->whereIn('user_id', $visibleStaffIds)
                     ->distinct('user_id')
                     ->count('user_id');
             }
@@ -295,12 +321,8 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $employees = HrEmployeeProfile::query()
+        $employees = $this->documentAccess->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
             ->with('user:id,name')
-            ->when($tenantId !== null, fn (Builder $query) => $query->where('tenant_id', $tenantId))
-            ->where('is_active', true)
             ->orderBy('employee_number')
             ->get(['id', 'user_id', 'employee_number'])
             ->map(fn (HrEmployeeProfile $profile) => [
@@ -324,13 +346,8 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $employeeRule = Rule::exists('hr_employee_profiles', 'id')
-            ->where(fn ($query) => $query->where('tenant_id', $tenantId));
-
         $data = $request->validate([
-            'employee_profile_id' => ['required', 'integer', $employeeRule],
+            'employee_profile_id' => ['required', 'bail', 'integer', $this->currentProfileRule($user)],
             'title' => ['required', 'string', 'max:255'],
             'category' => ['required', 'string', 'max:100'],
             'folder' => ['nullable', 'string', 'max:255'],
@@ -340,29 +357,33 @@ class HrDocumentController extends Controller
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        $profile = HrEmployeeProfile::query()->findOrFail($data['employee_profile_id']);
-        $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
+        $profile = $this->documentAccess->currentProfile($user, (int) $data['employee_profile_id']);
 
         $file = $request->file('file');
-        $path = $file->store("hr-documents/{$profile->tenant_id}/{$profile->id}", 'private');
+        $path = $file->store("hr-documents/profiles/{$profile->id}", 'private');
 
-        HrDocument::create([
-            'tenant_id' => $profile->tenant_id,
-            'employee_profile_id' => $data['employee_profile_id'],
-            'title' => $data['title'],
-            'category' => $data['category'],
-            'folder' => $data['folder'] ?? $this->folderForCategory($data['category']),
-            'storage_disk' => 'private',
-            'storage_path' => $path,
-            'original_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getClientMimeType() ?: $file->getMimeType(),
-            'size_bytes' => $file->getSize(),
-            'is_restricted' => $data['is_restricted'] ?? false,
-            'expires_at' => $data['expires_at'] ?? null,
-            'generated_from_template' => false,
-            'created_by' => $user->id,
-            'uploaded_by' => $user->id,
-        ]);
+        try {
+            HrDocument::create([
+                'employee_profile_id' => $data['employee_profile_id'],
+                'title' => $data['title'],
+                'category' => $data['category'],
+                'folder' => $data['folder'] ?? $this->folderForCategory($data['category']),
+                'storage_disk' => 'private',
+                'storage_path' => $path,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getClientMimeType() ?: $file->getMimeType(),
+                'size_bytes' => $file->getSize(),
+                'is_restricted' => $data['is_restricted'] ?? false,
+                'expires_at' => $data['expires_at'] ?? null,
+                'generated_from_template' => false,
+                'created_by' => $user->id,
+                'uploaded_by' => $user->id,
+            ]);
+        } catch (\Throwable $exception) {
+            Storage::disk('private')->delete($path);
+
+            throw $exception;
+        }
 
         return redirect()->route('hr.documents.index')->with('success', 'Document uploaded.');
     }
@@ -375,26 +396,18 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $templateRule = Rule::exists('hr_document_templates', 'id')
-            ->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        $employeeRule = Rule::exists('hr_employee_profiles', 'id')
-            ->where(fn ($query) => $query->where('tenant_id', $tenantId));
-
         $data = $request->validate([
-            'template_id' => ['required', 'integer', $templateRule],
-            'employee_profile_id' => ['required', 'integer', $employeeRule],
+            'template_id' => ['required', 'integer', Rule::exists('hr_document_templates', 'id')],
+            'employee_profile_id' => ['required', 'bail', 'integer', $this->currentProfileRule($user)],
             'title' => ['nullable', 'string', 'max:255'],
-            'offer_id' => ['nullable', 'integer', Rule::exists('hr_offers', 'id')],
+            'offer_id' => ['nullable', 'integer'],
             'merge_data' => ['nullable', 'array'],
         ]);
 
         $template = HrDocumentTemplate::query()->findOrFail($data['template_id']);
-        $profile = HrEmployeeProfile::query()->with('user')->findOrFail($data['employee_profile_id']);
-
-        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
-        $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
+        $profile = $this->documentAccess
+            ->currentProfile($user, (int) $data['employee_profile_id'])
+            ->load('user');
 
         // Approval-required templates may not be generated as a sendable doc
         // until they have been approved (no approval workflow record yet → block).
@@ -404,8 +417,7 @@ class HrDocumentController extends Controller
 
         $offer = null;
         if (! empty($data['offer_id'])) {
-            $offer = HrOffer::query()->with('application:id,tenant_id')->findOrFail($data['offer_id']);
-            $this->assertHrTenantAccess($tenantId, $offer->application?->tenant_id);
+            $offer = $this->visibleOffer($user, $profile, (int) $data['offer_id']);
         }
 
         $document = $this->mergeService->generateDocument(
@@ -431,29 +443,21 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $templateRule = Rule::exists('hr_document_templates', 'id')
-            ->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        $employeeRule = Rule::exists('hr_employee_profiles', 'id')
-            ->where(fn ($query) => $query->where('tenant_id', $tenantId));
-
         $data = $request->validate([
-            'template_id' => ['required', 'integer', $templateRule],
-            'employee_profile_id' => ['required', 'integer', $employeeRule],
-            'offer_id' => ['nullable', 'integer', Rule::exists('hr_offers', 'id')],
+            'template_id' => ['required', 'integer', Rule::exists('hr_document_templates', 'id')],
+            'employee_profile_id' => ['required', 'bail', 'integer', $this->currentProfileRule($user)],
+            'offer_id' => ['nullable', 'integer'],
             'merge_data' => ['nullable', 'array'],
         ]);
 
         $template = HrDocumentTemplate::query()->findOrFail($data['template_id']);
-        $profile = HrEmployeeProfile::query()->with('user')->findOrFail($data['employee_profile_id']);
-        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
-        $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
+        $profile = $this->documentAccess
+            ->currentProfile($user, (int) $data['employee_profile_id'])
+            ->load('user');
 
         $offer = null;
         if (! empty($data['offer_id'])) {
-            $offer = HrOffer::query()->with('application:id,tenant_id')->findOrFail($data['offer_id']);
-            $this->assertHrTenantAccess($tenantId, $offer->application?->tenant_id);
+            $offer = $this->visibleOffer($user, $profile, (int) $data['offer_id']);
         }
 
         $report = $this->mergeService->previewReport($template, $profile, $offer, $data['merge_data'] ?? []);
@@ -474,12 +478,7 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $document->tenant_id);
-
-        if ($document->is_restricted) {
-            abort_unless($user->canDo('hr.documents.manage'), 403, 'This document is restricted to managers.');
-        }
+        $document = $this->reloadReadableDocument($user, $document);
 
         abort_unless(
             Storage::disk($document->storage_disk)->exists($document->storage_path),
@@ -490,12 +489,32 @@ class HrDocumentController extends Controller
         $filename = $document->original_name ?: basename($document->storage_path);
 
         // Sensitive-file access must leave a trail (NZ Privacy Act expectations).
-        \App\Services\AuditLogger::log('hr.document.downloaded', $document, [
+        AuditLogger::log('hr.document.downloaded', $document, [
             'is_restricted' => (bool) $document->is_restricted,
             'filename' => $filename,
         ]);
 
         return Storage::disk($document->storage_disk)->download($document->storage_path, $filename);
+    }
+
+    public function downloadForProfile(
+        Request $request,
+        HrEmployeeProfile $profile,
+        HrDocument $document,
+    ) {
+        $user = $request->user();
+        abort_unless(
+            $user
+                && $user->canDo('hr.employees.viewAny')
+                && $user->canDo('hr.documents.view'),
+            403,
+        );
+
+        $profile = $this->documentAccess->historicalProfile($user, $profile);
+        $document = $this->documentAccess->readableDocument($user, $document);
+        abort_unless((int) $document->employee_profile_id === (int) $profile->id, 404);
+
+        return $this->download($request, $document);
     }
 
     /**
@@ -507,12 +526,8 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $document->tenant_id);
-
-        if ($document->is_restricted) {
-            abort_unless($user->canDo('hr.documents.manage'), 403);
-        }
+        $document = $this->reloadReadableDocument($user, $document);
+        abort_unless($user->canDo('hr.documents.manage') || $user->canDo('hr.signatures.manage'), 403);
 
         $entries = collect();
 
@@ -529,7 +544,7 @@ class HrDocumentController extends Controller
                 $entries->push([
                     'icon' => $verb === 'Uploaded' ? 'upload' : ($verb === 'Deleted' ? 'trash' : 'pencil'),
                     'label' => $verb === 'Updated' && $fields
-                        ? 'Updated ' . implode(', ', array_slice($fields, 0, 3))
+                        ? 'Updated '.implode(', ', array_slice($fields, 0, 3))
                         : $verb,
                     'who' => $log->user?->name ?? 'System',
                     'at' => optional($log->created_at)->toDateTimeString(),
@@ -537,7 +552,10 @@ class HrDocumentController extends Controller
             });
 
         $document->loadMissing('signatures.signer:id,name');
-        foreach ($document->signatures->sortBy('requested_at') as $sig) {
+        $signatures = $document->signatures
+            ->filter(fn (HrDocumentSignature $signature) => $this->signatureService
+                ->participantIsAvailable($document, (int) $signature->signer_user_id, $user));
+        foreach ($signatures->sortBy('requested_at') as $sig) {
             $entries->push([
                 'icon' => 'send',
                 'label' => 'Sent for signature',
@@ -547,14 +565,21 @@ class HrDocumentController extends Controller
             if ($sig->status === 'signed') {
                 $entries->push([
                     'icon' => 'check',
-                    'label' => 'Signed' . ($sig->ip_address ? " (IP {$sig->ip_address})" : ''),
+                    'label' => 'Signed'.($sig->ip_address ? " (IP {$sig->ip_address})" : ''),
                     'who' => $sig->signer?->name ?? 'Signer',
                     'at' => optional($sig->signed_at)->toDateTimeString(),
                 ]);
             } elseif ($sig->status === 'declined') {
                 $entries->push([
                     'icon' => 'alert',
-                    'label' => 'Declined' . ($sig->declined_reason ? " — {$sig->declined_reason}" : ''),
+                    'label' => 'Declined'.($sig->declined_reason ? " — {$sig->declined_reason}" : ''),
+                    'who' => $sig->signer?->name ?? 'Signer',
+                    'at' => optional($sig->updated_at)->toDateTimeString(),
+                ]);
+            } elseif ($sig->status === 'cancelled') {
+                $entries->push([
+                    'icon' => 'x',
+                    'label' => 'Signature request cancelled',
                     'who' => $sig->signer?->name ?? 'Signer',
                     'at' => optional($sig->updated_at)->toDateTimeString(),
                 ]);
@@ -577,13 +602,7 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $document->tenant_id);
-
-        // The signed rendition inherits the source document's restriction.
-        if ($document->is_restricted) {
-            abort_unless($user->canDo('hr.documents.manage'), 403, 'This document is restricted to managers.');
-        }
+        $document = $this->reloadReadableDocument($user, $document);
 
         abort_unless(
             $document->signed_document_path && Storage::disk('private')->exists($document->signed_document_path),
@@ -591,9 +610,9 @@ class HrDocumentController extends Controller
             'No signed document available.',
         );
 
-        $filename = Str::slug($document->title) . '-signed.pdf';
+        $filename = Str::slug($document->title).'-signed.pdf';
 
-        \App\Services\AuditLogger::log('hr.document.downloaded', $document, [
+        AuditLogger::log('hr.document.downloaded', $document, [
             'is_restricted' => (bool) $document->is_restricted,
             'variant' => 'signed',
             'filename' => $filename,
@@ -602,29 +621,25 @@ class HrDocumentController extends Controller
         return Storage::disk('private')->download($document->signed_document_path, $filename);
     }
 
+    private function reloadReadableDocument(User $user, HrDocument $document): HrDocument
+    {
+        return $this->documentAccess->readableDocument($user, $document);
+    }
+
     /**
      * Bulk download a set of documents as a zip.
      */
-    public function bulkDownload(Request $request): StreamedResponse|\Illuminate\Http\RedirectResponse
+    public function bulkDownload(Request $request): StreamedResponse|RedirectResponse
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
-
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
         ]);
 
-        $documents = HrDocument::query()
-            ->whereIn('id', $data['ids'])
-            ->when($tenantId !== null, fn (Builder $query) => $query->where('tenant_id', $tenantId))
-            ->get();
-
-        if ($documents->isEmpty()) {
-            return redirect()->back()->with('error', 'No documents found to download.');
-        }
+        $documents = $this->documentAccess->exactReadableDocuments($user, $data['ids']);
 
         $tmp = tempnam(sys_get_temp_dir(), 'hrdocs');
         $zip = new \ZipArchive;
@@ -641,7 +656,7 @@ class HrDocumentController extends Controller
             $base = $name;
             $i = 1;
             while (isset($used[$name])) {
-                $name = pathinfo($base, PATHINFO_FILENAME) . "-{$i}." . pathinfo($base, PATHINFO_EXTENSION);
+                $name = pathinfo($base, PATHINFO_FILENAME)."-{$i}.".pathinfo($base, PATHINFO_EXTENSION);
                 $i++;
             }
             $used[$name] = true;
@@ -649,7 +664,7 @@ class HrDocumentController extends Controller
         }
         $zip->close();
 
-        \App\Services\AuditLogger::log('hr.document.bulk_downloaded', null, [
+        AuditLogger::log('hr.document.bulk_downloaded', null, [
             'document_ids' => $documents->pluck('id')->all(),
             'count' => $documents->count(),
             'restricted_count' => $documents->where('is_restricted', true)->count(),
@@ -658,7 +673,7 @@ class HrDocumentController extends Controller
         return response()->streamDownload(function () use ($tmp) {
             readfile($tmp);
             @unlink($tmp);
-        }, 'hr-documents-' . now()->format('Ymd_His') . '.zip', [
+        }, 'hr-documents-'.now()->format('Ymd_His').'.zip', [
             'Content-Type' => 'application/zip',
         ]);
     }
@@ -671,18 +686,16 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $data = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
             'folder' => ['required', 'string', 'max:255'],
         ]);
 
-        HrDocument::query()
-            ->whereIn('id', $data['ids'])
-            ->when($tenantId !== null, fn (Builder $query) => $query->where('tenant_id', $tenantId))
-            ->update(['folder' => $data['folder']]);
+        $documents = $this->documentAccess->exactReadableDocuments($user, $data['ids']);
+        foreach ($documents as $document) {
+            $document->update(['folder' => $data['folder']]);
+        }
 
         return redirect()->back()->with('success', 'Documents moved.');
     }
@@ -695,23 +708,18 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $data = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
         ]);
 
-        $documents = HrDocument::query()
-            ->whereIn('id', $data['ids'])
-            ->when($tenantId !== null, fn (Builder $query) => $query->where('tenant_id', $tenantId))
-            ->get();
+        $documents = $this->documentAccess->exactReadableDocuments($user, $data['ids']);
 
         foreach ($documents as $document) {
             $document->update(['folder' => 'Archive']);
         }
 
-        return redirect()->back()->with('success', $documents->count() . ' document(s) archived.');
+        return redirect()->back()->with('success', $documents->count().' document(s) archived.');
     }
 
     /**
@@ -722,8 +730,7 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $document->tenant_id);
+        $document = $this->documentAccess->readableDocument($user, $document);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -745,20 +752,17 @@ class HrDocumentController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.view'), 403);
-
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $category = $request->query('category');
         $q = trim((string) $request->query('q', ''));
 
-        $documents = HrDocument::query()
+        $documents = $this->documentAccess->applyReadableDocumentScope(HrDocument::query(), $user)
             ->with(['employeeProfile.user:id,name', 'creator:id,name', 'signatures'])
-            ->when($tenantId !== null, fn (Builder $query) => $query->where('tenant_id', $tenantId))
             ->when($category, fn (Builder $query, string $value) => $query->where('category', $value))
             ->when($q !== '', fn (Builder $query) => $query->where('title', 'like', "%{$q}%"))
             ->orderByDesc('created_at')
             ->get();
 
-        $filename = 'hr-documents-' . now()->format('Ymd_His') . '.csv';
+        $filename = 'hr-documents-'.now()->format('Ymd_His').'.csv';
 
         return response()->streamDownload(function () use ($documents) {
             $out = fopen('php://output', 'w');
@@ -772,7 +776,7 @@ class HrDocumentController extends Controller
                     $this->signatureStatusFor($document) ?? '—',
                     $document->expires_at?->toDateString() ?? '',
                     $document->is_restricted ? 'Yes' : 'No',
-                    'v' . (int) ($document->version ?: 1),
+                    'v'.(int) ($document->version ?: 1),
                     $document->creator?->name ?? 'System',
                     optional($document->created_at)->toDateString(),
                 ]);
@@ -789,8 +793,7 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $document->tenant_id);
+        $document = $this->documentAccess->readableDocument($user, $document);
 
         $document->update(['folder' => 'Archive']);
 
@@ -805,12 +808,10 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $category = $request->query('category');
         $q = trim((string) $request->query('q', ''));
 
         $templates = HrDocumentTemplate::query()
-            ->when($tenantId !== null, fn (Builder $query) => $query->where('tenant_id', $tenantId))
             ->when($category, fn (Builder $query, string $value) => $query->where('category', $value))
             ->when($q !== '', fn (Builder $query) => $query->where('name', 'like', "%{$q}%"))
             ->orderBy('name')
@@ -863,9 +864,6 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
-
         return Inertia::render('hr/documents/edit-template', [
             'template' => [
                 'id' => $template->id,
@@ -889,10 +887,8 @@ class HrDocumentController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', $this->templateNameRule()],
             'category' => ['required', 'string', 'max:100'],
             'content' => ['required', 'string', 'max:100000'],
             'merge_fields' => ['nullable', 'array'],
@@ -906,18 +902,27 @@ class HrDocumentController extends Controller
             ->values()
             ->all();
 
-        HrDocumentTemplate::create([
-            'tenant_id' => $tenantId,
-            'name' => $data['name'],
-            'category' => $data['category'],
-            'content' => $data['content'],
-            'merge_fields' => $mergeFields,
-            'is_active' => true,
-            'version' => 1,
-            'approval_required' => (bool) ($data['approval_required'] ?? false),
-            'created_by' => $user->id,
-            'updated_by' => $user->id,
-        ]);
+        try {
+            HrDocumentTemplate::create([
+                'name' => trim($data['name']),
+                'category' => $data['category'],
+                'content' => $data['content'],
+                'merge_fields' => $mergeFields,
+                'is_active' => true,
+                'version' => 1,
+                'approval_required' => (bool) ($data['approval_required'] ?? false),
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
+            ]);
+        } catch (QueryException $exception) {
+            if ($this->templateNameExists($data['name'])) {
+                throw ValidationException::withMessages([
+                    'name' => 'A document template with this name already exists.',
+                ]);
+            }
+
+            throw $exception;
+        }
 
         return redirect()->route('hr.documents.templates')->with('success', 'Document template created.');
     }
@@ -930,11 +935,8 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
-
         $data = $request->validate([
-            'name' => ['sometimes', 'string', 'max:255'],
+            'name' => ['sometimes', 'string', 'max:255', $this->templateNameRule($template)],
             'category' => ['sometimes', 'string', 'max:100'],
             'content' => ['sometimes', 'string', 'max:100000'],
             'merge_fields' => ['nullable', 'array'],
@@ -951,13 +953,38 @@ class HrDocumentController extends Controller
                 ->all();
         }
 
-        if (array_key_exists('content', $data) && $data['content'] !== $template->content) {
-            $data['version'] = ((int) $template->version) + 1;
+        if (array_key_exists('name', $data)) {
+            $data['name'] = trim($data['name']);
         }
 
         $data['updated_by'] = $user->id;
 
-        $template->update($data);
+        try {
+            DB::transaction(function () use ($template, $data): void {
+                $locked = HrDocumentTemplate::query()
+                    ->lockForUpdate()
+                    ->findOrFail($template->getKey());
+                if (isset($data['name']) && $this->templateNameExists($data['name'], (int) $locked->id)) {
+                    throw ValidationException::withMessages([
+                        'name' => 'A document template with this name already exists.',
+                    ]);
+                }
+
+                if (array_key_exists('content', $data) && $data['content'] !== $locked->content) {
+                    $data['version'] = ((int) $locked->version) + 1;
+                }
+
+                $locked->update($data);
+            }, attempts: 1);
+        } catch (QueryException $exception) {
+            if (isset($data['name']) && $this->templateNameExists($data['name'], (int) $template->id)) {
+                throw ValidationException::withMessages([
+                    'name' => 'A document template with this name already exists.',
+                ]);
+            }
+
+            throw $exception;
+        }
 
         return redirect()->route('hr.documents.templates')->with('success', 'Document template updated.');
     }
@@ -970,9 +997,6 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
-
         $template->update([
             'is_active' => ! (bool) $template->is_active,
             'updated_by' => $user->id,
@@ -982,18 +1006,25 @@ class HrDocumentController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Profile-scoped document management                                 */
+    /*  Profile-scoped document management */
     /* ------------------------------------------------------------------ */
 
     public function profileDocuments(Request $request, HrEmployeeProfile $profile)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.employees.viewAny'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $profile->tenant_id);
+        abort_unless(
+            $user
+                && $user->canDo('hr.employees.viewAny')
+                && $user->canDo('hr.documents.view'),
+            403,
+        );
+        $profile = $this->documentAccess->historicalProfile($user, $profile);
 
         $profile->load('user:id,name,email');
+        $canManageDocuments = $user->canDo('hr.documents.manage');
 
-        $documents = HrDocument::where('employee_profile_id', $profile->id)
+        $documents = $this->documentAccess->applyReadableDocumentScope(HrDocument::query(), $user)
+            ->where('employee_profile_id', $profile->id)
             ->with('uploader:id,name')
             ->orderByDesc('created_at')
             ->get()
@@ -1020,7 +1051,7 @@ class HrDocumentController extends Controller
             'documents' => $documents,
             'categories' => $this->documentCategories(),
             'can' => [
-                'manage' => $user->canDo('hr.employees.manage'),
+                'manage' => $user->canDo('hr.employees.manage') && $canManageDocuments,
             ],
         ]);
     }
@@ -1028,10 +1059,13 @@ class HrDocumentController extends Controller
     public function storeForProfile(Request $request, HrEmployeeProfile $profile)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.employees.manage'), 403);
-
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
+        abort_unless(
+            $user
+                && $user->canDo('hr.employees.manage')
+                && $user->canDo('hr.documents.manage'),
+            403,
+        );
+        $profile = $this->documentAccess->currentProfile($user, $profile);
 
         $validated = $request->validate([
             'file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,csv,jpg,jpeg,png,gif,txt,rtf'],
@@ -1044,25 +1078,30 @@ class HrDocumentController extends Controller
         ]);
 
         $file = $request->file('file');
-        $path = $file->store("hr-documents/{$tenantId}/{$profile->id}", 'private');
+        $path = $file->store("hr-documents/profiles/{$profile->id}", 'private');
 
-        HrDocument::create([
-            'tenant_id' => $tenantId,
-            'employee_profile_id' => $profile->id,
-            'title' => $validated['title'],
-            'category' => $validated['category'] ?? null,
-            'folder' => $validated['folder'] ?? null,
-            'storage_disk' => 'private',
-            'storage_path' => $path,
-            'original_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getClientMimeType(),
-            'size_bytes' => $file->getSize(),
-            'is_restricted' => $validated['is_restricted'] ?? false,
-            'expires_at' => $validated['expires_at'] ?? null,
-            'generated_from_template' => false,
-            'created_by' => $user->id,
-            'uploaded_by' => $user->id,
-        ]);
+        try {
+            HrDocument::create([
+                'employee_profile_id' => $profile->id,
+                'title' => $validated['title'],
+                'category' => $validated['category'] ?? null,
+                'folder' => $validated['folder'] ?? null,
+                'storage_disk' => 'private',
+                'storage_path' => $path,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getClientMimeType(),
+                'size_bytes' => $file->getSize(),
+                'is_restricted' => $validated['is_restricted'] ?? false,
+                'expires_at' => $validated['expires_at'] ?? null,
+                'generated_from_template' => false,
+                'created_by' => $user->id,
+                'uploaded_by' => $user->id,
+            ]);
+        } catch (\Throwable $exception) {
+            Storage::disk('private')->delete($path);
+
+            throw $exception;
+        }
 
         return redirect()->back()->with('success', 'Document uploaded.');
     }
@@ -1070,9 +1109,15 @@ class HrDocumentController extends Controller
     public function updateForProfile(Request $request, HrEmployeeProfile $profile, HrDocument $document)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.employees.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $profile->tenant_id);
-        abort_unless($document->employee_profile_id === $profile->id, 404);
+        abort_unless(
+            $user
+                && $user->canDo('hr.employees.manage')
+                && $user->canDo('hr.documents.manage'),
+            403,
+        );
+        $profile = $this->documentAccess->historicalProfile($user, $profile);
+        $document = $this->documentAccess->readableDocument($user, $document);
+        abort_unless((int) $document->employee_profile_id === (int) $profile->id, 404);
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -1090,9 +1135,15 @@ class HrDocumentController extends Controller
     public function destroyForProfile(Request $request, HrEmployeeProfile $profile, HrDocument $document)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.employees.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $profile->tenant_id);
-        abort_unless($document->employee_profile_id === $profile->id, 404);
+        abort_unless(
+            $user
+                && $user->canDo('hr.employees.manage')
+                && $user->canDo('hr.documents.manage'),
+            403,
+        );
+        $profile = $this->documentAccess->historicalProfile($user, $profile);
+        $document = $this->documentAccess->readableDocument($user, $document);
+        abort_unless((int) $document->employee_profile_id === (int) $profile->id, 404);
 
         $document->update(['folder' => 'Archive']);
 
@@ -1100,8 +1151,69 @@ class HrDocumentController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                            */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
+
+    private function currentProfileRule(User $viewer): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) use ($viewer): void {
+            if (! is_numeric($value)
+                || ! $this->documentAccess
+                    ->applyCurrentProfileScope(HrEmployeeProfile::query(), $viewer)
+                    ->whereKey((int) $value)
+                    ->exists()) {
+                $fail('The selected staff member is not available.');
+            }
+        };
+    }
+
+    private function templateNameRule(?HrDocumentTemplate $current = null): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) use ($current): void {
+            $name = Str::lower(trim((string) $value));
+            if ($name === '') {
+                $fail('The template name is required.');
+
+                return;
+            }
+
+            if ($this->templateNameExists($name, $current?->getKey())) {
+                $fail('A document template with this name already exists.');
+            }
+        };
+    }
+
+    private function templateNameExists(string $name, ?int $exceptId = null): bool
+    {
+        return HrDocumentTemplate::query()
+            ->when($exceptId !== null, fn (Builder $query) => $query->whereKeyNot($exceptId))
+            ->whereRaw('LOWER(TRIM(name)) = ?', [Str::lower(trim($name))])
+            ->exists();
+    }
+
+    private function visibleOffer(User $viewer, HrEmployeeProfile $profile, int $offerId): HrOffer
+    {
+        $profileSiteIds = collect([
+            $profile->primary_site_id,
+            ...(array) ($profile->secondary_site_ids ?? []),
+        ])
+            ->filter(fn (mixed $siteId) => is_numeric($siteId) && (int) $siteId > 0)
+            ->map(fn (mixed $siteId) => (int) $siteId)
+            ->unique()
+            ->values()
+            ->all();
+        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds($viewer);
+        $allowedSiteIds = array_values(array_intersect($profileSiteIds, $accessibleSiteIds));
+
+        $offer = HrOffer::query()
+            ->whereKey($offerId)
+            ->whereIn('primary_site_id', $allowedSiteIds)
+            ->first();
+
+        abort_unless($offer, 404);
+
+        return $offer;
+    }
 
     /**
      * @return list<string>
@@ -1142,7 +1254,7 @@ class HrDocumentController extends Controller
         $first = mb_substr($parts[0] ?? '', 0, 1);
         $last = count($parts) > 1 ? mb_substr($parts[count($parts) - 1], 0, 1) : '';
 
-        return mb_strtoupper($first . $last) ?: '?';
+        return mb_strtoupper($first.$last) ?: '?';
     }
 
     /**

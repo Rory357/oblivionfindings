@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\Shift;
@@ -121,6 +122,11 @@ it('exposes active shift site checklists and clears them after completion', func
     $worker->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
 
     $site = Site::factory()->create(['name' => 'Rimu House', 'type' => 'house']);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $worker->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+    ]);
     $client = Client::factory()->create([
         'site_id' => $site->id,
         'first_name' => 'Margaret',
@@ -136,7 +142,7 @@ it('exposes active shift site checklists and clears them after completion', func
             'site_id' => $site->id,
         ]);
 
-    [$run, $item] = makeMyDayChecklistRun($site);
+    [$run, $item] = makeMyDayChecklistRun($site, $worker);
 
     $this->actingAs($worker)
         ->get("/my-day?run={$run->id}")
@@ -222,7 +228,7 @@ it('hue helper matches the TS implementation byte-for-byte for known inputs', fu
     expect(ResidentHue::initials(null, null))->toBe('');
 });
 
-function makeMyDayChecklistRun(Site $site): array
+function makeMyDayChecklistRun(Site $site, User $worker): array
 {
     $template = SiteChecklistTemplate::create([
         'tenant_id' => $site->tenant_id,
@@ -256,6 +262,7 @@ function makeMyDayChecklistRun(Site $site): array
         'assignment_id' => $assignment->id,
         'site_id' => $site->id,
         'template_id' => $template->id,
+        'assigned_to_user_id' => $worker->id,
         'scheduled_date' => now('Pacific/Auckland')->toDateString(),
         'status' => 'scheduled',
     ]);

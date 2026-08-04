@@ -1,9 +1,11 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\NextOfKin;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -37,12 +39,56 @@ function grantClientRagTestRole(User $user, string $roleName, array $permissions
     $user->roles()->sync([$role->id]);
 }
 
+function makeClientRagTestSite(string $name): Site
+{
+    return Site::factory()->create([
+        'name' => $name,
+        'is_active' => true,
+        'archived' => false,
+        'archived_at' => null,
+    ]);
+}
+
+function makeClientRagTestClient(Site $site): Client
+{
+    return Client::factory()->create([
+        'site_id' => $site->id,
+        'status' => 'active',
+    ]);
+}
+
+function makeClientRagTestStaff(
+    Site $site,
+    string $roleName,
+    array $permissions,
+    array $attributes = [],
+): User {
+    $staff = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+        ...$attributes,
+    ]);
+    grantClientRagTestRole($staff, $roleName, $permissions);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $staff->id,
+        'position_role' => $staff->role,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $staff->id,
+        'updated_by' => $staff->id,
+    ]);
+
+    return $staff;
+}
+
 it('denies the unredacted client RAG endpoint to next of kin even with the generic self permission', function () {
     config()->set('llm.openai.api_key', null);
 
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makeClientRagTestClient(makeClientRagTestSite('Kauri House'));
     $nextOfKin = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'next_of_kin',
         'approved_at' => now(),
     ]);
@@ -75,11 +121,12 @@ it('denies the unredacted client RAG endpoint to next of kin even with the gener
 it('requires a RAG capability in addition to ordinary client profile access', function () {
     config()->set('llm.openai.api_key', null);
 
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $viewer = User::factory()->create(['organization_id' => 1]);
-    grantClientRagTestRole($viewer, 'rag_profile_viewer_'.$viewer->id, [
-        'clients.viewAny',
+    $site = makeClientRagTestSite('Rimu House');
+    $client = makeClientRagTestClient($site);
+    $viewer = makeClientRagTestStaff($site, 'rag_profile_viewer_'.uniqid(), [
+        'clients.viewAssigned',
     ]);
+    $client->supportWorkers()->attach($viewer->id);
 
     $this->actingAs($viewer)
         ->post(route('operations.clients.rag.ask', $client, false), [
@@ -91,12 +138,9 @@ it('requires a RAG capability in addition to ordinary client profile access', fu
 it('allows an assigned worker with the assigned RAG capability to reach the disabled-provider response', function () {
     config()->set('llm.openai.api_key', null);
 
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $worker = User::factory()->create([
-        'organization_id' => 1,
-        'role' => 'support_worker',
-    ]);
-    grantClientRagTestRole($worker, 'support_worker', [
+    $site = makeClientRagTestSite('Totara House');
+    $client = makeClientRagTestClient($site);
+    $worker = makeClientRagTestStaff($site, 'rag_assigned_worker_'.uniqid(), [
         'clients.viewAssigned',
         'rag.ask.assigned',
     ]);
@@ -111,12 +155,52 @@ it('allows an assigned worker with the assigned RAG capability to reach the disa
         ->assertSessionHasErrors('question');
 });
 
+it('allows a manager with the any-client RAG capability and validates the question', function () {
+    config()->set('llm.openai.api_key', null);
+
+    $site = makeClientRagTestSite('Pohutukawa House');
+    $client = makeClientRagTestClient($site);
+    $manager = makeClientRagTestStaff(
+        $site,
+        'rag_manager_'.uniqid(),
+        ['clients.viewAny', 'rag.ask.any'],
+        ['role' => 'manager'],
+    );
+
+    $this->actingAs($manager)
+        ->from(route('operations.clients.show', $client, false))
+        ->post(route('operations.clients.rag.ask', $client, false), [
+            'question' => '',
+        ])
+        ->assertRedirect(route('operations.clients.show', $client, false))
+        ->assertSessionHasErrors('question');
+});
+
+it('denies assigned RAG access when the assigned client is outside the worker Site', function () {
+    config()->set('llm.openai.api_key', null);
+
+    $workerSite = makeClientRagTestSite('Nikau House');
+    $outsideClient = makeClientRagTestClient(makeClientRagTestSite('Manuka House'));
+    $worker = makeClientRagTestStaff($workerSite, 'rag_site_bound_worker_'.uniqid(), [
+        'clients.viewAssigned',
+        'rag.ask.assigned',
+    ]);
+    $outsideClient->supportWorkers()->attach($worker->id);
+
+    $this->actingAs($worker)
+        ->post(route('operations.clients.rag.ask', $outsideClient, false), [
+            'question' => 'What changed today?',
+        ])
+        ->assertForbidden();
+});
+
 it('allows the client viewing their own linked record with the self RAG capability', function () {
     config()->set('llm.openai.api_key', null);
 
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $site = makeClientRagTestSite('Harakeke House');
+    $client = makeClientRagTestClient($site);
+    $otherClient = makeClientRagTestClient($site);
     $portalClient = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'client',
         'approved_at' => now(),
     ]);
@@ -138,4 +222,10 @@ it('allows the client viewing their own linked record with the self RAG capabili
         ])
         ->assertRedirect(route('portal.clients.show', $client, false))
         ->assertSessionHasErrors('question');
+
+    $this->actingAs($portalClient)
+        ->post(route('portal.clients.rag.ask', $otherClient, false), [
+            'question' => 'What is in the other record?',
+        ])
+        ->assertForbidden();
 });

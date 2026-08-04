@@ -23,16 +23,23 @@ use App\Models\AssetAssignment;
 use App\Models\ItProvisioningRequest;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class OnboardingService
 {
+    public function __construct(
+        private readonly HrCurrentStaffService $currentStaff,
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     /**
      * Generate an onboarding checklist for a new employee from the matching template.
      *
@@ -48,17 +55,32 @@ class OnboardingService
     public function generateChecklist(HrEmployeeProfile $profile, int $createdBy, ?int $templateId = null): HrOnboardingChecklist
     {
         return DB::transaction(function () use ($profile, $createdBy, $templateId) {
+            $profile = HrEmployeeProfile::query()
+                ->lockForUpdate()
+                ->findOrFail($profile->getKey());
             $profile->loadMissing('primarySite');
+            $this->assertOnboardingProfile($profile, $createdBy);
+
+            $activeChecklistExists = HrOnboardingChecklist::query()
+                ->where('employee_profile_id', $profile->id)
+                ->whereIn('status', ['pending', 'in_progress'])
+                ->lockForUpdate()
+                ->exists();
+            if ($activeChecklistExists) {
+                throw ValidationException::withMessages([
+                    'employee_profile_id' => 'An active onboarding checklist already exists for this employee.',
+                ]);
+            }
 
             if ($templateId !== null) {
                 $template = HrOnboardingTemplate::query()
                     ->where('id', $templateId)
-                    ->where('tenant_id', $profile->tenant_id)
                     ->where('is_active', true)
+                    ->lockForUpdate()
                     ->first();
             } else {
                 $siteType = $profile->primarySite?->type ?? 'all';
-                $template = $this->resolveTemplate($profile->tenant_id, $profile->position_role, $siteType);
+                $template = $this->resolveTemplate($profile->position_role, $siteType);
             }
 
             if (! $template) {
@@ -68,7 +90,6 @@ class OnboardingService
             }
 
             $checklist = HrOnboardingChecklist::create([
-                'tenant_id' => $profile->tenant_id,
                 'employee_profile_id' => $profile->id,
                 'template_key' => "{$template->role}:{$template->site_type}",
                 'status' => 'pending',
@@ -85,6 +106,14 @@ class OnboardingService
                     $taskDef['assigned_to_role'] ?? null,
                     $profile,
                 );
+                if (($taskDef['is_required'] ?? true)
+                    && (($taskDef['assigned_to_user_id'] ?? null) || ($taskDef['assigned_to_role'] ?? null))
+                    && $assigneeId === null
+                ) {
+                    throw ValidationException::withMessages([
+                        'tasks' => "No current Site-authorised owner is available for required task '{$taskDef['title']}'.",
+                    ]);
+                }
                 $offsetDays = (int) ($taskDef['due_days_offset'] ?? $taskDef['offset_days'] ?? 0);
                 $dueDate = $profile->start_date
                     ? Carbon::parse($profile->start_date)->addDays($offsetDays)->toDateString()
@@ -134,7 +163,7 @@ class OnboardingService
             $this->createItProvisioningRequests($checklist, array_values($taskByIndex), $createdBy);
 
             // Cross-loop: auto-enrol the new hire in training for any induction
-            // tasks (explicit course_code, else the tenant's mandatory courses).
+            // tasks (explicit course_code, else the application's mandatory courses).
             $this->enrolInductionCourses($profile, $tasks);
 
             foreach ($taskByIndex as $task) {
@@ -188,64 +217,86 @@ class OnboardingService
      */
     public function completeTask(HrOnboardingTask $task, int $completedBy, array $data = []): HrOnboardingTask
     {
-        if ($task->status === 'completed') {
-            throw new \LogicException("Task '{$task->title}' is already completed.");
-        }
+        // Document + signature + task update + rollup commit together. Lock and
+        // re-read every mutable row so stale tabs cannot bypass lifecycle gates.
+        $storedEvidencePath = null;
 
-        $checklist = $task->checklist()->with('tasks')->firstOrFail();
-        if (! in_array($checklist->status, ['pending', 'in_progress'], true)) {
-            throw new \LogicException("Cannot complete tasks on a '{$checklist->status}' checklist.");
-        }
+        try {
+            return DB::transaction(function () use ($task, $completedBy, $data, &$storedEvidencePath) {
+                $lockedTask = HrOnboardingTask::query()->lockForUpdate()->findOrFail($task->getKey());
+                $checklist = HrOnboardingChecklist::query()
+                    ->lockForUpdate()
+                    ->findOrFail($lockedTask->checklist_id);
 
-        $dependencyTaskIds = collect($task->dependency_task_ids ?? [])->map(fn ($id) => (int) $id)->filter();
-        if ($dependencyTaskIds->isNotEmpty()) {
-            $completedDependencies = $checklist->tasks
-                ->whereIn('id', $dependencyTaskIds->all())
-                ->where('status', 'completed')
-                ->count();
+                if ($lockedTask->status === 'completed') {
+                    throw new \LogicException("Task '{$lockedTask->title}' is already completed.");
+                }
+                if (! in_array($checklist->status, ['pending', 'in_progress'], true)) {
+                    throw new \LogicException("Cannot complete tasks on a '{$checklist->status}' checklist.");
+                }
 
-            if ($completedDependencies !== $dependencyTaskIds->count()) {
-                throw new \LogicException('This task cannot be completed until all dependency tasks are complete.');
+                $dependencyTaskIds = collect($lockedTask->dependency_task_ids ?? [])
+                    ->map(fn ($id) => (int) $id)
+                    ->filter()
+                    ->unique()
+                    ->values();
+                if ($dependencyTaskIds->isNotEmpty()) {
+                    $completedDependencies = HrOnboardingTask::query()
+                        ->where('checklist_id', $checklist->id)
+                        ->whereIn('id', $dependencyTaskIds)
+                        ->where('status', 'completed')
+                        ->lockForUpdate()
+                        ->pluck('id')
+                        ->count();
+                    if ($completedDependencies !== $dependencyTaskIds->count()) {
+                        throw new \LogicException('This task cannot be completed until all dependency tasks are complete.');
+                    }
+                }
+
+                if ($lockedTask->sign_off_required && empty($data['signed_off_by'])) {
+                    throw new \LogicException("Task '{$lockedTask->title}' requires sign-off.");
+                }
+
+                // Cross-loop: turn an uploaded evidence file into a gated HrDocument
+                // (+ a sign-off signature request) and link it to the task.
+                if (isset($data['evidence_file'])) {
+                    $evidence = $this->storeEvidenceAsDocument(
+                        $lockedTask,
+                        $checklist,
+                        $data['evidence_file'],
+                        $completedBy,
+                        $data['signed_off_by'] ?? null,
+                    );
+                    $data['hr_document_id'] = $evidence['document_id'];
+                    $storedEvidencePath = $evidence['storage_path'];
+                }
+
+                $lockedTask->update([
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                    'completed_by' => $completedBy,
+                    'evidence_path' => $data['evidence_path'] ?? $lockedTask->evidence_path,
+                    'hr_document_id' => $data['hr_document_id'] ?? $lockedTask->hr_document_id,
+                    'notes' => $data['notes'] ?? $lockedTask->notes,
+                    'signed_off_by' => $data['signed_off_by'] ?? $lockedTask->signed_off_by,
+                    'signed_off_at' => isset($data['signed_off_by']) ? now() : $lockedTask->signed_off_at,
+                ]);
+
+                if ($checklist->status === 'pending') {
+                    $checklist->update(['status' => 'in_progress']);
+                }
+
+                $this->checkChecklistCompletion($checklist);
+
+                return $lockedTask->fresh();
+            });
+        } catch (\Throwable $exception) {
+            if ($storedEvidencePath !== null) {
+                Storage::disk('private')->delete($storedEvidencePath);
             }
+
+            throw $exception;
         }
-
-        if ($task->sign_off_required && empty($data['signed_off_by'])) {
-            throw new \LogicException("Task '{$task->title}' requires sign-off.");
-        }
-
-        // Document + signature + task update + rollup commit together.
-        return DB::transaction(function () use ($task, $checklist, $completedBy, $data) {
-            // Cross-loop: turn an uploaded evidence file into a gated HrDocument
-            // (+ a sign-off signature request) and link it to the task.
-            if (isset($data['evidence_file'])) {
-                $data['hr_document_id'] = $this->storeEvidenceAsDocument(
-                    $task,
-                    $checklist,
-                    $data['evidence_file'],
-                    $completedBy,
-                    $data['signed_off_by'] ?? null,
-                );
-            }
-
-            $task->update([
-                'status' => 'completed',
-                'completed_at' => now(),
-                'completed_by' => $completedBy,
-                'evidence_path' => $data['evidence_path'] ?? $task->evidence_path,
-                'hr_document_id' => $data['hr_document_id'] ?? $task->hr_document_id,
-                'notes' => $data['notes'] ?? $task->notes,
-                'signed_off_by' => $data['signed_off_by'] ?? $task->signed_off_by,
-                'signed_off_at' => isset($data['signed_off_by']) ? now() : $task->signed_off_at,
-            ]);
-
-            if ($checklist->status === 'pending') {
-                $checklist->update(['status' => 'in_progress']);
-            }
-
-            $this->checkChecklistCompletion($checklist);
-
-            return $task->fresh();
-        });
     }
 
     /**
@@ -255,21 +306,27 @@ class OnboardingService
      */
     public function uncompleteTask(HrOnboardingTask $task): HrOnboardingTask
     {
-        if ($task->status !== 'completed') {
-            return $task;
-        }
+        return DB::transaction(function () use ($task): HrOnboardingTask {
+            $lockedTask = HrOnboardingTask::query()->lockForUpdate()->findOrFail($task->getKey());
+            $checklist = HrOnboardingChecklist::query()
+                ->lockForUpdate()
+                ->findOrFail($lockedTask->checklist_id);
+            if ($lockedTask->status !== 'completed') {
+                return $lockedTask;
+            }
 
-        $task->update([
-            'status' => 'pending',
-            'completed_at' => null,
-            'completed_by' => null,
-            'signed_off_by' => null,
-            'signed_off_at' => null,
-        ]);
+            $lockedTask->update([
+                'status' => 'pending',
+                'completed_at' => null,
+                'completed_by' => null,
+                'signed_off_by' => null,
+                'signed_off_at' => null,
+            ]);
 
-        $this->recomputeChecklistStatus($task->checklist()->with('tasks')->firstOrFail());
+            $this->recomputeLockedChecklistStatus($checklist);
 
-        return $task->fresh();
+            return $lockedTask->fresh();
+        });
     }
 
     /**
@@ -280,30 +337,36 @@ class OnboardingService
      */
     public function editTask(HrOnboardingTask $task, array $data): HrOnboardingTask
     {
-        $reassigned = array_key_exists('assigned_to_user_id', $data)
-            && (int) $data['assigned_to_user_id'] !== (int) $task->assigned_to_user_id;
+        [$updated, $reassigned] = DB::transaction(function () use ($task, $data): array {
+            $lockedTask = HrOnboardingTask::query()->lockForUpdate()->findOrFail($task->getKey());
+            HrOnboardingChecklist::query()->lockForUpdate()->findOrFail($lockedTask->checklist_id);
+            $reassigned = array_key_exists('assigned_to_user_id', $data)
+                && (int) $data['assigned_to_user_id'] !== (int) $lockedTask->assigned_to_user_id;
 
-        $task->update(array_filter([
-            'title' => $data['title'] ?? null,
-            'category' => $data['category'] ?? null,
-        ], fn ($value) => $value !== null) + [
-            // Nullable fields + booleans are set explicitly so they can be cleared.
-            'due_date' => array_key_exists('due_date', $data) ? $data['due_date'] : $task->due_date,
-            'assigned_to_role' => array_key_exists('assigned_to_role', $data) ? $data['assigned_to_role'] : $task->assigned_to_role,
-            'description' => array_key_exists('description', $data) ? $data['description'] : $task->description,
-            'is_required' => array_key_exists('is_required', $data) ? (bool) $data['is_required'] : $task->is_required,
-            'sign_off_required' => array_key_exists('sign_off_required', $data) ? (bool) $data['sign_off_required'] : $task->sign_off_required,
-            'assigned_to_user_id' => array_key_exists('assigned_to_user_id', $data) ? $data['assigned_to_user_id'] : $task->assigned_to_user_id,
-        ]);
+            $lockedTask->update(array_filter([
+                'title' => $data['title'] ?? null,
+                'category' => $data['category'] ?? null,
+            ], fn ($value) => $value !== null) + [
+                // Nullable fields + booleans are explicit so they can be cleared.
+                'due_date' => array_key_exists('due_date', $data) ? $data['due_date'] : $lockedTask->due_date,
+                'assigned_to_role' => array_key_exists('assigned_to_role', $data) ? $data['assigned_to_role'] : $lockedTask->assigned_to_role,
+                'description' => array_key_exists('description', $data) ? $data['description'] : $lockedTask->description,
+                'is_required' => array_key_exists('is_required', $data) ? (bool) $data['is_required'] : $lockedTask->is_required,
+                'sign_off_required' => array_key_exists('sign_off_required', $data) ? (bool) $data['sign_off_required'] : $lockedTask->sign_off_required,
+                'assigned_to_user_id' => array_key_exists('assigned_to_user_id', $data) ? $data['assigned_to_user_id'] : $lockedTask->assigned_to_user_id,
+            ]);
 
-        if ($reassigned && $task->assigned_to_user_id) {
-            $assignee = User::find($task->assigned_to_user_id);
+            return [$lockedTask->fresh(), $reassigned];
+        });
+
+        if ($reassigned && $updated->assigned_to_user_id) {
+            $assignee = User::find($updated->assigned_to_user_id);
             if ($assignee) {
                 try {
-                    $assignee->notify(new OnboardingTaskAssignedNotification($task->fresh()));
+                    $assignee->notify(new OnboardingTaskAssignedNotification($updated));
                 } catch (\Throwable $exception) {
                     Log::warning('Failed to notify reassigned onboarding task owner', [
-                        'task_id' => $task->id,
+                        'task_id' => $updated->id,
                         'assignee_id' => $assignee->id,
                         'error' => $exception->getMessage(),
                     ]);
@@ -311,7 +374,7 @@ class OnboardingService
             }
         }
 
-        return $task->fresh();
+        return $updated;
     }
 
     /**
@@ -322,30 +385,53 @@ class OnboardingService
      */
     public function addTask(HrOnboardingChecklist $checklist, array $data): HrOnboardingTask
     {
-        $nextOrder = (int) $checklist->tasks()->max('sort_order') + 1;
+        $task = DB::transaction(function () use ($checklist, $data): HrOnboardingTask {
+            $lockedChecklist = HrOnboardingChecklist::query()
+                ->with('employeeProfile')
+                ->lockForUpdate()
+                ->findOrFail($checklist->getKey());
+            $lastOrder = HrOnboardingTask::query()
+                ->where('checklist_id', $lockedChecklist->id)
+                ->lockForUpdate()
+                ->orderByDesc('sort_order')
+                ->value('sort_order');
+            $nextOrder = (int) $lastOrder + 1;
 
-        $assigneeId = $this->resolveAssignee(
-            $data['assigned_to_user_id'] ?? null,
-            $data['assigned_to_role'] ?? null,
-            $checklist->employeeProfile,
-        );
+            $assigneeId = $this->resolveAssignee(
+                $data['assigned_to_user_id'] ?? null,
+                $data['assigned_to_role'] ?? null,
+                $lockedChecklist->employeeProfile,
+            );
+            if (($data['is_required'] ?? false)
+                && (($data['assigned_to_user_id'] ?? null) || ($data['assigned_to_role'] ?? null))
+                && $assigneeId === null
+            ) {
+                throw ValidationException::withMessages([
+                    'assigned_to_user_id' => 'The required task owner must be current and able to access every employee Site.',
+                ]);
+            }
 
-        $task = HrOnboardingTask::create([
-            'checklist_id' => $checklist->id,
-            'category' => $data['category'] ?? 'general',
-            'title' => $data['title'],
-            'description' => $data['description'] ?? null,
-            'is_required' => (bool) ($data['is_required'] ?? false),
-            'sort_order' => $nextOrder,
-            'assigned_to_user_id' => $assigneeId,
-            'assigned_to_role' => $data['assigned_to_role'] ?? null,
-            'sign_off_required' => (bool) ($data['sign_off_required'] ?? false),
-            'due_date' => $data['due_date'] ?? null,
-            'status' => 'pending',
-        ]);
+            $task = HrOnboardingTask::create([
+                'checklist_id' => $lockedChecklist->id,
+                'category' => $data['category'] ?? 'general',
+                'title' => $data['title'],
+                'description' => $data['description'] ?? null,
+                'is_required' => (bool) ($data['is_required'] ?? false),
+                'sort_order' => $nextOrder,
+                'assigned_to_user_id' => $assigneeId,
+                'assigned_to_role' => $data['assigned_to_role'] ?? null,
+                'sign_off_required' => (bool) ($data['sign_off_required'] ?? false),
+                'due_date' => $data['due_date'] ?? null,
+                'status' => 'pending',
+            ]);
 
-        if ($assigneeId) {
-            $assignee = User::find($assigneeId);
+            $this->recomputeLockedChecklistStatus($lockedChecklist);
+
+            return $task;
+        });
+
+        if ($task->assigned_to_user_id) {
+            $assignee = User::find($task->assigned_to_user_id);
             if ($assignee) {
                 try {
                     $assignee->notify(new OnboardingTaskAssignedNotification($task));
@@ -358,8 +444,6 @@ class OnboardingService
             }
         }
 
-        $this->recomputeChecklistStatus($checklist->fresh('tasks'));
-
         return $task;
     }
 
@@ -369,12 +453,14 @@ class OnboardingService
      */
     public function deleteTask(HrOnboardingTask $task): void
     {
-        $checklist = $task->checklist;
-        $task->delete();
-
-        if ($checklist) {
-            $this->recomputeChecklistStatus($checklist->fresh('tasks'));
-        }
+        DB::transaction(function () use ($task): void {
+            $lockedTask = HrOnboardingTask::query()->lockForUpdate()->findOrFail($task->getKey());
+            $checklist = HrOnboardingChecklist::query()
+                ->lockForUpdate()
+                ->findOrFail($lockedTask->checklist_id);
+            $lockedTask->delete();
+            $this->recomputeLockedChecklistStatus($checklist);
+        });
     }
 
     /**
@@ -385,15 +471,24 @@ class OnboardingService
      */
     public function reorderTasks(HrOnboardingChecklist $checklist, array $orderedIds): void
     {
-        $valid = $checklist->tasks()->pluck('id')->all();
-        $order = 1;
+        $orderedIds = collect($orderedIds)->map(fn ($id) => (int) $id)->unique()->values();
+        DB::transaction(function () use ($checklist, $orderedIds): void {
+            $lockedChecklist = HrOnboardingChecklist::query()->lockForUpdate()->findOrFail($checklist->getKey());
+            $valid = HrOnboardingTask::query()
+                ->where('checklist_id', $lockedChecklist->id)
+                ->lockForUpdate()
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->sort()
+                ->values();
+            if ($valid->all() !== $orderedIds->sort()->values()->all()) {
+                throw ValidationException::withMessages([
+                    'task_ids' => 'The task order must contain every current checklist task exactly once.',
+                ]);
+            }
 
-        DB::transaction(function () use ($orderedIds, $valid, &$order) {
-            foreach ($orderedIds as $id) {
-                if (! in_array((int) $id, $valid, true)) {
-                    continue;
-                }
-                HrOnboardingTask::where('id', $id)->update(['sort_order' => $order++]);
+            foreach ($orderedIds as $offset => $id) {
+                HrOnboardingTask::query()->whereKey($id)->update(['sort_order' => $offset + 1]);
             }
         });
 
@@ -401,7 +496,7 @@ class OnboardingService
         // events → AuditableChanges never fires), so record the reorder as a
         // single summary entry rather than one noisy row per task.
         AuditLogger::log('onboardingchecklist.tasks_reordered', $checklist, [
-            'ordered_task_ids' => array_values(array_map('intval', $orderedIds)),
+            'ordered_task_ids' => $orderedIds->all(),
         ]);
     }
 
@@ -411,14 +506,14 @@ class OnboardingService
      */
     public function markChecklistComplete(HrOnboardingChecklist $checklist): HrOnboardingChecklist
     {
-        if (! in_array($checklist->status, ['completed', 'cancelled', 'archived'], true)) {
-            $checklist->update([
-                'status' => 'completed',
-                'completed_at' => now(),
-            ]);
-        }
+        return DB::transaction(function () use ($checklist): HrOnboardingChecklist {
+            $locked = HrOnboardingChecklist::query()->lockForUpdate()->findOrFail($checklist->getKey());
+            if (! in_array($locked->status, ['completed', 'cancelled', 'archived'], true)) {
+                $locked->update(['status' => 'completed', 'completed_at' => now()]);
+            }
 
-        return $checklist->fresh();
+            return $locked->fresh();
+        });
     }
 
     /**
@@ -426,12 +521,15 @@ class OnboardingService
      */
     public function setChecklistStatus(HrOnboardingChecklist $checklist, string $status): HrOnboardingChecklist
     {
-        $checklist->update([
-            'status' => $status,
-            'completed_at' => $status === 'completed' ? now() : $checklist->completed_at,
-        ]);
+        return DB::transaction(function () use ($checklist, $status): HrOnboardingChecklist {
+            $locked = HrOnboardingChecklist::query()->lockForUpdate()->findOrFail($checklist->getKey());
+            $locked->update([
+                'status' => $status,
+                'completed_at' => $status === 'completed' ? ($locked->completed_at ?? now()) : $locked->completed_at,
+            ]);
 
-        return $checklist->fresh();
+            return $locked->fresh();
+        });
     }
 
     /**
@@ -441,11 +539,22 @@ class OnboardingService
      */
     public function recomputeChecklistStatus(HrOnboardingChecklist $checklist): void
     {
+        DB::transaction(function () use ($checklist): void {
+            $locked = HrOnboardingChecklist::query()->lockForUpdate()->findOrFail($checklist->getKey());
+            $this->recomputeLockedChecklistStatus($locked);
+        });
+    }
+
+    private function recomputeLockedChecklistStatus(HrOnboardingChecklist $checklist): void
+    {
         if (in_array($checklist->status, ['cancelled', 'archived'], true)) {
             return;
         }
 
-        $tasks = $checklist->tasks;
+        $tasks = HrOnboardingTask::query()
+            ->where('checklist_id', $checklist->id)
+            ->lockForUpdate()
+            ->get();
         $pendingRequired = $tasks->where('is_required', true)->where('status', '!=', 'completed')->count();
         $anyComplete = $tasks->where('status', 'completed')->count() > 0;
 
@@ -469,7 +578,7 @@ class OnboardingService
 
     /**
      * Auto-enrol a new hire in training for any induction tasks. Templates may
-     * carry an explicit `course_code` per task; otherwise the tenant's mandatory
+     * carry an explicit `course_code` per task; otherwise the application's mandatory
      * active courses are used. Idempotent and fully best-effort.
      *
      * @param  array<int, array<string, mixed>>  $taskDefs  raw template task defs
@@ -489,8 +598,8 @@ class OnboardingService
         $codes = $inductionDefs->pluck('course_code')->filter()->unique()->values();
 
         $courses = $codes->isNotEmpty()
-            ? HrCourse::query()->forTenant($profile->tenant_id)->active()->whereIn('code', $codes->all())->get()
-            : HrCourse::query()->forTenant($profile->tenant_id)->active()->where('is_mandatory', true)->get();
+            ? HrCourse::query()->active()->whereIn('code', $codes->all())->get()
+            : HrCourse::query()->active()->where('is_mandatory', true)->get();
 
         if ($courses->isEmpty()) {
             return;
@@ -500,7 +609,6 @@ class OnboardingService
 
         foreach ($courses as $course) {
             $alreadyEnrolled = HrCourseEnrollment::query()
-                ->where('tenant_id', $profile->tenant_id)
                 ->where('user_id', $profile->user_id)
                 ->where('course_id', $course->id)
                 ->whereIn('status', ['enrolled', 'completed'])
@@ -512,7 +620,6 @@ class OnboardingService
 
             try {
                 $training->enroll(
-                    $profile->tenant_id,
                     $profile->user_id,
                     $course->id,
                     null,
@@ -570,7 +677,6 @@ class OnboardingService
                 }
 
                 ItProvisioningRequest::create([
-                    'tenant_id' => $checklist->tenant_id,
                     'employee_profile_id' => $checklist->employee_profile_id,
                     'onboarding_task_id' => $task->id,
                     'type' => $type,
@@ -592,7 +698,9 @@ class OnboardingService
     /**
      * Persist an uploaded task-evidence file as a gated HrDocument on the
      * canonical private disk, and (for sign-off tasks with a sign-off user)
-     * mint a pending signature request. Returns the new document id.
+     * mint a pending signature request.
+     *
+     * @return array{document_id: int, storage_path: string}
      */
     protected function storeEvidenceAsDocument(
         HrOnboardingTask $task,
@@ -600,41 +708,48 @@ class OnboardingService
         UploadedFile $file,
         int $uploadedBy,
         ?int $signOffBy = null,
-    ): int {
-        $tenantId = $checklist->tenant_id;
+    ): array {
         $profileId = $checklist->employee_profile_id;
 
-        $path = $file->store("hr-documents/{$tenantId}/{$profileId}", 'private');
+        $path = $file->store("hr-documents/onboarding/{$profileId}", 'private');
 
-        $document = HrDocument::create([
-            'tenant_id' => $tenantId,
-            'employee_profile_id' => $profileId,
-            'title' => "Onboarding evidence — {$task->title}",
-            'category' => 'onboarding',
-            'storage_disk' => 'private',
-            'storage_path' => $path,
-            'original_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getClientMimeType() ?: $file->getMimeType(),
-            'size_bytes' => $file->getSize(),
-            'is_restricted' => false,
-            'generated_from_template' => false,
-            'created_by' => $uploadedBy,
-            'uploaded_by' => $uploadedBy,
-        ]);
+        try {
+            $document = HrDocument::create([
+                'employee_profile_id' => $profileId,
+                'title' => "Onboarding evidence — {$task->title}",
+                'category' => 'onboarding',
+                'storage_disk' => 'private',
+                'storage_path' => $path,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getClientMimeType() ?: $file->getMimeType(),
+                'size_bytes' => $file->getSize(),
+                'is_restricted' => false,
+                'generated_from_template' => false,
+                'created_by' => $uploadedBy,
+                'uploaded_by' => $uploadedBy,
+            ]);
 
-        if ($task->sign_off_required && $signOffBy) {
-            try {
-                app(ESignatureService::class)->requestSignature($document, (int) $signOffBy, $uploadedBy);
-            } catch (\Throwable $exception) {
-                Log::warning('Onboarding evidence signature request failed', [
-                    'document_id' => $document->id,
-                    'task_id' => $task->id,
-                    'error' => $exception->getMessage(),
-                ]);
+            if ($task->sign_off_required && $signOffBy) {
+                try {
+                    app(ESignatureService::class)->requestSignature($document, (int) $signOffBy, $uploadedBy);
+                } catch (\Throwable $exception) {
+                    Log::warning('Onboarding evidence signature request failed', [
+                        'document_id' => $document->id,
+                        'task_id' => $task->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
             }
+        } catch (\Throwable $exception) {
+            Storage::disk('private')->delete($path);
+
+            throw $exception;
         }
 
-        return $document->id;
+        return [
+            'document_id' => (int) $document->id,
+            'storage_path' => $path,
+        ];
     }
 
     /**
@@ -670,39 +785,51 @@ class OnboardingService
         ?string $purpose = null,
         ?int $signOffBy = null,
     ): HrOnboardingTask {
-        $checklist = $task->checklist()->with('employeeProfile')->firstOrFail();
-        $profile = $checklist->employeeProfile;
+        return DB::transaction(function () use ($task, $asset, $actorId, $purpose, $signOffBy): HrOnboardingTask {
+            $lockedTask = HrOnboardingTask::query()->lockForUpdate()->findOrFail($task->getKey());
+            $checklist = HrOnboardingChecklist::query()
+                ->with('employeeProfile')
+                ->lockForUpdate()
+                ->findOrFail($lockedTask->checklist_id);
+            Asset::query()->lockForUpdate()->findOrFail($asset->getKey());
+            $profile = $checklist->employeeProfile;
 
-        if (! $profile || ! $profile->user_id) {
-            throw new \LogicException('Cannot provision an asset for a hire with no linked user account.');
-        }
+            if (! $profile || ! $profile->user_id) {
+                throw new \LogicException('Cannot provision an asset for a hire with no linked user account.');
+            }
 
-        $assignment = AssetAssignment::query()
-            ->where('asset_id', $asset->id)
-            ->where('assignee_type', 'staff')
-            ->where('assignee_id', $profile->user_id)
-            ->whereNull('released_at')
-            ->first();
+            $assignment = AssetAssignment::query()
+                ->where('asset_id', $asset->id)
+                ->whereNull('released_at')
+                ->lockForUpdate()
+                ->first();
 
-        if (! $assignment) {
-            $assignment = AssetAssignment::create([
-                'asset_id' => $asset->id,
-                'assignee_type' => 'staff',
-                'assignee_id' => $profile->user_id,
-                'purpose' => $purpose ?: 'Onboarding provisioning',
-                'assigned_at' => now(),
-            ]);
-        }
+            if ($assignment
+                && ($assignment->assignee_type !== 'staff' || (int) $assignment->assignee_id !== (int) $profile->user_id)
+            ) {
+                throw new \LogicException('This asset is already assigned to another owner.');
+            }
 
-        $note = trim((string) ($task->notes ?? ''));
-        $stamp = "asset_assignment_id={$assignment->id};asset_id={$asset->id}";
-        if (! str_contains($note, $stamp)) {
-            $task->update(['notes' => trim($note.' '.$stamp)]);
-        }
+            if (! $assignment) {
+                $assignment = AssetAssignment::create([
+                    'asset_id' => $asset->id,
+                    'assignee_type' => 'staff',
+                    'assignee_id' => $profile->user_id,
+                    'purpose' => $purpose ?: 'Onboarding provisioning',
+                    'assigned_at' => now(),
+                ]);
+            }
 
-        return $this->completeTask($task, $actorId, array_filter([
-            'signed_off_by' => $task->sign_off_required ? $signOffBy : null,
-        ], fn ($v) => $v !== null));
+            $note = trim((string) ($lockedTask->notes ?? ''));
+            $stamp = "asset_assignment_id={$assignment->id};asset_id={$asset->id}";
+            if (! str_contains($note, $stamp)) {
+                $lockedTask->update(['notes' => trim($note.' '.$stamp)]);
+            }
+
+            return $this->completeTask($lockedTask, $actorId, array_filter([
+                'signed_off_by' => $lockedTask->sign_off_required ? $signOffBy : null,
+            ], fn ($value) => $value !== null));
+        });
     }
 
     /**
@@ -711,9 +838,11 @@ class OnboardingService
      * assignment, optionally filtered to a category. Returns null when the pool
      * is empty so the caller can surface a clear "nothing to assign" message.
      */
-    public function autoPickAvailableAsset(?string $category = null): ?Asset
+    /** @param list<int>|null $allowedAssetIds */
+    public function autoPickAvailableAsset(?string $category = null, ?array $allowedAssetIds = null): ?Asset
     {
         return Asset::query()
+            ->when($allowedAssetIds !== null, fn ($query) => $query->whereIn('id', $allowedAssetIds))
             ->when($category, fn ($q) => $q->where('category', $category))
             ->whereNotIn('status', ['retired', 'decommissioned', 'lost', 'maintenance'])
             ->whereDoesntHave('assignments', fn ($q) => $q->whereNull('released_at'))
@@ -728,48 +857,62 @@ class OnboardingService
      */
     public function completeOffboardingTask(HrOffboardingTask $task, int $completedBy, array $data = []): HrOffboardingTask
     {
-        if ($task->status === 'completed') {
-            throw new \LogicException("Task '{$task->title}' is already completed.");
-        }
+        return DB::transaction(function () use ($task, $completedBy, $data): HrOffboardingTask {
+            $lockedTask = HrOffboardingTask::query()->lockForUpdate()->findOrFail($task->getKey());
+            $checklist = HrOffboardingChecklist::query()
+                ->with('employeeProfile')
+                ->lockForUpdate()
+                ->findOrFail($lockedTask->offboarding_checklist_id);
 
-        $checklist = $task->checklist()->with(['tasks', 'employeeProfile'])->firstOrFail();
-        if (! in_array($checklist->status, ['pending', 'in_progress'], true)) {
-            throw new \LogicException("Cannot complete tasks on a '{$checklist->status}' checklist.");
-        }
-
-        $dependencyTaskIds = collect($task->dependency_task_ids ?? [])->map(fn ($id) => (int) $id)->filter();
-        if ($dependencyTaskIds->isNotEmpty()) {
-            $completedDependencies = $checklist->tasks
-                ->whereIn('id', $dependencyTaskIds->all())
-                ->where('status', 'completed')
-                ->count();
-
-            if ($completedDependencies !== $dependencyTaskIds->count()) {
-                throw new \LogicException('This task cannot be completed until all dependency tasks are complete.');
+            if ($lockedTask->status === 'completed') {
+                throw new \LogicException("Task '{$lockedTask->title}' is already completed.");
             }
-        }
 
-        if ($task->sign_off_required && empty($data['signed_off_by'])) {
-            throw new \LogicException("Task '{$task->title}' requires sign-off.");
-        }
+            if (! in_array($checklist->status, ['pending', 'in_progress'], true)) {
+                throw new \LogicException("Cannot complete tasks on a '{$checklist->status}' checklist.");
+            }
 
-        $task->update([
-            'status' => 'completed',
-            'completed_at' => now(),
-            'completed_by' => $completedBy,
-            'evidence_path' => $data['evidence_path'] ?? $task->evidence_path,
-            'notes' => $data['notes'] ?? $task->notes,
-            'signed_off_by' => $data['signed_off_by'] ?? $task->signed_off_by,
-            'signed_off_at' => isset($data['signed_off_by']) ? now() : $task->signed_off_at,
-        ]);
+            $dependencyTaskIds = collect($lockedTask->dependency_task_ids ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->unique()
+                ->values();
+            if ($dependencyTaskIds->isNotEmpty()) {
+                $completedDependencies = HrOffboardingTask::query()
+                    ->where('offboarding_checklist_id', $checklist->id)
+                    ->whereIn('id', $dependencyTaskIds)
+                    ->where('status', 'completed')
+                    ->lockForUpdate()
+                    ->pluck('id')
+                    ->count();
 
-        if ($checklist->status === 'pending') {
-            $checklist->update(['status' => 'in_progress']);
-        }
+                if ($completedDependencies !== $dependencyTaskIds->count()) {
+                    throw new \LogicException('This task cannot be completed until all dependency tasks are complete.');
+                }
+            }
 
-        $this->checkOffboardingChecklistCompletion($checklist, $completedBy);
+            if ($lockedTask->sign_off_required && empty($data['signed_off_by'])) {
+                throw new \LogicException("Task '{$lockedTask->title}' requires sign-off.");
+            }
 
-        return $task->fresh();
+            $lockedTask->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+                'completed_by' => $completedBy,
+                'evidence_path' => $data['evidence_path'] ?? $lockedTask->evidence_path,
+                'notes' => $data['notes'] ?? $lockedTask->notes,
+                'signed_off_by' => $data['signed_off_by'] ?? $lockedTask->signed_off_by,
+                'signed_off_at' => isset($data['signed_off_by']) ? now() : $lockedTask->signed_off_at,
+            ]);
+
+            if ($checklist->status === 'pending') {
+                $checklist->update(['status' => 'in_progress']);
+            }
+
+            $this->checkOffboardingChecklistCompletion($checklist, $completedBy);
+
+            return $lockedTask->fresh();
+        });
     }
 
     /**
@@ -784,9 +927,18 @@ class OnboardingService
     public function generateOffboardingChecklist(HrEmployeeProfile $profile, int $createdBy, array $options = []): HrOffboardingChecklist
     {
         $result = DB::transaction(function () use ($profile, $createdBy, $options) {
+            $profile = HrEmployeeProfile::query()->lockForUpdate()->findOrFail($profile->getKey());
+            $existing = HrOffboardingChecklist::query()
+                ->where('employee_profile_id', $profile->id)
+                ->whereIn('status', ['pending', 'in_progress'])
+                ->lockForUpdate()
+                ->first();
+            if ($existing !== null) {
+                throw new \LogicException('An active offboarding checklist already exists for this employee.');
+            }
+
             $endDate = $options['end_date'] ?? $profile->end_date ?? now()->addWeeks(2);
             $offboardingTemplate = HrOnboardingTemplate::query()
-                ->forTenant($profile->tenant_id)
                 ->active()
                 ->where('role', 'offboarding:'.$profile->position_role)
                 ->first();
@@ -815,7 +967,6 @@ class OnboardingService
             }
 
             $checklist = HrOffboardingChecklist::create([
-                'tenant_id' => $profile->tenant_id,
                 'employee_profile_id' => $profile->id,
                 'template_key' => $offboardingTemplate?->role ?? 'offboarding:default',
                 'status' => 'pending',
@@ -975,7 +1126,6 @@ class OnboardingService
         }
 
         $assignment = HrManagedAssetAssignment::query()
-            ->where('tenant_id', $checklist->tenant_id)
             ->where('asset_id', $asset->id)
             ->where('employee_profile_id', $checklist->employee_profile_id)
             ->whereNull('returned_at')
@@ -1047,24 +1197,30 @@ class OnboardingService
      */
     public function uncompleteOffboardingTask(HrOffboardingTask $task): HrOffboardingTask
     {
-        if ($task->status !== 'completed') {
-            return $task;
-        }
+        return DB::transaction(function () use ($task): HrOffboardingTask {
+            $lockedTask = HrOffboardingTask::query()->lockForUpdate()->findOrFail($task->getKey());
+            $checklist = HrOffboardingChecklist::query()
+                ->lockForUpdate()
+                ->findOrFail($lockedTask->offboarding_checklist_id);
 
-        $task->update([
-            'status' => 'pending',
-            'completed_at' => null,
-            'completed_by' => null,
-            'signed_off_by' => null,
-            'signed_off_at' => null,
-        ]);
+            if ($lockedTask->status !== 'completed') {
+                return $lockedTask;
+            }
 
-        $checklist = $task->checklist()->firstOrFail();
-        if ($checklist->status === 'completed') {
-            $checklist->update(['status' => 'in_progress', 'completed_at' => null]);
-        }
+            $lockedTask->update([
+                'status' => 'pending',
+                'completed_at' => null,
+                'completed_by' => null,
+                'signed_off_by' => null,
+                'signed_off_at' => null,
+            ]);
 
-        return $task->fresh();
+            if ($checklist->status === 'completed') {
+                $checklist->update(['status' => 'in_progress', 'completed_at' => null]);
+            }
+
+            return $lockedTask->fresh();
+        });
     }
 
     /**
@@ -1074,12 +1230,19 @@ class OnboardingService
      */
     public function setOffboardingChecklistStatus(HrOffboardingChecklist $checklist, string $status): HrOffboardingChecklist
     {
-        $checklist->update([
-            'status' => $status,
-            'completed_at' => $status === 'completed' ? ($checklist->completed_at ?? now()) : $checklist->completed_at,
-        ]);
+        return DB::transaction(function () use ($checklist, $status): HrOffboardingChecklist {
+            $lockedChecklist = HrOffboardingChecklist::query()
+                ->lockForUpdate()
+                ->findOrFail($checklist->getKey());
+            $lockedChecklist->update([
+                'status' => $status,
+                'completed_at' => $status === 'completed'
+                    ? ($lockedChecklist->completed_at ?? now())
+                    : $lockedChecklist->completed_at,
+            ]);
 
-        return $checklist->fresh();
+            return $lockedChecklist->fresh();
+        });
     }
 
     /**
@@ -1118,7 +1281,7 @@ class OnboardingService
             ]);
 
             try {
-                app(HrWebhookService::class)->publish($checklist->tenant_id, 'onboarding.checklist.completed', [
+                app(HrWebhookService::class)->publishApplicationEvent('onboarding.checklist.completed', [
                     'checklist_id' => $checklist->id,
                     'employee_profile_id' => $checklist->employee_profile_id,
                     'template_key' => $checklist->template_key,
@@ -1167,7 +1330,7 @@ class OnboardingService
             ]);
 
             try {
-                app(HrWebhookService::class)->publish($checklist->tenant_id, 'offboarding.checklist.completed', [
+                app(HrWebhookService::class)->publishApplicationEvent('offboarding.checklist.completed', [
                     'checklist_id' => $checklist->id,
                     'employee_profile_id' => $checklist->employee_profile_id,
                     'template_key' => $checklist->template_key,
@@ -1240,10 +1403,9 @@ class OnboardingService
         ]);
     }
 
-    protected function resolveTemplate(?int $tenantId, ?string $positionRole, string $siteType): ?HrOnboardingTemplate
+    protected function resolveTemplate(?string $positionRole, string $siteType): ?HrOnboardingTemplate
     {
         $query = HrOnboardingTemplate::query()
-            ->forTenant($tenantId)
             ->active()
             ->where(function ($builder) use ($positionRole) {
                 $builder->where('role', $positionRole)
@@ -1262,38 +1424,107 @@ class OnboardingService
     protected function resolveAssignee(?int $assignedToUserId, ?string $assignedToRole, HrEmployeeProfile $profile): ?int
     {
         if ($assignedToUserId) {
-            return $assignedToUserId;
+            return $this->eligibleOnboardingOwnerId($assignedToUserId, $profile);
         }
 
         if (! $assignedToRole) {
             return null;
         }
 
-        $users = User::query()
-            ->when(
-                $profile->tenant_id !== null && Schema::hasColumn('users', 'tenant_id'),
-                fn ($query) => $query->where('tenant_id', $profile->tenant_id)
-            );
-
         if ($assignedToRole === 'employee') {
-            return $profile->user_id;
+            return $this->onboardingSubjectId($profile);
         }
 
-        $roleName = $assignedToRole === 'manager' ? 'team_lead' : $assignedToRole;
+        if ($assignedToRole === 'manager') {
+            return $this->eligibleOnboardingOwnerId($profile->manager_user_id, $profile);
+        }
 
-        // Prefer an assignee who can actually action the task: login approved
-        // and not a former employee (inactive profile). Fall back to the plain
-        // role lookup so a template never silently loses its assignee when no
-        // "clean" candidate exists.
-        $eligibleId = (clone $users)
-            ->where('role', $roleName)
-            ->whereNotNull('approved_at')
-            ->whereDoesntHave('hrEmployeeProfile', fn ($q) => $q->where('is_active', false))
-            ->value('id');
+        $candidateIds = User::query()
+            ->where(function ($roles) use ($assignedToRole): void {
+                $roles->where('role', $assignedToRole)
+                    ->orWhereHas('roles', fn ($query) => $query->where('name', $assignedToRole));
+            })
+            ->orderBy('id')
+            ->pluck('id');
 
-        return $eligibleId ?? (clone $users)
-            ->where('role', $roleName)
-            ->value('id');
+        foreach ($candidateIds as $candidateId) {
+            $eligibleId = $this->eligibleOnboardingOwnerId((int) $candidateId, $profile);
+            if ($eligibleId !== null) {
+                return $eligibleId;
+            }
+        }
+
+        return null;
+    }
+
+    private function onboardingSubjectId(HrEmployeeProfile $profile): ?int
+    {
+        if (! $profile->is_active
+            || ! $profile->user_id
+            || ($profile->end_date && $profile->end_date->isBefore(today()))
+            || ! $profile->primary_site_id
+        ) {
+            return null;
+        }
+
+        return User::query()->whereKey($profile->user_id)->exists()
+            ? (int) $profile->user_id
+            : null;
+    }
+
+    private function assertOnboardingProfile(HrEmployeeProfile $profile, int $createdBy): void
+    {
+        $siteIds = collect([
+            $profile->primary_site_id,
+            ...($profile->secondary_site_ids ?? []),
+        ])
+            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values();
+
+        if (! $profile->is_active
+            || ! $profile->user_id
+            || ($profile->end_date && $profile->end_date->isBefore(today()))
+            || $siteIds->isEmpty()
+        ) {
+            throw ValidationException::withMessages([
+                'employee_profile_id' => 'The selected employee is not an active Site-complete onboarding subject.',
+            ]);
+        }
+
+        if ($this->eligibleOnboardingOwnerId($createdBy, $profile) === null) {
+            throw ValidationException::withMessages([
+                'employee_profile_id' => 'The initiating user cannot own onboarding work for every employee Site.',
+            ]);
+        }
+    }
+
+    private function eligibleOnboardingOwnerId(?int $userId, HrEmployeeProfile $profile): ?int
+    {
+        if (! $userId || ! $this->currentStaff->isCurrent($userId)) {
+            return null;
+        }
+
+        $subjectSiteIds = collect([
+            $profile->primary_site_id,
+            ...($profile->secondary_site_ids ?? []),
+        ])
+            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique();
+        if ($subjectSiteIds->isEmpty()) {
+            return null;
+        }
+
+        $candidate = User::query()->find($userId);
+        if (! $candidate) {
+            return null;
+        }
+
+        return $subjectSiteIds->diff($this->siteAccess->accessibleSiteIds($candidate))->isEmpty()
+            ? (int) $candidate->id
+            : null;
     }
 
     /**
@@ -1306,23 +1537,67 @@ class OnboardingService
         HrEmployeeProfile $profile,
         int $createdBy,
     ): ?int {
-        if ($assignedToUserId && User::query()->whereKey($assignedToUserId)->exists()) {
-            return $assignedToUserId;
+        $explicitOwner = $this->eligibleOffboardingOwnerId($assignedToUserId, $profile);
+        if ($explicitOwner !== null) {
+            return $explicitOwner;
         }
 
-        $roleOwner = $assignedToRole === 'manager'
-            ? null
-            : $this->resolveAssignee(null, $assignedToRole, $profile);
+        $roleOwner = null;
+        if ($assignedToRole && $assignedToRole !== 'manager') {
+            $roleName = $assignedToRole === 'manager' ? 'team_lead' : $assignedToRole;
+            $candidateIds = User::query()
+                ->where(function ($roles) use ($roleName): void {
+                    $roles->where('role', $roleName)
+                        ->orWhereHas('roles', fn ($query) => $query->where('name', $roleName));
+                })
+                ->orderBy('id')
+                ->pluck('id');
+
+            foreach ($candidateIds as $candidateId) {
+                $roleOwner = $this->eligibleOffboardingOwnerId((int) $candidateId, $profile);
+                if ($roleOwner !== null) {
+                    break;
+                }
+            }
+        }
 
         if ($roleOwner) {
             return $roleOwner;
         }
 
-        if ($profile->manager_user_id && User::query()->whereKey($profile->manager_user_id)->exists()) {
-            return (int) $profile->manager_user_id;
+        $managerOwner = $this->eligibleOffboardingOwnerId($profile->manager_user_id, $profile);
+        if ($managerOwner !== null) {
+            return $managerOwner;
         }
 
-        return User::query()->whereKey($createdBy)->value('id');
+        return $this->eligibleOffboardingOwnerId($createdBy, $profile);
+    }
+
+    private function eligibleOffboardingOwnerId(?int $userId, HrEmployeeProfile $profile): ?int
+    {
+        if (! $userId || ! $this->currentStaff->isCurrent($userId)) {
+            return null;
+        }
+
+        $subjectSiteIds = collect([
+            $profile->primary_site_id,
+            ...($profile->secondary_site_ids ?? []),
+        ])
+            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique();
+        if ($subjectSiteIds->isEmpty()) {
+            return null;
+        }
+
+        $candidate = User::query()->find($userId);
+        if (! $candidate) {
+            return null;
+        }
+
+        return $subjectSiteIds->diff($this->siteAccess->accessibleSiteIds($candidate))->isEmpty()
+            ? (int) $candidate->id
+            : null;
     }
 
     /**

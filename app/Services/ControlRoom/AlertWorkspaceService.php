@@ -2,6 +2,7 @@
 
 namespace App\Services\ControlRoom;
 
+use App\Domain\Monitoring\Presenters\MonitoringIncidentEvidencePresenter;
 use App\Models\AuditLog;
 use App\Models\ControlRoom\ConfigOption;
 use App\Models\ControlRoom\Playbook;
@@ -25,6 +26,7 @@ class AlertWorkspaceService
         private UserSiteAccessService $siteAccess,
         private HsVisibilityService $hsVisibility,
         private ControlRoomAlertProvenanceService $provenance,
+        private MonitoringIncidentEvidencePresenter $monitoringIncidentEvidence,
     ) {}
 
     /**
@@ -115,6 +117,7 @@ class AlertWorkspaceService
 
         $linkedIncident = $alert->clientIncident;
         $canViewIncident = $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned');
+        $monitoringContext = $this->monitoringIncidentEvidence->forAlert($alert, $user);
 
         return [
             'alert' => [
@@ -357,6 +360,8 @@ class AlertWorkspaceService
                     : null,
             ] : null,
             'linked_hs_event' => $this->hsVisibility->forControlRoomAlert($alert, $user),
+            'linked_it_work' => $monitoringContext['linked_it_work'],
+            'monitoring_incident_evidence' => $monitoringContext['incident_evidence'],
         ];
     }
 

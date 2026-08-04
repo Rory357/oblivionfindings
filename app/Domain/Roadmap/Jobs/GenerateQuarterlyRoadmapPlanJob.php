@@ -19,7 +19,6 @@ class GenerateQuarterlyRoadmapPlanJob implements ShouldQueue
         public int $fiscalYear,
         public int $quarter,
         public string $preset = 'board_ceo',
-        public ?int $tenantId = null,
         public ?int $generatedBy = null,
     ) {}
 
@@ -29,12 +28,10 @@ class GenerateQuarterlyRoadmapPlanJob implements ShouldQueue
             $this->fiscalYear,
             $this->quarter,
             $this->preset,
-            $this->tenantId,
             $this->generatedBy,
         );
 
         \Log::info('Roadmap quarterly plan generated', [
-            'tenant_id' => $this->tenantId,
             'plan_id' => $plan->id,
             'fiscal_year' => $this->fiscalYear,
             'quarter' => $this->quarter,

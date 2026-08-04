@@ -9,10 +9,9 @@ use App\Services\Operations\TimesheetHrSyncService;
 use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
-    $this->worker = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
-    $this->approver = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $this->worker = User::factory()->create(['approved_at' => now()]);
+    $this->approver = User::factory()->create(['approved_at' => now()]);
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'hourly_rate' => 32.50,
         'is_active' => true,
@@ -37,7 +36,6 @@ function identityTimesheet(User $worker, User $approver, array $overrides = []):
 function identityEntry(User $worker, User $approver, array $overrides = []): HrTimeEntry
 {
     return HrTimeEntry::factory()->create(array_merge([
-        'tenant_id' => 1,
         'user_id' => $worker->id,
         'status' => 'submitted',
         'approved_by' => null,
@@ -93,19 +91,18 @@ test('a conflicting direct link and canonical source row fails without rewriting
         ->and($canonical->fresh()->source_id)->toBe($timesheet->id);
 });
 
-test('a linked entry for another worker or organisation is rejected before mutation', function () {
-    $otherWorker = User::factory()->create(['organization_id' => 2, 'approved_at' => now()]);
-    $foreign = identityEntry($otherWorker, $this->approver, [
-        'tenant_id' => 2,
+test('a linked entry for another worker is rejected before mutation', function () {
+    $otherWorker = User::factory()->create(['approved_at' => now()]);
+    $otherEntry = identityEntry($otherWorker, $this->approver, [
         'status' => 'submitted',
     ]);
     $timesheet = identityTimesheet($this->worker, $this->approver, [
-        'hr_time_entry_id' => $foreign->id,
+        'hr_time_entry_id' => $otherEntry->id,
     ]);
 
     expect(fn () => app(TimesheetHrSyncService::class)->syncToHr($timesheet))
         ->toThrow(ValidationException::class);
 
-    expect($foreign->fresh()->status)->toBe('submitted')
-        ->and($foreign->fresh()->source_type)->toBeNull();
+    expect($otherEntry->fresh()->status)->toBe('submitted')
+        ->and($otherEntry->fresh()->source_type)->toBeNull();
 });

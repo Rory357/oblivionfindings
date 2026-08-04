@@ -8,6 +8,8 @@ use App\Domain\Rostering\RosteringFeatureFlags;
 use App\Http\Controllers\Controller;
 use App\Models\RosterSuggestion;
 use App\Models\RosterSuggestionRun;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 
 class RosterSuggestionController extends Controller
@@ -16,6 +18,7 @@ class RosterSuggestionController extends Controller
         private readonly RosterSuggestionService $suggestions,
         private readonly RosterSuggestionApplier $applier,
         private readonly RosteringFeatureFlags $featureFlags,
+        private readonly UserSiteAccessService $siteAccess,
     ) {
     }
 
@@ -23,8 +26,8 @@ class RosterSuggestionController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('rostering.autoSchedule'), 403);
-        abort_unless($this->featureFlags->autoScheduleEnabled($auth->organization_id), 404);
-        abort_unless((int) $run->organization_id === (int) $auth->organization_id, 403);
+        abort_unless($this->featureFlags->autoScheduleEnabled(), 404);
+        $this->assertCanAccessRun($run, $auth);
 
         $run->load([
             'site:id,name',
@@ -90,8 +93,8 @@ class RosterSuggestionController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('rostering.autoSchedule'), 403);
-        abort_unless($this->featureFlags->autoScheduleEnabled($auth->organization_id), 404);
-        $this->authorizeSuggestion($suggestion, $auth->organization_id);
+        abort_unless($this->featureFlags->autoScheduleEnabled(), 404);
+        $this->authorizeSuggestion($suggestion, $auth);
 
         $updated = $this->suggestions->accept($suggestion, $auth);
 
@@ -102,8 +105,8 @@ class RosterSuggestionController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('rostering.autoSchedule'), 403);
-        abort_unless($this->featureFlags->autoScheduleEnabled($auth->organization_id), 404);
-        $this->authorizeSuggestion($suggestion, $auth->organization_id);
+        abort_unless($this->featureFlags->autoScheduleEnabled(), 404);
+        $this->authorizeSuggestion($suggestion, $auth);
 
         $updated = $this->suggestions->dismiss($suggestion, $auth);
 
@@ -114,8 +117,8 @@ class RosterSuggestionController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('rostering.autoSchedule'), 403);
-        abort_unless($this->featureFlags->autoScheduleEnabled($auth->organization_id), 404);
-        $this->authorizeSuggestion($suggestion, $auth->organization_id);
+        abort_unless($this->featureFlags->autoScheduleEnabled(), 404);
+        $this->authorizeSuggestion($suggestion, $auth);
 
         $this->applier->applyOne($suggestion, $auth);
 
@@ -126,8 +129,8 @@ class RosterSuggestionController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('rostering.autoSchedule'), 403);
-        abort_unless($this->featureFlags->autoScheduleEnabled($auth->organization_id), 404);
-        abort_unless((int) $run->organization_id === (int) $auth->organization_id, 403);
+        abort_unless($this->featureFlags->autoScheduleEnabled(), 404);
+        $this->assertCanAccessRun($run, $auth);
 
         $results = $this->applier->applyAccepted($run, $auth);
 
@@ -137,10 +140,20 @@ class RosterSuggestionController extends Controller
         );
     }
 
-    private function authorizeSuggestion(RosterSuggestion $suggestion, ?int $organizationId): void
+    private function authorizeSuggestion(RosterSuggestion $suggestion, User $actor): void
     {
         $suggestion->loadMissing('run');
 
-        abort_unless((int) $suggestion->run?->organization_id === (int) $organizationId, 403);
+        abort_unless($suggestion->run instanceof RosterSuggestionRun, 403);
+        $this->assertCanAccessRun($suggestion->run, $actor);
+    }
+
+    private function assertCanAccessRun(RosterSuggestionRun $run, User $actor): void
+    {
+        $this->siteAccess->assertCanAccessSiteId(
+            $actor,
+            $run->site_id ? (int) $run->site_id : null,
+            ['shifts.manageAny'],
+        );
     }
 }

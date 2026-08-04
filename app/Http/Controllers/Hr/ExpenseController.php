@@ -2,50 +2,49 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Concerns\ServesPrivateAttachments;
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
-use App\Http\Requests\Hr\StoreExpenseClaimRequest;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrExpenseItem;
 use App\Domain\Hr\Services\CompensationService;
 use App\Domain\Hr\Services\ExpenseService;
+use App\Domain\Hr\Services\HrPerformanceAccessService;
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Hr\StoreExpenseClaimRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class ExpenseController extends Controller
 {
-    use ResolvesHrTenant, ServesPrivateAttachments;
+    use ServesPrivateAttachments;
 
     public function __construct(
         private readonly ExpenseService $expenseService,
         private readonly CompensationService $compensationService,
+        private readonly HrPerformanceAccessService $access,
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Index — expense claims list                                        */
+    /*  Index — expense claims list */
     /* ------------------------------------------------------------------ */
 
     public function index(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.view'), 403);
-
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->viewer($request);
         $status = $request->query('status');
         $search = trim((string) $request->query('q', ''));
         $canManage = $user->canDo('hr.expenses.manage');
+        $canApprove = $user->canDo('hr.expenses.approve');
+        $canViewAll = $canManage || $canApprove;
 
-        $claims = HrExpenseClaim::forTenant($tenantId)
-            ->when(! $canManage, fn ($q) => $q->where('user_id', $user->id))
+        $claims = $this->compensationService->visibleExpenseClaims($user)
+            ->when(! $canViewAll, fn ($q) => $q->where('user_id', $user->id))
             // "decided" is a UI lens, not a stored status — expand it to the set
             // of terminal states; any other value filters literally.
             ->when($status === 'decided', fn ($q) => $q->whereIn('status', ['approved', 'rejected', 'paid', 'declined']))
             ->when($status && $status !== 'decided', fn ($q) => $q->where('status', $status))
-            ->when($search !== '', fn ($q) => $q->whereHas('user', fn ($u) =>
-                $u->where('name', 'like', "%{$search}%")
+            ->when($search !== '', fn ($q) => $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%")
             ))
             ->with('user:id,name,email')
             ->withCount('items')
@@ -72,31 +71,30 @@ class ExpenseController extends Controller
                 'status' => $status,
                 'q' => $search,
             ],
-            'stats' => $this->compensationService->heroStats($tenantId, $user),
-            'tabCounts' => $this->compensationService->tabCounts($tenantId),
+            'stats' => $this->compensationService->heroStatsFor($user),
+            'tabCounts' => $this->compensationService->tabCountsFor($user),
             // Surfaced for the New-claim dialog: IRD mileage rate (read-only) +
             // the category list, so the dialog renders the config-driven mileage
             // line (distance × rate) instead of hard-coding anything.
             'mileageRatePerKm' => (float) config('finance.mileage_rate_per_km'),
             'categories' => ExpenseService::CATEGORIES,
-            // Managers can file on behalf of any employee in the tenant.
-            'employees' => $canManage ? $this->onBehalfEmployees($tenantId) : [],
+            // Managers can file on behalf of current staff at visible Sites.
+            'employees' => $canManage ? $this->onBehalfEmployees($user) : [],
             'can' => [
                 'create' => $user->canDo('hr.expenses.manage'),
                 'manage' => $canManage,
-                'approve' => $user->canDo('hr.expenses.approve'),
+                'approve' => $canApprove,
             ],
         ]);
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Create — form for new expense claim                                */
+    /*  Create — form for new expense claim */
     /* ------------------------------------------------------------------ */
 
     public function create(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.manage'), 403);
+        $user = $this->manager($request);
 
         // Optional prefill when arriving from a Development goal / PIP "Claim expense"
         // action — pre-populates the first line item and links it to its source.
@@ -115,7 +113,7 @@ class ExpenseController extends Controller
         return Inertia::render('hr/compensation/expenses/create', [
             'categories' => ExpenseService::CATEGORIES,
             'mileageRatePerKm' => (float) config('finance.mileage_rate_per_km'),
-            'employees' => $this->onBehalfEmployees($this->resolveHrTenantIdForUser($user)),
+            'employees' => $this->onBehalfEmployees($user),
             'prefill' => $prefill,
         ]);
     }
@@ -125,11 +123,10 @@ class ExpenseController extends Controller
      *
      * @return array<int, array{id: int, name: string}>
      */
-    private function onBehalfEmployees(int $tenantId): array
+    private function onBehalfEmployees(User $user): array
     {
-        return HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
+        return $this->access
+            ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
             ->with('user:id,name')
             ->get(['id', 'user_id'])
             ->filter(fn ($p) => $p->user !== null)
@@ -139,29 +136,22 @@ class ExpenseController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Store — persist new expense claim                                   */
+    /*  Store — persist new expense claim */
     /* ------------------------------------------------------------------ */
 
     public function store(StoreExpenseClaimRequest $request)
     {
-        $user = $request->user();
+        $user = $this->manager($request);
 
         $validated = $request->validated();
 
-        // On-behalf filing: a manager may file for another employee in the tenant.
-        // Resolve the owner here (gate + same-tenant guard); ignore the field for
-        // non-managers so a self-filer can never reassign ownership.
+        // On-behalf filing is limited to current staff at a Site visible to the
+        // manager. The integer-only request rule avoids leaking hidden users.
         $onBehalfOf = null;
         $onBehalfId = $validated['on_behalf_user_id'] ?? null;
         unset($validated['on_behalf_user_id']);
-        if ($onBehalfId && $user->canDo('hr.expenses.manage') && (int) $onBehalfId !== (int) $user->id) {
-            $tenantId = $this->resolveHrTenantIdForUser($user);
-            $inTenant = HrEmployeeProfile::query()
-                ->where('user_id', $onBehalfId)
-                ->where('tenant_id', $tenantId)
-                ->exists();
-            abort_unless($inTenant, 422, 'That employee is not in your organisation.');
-            $onBehalfOf = User::find($onBehalfId);
+        if ($onBehalfId && (int) $onBehalfId !== (int) $user->id) {
+            $onBehalfOf = $this->access->currentStaff($user, (int) $onBehalfId);
         }
 
         // Persist any uploaded per-item receipts to the private disk and replace the
@@ -187,16 +177,13 @@ class ExpenseController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Show — claim detail + approval                                     */
+    /*  Show — claim detail + approval */
     /* ------------------------------------------------------------------ */
 
     public function show(Request $request, HrExpenseClaim $expenseClaim)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.view'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $expenseClaim->tenant_id);
-        // Staff without manage may only open their own claims (mirrors index/receipt).
-        abort_unless($user->canDo('hr.expenses.manage') || $expenseClaim->user_id === $user->id, 403);
+        $user = $this->viewer($request);
+        $expenseClaim = $this->claimForViewer($user, $expenseClaim);
 
         $expenseClaim->load(['user:id,name,email', 'items', 'approver:id,name']);
 
@@ -241,17 +228,14 @@ class ExpenseController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Receipt — stream a stored per-item receipt (private disk)           */
+    /*  Receipt — stream a stored per-item receipt (private disk) */
     /* ------------------------------------------------------------------ */
 
     public function downloadReceipt(Request $request, HrExpenseClaim $expenseClaim, HrExpenseItem $item)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.view'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $expenseClaim->tenant_id);
-        // Staff without manage may only open receipts on their own claims.
-        abort_unless($user->canDo('hr.expenses.manage') || $expenseClaim->user_id === $user->id, 403);
-        abort_unless((int) $item->expense_claim_id === (int) $expenseClaim->id, 404);
+        $user = $this->viewer($request);
+        $expenseClaim = $this->claimForViewer($user, $expenseClaim);
+        $item = $expenseClaim->items()->findOrFail($item->getKey());
         abort_unless($item->receipt_path, 404);
 
         $ext = strtolower(pathinfo($item->receipt_path, PATHINFO_EXTENSION));
@@ -272,14 +256,13 @@ class ExpenseController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Submit — submit draft claim for approval                           */
+    /*  Submit — submit draft claim for approval */
     /* ------------------------------------------------------------------ */
 
     public function submit(Request $request, HrExpenseClaim $expenseClaim)
     {
-        $user = $request->user();
-        abort_unless($user && ($user->canDo('hr.expenses.manage') || $expenseClaim->user_id === $user->id), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $expenseClaim->tenant_id);
+        $user = $this->viewer($request);
+        $expenseClaim = $this->claimForViewer($user, $expenseClaim, allowApprover: false);
 
         try {
             $this->expenseService->submitClaim($expenseClaim);
@@ -291,14 +274,13 @@ class ExpenseController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Approve                                                            */
+    /*  Approve */
     /* ------------------------------------------------------------------ */
 
     public function approve(Request $request, HrExpenseClaim $expenseClaim)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.approve'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $expenseClaim->tenant_id);
+        $user = $this->approver($request);
+        $expenseClaim = $this->access->expenseClaim($user, $expenseClaim);
 
         try {
             $this->expenseService->approveClaim($expenseClaim, $user);
@@ -310,14 +292,13 @@ class ExpenseController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Reject                                                             */
+    /*  Reject */
     /* ------------------------------------------------------------------ */
 
     public function reject(Request $request, HrExpenseClaim $expenseClaim)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.approve'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $expenseClaim->tenant_id);
+        $user = $this->approver($request);
+        $expenseClaim = $this->access->expenseClaim($user, $expenseClaim);
 
         $validated = $request->validate([
             'rejection_reason' => ['required', 'string', 'max:2000'],
@@ -333,14 +314,13 @@ class ExpenseController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Mark paid                                                          */
+    /*  Mark paid */
     /* ------------------------------------------------------------------ */
 
     public function pay(Request $request, HrExpenseClaim $expenseClaim)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.approve'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $expenseClaim->tenant_id);
+        $user = $this->approver($request);
+        $expenseClaim = $this->access->expenseClaim($user, $expenseClaim);
 
         // Only disburse a claim that has been posted to the GL (the approve flow
         // dispatches PostExpenseJournalJob; markPaid itself guards status).
@@ -358,23 +338,22 @@ class ExpenseController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Bulk approve                                                       */
+    /*  Bulk approve */
     /* ------------------------------------------------------------------ */
 
     public function bulkApprove(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.approve'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->approver($request);
 
         $data = $request->validate([
             'claim_ids' => ['required', 'array', 'min:1'],
             'claim_ids.*' => ['integer'],
         ]);
 
-        // Approve only this-tenant, still-submitted claims; skip the rest silently
-        // so a stale id in the batch can't 500 the whole action.
-        $claims = HrExpenseClaim::forTenant($tenantId)
+        // Approve only Site-visible, still-submitted claims; hidden or stale IDs
+        // are ignored so the batch never becomes a direct-object oracle.
+        $claims = $this->access
+            ->applyExpenseClaimScope(HrExpenseClaim::query(), $user)
             ->whereIn('id', $data['claim_ids'])
             ->where('status', 'submitted')
             ->get();
@@ -393,5 +372,45 @@ class ExpenseController extends Controller
             'success',
             $approved === 1 ? '1 claim approved.' : "{$approved} claims approved.",
         );
+    }
+
+    private function claimForViewer(
+        User $user,
+        HrExpenseClaim $claim,
+        bool $allowApprover = true,
+    ): HrExpenseClaim {
+        $claim = $this->access->expenseClaim($user, $claim);
+        abort_unless(
+            $user->canDo('hr.expenses.manage')
+                || ($allowApprover && $user->canDo('hr.expenses.approve'))
+                || $claim->user_id === $user->id,
+            404,
+        );
+
+        return $claim;
+    }
+
+    private function viewer(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.expenses.view'), 403);
+
+        return $this->access->currentStaff($user, $user);
+    }
+
+    private function manager(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.expenses.manage'), 403);
+
+        return $this->access->currentStaff($user, $user);
+    }
+
+    private function approver(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.expenses.approve'), 403);
+
+        return $this->access->currentStaff($user, $user);
     }
 }

@@ -37,16 +37,59 @@ class SyncResourceCalendarsJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(CalendarSyncService $service): void
     {
-        $query = CalendarSyncMapping::query()->active();
+        $query = CalendarSyncMapping::query()
+            ->active()
+            ->whereHas('site', fn ($siteQuery) => $siteQuery
+                ->active()
+                ->notArchived()
+                ->whereNull('archived_at'));
         if ($this->mappingId !== null) {
-            $query->whereKey($this->mappingId);
+            $target = (clone $query)->whereKey($this->mappingId)->first();
+            if (! $target) {
+                return;
+            }
+
+            $query->where('site_id', $target->site_id);
         }
 
-        $mappings = $query->get()->filter(fn (CalendarSyncMapping $m) => $m->isSyncable());
+        $mappingGroups = $query->get()->groupBy(fn (CalendarSyncMapping $mapping) => (int) $mapping->site_id);
 
-        foreach ($mappings as $mapping) {
+        foreach ($mappingGroups as $siteId => $siteMappings) {
+            if ($siteMappings->count() !== 1) {
+                $error = 'Several active resource calendar mappings exist for this Site; synchronization is disabled until they are reconciled.';
+                CalendarSyncMapping::query()
+                    ->whereKey($siteMappings->modelKeys())
+                    ->update(['last_error' => $error]);
+                Log::warning('Resource calendar sync skipped because the Site has several active mappings', [
+                    'site' => $siteId,
+                    'mappings' => $siteMappings->modelKeys(),
+                ]);
+
+                continue;
+            }
+
+            $mapping = $siteMappings->first();
+            if (! $mapping?->isSyncable()) {
+                continue;
+            }
+
             try {
                 $counts = $service->syncMapping($mapping);
+                if ($counts === null) {
+                    continue;
+                }
+
+                if (($counts['failed'] ?? 0) > 0) {
+                    Log::warning('Resource calendar sync incomplete', [
+                        'mapping' => $mapping->id,
+                        'site' => $mapping->site_id,
+                        'provider' => $mapping->provider,
+                        ...$counts,
+                    ]);
+
+                    continue;
+                }
+
                 Log::info('Resource calendar synced', [
                     'mapping' => $mapping->id,
                     'site' => $mapping->site_id,

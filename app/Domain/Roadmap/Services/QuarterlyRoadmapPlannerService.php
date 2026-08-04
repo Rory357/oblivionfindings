@@ -20,14 +20,12 @@ class QuarterlyRoadmapPlannerService
         int $fiscalYear,
         int $quarter,
         string $preset,
-        ?int $tenantId,
         ?int $generatedBy = null
     ): QuarterlyRoadmapPlan {
-        return DB::transaction(function () use ($fiscalYear, $quarter, $preset, $tenantId, $generatedBy) {
-            $revisionNo = $this->nextRevisionNo($fiscalYear, $quarter, $tenantId);
+        return DB::transaction(function () use ($fiscalYear, $quarter, $preset, $generatedBy) {
+            $revisionNo = $this->nextRevisionNo($fiscalYear, $quarter);
 
             $plan = QuarterlyRoadmapPlan::create([
-                'tenant_id' => $tenantId,
                 'fiscal_year' => $fiscalYear,
                 'quarter' => $quarter,
                 'status' => QuarterlyRoadmapPlan::STATUS_DRAFT,
@@ -38,7 +36,6 @@ class QuarterlyRoadmapPlannerService
             ]);
 
             $initiatives = Initiative::query()
-                ->forTenant($tenantId)
                 ->whereIn('status', [
                     Initiative::STATUS_PROPOSED,
                     Initiative::STATUS_APPROVED,
@@ -65,7 +62,6 @@ class QuarterlyRoadmapPlannerService
                     ->first();
 
                 QuarterlyRoadmapPlanItem::create([
-                    'tenant_id' => $tenantId,
                     'quarterly_plan_id' => $plan->id,
                     'initiative_id' => $initiative->id,
                     'rank' => $rank,
@@ -84,7 +80,6 @@ class QuarterlyRoadmapPlannerService
             }
 
             $this->changeLogService->log(
-                $tenantId,
                 QuarterlyRoadmapPlan::class,
                 $plan->id,
                 'plan.generated',
@@ -113,7 +108,6 @@ class QuarterlyRoadmapPlannerService
         ]);
 
         $this->changeLogService->log(
-            $plan->tenant_id,
             QuarterlyRoadmapPlan::class,
             $plan->id,
             'plan.submitted_manager_review',
@@ -136,7 +130,6 @@ class QuarterlyRoadmapPlannerService
         ]);
 
         $this->changeLogService->log(
-            $plan->tenant_id,
             QuarterlyRoadmapPlan::class,
             $plan->id,
             'plan.submitted_executive_review',
@@ -165,7 +158,6 @@ class QuarterlyRoadmapPlannerService
         ]);
 
         $this->changeLogService->log(
-            $plan->tenant_id,
             QuarterlyRoadmapPlan::class,
             $plan->id,
             'plan.approved',
@@ -201,7 +193,6 @@ class QuarterlyRoadmapPlannerService
         event(new QuarterlyPlanPublished($plan->fresh()));
 
         $this->changeLogService->log(
-            $plan->tenant_id,
             QuarterlyRoadmapPlan::class,
             $plan->id,
             'plan.published',
@@ -223,10 +214,9 @@ class QuarterlyRoadmapPlannerService
         }
 
         return DB::transaction(function () use ($publishedPlan, $userId, $changeSummary) {
-            $revisionNo = $this->nextRevisionNo($publishedPlan->fiscal_year, $publishedPlan->quarter, $publishedPlan->tenant_id);
+            $revisionNo = $this->nextRevisionNo($publishedPlan->fiscal_year, $publishedPlan->quarter);
 
             $newPlan = QuarterlyRoadmapPlan::create([
-                'tenant_id' => $publishedPlan->tenant_id,
                 'fiscal_year' => $publishedPlan->fiscal_year,
                 'quarter' => $publishedPlan->quarter,
                 'status' => QuarterlyRoadmapPlan::STATUS_DRAFT,
@@ -240,7 +230,6 @@ class QuarterlyRoadmapPlannerService
 
             foreach ($publishedPlan->items as $item) {
                 QuarterlyRoadmapPlanItem::create([
-                    'tenant_id' => $publishedPlan->tenant_id,
                     'quarterly_plan_id' => $newPlan->id,
                     'initiative_id' => $item->initiative_id,
                     'rank' => $item->rank,
@@ -258,7 +247,6 @@ class QuarterlyRoadmapPlannerService
             }
 
             $this->changeLogService->log(
-                $publishedPlan->tenant_id,
                 QuarterlyRoadmapPlan::class,
                 $newPlan->id,
                 'plan.revision_created',
@@ -274,10 +262,9 @@ class QuarterlyRoadmapPlannerService
         });
     }
 
-    protected function nextRevisionNo(int $fiscalYear, int $quarter, ?int $tenantId): int
+    protected function nextRevisionNo(int $fiscalYear, int $quarter): int
     {
         $current = QuarterlyRoadmapPlan::query()
-            ->forTenant($tenantId)
             ->where('fiscal_year', $fiscalYear)
             ->where('quarter', $quarter)
             ->max('revision_no');

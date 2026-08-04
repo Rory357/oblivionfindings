@@ -3,15 +3,15 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SiteUtility extends Model
 {
-    use AuditableChanges;
+    use AuditableChanges, WritesLegacyStorageContext;
 
     protected $fillable = [
-        'tenant_id',
         'site_id',
         'type',
         'provider',
@@ -33,11 +33,6 @@ class SiteUtility extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
-    }
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 
     public function scopeActive($query)

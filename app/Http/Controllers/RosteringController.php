@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Hr\Services\HrLeaveAccessService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Rostering\AutoSchedule\RosterSuggestionService;
 use App\Domain\Rostering\RosteringFeatureFlags;
@@ -26,6 +27,7 @@ use App\Models\User;
 use App\Services\Operations\ShiftSeriesPresenter;
 use App\Services\ShiftCoverageService;
 use App\Services\ShiftStaffEligibilityService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -41,6 +43,8 @@ class RosteringController extends Controller
         protected RosterPublishingService $publishing,
         protected RosterSuggestionService $suggestions,
         protected RosteringFeatureFlags $featureFlags,
+        protected HrLeaveAccessService $leaveAccess,
+        protected UserSiteAccessService $siteAccess,
     ) {}
 
     public function index(RosteringIndexRequest $request)
@@ -95,21 +99,22 @@ class RosteringController extends Controller
         // datasets for either gate so a roster_templates.create user who is not a
         // shifts.manageAny manager doesn't open the wizard to empty dropdowns.
         if ($canManageAny || $canManageTemplates) {
-            // Org-scope the filter dropdowns so managers only see their own
-            // organization's staff/clients. Sites are not organization-scoped
-            // in the schema (the table carries tenant_id, not organization_id),
-            // so the site list is left unscoped here.
-            $staff = User::staff()
-                ->when($organizationId, fn ($q) => $q->where('organization_id', $organizationId))
+            $siteBypassPermissions = ['rostering.viewAny', 'shifts.manageAny'];
+            $accessibleSiteIds = $this->siteAccess->accessibleSiteIds($auth, $siteBypassPermissions);
+
+            $staff = $this->siteAccess->applyStaffScope(User::query(), $auth, $siteBypassPermissions)
                 ->orderBy('name')
                 ->get(['id', 'name', 'email']);
-            $clients = Client::query()
-                ->when($organizationId, fn ($q) => $q->where('organization_id', $organizationId))
+            $clients = $this->siteAccess->applyClientScope(Client::query(), $auth, $siteBypassPermissions)
                 ->with('site:id,name')
                 ->orderBy('first_name')
                 ->get(['id', 'first_name', 'last_name', 'service_context_id', 'site_id']);
-            $sites = Site::query()->orderBy('name')->get(['id', 'name', 'type']);
+            $sites = Site::query()
+                ->whereIn('id', $accessibleSiteIds)
+                ->orderBy('name')
+                ->get(['id', 'name', 'type']);
             $serviceContexts = ServiceContext::query()
+                ->availableToSites($accessibleSiteIds)
                 ->orderBy('name')
                 ->get(['id', 'name', 'type', 'is_active']);
         }
@@ -318,7 +323,7 @@ class RosteringController extends Controller
             ->all();
 
         // Staff on leave this week
-        $onLeaveCount = $canManageAny ? $this->scopeHrRecordOrganization(HrLeaveRequest::query(), $organizationId)
+        $onLeaveCount = $canManageAny ? $this->leaveAccess->visibleRequests($auth, true)
             ->where('status', 'approved')
             ->where('starts_at', '<', $weekEnd)
             ->where('ends_at', '>', $weekStart)
@@ -504,14 +509,14 @@ class RosteringController extends Controller
             }
         }
 
-        $publishEnabled = $this->featureFlags->publishEnabled($auth->organization_id);
-        $autoScheduleEnabled = $this->featureFlags->autoScheduleEnabled($auth->organization_id);
+        $publishEnabled = $this->featureFlags->publishEnabled();
+        $autoScheduleEnabled = $this->featureFlags->autoScheduleEnabled();
         $selectedRosterPeriod = null;
         $selectedRosterPeriodDiffSummary = null;
 
         if ($publishEnabled && $canManageAny && $selectedSiteId) {
-            $selectedRosterPeriod = $this->rosterPeriods->activeFor($auth->organization_id, (int) $selectedSiteId, $weekStart)
-                ?? $this->rosterPeriods->findOrCreate($auth->organization_id, (int) $selectedSiteId, $weekStart);
+            $selectedRosterPeriod = $this->rosterPeriods->activeFor((int) $selectedSiteId, $weekStart)
+                ?? $this->rosterPeriods->findOrCreate((int) $selectedSiteId, $weekStart);
 
             if ($selectedRosterPeriod->snapshot) {
                 $selectedRosterPeriodDiffSummary = $this->publishing->diff($selectedRosterPeriod)['summary'];
@@ -523,7 +528,7 @@ class RosteringController extends Controller
         $pendingLeave = collect();
 
         if ($canManageAny) {
-            $approvedLeave = $this->scopeHrRecordOrganization(HrLeaveRequest::query(), $organizationId)
+            $approvedLeave = $this->leaveAccess->visibleRequests($auth, true)
                 ->where('status', 'approved')
                 ->where('starts_at', '<', $leaveLookaheadEnd)
                 ->where('ends_at', '>', $weekStart)
@@ -534,7 +539,7 @@ class RosteringController extends Controller
         }
 
         if ($canApproveLeave) {
-            $pendingLeave = $this->scopeHrRecordOrganization(HrLeaveRequest::query(), $organizationId)
+            $pendingLeave = $this->leaveAccess->visibleRequests($auth, true)
                 ->where('status', 'pending')
                 ->where('starts_at', '<', $leaveLookaheadEnd)
                 ->where('ends_at', '>', $weekStart)
@@ -584,8 +589,8 @@ class RosteringController extends Controller
             // eager only on the ?tab=templates landing, otherwise resolved on a
             // partial reload when the user opens the tab.
             'rosterTemplates' => $request->query('tab') === 'templates'
-                ? $this->buildRosterTemplates($organizationId)
-                : Inertia::optional(fn () => $this->buildRosterTemplates($organizationId)),
+                ? $this->buildRosterTemplates()
+                : Inertia::optional(fn () => $this->buildRosterTemplates()),
             'canManageSeries' => $auth->canDo('shifts.manageAny') || $auth->canDo('rostering.viewAny'),
             // Recurring series (tab). Same lazy pattern as rosterTemplates: eager on
             // the ?tab=recurring landing, otherwise resolved on a partial reload.
@@ -729,10 +734,9 @@ class RosteringController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
-    protected function buildRosterTemplates(?int $organizationId): array
+    protected function buildRosterTemplates(): array
     {
         return RosterTemplate::query()
-            ->when($organizationId, fn ($q) => $q->where('organization_id', $organizationId))
             ->with([
                 'creator:id,name',
                 'templateShifts.client:id,first_name,last_name',
@@ -1065,7 +1069,7 @@ class RosteringController extends Controller
 
         $data = $request->validated();
 
-        if ($this->featureFlags->autoScheduleEnabled($auth->organization_id)) {
+        if ($this->featureFlags->autoScheduleEnabled()) {
             $siteId = ! empty($data['site_id'])
                 ? (int) $data['site_id']
                 : (! empty($data['client_id'])
@@ -1081,6 +1085,7 @@ class RosteringController extends Controller
                     ->with('warning', __('rostering.suggestions.choose_site'));
             }
 
+            $this->siteAccess->assertCanAccessSiteId($auth, $siteId, ['shifts.manageAny']);
             $run = $this->suggestions->generateOrQueue($auth, $data['week'] ?? null, $siteId);
 
             return redirect()
@@ -1106,8 +1111,8 @@ class RosteringController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('rostering.publish'), 403);
-        abort_unless($this->featureFlags->publishEnabled($auth->organization_id), 404);
-        abort_unless((int) $period->organization_id === (int) $auth->organization_id, 403);
+        abort_unless($this->featureFlags->publishEnabled(), 404);
+        $this->siteAccess->assertCanAccessSiteId($auth, (int) $period->site_id, ['shifts.manageAny']);
 
         $summary = $this->publishing->review($period, $auth);
 
@@ -1125,8 +1130,8 @@ class RosteringController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('rostering.publish'), 403);
-        abort_unless($this->featureFlags->publishEnabled($auth->organization_id), 404);
-        abort_unless((int) $period->organization_id === (int) $auth->organization_id, 403);
+        abort_unless($this->featureFlags->publishEnabled(), 404);
+        $this->siteAccess->assertCanAccessSiteId($auth, (int) $period->site_id, ['shifts.manageAny']);
 
         $period->load(['site:id,name', 'publisher:id,name']);
         $summary = $period->validation_summary ?? [
@@ -1173,8 +1178,8 @@ class RosteringController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('rostering.publish'), 403);
-        abort_unless($this->featureFlags->publishEnabled($auth->organization_id), 404);
-        abort_unless((int) $period->organization_id === (int) $auth->organization_id, 403);
+        abort_unless($this->featureFlags->publishEnabled(), 404);
+        $this->siteAccess->assertCanAccessSiteId($auth, (int) $period->site_id, ['shifts.manageAny']);
 
         $published = $this->publishing->publish($period, $auth);
         $reportLink = $this->shiftOperationsReportLink($published);
@@ -1192,8 +1197,8 @@ class RosteringController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('rostering.publish'), 403);
-        abort_unless($this->featureFlags->publishEnabled($auth->organization_id), 404);
-        abort_unless((int) $period->organization_id === (int) $auth->organization_id, 403);
+        abort_unless($this->featureFlags->publishEnabled(), 404);
+        $this->siteAccess->assertCanAccessSiteId($auth, (int) $period->site_id, ['shifts.manageAny']);
 
         $period->load(['site:id,name', 'publisher:id,name']);
         $diff = $this->publishing->diff($period);
@@ -1219,8 +1224,8 @@ class RosteringController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('rostering.publish'), 403);
-        abort_unless($this->featureFlags->publishEnabled($auth->organization_id), 404);
-        abort_unless((int) $period->organization_id === (int) $auth->organization_id, 403);
+        abort_unless($this->featureFlags->publishEnabled(), 404);
+        $this->siteAccess->assertCanAccessSiteId($auth, (int) $period->site_id, ['shifts.manageAny']);
 
         $published = $this->publishing->republish($period, $auth);
         $reportLink = $this->shiftOperationsReportLink($published);
@@ -1238,8 +1243,8 @@ class RosteringController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('rostering.publish'), 403);
-        abort_unless($this->featureFlags->publishEnabled($auth->organization_id), 404);
-        abort_unless((int) $period->organization_id === (int) $auth->organization_id, 403);
+        abort_unless($this->featureFlags->publishEnabled(), 404);
+        $this->siteAccess->assertCanAccessSiteId($auth, (int) $period->site_id, ['shifts.manageAny']);
 
         $draft = $this->publishing->unpublish($period, $auth);
 

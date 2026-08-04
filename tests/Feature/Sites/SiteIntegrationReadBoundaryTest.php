@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Sites;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
@@ -19,14 +20,21 @@ class SiteIntegrationReadBoundaryTest extends TestCase
     public function test_site_hardware_view_receives_only_bounded_integration_state(): void
     {
         $this->seed(RbacSeeder::class);
-        $site = Site::factory()->create(['tenant_id' => 42]);
-        $viewer = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
+        $site = Site::factory()->create();
+        $viewer = User::factory()->create(['approved_at' => now()]);
         $viewer->roles()->attach(Role::query()->where('name', 'team_lead')->firstOrFail());
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
         $this->assertTrue($viewer->canDo('siteHardware.view'));
         $this->assertFalse($viewer->canDo('integrations.manage_site_secrets'));
 
         IntegrationSiteConfig::create([
-            'tenant_id' => 42,
             'site_id' => $site->id,
             'provider' => 'unifi',
             'status' => 'RAW-LEGACY-CONFIG-STATUS',
@@ -36,7 +44,6 @@ class SiteIntegrationReadBoundaryTest extends TestCase
             'is_active' => true,
         ]);
         IntegrationSiteSecret::create([
-            'tenant_id' => 42,
             'site_id' => $site->id,
             'provider' => 'unifi',
             'capability' => 'protect',
@@ -47,14 +54,13 @@ class SiteIntegrationReadBoundaryTest extends TestCase
             'last_error' => 'RAW-LEGACY-SITE-ERROR',
         ]);
         IntegrationProviderConnection::create([
-            'tenant_id' => 42,
             'provider' => 'unifi',
-            'secret_encrypted' => 'RAW-LEGACY-TENANT-SECRET',
+            'secret_encrypted' => 'RAW-LEGACY-APPLICATION-SECRET',
             'secret_last4' => '9876',
-            'status' => 'RAW-LEGACY-TENANT-STATUS',
+            'status' => 'RAW-LEGACY-APPLICATION-STATUS',
             'last_tested_at' => now(),
             'last_synced_at' => now(),
-            'last_error' => 'RAW-LEGACY-TENANT-ERROR',
+            'last_error' => 'RAW-LEGACY-APPLICATION-ERROR',
             'config' => [
                 'token' => 'RAW-LEGACY-TOKEN',
                 'discovered_sites' => [['id' => 'RAW-LEGACY-DISCOVERED-SITE', 'name' => 'RAW-LEGACY-SITE-NAME']],

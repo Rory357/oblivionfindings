@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Hr;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayslip;
+use App\Domain\Hr\Services\HrCurrentStaffService;
+use App\Domain\Hr\Services\HrPerformanceAccessService;
 use App\Domain\Hr\Services\PayslipService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\BuildsMyHrShell;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -16,10 +18,12 @@ use Inertia\Inertia;
 
 class PayslipController extends Controller
 {
-    use BuildsMyHrShell, ResolvesHrTenant;
+    use BuildsMyHrShell;
 
     public function __construct(
         protected PayslipService $payslipService,
+        private readonly HrPerformanceAccessService $performanceAccess,
+        private readonly HrCurrentStaffService $currentStaff,
     ) {}
 
     /**
@@ -30,10 +34,8 @@ class PayslipController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.payslips.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $payslips = HrPayslip::query()
-            ->forTenant($tenantId)
+        $payslips = $this->performanceAccess
+            ->applyPayslipScope(HrPayslip::query(), $user)
             ->with(['user:id,name', 'employeeProfile:id,employee_number,position_title'])
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->when($request->query('user_id'), fn ($q, $uid) => $q->where('user_id', $uid))
@@ -43,19 +45,18 @@ class PayslipController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $employees = HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->active()
+        $employees = $this->performanceAccess
+            ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
             ->with('user:id,name')
             ->get()
             ->map(fn ($p) => ['id' => $p->user_id, 'name' => $p->user?->name ?? 'Unknown']);
 
-        // Server-side status counts across the whole tenant so the hero tiles
+        // Server-side status counts across the complete visible worklist so the hero tiles
         // are true (a page-scoped client tally only sees the current 20 rows).
         // Payslips flow draft → paid; 'approved' from the original schema was
         // never wired, so it isn't surfaced.
-        $statusCounts = HrPayslip::query()
-            ->forTenant($tenantId)
+        $statusCounts = $this->performanceAccess
+            ->applyPayslipScope(HrPayslip::query(), $user)
             ->selectRaw('status, COUNT(*) as aggregate')
             ->groupBy('status')
             ->pluck('aggregate', 'status');
@@ -88,28 +89,49 @@ class PayslipController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.payslips.generate'), 403);
 
-        // users has no tenant_id column, so resolve it — the old
-        // $user->tenant_id made the "all employees" branch filter on NULL.
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $data = $request->validate([
             'period_start' => ['required', 'date'],
             'period_end' => ['required', 'date', 'after:period_start'],
-            'payroll_run_id' => ['nullable', 'exists:hr_payroll_runs,id'],
-            'employee_profile_id' => ['nullable', 'exists:hr_employee_profiles,id'],
+            'payroll_run_id' => ['nullable', 'integer'],
+            'employee_profile_id' => ['nullable', 'integer'],
         ]);
 
         $generated = collect();
+        $run = null;
+        $profile = null;
+        $profiles = collect();
+
+        if (! empty($data['payroll_run_id'])) {
+            $run = HrPayrollRun::query()->findOrFail($data['payroll_run_id']);
+            $runUserIds = $run->items()
+                ->pluck('user_id')
+                ->filter()
+                ->map(fn ($userId): int => (int) $userId)
+                ->unique()
+                ->values();
+            $visibleRunUserIds = $this->performanceAccess
+                ->currentUserIds($user)
+                ->whereIn('users.id', $runUserIds)
+                ->pluck('users.id')
+                ->map(fn ($userId): int => (int) $userId);
+            abort_unless($runUserIds->diff($visibleRunUserIds)->isEmpty(), 404);
+        } elseif (! empty($data['employee_profile_id'])) {
+            $profile = $this->performanceAccess
+                ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
+                ->findOrFail($data['employee_profile_id']);
+        } else {
+            $profiles = $this->performanceAccess
+                ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
+                ->get();
+        }
 
         try {
-            if (! empty($data['payroll_run_id'])) {
+            if ($run instanceof HrPayrollRun) {
                 // Bulk generate from a payroll run
-                $run = HrPayrollRun::where('tenant_id', $tenantId)->findOrFail($data['payroll_run_id']);
                 $generated = $this->payslipService->generateBulkPayslips($run);
                 $count = $generated->count();
-            } elseif (! empty($data['employee_profile_id'])) {
+            } elseif ($profile instanceof HrEmployeeProfile) {
                 // Single employee
-                $profile = HrEmployeeProfile::where('tenant_id', $tenantId)->findOrFail($data['employee_profile_id']);
                 $generated->push($this->payslipService->generatePayslip(
                     $profile,
                     $data['period_start'],
@@ -117,12 +139,7 @@ class PayslipController extends Controller
                 ));
                 $count = 1;
             } else {
-                // All active employees
-                $profiles = HrEmployeeProfile::query()
-                    ->where('tenant_id', $tenantId)
-                    ->active()
-                    ->get();
-
+                // All current employees visible to the generator.
                 foreach ($profiles as $profile) {
                     $generated->push($this->payslipService->generatePayslip(
                         $profile,
@@ -148,11 +165,8 @@ class PayslipController extends Controller
     public function show(Request $request, HrPayslip $payslip)
     {
         $user = $request->user();
-
-        // HR admins, or the employee viewing their own payslip (self-service).
-        $canView = ($user && $user->canDo('hr.payslips.view'))
-            || ($user && $user->id === $payslip->user_id);
-        abort_unless($canView, 403);
+        abort_unless($user, 403);
+        $payslip = $this->payslipForViewer($user, $payslip);
 
         $payslip->load([
             'user:id,name,email',
@@ -163,7 +177,6 @@ class PayslipController extends Controller
         // Calculate YTD totals
         $ytdStart = Carbon::parse($payslip->pay_period_end)->startOfYear()->format('Y-m-d');
         $ytd = HrPayslip::where('user_id', $payslip->user_id)
-            ->where('tenant_id', $payslip->tenant_id)
             ->where('pay_period_start', '>=', $ytdStart)
             ->where('pay_period_end', '<=', $payslip->pay_period_end)
             ->selectRaw('
@@ -191,11 +204,8 @@ class PayslipController extends Controller
     public function download(Request $request, HrPayslip $payslip)
     {
         $user = $request->user();
-
-        // Allow HR admins or the employee themselves
-        $canView = ($user && $user->canDo('hr.payslips.view'))
-            || ($user && $user->id === $payslip->user_id);
-        abort_unless($canView, 403);
+        abort_unless($user, 403);
+        $payslip = $this->payslipForViewer($user, $payslip);
 
         // Generate the PDF if not yet created, or upgrade a stale pre-PDF (.html) artefact.
         if (! $payslip->pdf_path || ! str_ends_with($payslip->pdf_path, '.pdf')) {
@@ -220,7 +230,7 @@ class PayslipController extends Controller
     public function myPayslips(Request $request)
     {
         $user = $request->user();
-        abort_unless($user, 403);
+        abort_unless($user && $this->currentStaff->isCurrent($user), 403);
 
         $payslips = HrPayslip::query()
             ->where('user_id', $user->id)
@@ -229,8 +239,23 @@ class PayslipController extends Controller
             ->withQueryString();
 
         return Inertia::render('hr/my/payslips', [
-            'myHr' => $this->myHrShellProps($user, $this->resolveHrTenantIdForUser($user)),
+            'myHr' => $this->myHrShellProps($user),
             'payslips' => $payslips,
         ]);
+    }
+
+    private function payslipForViewer(User $viewer, HrPayslip $payslip): HrPayslip
+    {
+        if ((int) $payslip->user_id === (int) $viewer->id) {
+            abort_unless($this->currentStaff->isCurrent($viewer), 404);
+
+            return HrPayslip::query()
+                ->where('user_id', $viewer->id)
+                ->findOrFail($payslip->getKey());
+        }
+
+        abort_unless($viewer->canDo('hr.payslips.view'), 403);
+
+        return $this->performanceAccess->payslip($viewer, $payslip);
     }
 }

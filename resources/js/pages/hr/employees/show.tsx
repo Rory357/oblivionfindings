@@ -1,13 +1,20 @@
+import {
+    ApplicableProceduresPanel,
+    type ApplicableProcedure,
+} from '@/components/health-safety/applicable-procedures-panel';
 import { PhotoUploadButton } from '@/components/hr';
 import {
     RehireWizard,
     type EmploymentStint,
     type RehireTarget,
 } from '@/components/hr/rehire-wizard';
-import { PageHero, type PageHeroBadge, type PageHeroMetaItem } from '@/components/page';
+import {
+    PageHero,
+    type PageHeroBadge,
+    type PageHeroMetaItem,
+} from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ApplicableProceduresPanel, type ApplicableProcedure } from '@/components/health-safety/applicable-procedures-panel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     TabsRoot as Tabs,
@@ -29,6 +36,7 @@ import {
     CheckCircle2,
     ChevronRight,
     Clock,
+    ExternalLink,
     FileText,
     Flame,
     FolderOpen,
@@ -46,6 +54,7 @@ import {
     User,
     UserCheck,
     Users,
+    Workflow,
     X,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -274,15 +283,68 @@ interface HrCase {
     closed_at: string | null;
     assigned_to_name: string | null;
 }
-interface AssetAssignment {
-    id: number;
-    asset_name: string | null;
-    asset_tag: string | null;
+interface EquipmentItem {
+    key: string;
+    assignment_id: number;
+    record_id: number | null;
+    source: 'security_devices' | 'assets' | 'hr_assets';
+    source_label: string;
+    name: string | null;
+    tag: string | null;
     category: string | null;
     serial_number: string | null;
     assigned_at: string | null;
     returned_at: string | null;
+    status: string | null;
+    health: string | null;
     condition: string | null;
+    needs_recovery: boolean;
+    href: string | null;
+    recovery_only: boolean;
+}
+interface ProvisioningWorkflow {
+    id: number;
+    lifecycle: string;
+    status: string;
+    effective_at: string | null;
+    total: number;
+    completed: number;
+    outstanding: number;
+    href: string;
+}
+interface AccessWorkItem {
+    id: number;
+    workflow_id: number | null;
+    lifecycle: string | null;
+    type: 'account' | 'access' | 'equipment';
+    action: string;
+    item: string;
+    status: string;
+    priority: string;
+    due_date: string | null;
+    href: string;
+}
+interface EquipmentAccessProjection {
+    summary: {
+        active_equipment: number;
+        recovery_due: number;
+        active_workflows: number;
+        outstanding_access: number;
+    };
+    equipment: EquipmentItem[];
+    workflows: ProvisioningWorkflow[];
+    access_work: AccessWorkItem[];
+    can: {
+        view_hr_assets: boolean;
+        view_devices: boolean;
+        view_assets: boolean;
+        view_it: boolean;
+    };
+    links: {
+        hr_assets: string | null;
+        devices: string | null;
+        provisioning: string | null;
+    };
 }
 interface PolicyAttestation {
     id: number;
@@ -333,7 +395,7 @@ interface Props {
     backgroundChecks: BackgroundCheck[];
     supervisionNotes: SupervisionNote[];
     cases: HrCase[];
-    assetAssignments: AssetAssignment[];
+    equipmentAccess: EquipmentAccessProjection;
     policyAttestations: PolicyAttestation[];
     safeWorkProcedures?: ApplicableProcedure[];
     workplaceInjuries?: WorkplaceInjurySummary[];
@@ -420,6 +482,9 @@ function StatusBadge({ status }: { status: string }) {
             'border-status-success/30 bg-status-success-bg text-status-success',
         approved:
             'border-status-success/30 bg-status-success-bg text-status-success',
+        done: 'border-status-success/30 bg-status-success-bg text-status-success',
+        healthy:
+            'border-status-success/30 bg-status-success-bg text-status-success',
         expiring_soon:
             'border-status-warning/30 bg-status-warning-bg text-status-warning',
         pending:
@@ -427,11 +492,18 @@ function StatusBadge({ status }: { status: string }) {
         pending_review:
             'border-status-warning/30 bg-status-warning-bg text-status-warning',
         in_progress: 'border-status-info/30 bg-status-info-bg text-status-info',
+        degraded:
+            'border-status-warning/30 bg-status-warning-bg text-status-warning',
+        warning:
+            'border-status-warning/30 bg-status-warning-bg text-status-warning',
         enrolled: 'border-status-info/30 bg-status-info-bg text-status-info',
         open: 'border-status-info/30 bg-status-info-bg text-status-info',
         expired:
             'border-status-critical/30 bg-status-critical-bg text-status-critical',
         suspended:
+            'border-status-critical/30 bg-status-critical-bg text-status-critical',
+        failed: 'border-status-critical/30 bg-status-critical-bg text-status-critical',
+        offline:
             'border-status-critical/30 bg-status-critical-bg text-status-critical',
         adverse:
             'border-status-critical/30 bg-status-critical-bg text-status-critical',
@@ -441,6 +513,7 @@ function StatusBadge({ status }: { status: string }) {
         draft: 'border-border bg-muted text-muted-foreground',
         closed: 'border-border bg-muted text-muted-foreground',
         cancelled: 'border-border bg-muted text-muted-foreground',
+        returned: 'border-border bg-muted text-muted-foreground',
         rejected:
             'border-status-critical/30 bg-status-critical-bg text-status-critical',
         high: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
@@ -606,7 +679,24 @@ export default function EmployeeShow({
     backgroundChecks = [],
     supervisionNotes = [],
     cases = [],
-    assetAssignments = [],
+    equipmentAccess = {
+        summary: {
+            active_equipment: 0,
+            recovery_due: 0,
+            active_workflows: 0,
+            outstanding_access: 0,
+        },
+        equipment: [],
+        workflows: [],
+        access_work: [],
+        can: {
+            view_hr_assets: false,
+            view_devices: false,
+            view_assets: false,
+            view_it: false,
+        },
+        links: { hr_assets: null, devices: null, provisioning: null },
+    },
     policyAttestations = [],
     safeWorkProcedures = [],
     workplaceInjuries = [],
@@ -614,6 +704,39 @@ export default function EmployeeShow({
     can,
 }: Props) {
     const [rehireOpen, setRehireOpen] = useState(false);
+    const [activeProfileTab, setActiveProfileTab] = useState(() => {
+        if (typeof window === 'undefined') return 'overview';
+
+        const requested = new URLSearchParams(window.location.search).get(
+            'tab',
+        );
+        const allowed = new Set([
+            'overview',
+            'documents',
+            'performance',
+            'training',
+            'driver',
+            'vetting',
+            'compliance',
+            'leave',
+            'onboarding',
+            'supervision',
+            'cases',
+            'assets',
+            ...(can.viewInjuries ? ['injuries'] : []),
+        ]);
+
+        return requested && allowed.has(requested) ? requested : 'overview';
+    });
+    const openProfileTab = (tab: string) => {
+        setActiveProfileTab(tab);
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            if (tab === 'overview') url.searchParams.delete('tab');
+            else url.searchParams.set('tab', tab);
+            window.history.replaceState(window.history.state, '', url);
+        }
+    };
     const rehireTarget: RehireTarget = {
         profileId: p.id,
         name: p.user.name,
@@ -661,16 +784,35 @@ export default function EmployeeShow({
                         },
                         { label: formatLabel(p.employment_type) },
                     ];
-                    if (p.department) heroBadges.push({ label: p.department, icon: Briefcase });
+                    if (p.department)
+                        heroBadges.push({
+                            label: p.department,
+                            icon: Briefcase,
+                        });
                     if (p.team) heroBadges.push({ label: p.team, icon: Users });
                     if (p.primary_site)
-                        heroBadges.push({ label: p.primary_site.name, icon: MapPin });
+                        heroBadges.push({
+                            label: p.primary_site.name,
+                            icon: MapPin,
+                        });
                     if (p.is_first_aider)
-                        heroBadges.push({ label: 'First Aider', icon: Heart, tone: 'success' });
+                        heroBadges.push({
+                            label: 'First Aider',
+                            icon: Heart,
+                            tone: 'success',
+                        });
                     if (p.is_fire_warden)
-                        heroBadges.push({ label: 'Fire Warden', icon: Flame, tone: 'warning' });
+                        heroBadges.push({
+                            label: 'Fire Warden',
+                            icon: Flame,
+                            tone: 'warning',
+                        });
                     if (p.can_drive_clients)
-                        heroBadges.push({ label: 'Driver', icon: Car, tone: 'info' });
+                        heroBadges.push({
+                            label: 'Driver',
+                            icon: Car,
+                            tone: 'info',
+                        });
 
                     const heroMeta: PageHeroMetaItem[] = [];
                     if (p.preferred_name && p.preferred_name !== p.user.name)
@@ -690,7 +832,8 @@ export default function EmployeeShow({
                         .toFixed(0);
 
                     return (
-                        <PageHero category="hr"
+                        <PageHero
+                            category="hr"
                             avatar={{
                                 src: p.profile_photo_path ?? undefined,
                                 fallback: getInitials(p.user.name),
@@ -708,8 +851,14 @@ export default function EmployeeShow({
                                             : `${tenure.months}m`
                                         : '\u2014',
                                 },
-                                { label: 'Compliance', value: `${complianceRate}%` },
-                                { label: 'Leave Bal.', value: `${leaveTotal}h` },
+                                {
+                                    label: 'Compliance',
+                                    value: `${complianceRate}%`,
+                                },
+                                {
+                                    label: 'Leave Bal.',
+                                    value: `${leaveTotal}h`,
+                                },
                             ]}
                             actions={
                                 <>
@@ -729,7 +878,9 @@ export default function EmployeeShow({
                                                 profileId={p.id}
                                                 onDark
                                             />
-                                            <Link href={`/hr/people/${p.id}/edit`}>
+                                            <Link
+                                                href={`/hr/people/${p.id}/edit`}
+                                            >
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
@@ -799,7 +950,11 @@ export default function EmployeeShow({
                 {/* ============================================================ */}
                 {/*  TABS                                                         */}
                 {/* ============================================================ */}
-                <Tabs defaultValue="overview" className="w-full">
+                <Tabs
+                    value={activeProfileTab}
+                    onValueChange={openProfileTab}
+                    className="w-full"
+                >
                     <TabsList className="flex h-auto w-full flex-wrap gap-1">
                         <TabsTrigger value="overview">
                             <User className="mr-1.5 h-3.5 w-3.5" />
@@ -862,13 +1017,9 @@ export default function EmployeeShow({
                         </TabsTrigger>
                         <TabsTrigger value="assets">
                             <Laptop className="mr-1.5 h-3.5 w-3.5" />
-                            Assets
+                            Equipment &amp; access
                             <TabCount
-                                count={
-                                    assetAssignments.filter(
-                                        (a) => !a.returned_at,
-                                    ).length
-                                }
+                                count={equipmentAccess.summary.active_equipment}
                             />
                         </TabsTrigger>
                     </TabsList>
@@ -936,11 +1087,9 @@ export default function EmployeeShow({
                                                 label="Visa Expiry"
                                                 value={
                                                     <span
-                                                        className={
-                                                            visaExpiryTone(
-                                                                p.visa_expires_at,
-                                                            )
-                                                        }
+                                                        className={visaExpiryTone(
+                                                            p.visa_expires_at,
+                                                        )}
                                                     >
                                                         {formatDate(
                                                             p.visa_expires_at,
@@ -1204,7 +1353,9 @@ export default function EmployeeShow({
                                                 Health &amp; Safety.
                                             </p>
                                         </div>
-                                        <Badge variant="outline">Read only</Badge>
+                                        <Badge variant="outline">
+                                            Read only
+                                        </Badge>
                                     </div>
                                 </CardHeader>
                                 <CardContent className="p-0">
@@ -1224,18 +1375,16 @@ export default function EmployeeShow({
                                                     <div className="min-w-0">
                                                         <div className="flex flex-wrap items-center gap-2">
                                                             <span className="font-medium">
-                                                                {injury.reference}
+                                                                {
+                                                                    injury.reference
+                                                                }
                                                             </span>
-                                                            <Badge
-                                                                variant="outline"
-                                                            >
+                                                            <Badge variant="outline">
                                                                 {formatLabel(
                                                                     injury.severity,
                                                                 )}
                                                             </Badge>
-                                                            <Badge
-                                                                variant="outline"
-                                                            >
+                                                            <Badge variant="outline">
                                                                 {formatLabel(
                                                                     injury.status,
                                                                 )}
@@ -1413,9 +1562,7 @@ export default function EmployeeShow({
                                             Request 360 Feedback
                                         </Button>
                                     </Link>
-                                    <Link
-                                        href="/hr/goals"
-                                    >
+                                    <Link href="/hr/goals">
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -1681,9 +1828,7 @@ export default function EmployeeShow({
                                             </Link>
                                         )}
                                         {can.manage && (
-                                            <Link
-                                                href="/hr/goals/development"
-                                            >
+                                            <Link href="/hr/goals/development">
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
@@ -1850,6 +1995,7 @@ export default function EmployeeShow({
                                                                                         {
                                                                                             current
                                                                                         }
+
                                                                                         /
                                                                                         {
                                                                                             target
@@ -3151,86 +3297,12 @@ export default function EmployeeShow({
                         </Card>
                     </TabsContent>
 
-                    {/* ======== ASSETS ======== */}
+                    {/* ======== EQUIPMENT & ACCESS ======== */}
                     <TabsContent value="assets">
-                        <Card>
-                            <CardContent className="p-0">
-                                {assetAssignments.length === 0 ? (
-                                    <EmptyState
-                                        icon={Laptop}
-                                        label="No assets assigned"
-                                    />
-                                ) : (
-                                    <table className="w-full text-sm">
-                                        <thead className="border-b bg-muted/50">
-                                            <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                                    Asset
-                                                </th>
-                                                <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase sm:table-cell">
-                                                    Tag
-                                                </th>
-                                                <th className="hidden px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase md:table-cell">
-                                                    Category
-                                                </th>
-                                                <th className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                                    Assigned
-                                                </th>
-                                                <th className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                                    Status
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y">
-                                            {assetAssignments.map((a) => (
-                                                <tr
-                                                    key={a.id}
-                                                    className="hover:bg-muted/30"
-                                                >
-                                                    <td className="px-4 py-3 font-medium">
-                                                        {a.asset_name ||
-                                                            '\u2014'}
-                                                    </td>
-                                                    <td className="hidden px-4 py-3 font-mono text-xs text-muted-foreground sm:table-cell">
-                                                        {a.asset_tag ||
-                                                            '\u2014'}
-                                                    </td>
-                                                    <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
-                                                        {a.category
-                                                            ? formatLabel(
-                                                                  a.category,
-                                                              )
-                                                            : '\u2014'}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-muted-foreground">
-                                                        {formatDate(
-                                                            a.assigned_at,
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        {a.returned_at ? (
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="border-border bg-muted text-muted-foreground"
-                                                            >
-                                                                Returned
-                                                            </Badge>
-                                                        ) : (
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="border-status-success/30 bg-status-success-bg text-status-success"
-                                                            >
-                                                                Active
-                                                            </Badge>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                )}
-                            </CardContent>
-                        </Card>
+                        <EquipmentAccessTab
+                            projection={equipmentAccess}
+                            employeeActive={p.is_active}
+                        />
                     </TabsContent>
                 </Tabs>
             </div>
@@ -3243,5 +3315,320 @@ export default function EmployeeShow({
                 />
             ) : null}
         </AppLayout>
+    );
+}
+
+function EquipmentAccessTab({
+    projection,
+    employeeActive,
+}: {
+    projection: EquipmentAccessProjection;
+    employeeActive: boolean;
+}) {
+    const {
+        summary,
+        equipment,
+        workflows,
+        access_work: accessWork,
+        can,
+        links,
+    } = projection;
+    const hasAnySource =
+        can.view_hr_assets ||
+        can.view_assets ||
+        can.view_devices ||
+        can.view_it;
+
+    return (
+        <div className="space-y-5">
+            {!employeeActive && summary.recovery_due > 0 ? (
+                <div className="flex items-start gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg px-4 py-3.5">
+                    <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
+                    <div>
+                        <p className="text-sm font-semibold text-status-critical">
+                            {summary.recovery_due}{' '}
+                            {summary.recovery_due === 1
+                                ? 'item is'
+                                : 'items are'}{' '}
+                            still assigned to this former employee
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            Complete the leaver workflow in IT &amp; Support and
+                            release each item in its owning register. HR is a
+                            read-only view.
+                        </p>
+                    </div>
+                </div>
+            ) : null}
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {[
+                    ['Active equipment', summary.active_equipment],
+                    ['Recovery due', summary.recovery_due],
+                    ['Active workflows', summary.active_workflows],
+                    ['Open account & access work', summary.outstanding_access],
+                ].map(([label, value]) => (
+                    <Card key={label}>
+                        <CardContent className="px-4 py-3.5">
+                            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                {label}
+                            </p>
+                            <p className="mt-1 text-2xl font-bold tabular-nums">
+                                {value}
+                            </p>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+
+            <Card>
+                <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+                    <div>
+                        <CardTitle className="text-base">
+                            Issued equipment
+                        </CardTitle>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            One read-only view of records owned by Security
+                            &amp; Devices, Fleet &amp; Assets, and HR.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2">
+                        {links.devices ? (
+                            <Button asChild size="sm" variant="outline">
+                                <Link href={links.devices}>
+                                    Security &amp; Devices
+                                    <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                                </Link>
+                            </Button>
+                        ) : null}
+                        {links.hr_assets ? (
+                            <Button asChild size="sm" variant="outline">
+                                <Link href={links.hr_assets}>HR equipment</Link>
+                            </Button>
+                        ) : null}
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    {equipment.length === 0 ? (
+                        <EmptyState
+                            icon={Laptop}
+                            label={
+                                hasAnySource
+                                    ? 'No access-approved equipment records are assigned.'
+                                    : 'Equipment details are not available with your current permissions.'
+                            }
+                        />
+                    ) : (
+                        <div className="divide-y">
+                            {equipment.map((item) => (
+                                <div
+                                    key={item.key}
+                                    className="flex items-center gap-4 px-5 py-4"
+                                >
+                                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
+                                        <Laptop className="h-5 w-5" />
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {item.href ? (
+                                                <Link
+                                                    href={item.href}
+                                                    className="truncate text-sm font-semibold text-primary hover:underline"
+                                                >
+                                                    {item.name ||
+                                                        'Unnamed equipment'}
+                                                </Link>
+                                            ) : (
+                                                <span className="truncate text-sm font-semibold">
+                                                    {item.name ||
+                                                        'Unnamed equipment'}
+                                                </span>
+                                            )}
+                                            <Badge
+                                                variant="outline"
+                                                className="text-[10px]"
+                                            >
+                                                {item.source_label}
+                                            </Badge>
+                                            {item.needs_recovery ? (
+                                                <Badge
+                                                    variant="outline"
+                                                    className="border-status-critical/30 bg-status-critical-bg text-status-critical"
+                                                >
+                                                    Recovery due
+                                                </Badge>
+                                            ) : null}
+                                        </div>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            {[
+                                                item.tag,
+                                                item.category
+                                                    ? formatLabel(item.category)
+                                                    : null,
+                                                item.serial_number
+                                                    ? `Serial ${item.serial_number}`
+                                                    : null,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(' · ') ||
+                                                'No identifying details recorded'}
+                                        </p>
+                                    </div>
+                                    <div className="w-36 shrink-0 text-right">
+                                        <p className="text-xs font-medium">
+                                            {item.returned_at
+                                                ? 'Returned'
+                                                : 'Assigned'}
+                                        </p>
+                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                            {formatDate(
+                                                item.returned_at ||
+                                                    item.assigned_at,
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="w-28 shrink-0 text-right">
+                                        <StatusBadge
+                                            status={
+                                                item.returned_at
+                                                    ? 'returned'
+                                                    : item.health ||
+                                                      item.status ||
+                                                      'active'
+                                            }
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <div className="grid gap-5 xl:grid-cols-2">
+                <Card>
+                    <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+                        <div>
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <Workflow className="h-4 w-4" />
+                                Joiner, mover &amp; leaver workflows
+                            </CardTitle>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Account, equipment, network, and access-control
+                                delivery.
+                            </p>
+                        </div>
+                        {links.provisioning ? (
+                            <Button asChild size="sm" variant="outline">
+                                <Link href={links.provisioning}>
+                                    Open IT queue
+                                </Link>
+                            </Button>
+                        ) : null}
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        {!can.view_it ? (
+                            <EmptyState
+                                icon={Workflow}
+                                label="IT workflow details require IT & Support access."
+                            />
+                        ) : workflows.length === 0 ? (
+                            <EmptyState
+                                icon={Workflow}
+                                label="No provisioning workflows recorded."
+                            />
+                        ) : (
+                            <div className="divide-y">
+                                {workflows.map((workflow) => (
+                                    <Link
+                                        key={workflow.id}
+                                        href={workflow.href}
+                                        className="block px-5 py-4 hover:bg-muted/30"
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-semibold">
+                                                    {formatLabel(
+                                                        workflow.lifecycle,
+                                                    )}{' '}
+                                                    workflow
+                                                </p>
+                                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                                    Effective{' '}
+                                                    {formatDate(
+                                                        workflow.effective_at,
+                                                    )}{' '}
+                                                    · {workflow.completed}/
+                                                    {workflow.total} complete
+                                                </p>
+                                            </div>
+                                            <StatusBadge
+                                                status={workflow.status}
+                                            />
+                                        </div>
+                                        <div className="mt-3">
+                                            <ProgressBar
+                                                value={workflow.completed}
+                                                max={workflow.total || 1}
+                                            />
+                                        </div>
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">
+                            Accounts &amp; access work
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            Provision, change, or revoke access through the IT
+                            workflow—never from the HR profile.
+                        </p>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        {!can.view_it ? (
+                            <EmptyState
+                                icon={Shield}
+                                label="Account and access work requires IT & Support access."
+                            />
+                        ) : accessWork.length === 0 ? (
+                            <EmptyState
+                                icon={Shield}
+                                label="No account or access work recorded."
+                            />
+                        ) : (
+                            <div className="divide-y">
+                                {accessWork.map((item) => (
+                                    <Link
+                                        key={item.id}
+                                        href={item.href}
+                                        className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted/30"
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-semibold">
+                                                {item.item}
+                                            </p>
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                                {formatLabel(item.action)} ·{' '}
+                                                {formatLabel(item.type)}
+                                                {item.due_date
+                                                    ? ` · due ${formatDate(item.due_date)}`
+                                                    : ''}
+                                            </p>
+                                        </div>
+                                        <StatusBadge status={item.status} />
+                                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
     );
 }

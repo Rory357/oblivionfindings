@@ -10,21 +10,25 @@ use App\Domain\Hr\Models\HrLeaveApprovalChain;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Services\ApprovalWorkflowService;
+use App\Domain\Hr\Services\HrCurrentStaffService;
+use App\Domain\Hr\Services\HrPerformanceAccessService;
+use App\Domain\Hr\Services\HrRecruitmentAccessService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ApprovalController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         private readonly ApprovalWorkflowService $workflowService,
+        private readonly HrCurrentStaffService $currentStaff,
+        private readonly HrPerformanceAccessService $performanceAccess,
+        private readonly HrRecruitmentAccessService $recruitmentAccess,
     ) {}
 
     /* ------------------------------------------------------------------ */
@@ -36,9 +40,7 @@ class ApprovalController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.approvals.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $chains = HrApprovalChain::forTenant($tenantId)
+        $chains = HrApprovalChain::query()
             ->with(['steps', 'creator:id,name'])
             ->withCount('instances')
             ->orderByDesc('created_at')
@@ -62,7 +64,7 @@ class ApprovalController extends Controller
                 'created_at' => $chain->created_at?->toDateString(),
             ]);
 
-        $leaveChains = HrLeaveApprovalChain::forTenant($tenantId)
+        $leaveChains = HrLeaveApprovalChain::query()
             ->with(['user:id,name', 'approver:id,name', 'delegate:id,name'])
             ->orderBy('user_id')
             ->orderBy('approval_level')
@@ -81,8 +83,7 @@ class ApprovalController extends Controller
             ]);
 
         $roles = Role::orderBy('name')->get(['id', 'name']);
-        $users = User::query()
-            ->where('organization_id', $tenantId)
+        $users = $this->currentStaff->currentUsersQuery()
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -103,37 +104,58 @@ class ApprovalController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.approvals.manage'), 403);
+        $currentUserIds = $this->currentStaff->currentUserIds();
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('hr_approval_chains', 'name')->where(
+                    fn ($query) => $query->where('process_type', $request->string('process_type')->toString()),
+                ),
+            ],
             'process_type' => ['required', 'string', Rule::in(['leave', 'expense', 'timesheet', 'document'])],
             'is_active' => ['boolean'],
             'steps' => ['required', 'array', 'min:1'],
-            'steps.*.step_order' => ['required', 'integer', 'min:1'],
+            'steps.*.step_order' => ['required', 'integer', 'min:1', 'distinct'],
             'steps.*.approver_type' => ['required', 'string', Rule::in(['manager', 'role', 'user'])],
             'steps.*.approver_role_id' => ['nullable', 'integer', 'exists:roles,id'],
-            'steps.*.approver_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'steps.*.approver_user_id' => ['nullable', 'integer', Rule::in($currentUserIds)],
             'steps.*.auto_approve_after_days' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $chain = HrApprovalChain::create([
-            'tenant_id' => $this->resolveHrTenantIdForUser($user),
-            'name' => $validated['name'],
-            'process_type' => $validated['process_type'],
-            'is_active' => $validated['is_active'] ?? true,
-            'created_by' => $user->id,
-        ]);
-
         foreach ($validated['steps'] as $stepData) {
-            $chain->steps()->create([
-                'step_order' => $stepData['step_order'],
-                'approver_type' => $stepData['approver_type'],
-                'approver_role_id' => $stepData['approver_role_id'] ?? null,
-                'approver_user_id' => $stepData['approver_user_id'] ?? null,
-                'auto_approve_after_days' => $stepData['auto_approve_after_days'] ?? null,
-                'created_at' => now(),
-            ]);
+            $hasRole = ! empty($stepData['approver_role_id']);
+            $hasUser = ! empty($stepData['approver_user_id']);
+            if (($stepData['approver_type'] === 'role' && (! $hasRole || $hasUser))
+                || ($stepData['approver_type'] === 'user' && (! $hasUser || $hasRole))
+                || ($stepData['approver_type'] === 'manager' && ($hasRole || $hasUser))) {
+                throw ValidationException::withMessages([
+                    'steps' => 'Each step must configure only the approver required by its type.',
+                ]);
+            }
         }
+
+        DB::transaction(function () use ($validated, $user): void {
+            $chain = HrApprovalChain::query()->create([
+                'name' => $validated['name'],
+                'process_type' => $validated['process_type'],
+                'is_active' => $validated['is_active'] ?? true,
+                'created_by' => $user->id,
+            ]);
+
+            foreach (collect($validated['steps'])->sortBy('step_order') as $stepData) {
+                $chain->steps()->create([
+                    'step_order' => $stepData['step_order'],
+                    'approver_type' => $stepData['approver_type'],
+                    'approver_role_id' => $stepData['approver_role_id'] ?? null,
+                    'approver_user_id' => $stepData['approver_user_id'] ?? null,
+                    'auto_approve_after_days' => $stepData['auto_approve_after_days'] ?? null,
+                    'created_at' => now(),
+                ]);
+            }
+        });
 
         return redirect()->route('hr.approvals.chains')->with('success', 'Approval chain created.');
     }
@@ -142,17 +164,15 @@ class ApprovalController extends Controller
     {
         $actor = $request->user();
         abort_unless($actor && $actor->canDo('hr.approvals.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $allowedUserIds = $this->tenantUserIds($tenantId);
+        $allowedUserIds = $this->currentStaff->currentUserIds();
 
         $validated = $request->validate([
             'user_id' => ['required', 'integer', Rule::in($allowedUserIds)],
-            'approver_user_id' => ['required', 'integer', Rule::in($allowedUserIds)],
-            'delegate_user_id' => ['nullable', 'integer', Rule::in($allowedUserIds)],
+            'approver_user_id' => ['required', 'integer', Rule::in($allowedUserIds), 'different:user_id'],
+            'delegate_user_id' => ['nullable', 'integer', Rule::in($allowedUserIds), 'different:user_id', 'different:approver_user_id'],
             'approval_level' => [
                 'required', 'integer', 'min:1',
                 Rule::unique('hr_leave_approval_chains', 'approval_level')->where(fn ($query) => $query
-                    ->where('tenant_id', $tenantId)
                     ->where('user_id', $request->integer('user_id'))),
             ],
             'escalation_after_hours' => ['nullable', 'integer', 'min:1', 'max:8760'],
@@ -160,7 +180,6 @@ class ApprovalController extends Controller
         ]);
 
         HrLeaveApprovalChain::query()->create([
-            'tenant_id' => $tenantId,
             ...$validated,
             'escalation_after_hours' => $validated['escalation_after_hours'] ?? 48,
             'is_active' => $validated['is_active'] ?? true,
@@ -175,15 +194,20 @@ class ApprovalController extends Controller
     {
         $actor = $request->user();
         abort_unless($actor && $actor->canDo('hr.approvals.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $this->assertHrTenantAccess($tenantId, $leaveChain->tenant_id);
-        $allowedUserIds = $this->tenantUserIds($tenantId);
+        $allowedUserIds = $this->currentStaff->currentUserIds();
 
         $validated = $request->validate([
             'approver_user_id' => ['required', 'integer', Rule::in($allowedUserIds)],
-            'delegate_user_id' => ['nullable', 'integer', Rule::in($allowedUserIds)],
+            'delegate_user_id' => ['nullable', 'integer', Rule::in($allowedUserIds), 'different:approver_user_id'],
             'escalation_after_hours' => ['required', 'integer', 'min:1', 'max:8760'],
         ]);
+
+        if (in_array((int) $validated['approver_user_id'], [(int) $leaveChain->user_id], true)
+            || (! empty($validated['delegate_user_id']) && (int) $validated['delegate_user_id'] === (int) $leaveChain->user_id)) {
+            throw ValidationException::withMessages([
+                'approver_user_id' => 'The employee cannot approve or delegate their own leave route.',
+            ]);
+        }
 
         $leaveChain->update([...$validated, 'updated_by' => $actor->id]);
 
@@ -194,15 +218,14 @@ class ApprovalController extends Controller
     {
         $actor = $request->user();
         abort_unless($actor && $actor->canDo('hr.approvals.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $allowedUserIds = $this->tenantUserIds($tenantId);
+        $allowedUserIds = $this->currentStaff->currentUserIds();
 
         $validated = $request->validate([
             'user_id' => ['required', 'integer', Rule::in($allowedUserIds)],
             'ordered_ids' => ['required', 'array', 'min:1'],
             'ordered_ids.*' => ['integer'],
         ]);
-        $routes = HrLeaveApprovalChain::forTenant($tenantId)
+        $routes = HrLeaveApprovalChain::query()
             ->where('user_id', $validated['user_id'])
             ->orderBy('approval_level')
             ->get();
@@ -229,7 +252,6 @@ class ApprovalController extends Controller
     {
         $actor = $request->user();
         abort_unless($actor && $actor->canDo('hr.approvals.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($actor), $leaveChain->tenant_id);
         $validated = $request->validate(['is_active' => ['required', 'boolean']]);
         $leaveChain->update(['is_active' => $validated['is_active'], 'updated_by' => $actor->id]);
 
@@ -240,20 +262,9 @@ class ApprovalController extends Controller
     {
         $actor = $request->user();
         abort_unless($actor && $actor->canDo('hr.approvals.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($actor), $leaveChain->tenant_id);
         $leaveChain->delete();
 
         return redirect()->back()->with('success', 'Leave approval route removed.');
-    }
-
-    /** @return array<int, int> */
-    private function tenantUserIds(int $tenantId): array
-    {
-        return User::query()
-            ->where('organization_id', $tenantId)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
     }
 
     /* ------------------------------------------------------------------ */
@@ -265,9 +276,15 @@ class ApprovalController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.approvals.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $currentApproverInstanceIds = HrApprovalInstance::query()
+            ->pending()
+            ->with('chain.steps')
+            ->get()
+            ->filter(fn (HrApprovalInstance $instance) => $this->workflowService->isCurrentApprover($instance, $user))
+            ->pluck('id');
 
-        $instances = HrApprovalInstance::forTenant($tenantId)
+        $instances = HrApprovalInstance::query()
+            ->whereKey($currentApproverInstanceIds)
             ->pending()
             ->with(['chain.steps', 'initiator:id,name', 'actions'])
             ->orderByDesc('initiated_at')
@@ -298,7 +315,8 @@ class ApprovalController extends Controller
         $nativeApprovals = collect();
 
         if ($user->canDo('hr.leave.approve') || $user->canDo('hr.leave.manage')) {
-            $nativeApprovals->push(...HrLeaveRequest::forTenant($tenantId)
+            $nativeApprovals->push(...$this->performanceAccess
+                ->applyHistoricalSubjectScope(HrLeaveRequest::query(), $user, 'user_id')
                 ->pending()
                 ->with('user:id,name')
                 ->latest('submitted_at')
@@ -317,7 +335,8 @@ class ApprovalController extends Controller
         }
 
         if ($user->canDo('hr.expenses.approve')) {
-            $nativeApprovals->push(...HrExpenseClaim::forTenant($tenantId)
+            $nativeApprovals->push(...$this->performanceAccess
+                ->applyExpenseClaimScope(HrExpenseClaim::query(), $user)
                 ->submitted()
                 ->with('user:id,name')
                 ->latest('submitted_at')
@@ -336,9 +355,8 @@ class ApprovalController extends Controller
         }
 
         if ($user->canDo('hr.recruitment.manage')) {
-            $nativeApprovals->push(...HrOffer::query()
+            $nativeApprovals->push(...$this->recruitmentAccess->visibleOffers($user)
                 ->where('approval_status', 'pending_approval')
-                ->whereHas('application', fn ($query) => $query->where('tenant_id', $tenantId))
                 ->with('application.candidate:id,first_name,last_name')
                 ->latest('approval_requested_at')
                 ->limit(20)
@@ -354,8 +372,7 @@ class ApprovalController extends Controller
                     'url' => route('hr.recruitment.index', ['tab' => 'offers'], false),
                 ]));
 
-            $nativeApprovals->push(...HrJobRequisition::query()
-                ->where('tenant_id', $tenantId)
+            $nativeApprovals->push(...$this->recruitmentAccess->visibleRequisitions($user)
                 ->where('requires_approval', true)
                 ->where('status', 'pending_approval')
                 ->latest('updated_at')
@@ -395,7 +412,10 @@ class ApprovalController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.approvals.view'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $instance->tenant_id);
+        $instance = HrApprovalInstance::query()
+            ->with('chain.steps')
+            ->findOrFail($instance->getKey());
+        abort_unless($this->workflowService->isCurrentApprover($instance, $user), 404);
 
         $validated = $request->validate([
             'action' => ['required', 'string', Rule::in(['approved', 'rejected', 'escalated'])],

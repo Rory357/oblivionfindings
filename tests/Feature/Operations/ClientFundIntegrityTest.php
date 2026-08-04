@@ -1,10 +1,12 @@
 <?php
 
 use App\Domain\Finance\Jobs\PostClientFundJournalJob;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientFund;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -31,12 +33,32 @@ function grantClientFundIntegrityPermissions(User $user, array $permissionKeys):
     $user->roles()->syncWithoutDetaching([$role->id]);
 }
 
-function makeClientFundIntegrityFund(int $organizationId = 1, string $balance = '100.00'): ClientFund
+function makeClientFundIntegrityUser(Site $site, array $permissionKeys = []): User
 {
-    $client = Client::factory()->create(['organization_id' => $organizationId]);
+    $user = User::factory()->create(['approved_at' => now()]);
+    HrEmployeeProfile::query()->create([
+        'user_id' => $user->id,
+        'employee_number' => 'EMP-FUND-'.$user->id,
+        'work_email' => $user->email,
+        'position_title' => 'Client Funds Officer',
+        'position_role' => 'finance',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subMonth()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+    ]);
+    grantClientFundIntegrityPermissions($user, $permissionKeys);
+
+    return $user;
+}
+
+function makeClientFundIntegrityFund(?Site $site = null, string $balance = '100.00'): ClientFund
+{
+    $site ??= Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
 
     return ClientFund::query()->create([
-        'organization_id' => $organizationId,
         'client_id' => $client->id,
         'fund_name' => 'Personal trust',
         'fund_type' => 'trust',
@@ -165,9 +187,9 @@ beforeEach(function () {
 });
 
 it('requires the client funds capability instead of broad client visibility', function () {
-    $fund = makeClientFundIntegrityFund();
-    $viewer = User::factory()->create(['organization_id' => 1]);
-    grantClientFundIntegrityPermissions($viewer, ['clients.viewAny']);
+    $site = Site::factory()->create();
+    $fund = makeClientFundIntegrityFund($site);
+    $viewer = makeClientFundIntegrityUser($site, ['clients.viewAny']);
 
     $payload = clientFundIntegrityTransactionPayload('credit', '10.00');
 
@@ -178,8 +200,7 @@ it('requires the client funds capability instead of broad client visibility', fu
     expect($fund->transactions()->count())->toBe(0)
         ->and((string) $fund->fresh()->balance)->toBe('100.00');
 
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientFundIntegrityPermissions($manager, ['client_funds.manage']);
+    $manager = makeClientFundIntegrityUser($site, ['client_funds.manage']);
 
     $this->actingAs($manager)
         ->post("/operations/client-funds/{$fund->id}/transactions", $payload)
@@ -189,10 +210,10 @@ it('requires the client funds capability instead of broad client visibility', fu
         ->and((string) $fund->fresh()->balance)->toBe('110.00');
 });
 
-it('rejects a client from another organisation when creating a fund', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientFundIntegrityPermissions($manager, ['client_funds.manage']);
-    $foreignClient = Client::factory()->create(['organization_id' => 2]);
+it('rejects a Client from another Site when creating a fund', function () {
+    $assignedSite = Site::factory()->create();
+    $manager = makeClientFundIntegrityUser($assignedSite, ['client_funds.manage']);
+    $foreignClient = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
 
     $this->actingAs($manager)
         ->from('/operations/client-funds/create')
@@ -203,17 +224,16 @@ it('rejects a client from another organisation when creating a fund', function (
             'total_budget' => '100.00',
             'balance' => '25.00',
         ])
-        ->assertSessionHasErrors('client_id');
+        ->assertForbidden();
 
     expect(ClientFund::query()
         ->where('client_id', $foreignClient->id)
         ->exists())->toBeFalse();
 });
 
-it('does not expose a fund from another organisation by id', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientFundIntegrityPermissions($manager, ['client_funds.manage']);
-    $foreignFund = makeClientFundIntegrityFund(2);
+it('does not expose a fund from another Site by id', function () {
+    $manager = makeClientFundIntegrityUser(Site::factory()->create(), ['client_funds.manage']);
+    $foreignFund = makeClientFundIntegrityFund(Site::factory()->create());
 
     $this->actingAs($manager)
         ->post(
@@ -227,9 +247,9 @@ it('does not expose a fund from another organisation by id', function () {
 });
 
 it('replays an idempotent transaction without changing the balance twice', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientFundIntegrityPermissions($manager, ['client_funds.manage']);
-    $fund = makeClientFundIntegrityFund();
+    $site = Site::factory()->create();
+    $manager = makeClientFundIntegrityUser($site, ['client_funds.manage']);
+    $fund = makeClientFundIntegrityFund($site);
     $key = Str::uuid()->toString();
     $payload = clientFundIntegrityTransactionPayload('credit', '25.00', $key);
 
@@ -248,9 +268,9 @@ it('replays an idempotent transaction without changing the balance twice', funct
 });
 
 it('rejects reuse of an idempotency key with a different payload', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientFundIntegrityPermissions($manager, ['client_funds.manage']);
-    $fund = makeClientFundIntegrityFund();
+    $site = Site::factory()->create();
+    $manager = makeClientFundIntegrityUser($site, ['client_funds.manage']);
+    $fund = makeClientFundIntegrityFund($site);
     $key = Str::uuid()->toString();
 
     $this->actingAs($manager)
@@ -273,9 +293,9 @@ it('rejects reuse of an idempotency key with a different payload', function () {
 });
 
 it('preserves exact running balances across sequential writes', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientFundIntegrityPermissions($manager, ['client_funds.manage']);
-    $fund = makeClientFundIntegrityFund();
+    $site = Site::factory()->create();
+    $manager = makeClientFundIntegrityUser($site, ['client_funds.manage']);
+    $fund = makeClientFundIntegrityFund($site);
 
     $this->actingAs($manager)
         ->post(
@@ -301,9 +321,9 @@ it('preserves exact running balances across sequential writes', function () {
 });
 
 it('uses exact decimal arithmetic for small currency amounts', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientFundIntegrityPermissions($manager, ['client_funds.manage']);
-    $fund = makeClientFundIntegrityFund(balance: '0.00');
+    $site = Site::factory()->create();
+    $manager = makeClientFundIntegrityUser($site, ['client_funds.manage']);
+    $fund = makeClientFundIntegrityFund($site, balance: '0.00');
 
     $this->actingAs($manager)
         ->post(
@@ -329,9 +349,9 @@ it('uses exact decimal arithmetic for small currency amounts', function () {
 });
 
 it('never creates a non-zero opening balance without a matching transaction', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientFundIntegrityPermissions($manager, ['client_funds.manage']);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $manager = makeClientFundIntegrityUser($site, ['client_funds.manage']);
+    $client = Client::factory()->create(['site_id' => $site->id]);
 
     $this->actingAs($manager)
         ->post('/operations/client-funds', [
@@ -365,9 +385,11 @@ it('serializes simultaneous fund movements without losing either balance update'
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
 
-    $actor = User::factory()->create(['organization_id' => 1]);
-    $fund = makeClientFundIntegrityFund(balance: '100.00');
+    $site = Site::factory()->create();
+    $actor = makeClientFundIntegrityUser($site);
+    $fund = makeClientFundIntegrityFund($site, balance: '100.00');
     $clientId = $fund->client_id;
+    $siteId = $site->id;
     $database = $connection->getDatabaseName();
     $token = Str::uuid()->toString();
     $releasePath = sys_get_temp_dir().DIRECTORY_SEPARATOR."client-fund-release-{$token}";
@@ -471,7 +493,9 @@ it('serializes simultaneous fund movements without losing either balance update'
             DB::table('client_fund_transactions')->where('client_fund_id', $fund->id)->delete();
             DB::table('client_funds')->where('id', $fund->id)->delete();
             DB::table('clients')->where('id', $clientId)->delete();
+            DB::table('hr_employee_profiles')->where('user_id', $actor->id)->delete();
             DB::table('users')->where('id', $actor->id)->delete();
+            DB::table('sites')->where('id', $siteId)->delete();
         } finally {
             $connection->beginTransaction();
         }

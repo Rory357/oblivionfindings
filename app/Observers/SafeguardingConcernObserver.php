@@ -179,7 +179,6 @@ class SafeguardingConcernObserver implements ShouldHandleEventsAfterCommit
                 'site_id' => $concern->site_id,
                 'client_id' => $concern->subject_type === 'App\\Models\\Client' ? $concern->subject_id : null,
                 'staff_id' => $concern->reported_by_user_id,
-                'organization_id' => $concern->organization_id,
                 'created_by' => $concern->reported_by_user_id,
             ]);
         } catch (\Throwable $e) {

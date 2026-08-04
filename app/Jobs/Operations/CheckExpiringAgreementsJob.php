@@ -15,20 +15,18 @@ class CheckExpiringAgreementsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(
-        public int $organizationId
-    ) {}
+    private const APPLICATION_STORAGE_CONTEXT_ID = 1;
 
     public function handle(FundingService $fundingService, OpsNotificationService $notificationService): void
     {
-        $expiring = $fundingService->getExpiringAgreements($this->organizationId);
-        $budgetAlerts = $fundingService->getBudgetAlerts($this->organizationId);
+        $expiring = $fundingService->getExpiringAgreements();
+        $budgetAlerts = $fundingService->getBudgetAlerts();
 
         foreach ($expiring as $agreement) {
             if ($agreement->created_by) {
                 $notificationService->notifySpecific(
                     $agreement->created_by,
-                    $this->organizationId,
+                    self::APPLICATION_STORAGE_CONTEXT_ID,
                     'Service Agreement Expiring',
                     sprintf(
                         'Service agreement "%s" for %s expires on %s.',
@@ -50,7 +48,7 @@ class CheckExpiringAgreementsJob implements ShouldQueue
             if ($agreement->created_by) {
                 $notificationService->notifySpecific(
                     $agreement->created_by,
-                    $this->organizationId,
+                    self::APPLICATION_STORAGE_CONTEXT_ID,
                     'Budget Alert',
                     sprintf(
                         'Service agreement "%s" has used %s%% of its budget ($%s of $%s).',
@@ -65,6 +63,6 @@ class CheckExpiringAgreementsJob implements ShouldQueue
             }
         }
 
-        Log::info("Checked expiring agreements for org {$this->organizationId}: {$expiring->count()} expiring, {$budgetAlerts->count()} budget alerts.");
+        Log::info("Checked application service agreements: {$expiring->count()} expiring, {$budgetAlerts->count()} budget alerts.");
     }
 }

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+use App\Models\Role;
 use App\Models\User;
+use App\Services\Clients\ClientPortalMembershipService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -11,6 +13,10 @@ use Illuminate\Validation\Rule;
 
 class ClientPortalUserController extends Controller
 {
+    public function __construct(
+        private readonly ClientPortalMembershipService $portalMembership,
+    ) {}
+
     public function edit(Request $request, Client $client)
     {
         $this->authorize('update', $client);
@@ -19,7 +25,7 @@ class ClientPortalUserController extends Controller
 
         return inertia('operations/clients/portal-users', [
             'client' => $client->only(['id', 'first_name', 'last_name']),
-            'portal_users' => $client->portalUsers->map(fn($u) => [
+            'portal_users' => $client->portalUsers->map(fn ($u) => [
                 'id' => $u->id,
                 'name' => $u->name,
                 'email' => $u->email,
@@ -44,7 +50,7 @@ class ClientPortalUserController extends Controller
         $action = $data['action'] ?? 'link';
         $user = User::where('email', $data['email'])->first();
 
-        if (!$user) {
+        if (! $user) {
             if ($action === 'create_user') {
                 if (empty($data['name'])) {
                     return back()->withErrors(['name' => 'Name is required to create a user.']);
@@ -57,7 +63,6 @@ class ClientPortalUserController extends Controller
                     'role' => $data['portal_role'],
                     'approved_at' => now(),
                 ]);
-                Password::sendResetLink(['email' => $user->email]);
             } elseif ($action === 'contact_only') {
                 if ($data['portal_role'] !== 'next_of_kin') {
                     return back()->withErrors(['portal_role' => 'Contact-only mode is only available for next of kin.']);
@@ -78,23 +83,24 @@ class ClientPortalUserController extends Controller
             } else {
                 return back()->withErrors(['email' => 'No user found with this email.']);
             }
-        } elseif ($action === 'create_user') {
+        }
+
+        $this->portalMembership->assertLinkable($user);
+        if ($action === 'create_user') {
             Password::sendResetLink(['email' => $user->email]);
         }
 
         // Ensure role
         if ($data['portal_role'] === 'client') {
-            $role = \App\Models\Role::where('name', 'client')->first();
+            $role = Role::where('name', 'client')->first();
         } else {
-            $role = \App\Models\Role::where('name', 'next_of_kin')->first();
+            $role = Role::where('name', 'next_of_kin')->first();
         }
         if ($role) {
             $user->roles()->syncWithoutDetaching([$role->id]);
         }
 
-        $client->portalUsers()->syncWithoutDetaching([
-            $user->id => ['relation' => $data['relation']],
-        ]);
+        $this->portalMembership->link($client, $user, $data['relation']);
 
         return back()->with('status', 'Portal user linked.');
     }
@@ -103,7 +109,7 @@ class ClientPortalUserController extends Controller
     {
         $this->authorize('update', $client);
 
-        $client->portalUsers()->detach($user->id);
+        abort_unless($this->portalMembership->unlink($client, $user), 404);
 
         return back()->with('status', 'Portal user unlinked.');
     }

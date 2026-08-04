@@ -6,21 +6,26 @@ use App\Domain\Hr\Models\HrCalendarEvent;
 use App\Domain\Hr\Models\HrICalToken;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPublicHoliday;
+use App\Domain\Hr\Services\HrCalendarAccessService;
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\Shift;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class ICalController extends Controller
 {
-    use ResolvesHrTenant;
+    public function __construct(
+        private readonly HrCalendarAccessService $calendarAccess,
+        private readonly HrCurrentStaffService $currentStaff,
+    ) {}
 
     public function feed(Request $request, string $token)
     {
         $icalToken = HrICalToken::where('token', $token)->firstOrFail();
         $user = $icalToken->user;
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        abort_unless($user && $this->currentStaff->isCurrent($user), 404);
 
         $events = [];
 
@@ -39,15 +44,18 @@ class ICalController extends Controller
             );
         }
 
-        // Calendar events — tenant-scoped (previously leaked across tenants).
-        // Limit raised 100→500 (audit fix round 2): busy orgs were silently
-        // truncated after ~1 month of events.
-        $calEvents = HrCalendarEvent::forTenant($tenantId)
+        // Personal subscriptions include application-wide rows plus events whose
+        // explicit people/Site/department/team audience contains the token user.
+        // Filter before the 500-row cap so hidden rows never consume visible slots.
+        $calEvents = HrCalendarEvent::query()
             ->active()
             ->where('starts_at', '>=', now()->subMonths(3))
+            ->with('attendees')
             ->orderBy('starts_at')
-            ->limit(500)
-            ->get();
+            ->lazy(100)
+            ->filter(fn (HrCalendarEvent $event) => $this->eventIsVisibleTo($event, $user))
+            ->take(500)
+            ->collect();
 
         foreach ($calEvents as $event) {
             $events[] = $this->formatEvent(
@@ -88,8 +96,8 @@ class ICalController extends Controller
             );
         }
 
-        // Org public holidays (audit fix round 2) — all-day rows.
-        $holidays = HrPublicHoliday::forTenant($tenantId)
+        // Application public holidays — all-day rows.
+        $holidays = HrPublicHoliday::query()
             ->where('date', '>=', now()->subMonths(3))
             ->orderBy('date')
             ->limit(100)
@@ -121,7 +129,7 @@ class ICalController extends Controller
     public function generateToken(Request $request)
     {
         $user = $request->user();
-        abort_unless($user, 403);
+        abort_unless($user && $this->currentStaff->isCurrent($user), 403);
 
         $token = HrICalToken::updateOrCreate(
             ['user_id' => $user->id],
@@ -147,6 +155,11 @@ class ICalController extends Controller
         $event .= "END:VEVENT\r\n";
 
         return $event;
+    }
+
+    private function eventIsVisibleTo(HrCalendarEvent $event, User $user): bool
+    {
+        return $this->calendarAccess->canViewEvent($user, $event);
     }
 
     private function escapeIcal(string $text): string

@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\Site;
 use App\Models\User;
 use Database\Factories\Hr\HrEmployeeProfileFactory;
@@ -15,7 +16,7 @@ use Illuminate\Support\Str;
 
 class HrEmployeeProfile extends Model
 {
-    use AuditableChanges, HasFactory, SoftDeletes;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
@@ -23,7 +24,6 @@ class HrEmployeeProfile extends Model
     }
 
     protected $fillable = [
-        'tenant_id',
         'user_id',
         'employee_number',
         'date_of_birth',
@@ -178,11 +178,6 @@ class HrEmployeeProfile extends Model
     /*  Scopes */
     /* ------------------------------------------------------------------ */
 
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
-
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
@@ -212,7 +207,7 @@ class HrEmployeeProfile extends Model
         return $normalised === '' ? null : $normalised;
     }
 
-    public static function canonicalTeamForTenant(?string $team, int $tenantId): ?string
+    public static function canonicalTeam(?string $team): ?string
     {
         $normalised = self::normalizeTeam($team);
         if ($normalised === null) {
@@ -220,7 +215,6 @@ class HrEmployeeProfile extends Model
         }
 
         $match = self::query()
-            ->where('tenant_id', $tenantId)
             ->whereNotNull('team')
             ->pluck('team')
             ->map(fn (string $existing) => self::normalizeTeam($existing))

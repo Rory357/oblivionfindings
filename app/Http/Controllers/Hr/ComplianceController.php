@@ -2,30 +2,37 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Concerns\ServesPrivateAttachments;
-use App\Http\Controllers\Hr\Concerns\BuildsComplianceHero;
-use App\Http\Controllers\Hr\Concerns\ProvidesComplianceWizardData;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Domain\Hr\Models\HrComplianceRenewalSnooze;
 use App\Domain\Hr\Models\HrComplianceRequirement;
 use App\Domain\Hr\Models\HrDriverEligibility;
-use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Services\ComplianceMatrixService;
+use App\Domain\Hr\Services\HrComplianceReminderDeliveryService;
+use App\Domain\Hr\Services\PeopleMutationLockService;
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\BuildsComplianceHero;
+use App\Http\Controllers\Hr\Concerns\ProvidesComplianceWizardData;
 use App\Models\Shift;
 use App\Models\StaffBackgroundCheck;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Throwable;
 
 class ComplianceController extends Controller
 {
     use BuildsComplianceHero;
     use ProvidesComplianceWizardData;
-    use ResolvesHrTenant;
     use ServesPrivateAttachments;
 
     /** Manual / recorded compliance status values a manager may set. */
@@ -33,108 +40,126 @@ class ComplianceController extends Controller
 
     public function __construct(
         private readonly ComplianceMatrixService $complianceMatrixService,
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly PeopleMutationLockService $mutationLocks,
+        private readonly HrComplianceReminderDeliveryService $reminderDeliveries,
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Index — staff compliance table with per-user breakdown             */
+    /*  Index — staff compliance table with per-user breakdown */
     /* ------------------------------------------------------------------ */
 
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $search = trim((string) $request->query('q', ''));
         $statusFilter = $request->query('status');
         $requirementId = $request->query('requirement_id');
 
         // Requirements list for filter dropdown
-        $requirements = HrComplianceRequirement::where('tenant_id', $tenantId)
+        $requirements = HrComplianceRequirement::query()
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'check_type as type']);
 
-        // Build per-staff compliance stats from hr_staff_compliance_status
-        $totalRequirements = HrComplianceRequirement::where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->count();
-
-        // Get active staff user IDs from employee profiles
-        $activeStaffQuery = HrEmployeeProfile::where('tenant_id', $tenantId)->where('is_active', true);
-        $activeStaffUserIds = (clone $activeStaffQuery)->pluck('user_id');
-
         // Build paginated per-user compliance data
-        $staffQuery = User::whereIn('id', $activeStaffUserIds)
+        $staffQuery = $this->visibleCurrentStaffQuery($user)
+            ->with([
+                'roles:id,name',
+                'hrEmployeeProfile:id,user_id,work_email,primary_site_id,secondary_site_ids',
+                'hrEmployeeProfile.primarySite:id,type',
+            ])
             ->when($search !== '', fn ($q) => $q->where(function ($q2) use ($search) {
                 $q2->where('name', 'like', "%{$search}%")
-                   ->orWhere('email', 'like', "%{$search}%");
-            }))
-            ->when($requirementId, fn ($q) => $q->whereHas('complianceStatuses', fn ($cs) =>
-                $cs->where('tenant_id', $tenantId)->where('requirement_id', $requirementId)
-            ));
+                    ->orWhereHas('hrEmployeeProfile', fn (Builder $profile) => $profile
+                        ->where('work_email', 'like', "%{$search}%"));
+            }));
 
-        // Apply status filter
-        if ($statusFilter === 'fully_compliant') {
-            $staffQuery->whereDoesntHave('complianceStatuses', fn ($q) =>
-                $q->where('tenant_id', $tenantId)->whereIn('status', ['expired', 'expiring_soon', 'not_started'])
-            );
-        } elseif ($statusFilter === 'has_expired') {
-            $staffQuery->whereHas('complianceStatuses', fn ($q) =>
-                $q->where('tenant_id', $tenantId)->where('status', 'expired')
-            );
-        } elseif ($statusFilter === 'has_expiring') {
-            $staffQuery->whereHas('complianceStatuses', fn ($q) =>
-                $q->where('tenant_id', $tenantId)->where('status', 'expiring_soon')
-            );
-        } elseif ($statusFilter === 'incomplete') {
-            $staffQuery->whereHas('complianceStatuses', fn ($q) =>
-                $q->where('tenant_id', $tenantId)->where('status', 'not_started')
-            );
+        // Apply requirement and status filters against exact matrix snapshots,
+        // not only materialised status rows. Newly applicable requirements are
+        // therefore immediately discoverable as not started.
+        if ($requirementId || $statusFilter) {
+            $population = (clone $staffQuery)->get();
+            $snapshots = $this->complianceMatrixService->snapshotsForUsers($population);
+            $requirementFilterId = is_numeric($requirementId) ? (int) $requirementId : 0;
+            $matchingUserIds = $snapshots
+                ->filter(function (Collection $rows) use ($requirementId, $requirementFilterId, $statusFilter): bool {
+                    if ($requirementId && ! $rows->contains(
+                        fn (array $row): bool => (int) $row['requirement']->id === $requirementFilterId,
+                    )) {
+                        return false;
+                    }
+
+                    return match ($statusFilter) {
+                        'fully_compliant' => $rows->isNotEmpty()
+                            && $rows->every(fn (array $row): bool => $row['status'] === 'compliant'),
+                        'has_expired' => $rows->contains(fn (array $row): bool => $row['status'] === 'expired'),
+                        'has_expiring' => $rows->contains(fn (array $row): bool => $row['status'] === 'expiring_soon'),
+                        'incomplete' => $rows->contains(fn (array $row): bool => $row['status'] === 'not_started'),
+                        'hard_stop' => $rows->contains(fn (array $row): bool => (bool) $row['requirement']->hard_stop
+                            && in_array($row['status'], ['expired', 'not_started'], true)),
+                        default => true,
+                    };
+                })
+                ->keys()
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+            $staffQuery->whereIn('users.id', $matchingUserIds ?: [-1]);
         }
 
         $staffPaginated = $staffQuery
-            ->withCount([
-                'complianceStatuses as compliant_count' => fn ($q) => $q->where('tenant_id', $tenantId)->where('status', 'compliant'),
-                'complianceStatuses as expired_count' => fn ($q) => $q->where('tenant_id', $tenantId)->where('status', 'expired'),
-                'complianceStatuses as expiring_soon_count' => fn ($q) => $q->where('tenant_id', $tenantId)->where('status', 'expiring_soon'),
-                'complianceStatuses as not_started_count' => fn ($q) => $q->where('tenant_id', $tenantId)->where('status', 'not_started'),
-            ])
             ->orderBy('name')
             ->paginate(20)
             ->withQueryString();
 
         // Pre-load future shift counts for staff on this page (lightweight aggregate)
         $pageUserIds = $staffPaginated->getCollection()->pluck('id');
-        $futureShiftCounts = $pageUserIds->isNotEmpty()
-            ? Shift::query()
+        $futureShiftCounts = collect();
+        if ($pageUserIds->isNotEmpty()) {
+            $futureShiftQuery = Shift::query()
                 ->whereIn('user_id', $pageUserIds)
                 ->where('status', 'scheduled')
                 ->where('starts_at', '>', now())
-                ->where('starts_at', '<', now()->addDays(14))
+                ->where('starts_at', '<', now()->addDays(14));
+            $this->siteAccess->applyShiftScope($futureShiftQuery, $user);
+            $futureShiftCounts = $futureShiftQuery
                 ->selectRaw('user_id, COUNT(*) as shift_count')
                 ->groupBy('user_id')
-                ->pluck('shift_count', 'user_id')
-            : collect();
+                ->pluck('shift_count', 'user_id');
+        }
 
         // Vetting + driver rollups for the unified Overview chips (one query each, no N+1).
-        [$vettingRollup, $driverRollup] = $this->statusRollups($pageUserIds, $tenantId);
+        [$vettingRollup, $driverRollup] = $this->statusRollups($pageUserIds);
 
         // Transform paginated data to match frontend StaffStatus interface
-        $staffPaginated->getCollection()->transform(function ($staffUser) use ($futureShiftCounts, $vettingRollup, $driverRollup) {
-            $total = max($staffUser->compliant_count + $staffUser->expired_count + $staffUser->expiring_soon_count + $staffUser->not_started_count, 1);
-            $hasIssues = $staffUser->expired_count > 0 || $staffUser->expiring_soon_count > 0;
+        $pageSummaries = $this->complianceMatrixService
+            ->summariesForUsers($staffPaginated->getCollection());
+        $staffPaginated->getCollection()->transform(function ($staffUser) use ($futureShiftCounts, $vettingRollup, $driverRollup, $pageSummaries) {
+            $summary = $pageSummaries->get((int) $staffUser->id, [
+                'total' => 0,
+                'compliant' => 0,
+                'expired' => 0,
+                'expiring_soon' => 0,
+                'not_started' => 0,
+            ]);
+            $total = $summary['total'];
+            $hasIssues = $summary['expired'] > 0
+                || $summary['expiring_soon'] > 0
+                || $summary['not_started'] > 0;
+
             return [
                 'user_id' => $staffUser->id,
                 'user_name' => $staffUser->name,
-                'user_email' => $staffUser->email,
+                'user_email' => $staffUser->hrEmployeeProfile?->work_email,
                 'total_requirements' => $total,
-                'compliant_count' => $staffUser->compliant_count,
-                'expired_count' => $staffUser->expired_count,
-                'expiring_soon_count' => $staffUser->expiring_soon_count,
-                'not_started_count' => $staffUser->not_started_count,
+                'compliant_count' => $summary['compliant'],
+                'expired_count' => $summary['expired'],
+                'expiring_soon_count' => $summary['expiring_soon'],
+                'not_started_count' => $summary['not_started'],
                 'compliance_percent' => $total > 0
-                    ? (int) round(($staffUser->compliant_count / $total) * 100)
+                    ? (int) round(($summary['compliant'] / $total) * 100)
                     : 0,
                 'future_shifts_affected' => $hasIssues ? (int) ($futureShiftCounts->get($staffUser->id, 0)) : 0,
                 'vetting_status' => $vettingRollup->get($staffUser->id, 'none'),
@@ -143,14 +168,14 @@ class ComplianceController extends Controller
         });
 
         // Hero band (golden) + the aggregate summary feeding the KPI tiles.
-        $hero = $this->complianceHero($user, $tenantId);
+        $hero = $this->complianceHero($user);
 
         return Inertia::render('hr/compliance/index', [
             'hero' => $hero,
             'staffStatuses' => $staffPaginated,
             'summary' => $hero['summary'],
             'requirements' => $requirements,
-            'wizard' => $this->complianceWizardData($tenantId),
+            'wizard' => $this->complianceWizardData($user),
             'filters' => [
                 'q' => $search,
                 'status' => $statusFilter,
@@ -171,14 +196,14 @@ class ComplianceController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Vetting + driver status rollups (shared by Overview + staff hub)   */
+    /*  Vetting + driver status rollups (shared by Overview + staff hub) */
     /* ------------------------------------------------------------------ */
 
     /**
-     * @return array{0:\Illuminate\Support\Collection,1:\Illuminate\Support\Collection}
-     *         [ user_id => vetting_status, user_id => driver_status ]
+     * @return array{0:Collection,1:Collection}
+     *                                          [ user_id => vetting_status, user_id => driver_status ]
      */
-    private function statusRollups($userIds, ?int $tenantId): array
+    private function statusRollups($userIds): array
     {
         if ($userIds->isEmpty()) {
             return [collect(), collect()];
@@ -204,7 +229,7 @@ class ComplianceController extends Controller
             });
 
         // Driver eligibility status per user (derive expired from licence date).
-        $driverRollup = HrDriverEligibility::where('tenant_id', $tenantId)
+        $driverRollup = HrDriverEligibility::query()
             ->whereIn('user_id', $userIds)
             ->get(['user_id', 'status', 'licence_expires_at'])
             ->keyBy('user_id')
@@ -239,68 +264,70 @@ class ComplianceController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Staff Detail — per-staff compliance view                           */
+    /*  Staff Detail — per-staff compliance view */
     /* ------------------------------------------------------------------ */
 
-    public function staffDetail(Request $request, User $staff)
+    public function staffDetail(Request $request, string $staff)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $staff = $this->currentVisibleStaff($staff, $user);
 
-        $belongsToTenant = HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->where('user_id', $staff->id)
-            ->exists();
-        if (! $belongsToTenant) {
-            abort(404);
-        }
-
+        $applicableRequirements = $this->complianceMatrixService
+            ->getApplicableRequirements($staff)
+            ->keyBy('id');
         $statuses = HrStaffComplianceStatus::where('user_id', $staff->id)
-            ->where('tenant_id', $tenantId)
+            ->whereIn('requirement_id', $applicableRequirements->keys())
             ->with('requirement:id,code,name,description,category,check_type,hard_stop,validity_months')
             ->orderBy('status')
-            ->get();
+            ->get()
+            ->keyBy('requirement_id');
 
-        $complianceStatuses = $statuses
-            ->map(fn (HrStaffComplianceStatus $status) => [
-                'id' => $status->id,
-                'requirement_id' => $status->requirement_id,
-                'requirement_name' => $status->requirement?->name ?? 'Unknown requirement',
-                'requirement_type' => $status->requirement?->check_type ?? 'manual',
-                'renewal_period_months' => $status->requirement?->validity_months,
-                'status' => $status->status,
-                'expiry_date' => optional($status->expires_at)->toDateString(),
-                'completed_date' => optional($status->valid_from)->toDateString(),
-                'evidence_url' => $status->evidence_url ?? null,
-                'evidence_notes' => $status->notes ?? null,
-                'is_mandatory' => (bool) ($status->requirement?->hard_stop ?? false),
-            ])
+        $complianceStatuses = $applicableRequirements
+            ->map(function (HrComplianceRequirement $requirement) use ($statuses): array {
+                $status = $statuses->get($requirement->id);
+
+                return [
+                    'id' => $status?->id,
+                    'requirement_id' => $requirement->id,
+                    'requirement_name' => $requirement->name,
+                    'requirement_type' => $requirement->check_type,
+                    'renewal_period_months' => $requirement->validity_months,
+                    'status' => $status?->status ?? 'not_started',
+                    'expiry_date' => optional($status?->expires_at)->toDateString(),
+                    'completed_date' => optional($status?->valid_from)->toDateString(),
+                    'evidence_url' => $status?->evidence_url,
+                    'evidence_notes' => $status?->notes,
+                    'is_mandatory' => (bool) $requirement->hard_stop,
+                ];
+            })
             ->values();
 
-        $summary = [
-            'compliant' => $statuses->where('status', 'compliant')->count(),
-            'expiring_soon' => $statuses->where('status', 'expiring_soon')->count(),
-            'expired' => $statuses->where('status', 'expired')->count(),
-            'not_started' => $statuses->where('status', 'not_started')->count(),
-        ];
+        $summary = $this->complianceMatrixService->summaryForUser($staff);
 
-        $hardStopFailures = $this->complianceMatrixService->getHardStopFailures($staff);
+        $hardStopFailures = collect(
+            $this->complianceMatrixService->canAssignToShift($staff)['failures'],
+        );
         $softWarnings = $this->complianceMatrixService->getSoftWarnings($staff);
 
         // Latest vetting check + driver record for the right-hand unification panels.
-        $latestVetting = StaffBackgroundCheck::where('user_id', $staff->id)
-            ->orderByDesc('created_at')
-            ->first();
-        $driverRecord = HrDriverEligibility::where('tenant_id', $tenantId)
-            ->where('user_id', $staff->id)
-            ->first();
+        $canViewVetting = $user->canDo('hr.vetting.view');
+        $canViewDriver = $user->canDo('hr.driver.view');
+        $latestVetting = $canViewVetting
+            ? StaffBackgroundCheck::where('user_id', $staff->id)
+                ->orderByDesc('created_at')
+                ->first()
+            : null;
+        $driverRecord = $canViewDriver
+            ? HrDriverEligibility::query()->where('user_id', $staff->id)->first()
+            : null;
 
-        $futureShifts = Shift::where('user_id', $staff->id)
+        $futureShiftQuery = Shift::where('user_id', $staff->id)
             ->where('status', 'scheduled')
             ->where('starts_at', '>', now())
-            ->where('starts_at', '<', now()->addDays(14))
-            ->count();
+            ->where('starts_at', '<', now()->addDays(14));
+        $this->siteAccess->applyShiftScope($futureShiftQuery, $user);
+        $futureShifts = $futureShiftQuery->count();
 
         // Expiring licence vs already-rostered future shifts (audit fix round
         // 2, item 6): shifts this driver is booked on that START AFTER the
@@ -309,14 +336,15 @@ class ComplianceController extends Controller
         // surface them so HR can re-roster proactively.
         $atRiskShifts = [];
         if ($driverRecord && $driverRecord->licence_expires_at) {
-            $atRiskShifts = Shift::where('user_id', $staff->id)
+            $atRiskShiftQuery = Shift::where('user_id', $staff->id)
                 ->where('status', 'scheduled')
                 ->where('starts_at', '>', now())
                 ->where('starts_at', '>', $driverRecord->licence_expires_at->copy()->endOfDay())
                 ->orderBy('starts_at')
                 ->limit(10)
-                ->with('site:id,name')
-                ->get()
+                ->with('site:id,name');
+            $this->siteAccess->applyShiftScope($atRiskShiftQuery, $user);
+            $atRiskShifts = $atRiskShiftQuery->get()
                 ->map(fn (Shift $s) => [
                     'id' => $s->id,
                     'date' => $s->starts_at->toDateString(),
@@ -326,7 +354,7 @@ class ComplianceController extends Controller
         }
 
         // Active requirements offered in the Record / Waive wizards launched here.
-        $requirements = HrComplianceRequirement::where('tenant_id', $tenantId)
+        $requirements = HrComplianceRequirement::query()
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'code', 'name', 'category', 'check_type', 'validity_months', 'hard_stop'])
@@ -341,15 +369,18 @@ class ComplianceController extends Controller
             ]);
 
         return Inertia::render('hr/compliance/staff-detail', [
-            'staff' => $staff->only(['id', 'name', 'email']),
+            'staff' => [
+                'id' => $staff->id,
+                'name' => $staff->name,
+                'email' => $staff->hrEmployeeProfile?->work_email,
+            ],
             'complianceStatuses' => $complianceStatuses,
             'summary' => $summary,
-            'statuses' => $statuses,
             'hardStopFailures' => $hardStopFailures,
             'softWarnings' => $softWarnings,
             'futureShiftsAffected' => $hardStopFailures->isNotEmpty() ? $futureShifts : 0,
             'requirements' => $requirements,
-            'wizard' => $this->complianceWizardData($tenantId),
+            'wizard' => $this->complianceWizardData($user),
             'vetting' => $latestVetting ? [
                 'id' => $latestVetting->id,
                 'status' => $this->mapVettingStatus($latestVetting->status, $latestVetting->expires_at),
@@ -368,75 +399,224 @@ class ComplianceController extends Controller
             ] : null,
             'can' => [
                 'manage' => $user->canDo('hr.compliance.manage'),
-                'vetting' => $user->canDo('hr.vetting.view'),
-                'driver' => $user->canDo('hr.driver.view'),
+                'vetting' => $canViewVetting,
+                'driver' => $canViewDriver,
             ],
         ]);
     }
 
+    public function concealInvalidStaff(): never
+    {
+        abort(404);
+    }
+
+    public function concealInvalidStatus(): never
+    {
+        abort(404);
+    }
+
     /* ================================================================== */
-    /*  Record / update a staff compliance status — THE write path        */
+    /*  Record / update a staff compliance status — THE write path */
     /* ================================================================== */
 
-    public function storeStatus(Request $request, User $staff)
+    public function storeStatus(Request $request, string $staff)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $staff = $this->currentVisibleStaff($staff, $user);
+        $validated = $this->validateStatusPayload($request);
 
-        $belongsToTenant = HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->where('user_id', $staff->id)
-            ->exists();
-        abort_unless($belongsToTenant, 404);
+        $newEvidencePath = null;
+        $committed = false;
+        if ($request->hasFile('evidence_file') && DB::transactionLevel() > 0) {
+            // The controller may be called inside a wider transaction. Register
+            // against that outer transaction before opening our savepoint so a
+            // later outer rollback cannot strand the newly stored private file.
+            DB::afterRollBack(function () use (&$newEvidencePath): void {
+                $this->deleteEvidencePath('private', $newEvidencePath);
+            });
+        }
+        try {
+            DB::transaction(function () use (
+                $request,
+                $user,
+                $staff,
+                $validated,
+                &$newEvidencePath,
+                &$committed,
+            ): void {
+                [$lockedActor, $lockedStaff] = $this->lockAndReauthoriseStaff($user, $staff);
+                $requirement = HrComplianceRequirement::query()
+                    ->whereKey($validated['requirement_id'])
+                    ->where('is_active', true)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+                $status = HrStaffComplianceStatus::query()
+                    ->where('user_id', $lockedStaff->id)
+                    ->where('requirement_id', $requirement->id)
+                    ->lockForUpdate()
+                    ->first() ?? new HrStaffComplianceStatus([
+                        'user_id' => $lockedStaff->id,
+                        'requirement_id' => $requirement->id,
+                    ]);
+                $oldEvidenceDisk = $status->evidence_disk;
+                $oldEvidencePath = $status->evidence_path;
 
-        $validated = $this->validateStatusPayload($request, $tenantId);
+                $newEvidencePath = $this->applyStatusPayload(
+                    $status,
+                    $validated,
+                    $request,
+                    $lockedActor->id,
+                );
+                $this->persistComplianceStatus($status);
+                DB::afterCommit(function () use (
+                    &$committed,
+                    $oldEvidenceDisk,
+                    $oldEvidencePath,
+                    $newEvidencePath,
+                ): void {
+                    $committed = true;
+                    try {
+                        if ($newEvidencePath && $oldEvidencePath !== $newEvidencePath) {
+                            $this->deleteEvidencePath($oldEvidenceDisk, $oldEvidencePath);
+                        }
+                    } catch (Throwable $exception) {
+                        report($exception);
+                    }
+                });
+            }, 1);
+        } catch (Throwable $exception) {
+            if (! $committed) {
+                $this->deleteEvidencePath('private', $newEvidencePath);
+            }
 
-        $requirement = HrComplianceRequirement::where('id', $validated['requirement_id'])
-            ->where('tenant_id', $tenantId)
-            ->firstOrFail();
-
-        $status = HrStaffComplianceStatus::firstOrNew([
-            'tenant_id' => $tenantId,
-            'user_id' => $staff->id,
-            'requirement_id' => $requirement->id,
-        ]);
-
-        $this->applyStatusPayload($status, $validated, $request, $tenantId, $user->id);
-        $status->save();
+            throw $exception;
+        }
 
         return redirect()->back()->with('success', "Compliance recorded for {$staff->name}.");
     }
 
-    public function updateStatus(Request $request, HrStaffComplianceStatus $status)
+    public function updateStatus(Request $request, string $status)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $status->tenant_id);
+        $status = $this->currentVisibleStatus($status, $user);
+        $validated = $this->validateStatusPayload($request, requireRequirement: false);
 
-        $validated = $this->validateStatusPayload($request, $tenantId, requireRequirement: false);
-        $this->applyStatusPayload($status, $validated, $request, $tenantId, $user->id);
-        $status->save();
+        $newEvidencePath = null;
+        $committed = false;
+        if ($request->hasFile('evidence_file') && DB::transactionLevel() > 0) {
+            DB::afterRollBack(function () use (&$newEvidencePath): void {
+                $this->deleteEvidencePath('private', $newEvidencePath);
+            });
+        }
+        try {
+            DB::transaction(function () use (
+                $request,
+                $user,
+                $status,
+                $validated,
+                &$newEvidencePath,
+                &$committed,
+            ): void {
+                [$lockedActor, $lockedStatus] = $this->lockAndReauthoriseStatus($user, $status);
+                HrComplianceRequirement::query()
+                    ->whereKey($lockedStatus->requirement_id)
+                    ->where('is_active', true)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+                $oldEvidenceDisk = $lockedStatus->evidence_disk;
+                $oldEvidencePath = $lockedStatus->evidence_path;
+                $newEvidencePath = $this->applyStatusPayload(
+                    $lockedStatus,
+                    $validated,
+                    $request,
+                    $lockedActor->id,
+                );
+                $this->persistComplianceStatus($lockedStatus);
+                DB::afterCommit(function () use (
+                    &$committed,
+                    $oldEvidenceDisk,
+                    $oldEvidencePath,
+                    $newEvidencePath,
+                ): void {
+                    $committed = true;
+                    try {
+                        if ($newEvidencePath && $oldEvidencePath !== $newEvidencePath) {
+                            $this->deleteEvidencePath($oldEvidenceDisk, $oldEvidencePath);
+                        }
+                    } catch (Throwable $exception) {
+                        report($exception);
+                    }
+                });
+            }, 1);
+        } catch (Throwable $exception) {
+            if (! $committed) {
+                $this->deleteEvidencePath('private', $newEvidencePath);
+            }
+
+            throw $exception;
+        }
 
         return redirect()->back()->with('success', 'Compliance status updated.');
     }
 
-    private function validateStatusPayload(Request $request, ?int $tenantId, bool $requireRequirement = true): array
+    private function validateStatusPayload(Request $request, bool $requireRequirement = true): array
     {
-        return $request->validate([
-            'requirement_id' => [$requireRequirement ? 'required' : 'nullable', 'integer', Rule::exists('hr_compliance_requirements', 'id')->where('tenant_id', $tenantId)],
+        return $this->validateStatusSemantics($request->validate([
+            'requirement_id' => [
+                $requireRequirement ? 'required' : 'nullable',
+                'integer',
+                Rule::exists('hr_compliance_requirements', 'id')->where('is_active', true),
+            ],
             'status' => ['required', 'string', Rule::in(self::STATUS_VALUES)],
             'valid_from' => ['nullable', 'date'],
             'expires_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'evidence_category' => ['nullable', 'string', 'max:100'],
             'evidence_file' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,heic', 'max:10240'],
-        ]);
+        ]));
     }
 
-    private function applyStatusPayload(HrStaffComplianceStatus $status, array $validated, Request $request, ?int $tenantId, int $actorId): void
+    private function validateStatusSemantics(array $validated): array
     {
+        $status = (string) $validated['status'];
+        $validFrom = filled($validated['valid_from'] ?? null)
+            ? Carbon::parse($validated['valid_from'])->startOfDay()
+            : null;
+        $expiresAt = filled($validated['expires_at'] ?? null)
+            ? Carbon::parse($validated['expires_at'])->startOfDay()
+            : null;
+        $errors = [];
+
+        if ($validFrom && $expiresAt && $expiresAt->lt($validFrom)) {
+            $errors['expires_at'] = 'The expiry date must be on or after the valid-from date.';
+        }
+        if (in_array($status, ['compliant', 'expiring_soon'], true)
+            && $validFrom?->isAfter(today())) {
+            $errors['valid_from'] = 'A current status cannot begin in the future.';
+        }
+        if (in_array($status, ['compliant', 'expiring_soon'], true)
+            && $expiresAt?->isBefore(today())) {
+            $errors['expires_at'] = 'A current status cannot use an expiry date in the past.';
+        }
+        if ($status === 'expiring_soon' && ! $expiresAt) {
+            $errors['expires_at'] = 'An expiring-soon status requires an expiry date.';
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return $validated;
+    }
+
+    private function applyStatusPayload(
+        HrStaffComplianceStatus $status,
+        array $validated,
+        Request $request,
+        int $actorId,
+    ): ?string {
         $status->fill([
             'status' => $validated['status'],
             'evidence_type' => 'manual',
@@ -445,37 +625,57 @@ class ComplianceController extends Controller
             'expires_at' => $validated['expires_at'] ?? null,
             'notes' => $validated['notes'] ?? null,
             'recorded_by' => $actorId,
+            'exemption_reason' => null,
+            'exempted_by' => null,
+            'exempted_until' => null,
+            'exempted_at' => null,
             'last_checked_at' => now(),
             'next_check_at' => now()->addDay(),
         ]);
 
+        $newEvidencePath = null;
         if ($request->hasFile('evidence_file')) {
-            // Replace any prior evidence file, then store the new one privately under
-            // a tenant-scoped, unguessable path (never reachable at a public URL).
-            $this->deleteEvidenceFile($status);
             $file = $request->file('evidence_file');
             $ext = $file->getClientOriginalExtension() ?: $file->extension();
-            $dir = "hr-compliance/evidence/{$tenantId}";
-            $name = Str::uuid()->toString() . ($ext ? ".{$ext}" : '');
-            \Illuminate\Support\Facades\Storage::disk('private')->putFileAs($dir, $file, $name);
+            $dir = 'hr-compliance/evidence';
+            $name = Str::uuid()->toString().($ext ? ".{$ext}" : '');
+            $candidatePath = "{$dir}/{$name}";
+            try {
+                $storedPath = Storage::disk('private')->putFileAs($dir, $file, $name);
+                $stored = is_string($storedPath)
+                    && $storedPath === $candidatePath
+                    && Storage::disk('private')->exists($storedPath);
+            } catch (Throwable $exception) {
+                $this->deleteEvidencePath('private', $candidatePath);
+
+                throw $exception;
+            }
+            if (! $stored) {
+                $this->deleteEvidencePath('private', $candidatePath);
+                throw ValidationException::withMessages([
+                    'evidence_file' => 'The evidence file could not be stored. Please try again.',
+                ]);
+            }
+            $newEvidencePath = $storedPath;
 
             $status->evidence_disk = 'private';
-            $status->evidence_path = "{$dir}/{$name}";
+            $status->evidence_path = $storedPath;
             $status->evidence_filename = $file->getClientOriginalName();
             $status->evidence_mime = $file->getClientMimeType();
         }
+
+        return $newEvidencePath;
     }
 
     /* ================================================================== */
-    /*  Waive / exempt — lift a hard-stop with reason + approver           */
+    /*  Waive / exempt — lift a hard-stop with reason + approver */
     /* ================================================================== */
 
-    public function exempt(Request $request, HrStaffComplianceStatus $status)
+    public function exempt(Request $request, string $status)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $status->tenant_id);
+        $status = $this->currentVisibleStatus($status, $user);
 
         $validated = $request->validate([
             'exemption_reason' => ['required', 'string', 'max:5000'],
@@ -484,36 +684,48 @@ class ComplianceController extends Controller
             'acknowledge' => ['accepted'],
         ]);
 
-        $status->update([
-            'exemption_reason' => $validated['exemption_reason'],
-            'exempted_by' => $user->id,
-            'exempted_until' => $validated['exempted_until'] ?? null,
-            'exempted_at' => now(),
-            'status' => 'compliant', // lifts the hard-stop
-            'notes' => trim(($status->notes ? $status->notes . "\n" : '')
-                . 'Exemption granted'
-                . (! empty($validated['approver']) ? " (approved by {$validated['approver']})" : '')
-                . '.'),
-            'last_checked_at' => now(),
-        ]);
+        DB::transaction(function () use ($user, $status, $validated): void {
+            [$lockedActor, $lockedStatus] = $this->lockAndReauthoriseStatus($user, $status);
+            HrComplianceRequirement::query()
+                ->whereKey($lockedStatus->requirement_id)
+                ->where('is_active', true)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $lockedStatus->update([
+                'exemption_reason' => $validated['exemption_reason'],
+                'exempted_by' => $lockedActor->id,
+                'exempted_until' => $validated['exempted_until'] ?? null,
+                'exempted_at' => now(),
+                'status' => 'compliant', // lifts the hard-stop
+                'notes' => trim(($lockedStatus->notes ? $lockedStatus->notes."\n" : '')
+                    .'Exemption granted'
+                    .(! empty($validated['approver']) ? " (approved by {$validated['approver']})" : '')
+                    .'.'),
+                'last_checked_at' => now(),
+            ]);
+        }, 3);
 
         return redirect()->back()->with('success', 'Exemption recorded and hard-stop lifted.');
     }
 
     /* ================================================================== */
-    /*  Evidence download (private disk, hardened headers)                 */
+    /*  Evidence download (private disk, hardened headers) */
     /* ================================================================== */
 
-    public function evidence(Request $request, HrStaffComplianceStatus $status)
+    public function evidence(Request $request, string $status)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $status->tenant_id);
+        $status = $this->currentVisibleStatus($status, $user);
         abort_unless($status->evidence_path, 404);
+        $evidenceDisk = blank($status->evidence_disk) ? 'private' : $status->evidence_disk;
+        abort_unless(
+            $evidenceDisk === 'private' && $this->isEvidencePath($status->evidence_path),
+            404,
+        );
 
         return $this->streamPrivateAttachment(
-            $status->evidence_disk,
+            $evidenceDisk,
             $status->evidence_path,
             $status->evidence_filename ?: 'evidence',
             $status->evidence_mime,
@@ -521,79 +733,129 @@ class ComplianceController extends Controller
         );
     }
 
-    private function deleteEvidenceFile(HrStaffComplianceStatus $status): void
+    protected function persistComplianceStatus(HrStaffComplianceStatus $status): void
     {
-        if ($status->evidence_path) {
-            \Illuminate\Support\Facades\Storage::disk($status->evidence_disk ?: 'private')->delete($status->evidence_path);
+        $status->save();
+    }
+
+    private function deleteEvidencePath(mixed $disk, mixed $path): void
+    {
+        $disk = blank($disk) ? 'private' : $disk;
+        if ($disk !== 'private' || ! $this->isEvidencePath($path)) {
+            return;
+        }
+
+        try {
+            $storage = Storage::disk('private');
+            if ($storage->exists($path)) {
+                $deleted = $storage->delete($path);
+                if (! $deleted || $storage->exists($path)) {
+                    report(new \RuntimeException('A superseded HR compliance evidence file could not be removed.'));
+                }
+            }
+        } catch (Throwable $exception) {
+            report($exception);
         }
     }
 
+    private function isEvidencePath(mixed $path): bool
+    {
+        return is_string($path)
+            && preg_match(
+                '~\Ahr-compliance/evidence/(?:[1-9][0-9]*/)?[A-Za-z0-9][A-Za-z0-9._-]*\z~D',
+                $path,
+            ) === 1;
+    }
+
     /* ================================================================== */
-    /*  Bulk actions                                                       */
+    /*  Bulk actions */
     /* ================================================================== */
 
     public function bulkRemind(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
-            'user_ids' => ['required', 'array', 'min:1'],
-            'user_ids.*' => ['integer'],
+            'user_ids' => ['required', 'array', 'min:1', 'max:500'],
+            'user_ids.*' => ['integer', 'distinct'],
         ]);
+        $recipients = $this->visibleStaffSelection($user, $validated['user_ids']);
+        $deliveries = DB::transaction(function () use ($user, $recipients): Collection {
+            [$lockedActor, $lockedRecipients] = $this->lockAndReauthoriseSelection($user, $recipients);
 
-        $recipients = $this->tenantUsers($validated['user_ids'], $tenantId);
-        foreach ($recipients as $recipient) {
-            $recipient->notify(new \App\Notifications\ComplianceReminderNotification(
-                'outstanding compliance requirements',
-                null,
-                $user->name,
+            return $lockedRecipients->map(fn (User $recipient) => $this->reminderDeliveries->stageManual(
+                recipient: $recipient,
+                sourceType: 'bulk_outstanding',
+                sourceId: null,
+                requirementName: 'outstanding compliance requirements',
+                expiryDate: null,
+                initiatedBy: $lockedActor,
             ));
-        }
+        }, 3);
+        $deliveries->each(fn ($delivery) => $this->reminderDeliveries->queue($delivery));
 
         $count = $recipients->count();
 
-        return redirect()->back()->with('success', "Reminders sent to {$count} staff.");
+        return redirect()->back()->with('success', "Reminders queued for {$count} staff.");
     }
 
     public function bulkRecord(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $validated = $request->validate([
-            'user_ids' => ['required', 'array', 'min:1'],
-            'user_ids.*' => ['integer'],
-            'requirement_id' => ['required', 'integer', Rule::exists('hr_compliance_requirements', 'id')->where('tenant_id', $tenantId)],
+        $validated = $this->validateStatusSemantics($request->validate([
+            'user_ids' => ['required', 'array', 'min:1', 'max:500'],
+            'user_ids.*' => ['integer', 'distinct'],
+            'requirement_id' => [
+                'required',
+                'integer',
+                Rule::exists('hr_compliance_requirements', 'id')->where('is_active', true),
+            ],
             'status' => ['required', 'string', Rule::in(self::STATUS_VALUES)],
             'valid_from' => ['nullable', 'date'],
             'expires_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:5000'],
-        ]);
+        ]));
 
-        $userIds = $this->tenantUsers($validated['user_ids'], $tenantId)->pluck('id');
-        $affected = 0;
-        foreach ($userIds as $uid) {
-            $status = HrStaffComplianceStatus::firstOrNew([
-                'tenant_id' => $tenantId,
-                'user_id' => $uid,
-                'requirement_id' => $validated['requirement_id'],
-            ]);
-            $status->fill([
-                'status' => $validated['status'],
-                'evidence_type' => 'manual',
-                'valid_from' => $validated['valid_from'] ?? null,
-                'expires_at' => $validated['expires_at'] ?? null,
-                'notes' => $validated['notes'] ?? null,
-                'recorded_by' => $user->id,
-                'last_checked_at' => now(),
-                'next_check_at' => now()->addDay(),
-            ]);
-            $status->save();
-            $affected++;
-        }
+        $selection = $this->visibleStaffSelection($user, $validated['user_ids']);
+        $affected = DB::transaction(function () use ($user, $selection, $validated): int {
+            [$lockedActor, $lockedSelection] = $this->lockAndReauthoriseSelection($user, $selection);
+            HrComplianceRequirement::query()
+                ->whereKey($validated['requirement_id'])
+                ->where('is_active', true)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $affected = 0;
+            foreach ($lockedSelection as $recipient) {
+                $status = HrStaffComplianceStatus::query()
+                    ->where('user_id', $recipient->id)
+                    ->where('requirement_id', $validated['requirement_id'])
+                    ->lockForUpdate()
+                    ->first() ?? new HrStaffComplianceStatus([
+                        'user_id' => $recipient->id,
+                        'requirement_id' => $validated['requirement_id'],
+                    ]);
+                $status->fill([
+                    'status' => $validated['status'],
+                    'evidence_type' => 'manual',
+                    'valid_from' => $validated['valid_from'] ?? null,
+                    'expires_at' => $validated['expires_at'] ?? null,
+                    'notes' => $validated['notes'] ?? null,
+                    'recorded_by' => $lockedActor->id,
+                    'exemption_reason' => null,
+                    'exempted_by' => null,
+                    'exempted_until' => null,
+                    'exempted_at' => null,
+                    'last_checked_at' => now(),
+                    'next_check_at' => now()->addDay(),
+                ]);
+                $status->save();
+                $affected++;
+            }
+
+            return $affected;
+        }, 3);
 
         return redirect()->back()->with('success', "Compliance recorded for {$affected} staff.");
     }
@@ -602,80 +864,53 @@ class ComplianceController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $validated = $request->validate([
-            'user_ids' => ['required', 'array', 'min:1'],
-            'user_ids.*' => ['integer'],
-            'requirement_id' => ['required', 'integer', Rule::exists('hr_compliance_requirements', 'id')->where('tenant_id', $tenantId)],
+            'user_ids' => ['required', 'array', 'min:1', 'max:500'],
+            'user_ids.*' => ['integer', 'distinct'],
+            'requirement_id' => [
+                'required',
+                'integer',
+                Rule::exists('hr_compliance_requirements', 'id')->where('is_active', true),
+            ],
             'exemption_reason' => ['required', 'string', 'max:5000'],
             'exempted_until' => ['nullable', 'date', 'after:today'],
             'acknowledge' => ['accepted'],
         ]);
 
-        $userIds = $this->tenantUsers($validated['user_ids'], $tenantId)->pluck('id');
-        $affected = 0;
-        foreach ($userIds as $uid) {
-            $status = HrStaffComplianceStatus::firstOrNew([
-                'tenant_id' => $tenantId,
-                'user_id' => $uid,
-                'requirement_id' => $validated['requirement_id'],
-            ]);
-            $status->fill([
-                'status' => 'compliant',
-                'exemption_reason' => $validated['exemption_reason'],
-                'exempted_by' => $user->id,
-                'exempted_until' => $validated['exempted_until'] ?? null,
-                'exempted_at' => now(),
-                'last_checked_at' => now(),
-            ]);
-            $status->save();
-            $affected++;
-        }
+        $selection = $this->visibleStaffSelection($user, $validated['user_ids']);
+        $affected = DB::transaction(function () use ($user, $selection, $validated): int {
+            [$lockedActor, $lockedSelection] = $this->lockAndReauthoriseSelection($user, $selection);
+            HrComplianceRequirement::query()
+                ->whereKey($validated['requirement_id'])
+                ->where('is_active', true)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $affected = 0;
+            foreach ($lockedSelection as $recipient) {
+                $status = HrStaffComplianceStatus::query()
+                    ->where('user_id', $recipient->id)
+                    ->where('requirement_id', $validated['requirement_id'])
+                    ->lockForUpdate()
+                    ->first() ?? new HrStaffComplianceStatus([
+                        'user_id' => $recipient->id,
+                        'requirement_id' => $validated['requirement_id'],
+                    ]);
+                $status->fill([
+                    'status' => 'compliant',
+                    'exemption_reason' => $validated['exemption_reason'],
+                    'exempted_by' => $lockedActor->id,
+                    'exempted_until' => $validated['exempted_until'] ?? null,
+                    'exempted_at' => now(),
+                    'last_checked_at' => now(),
+                ]);
+                $status->save();
+                $affected++;
+            }
+
+            return $affected;
+        }, 3);
 
         return redirect()->back()->with('success', "Waiver applied to {$affected} staff.");
-    }
-
-    /**
-     * Assign a requirement to roles / site types (per-role matrix rows). Backs both
-     * the Matrix "Bulk assign" wizard and the Requirement wizard's Assignment step.
-     */
-    public function assign(Request $request)
-    {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compliance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $validated = $request->validate([
-            'requirement_ids' => ['required', 'array', 'min:1'],
-            'requirement_ids.*' => ['integer', Rule::exists('hr_compliance_requirements', 'id')->where('tenant_id', $tenantId)],
-            'roles' => ['required', 'array', 'min:1'],
-            'roles.*' => ['string', 'max:100'],
-            'site_types' => ['nullable', 'array'],
-            'site_types.*' => ['string', 'max:100'],
-            'is_mandatory' => ['sometimes', 'boolean'],
-        ]);
-
-        $siteTypes = ! empty($validated['site_types']) ? $validated['site_types'] : [null];
-        $count = 0;
-        foreach ($validated['requirement_ids'] as $reqId) {
-            foreach ($validated['roles'] as $role) {
-                foreach ($siteTypes as $siteType) {
-                    \App\Domain\Hr\Models\HrComplianceMatrix::updateOrCreate(
-                        [
-                            'tenant_id' => $tenantId,
-                            'requirement_id' => $reqId,
-                            'role' => $role,
-                            'site_type' => $siteType,
-                        ],
-                        ['is_mandatory' => $validated['is_mandatory'] ?? true],
-                    );
-                    $count++;
-                }
-            }
-        }
-
-        return redirect()->back()->with('success', "Assigned across {$count} role/site combinations.");
     }
 
     /* ================================================================== */
@@ -686,71 +921,272 @@ class ComplianceController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $validated = $request->validate([
+        $locator = $request->validate([
             'type' => ['required', Rule::in(['compliance', 'vetting', 'driver'])],
             'id' => ['required', 'integer'],
         ]);
+        $renewable = $this->visibleRenewable($locator['type'], $locator['id'], $user);
+        abort_unless($renewable, 404);
 
-        [$recipient, $label, $date] = $this->resolveRenewable($validated['type'], $validated['id'], $tenantId);
-        abort_unless($recipient, 404);
+        $delivery = DB::transaction(function () use ($user, $renewable) {
+            [$lockedActor, $lockedRenewable] = $this->lockAndReauthoriseRenewable(
+                $user,
+                $renewable,
+                'hr.compliance.view',
+            );
 
-        $recipient->notify(new \App\Notifications\ComplianceReminderNotification($label, $date, $user->name));
+            return $this->reminderDeliveries->stageManual(
+                recipient: $lockedRenewable['recipient'],
+                sourceType: 'renewal_'.$lockedRenewable['type'],
+                sourceId: $lockedRenewable['entity_id'],
+                requirementName: $lockedRenewable['label'],
+                expiryDate: $lockedRenewable['date'],
+                initiatedBy: $lockedActor,
+            );
+        }, 3);
+        $this->reminderDeliveries->queue($delivery);
 
-        return redirect()->back()->with('success', "Reminder sent to {$recipient->name}.");
+        return redirect()->back()->with('success', "Reminder queued for {$renewable['recipient']->name}.");
     }
 
     public function renewalSnooze(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $validated = $request->validate([
+        $locator = $request->validate([
             'type' => ['required', Rule::in(['compliance', 'vetting', 'driver'])],
             'id' => ['required', 'integer'],
+        ]);
+        $renewable = $this->visibleRenewable($locator['type'], $locator['id'], $user);
+        abort_unless($renewable, 404);
+        $validated = $request->validate([
             'days' => ['nullable', 'integer', 'min:1', 'max:90'],
         ]);
 
         $days = $validated['days'] ?? 7;
-
-        if ($validated['type'] === 'compliance') {
-            $status = HrStaffComplianceStatus::where('tenant_id', $tenantId)->find($validated['id']);
-            abort_unless($status, 404);
-            $status->update(['next_check_at' => now()->addDays($days)]);
-        }
+        DB::transaction(function () use ($user, $renewable, $days): void {
+            [$lockedActor, $lockedRenewable] = $this->lockAndReauthoriseRenewable(
+                $user,
+                $renewable,
+                'hr.compliance.manage',
+            );
+            $snooze = HrComplianceRenewalSnooze::query()
+                ->where('entity_type', $lockedRenewable['type'])
+                ->where('entity_id', $lockedRenewable['entity_id'])
+                ->lockForUpdate()
+                ->first() ?? new HrComplianceRenewalSnooze([
+                    'entity_type' => $lockedRenewable['type'],
+                    'entity_id' => $lockedRenewable['entity_id'],
+                ]);
+            $snooze->fill([
+                'snoozed_until' => now()->addDays($days),
+                'snoozed_by' => $lockedActor->id,
+            ])->save();
+        }, 3);
 
         return redirect()->back()->with('success', "Snoozed for {$days} days.");
     }
 
-    /** @return array{0:?User,1:string,2:?string} */
-    private function resolveRenewable(string $type, int $id, ?int $tenantId): array
+    /**
+     * @return array{type:string,entity_id:int,user_id:int,recipient:User,label:string,date:?string}|null
+     */
+    private function visibleRenewable(string $type, int $id, User $viewer, bool $forUpdate = false): ?array
     {
-        return match ($type) {
-            'compliance' => (function () use ($id, $tenantId) {
-                $s = HrStaffComplianceStatus::where('tenant_id', $tenantId)->with(['user', 'requirement:id,name'])->find($id);
-                return [$s?->user, $s?->requirement?->name ?? 'Compliance requirement', optional($s?->expires_at)->toDateString()];
-            })(),
-            'vetting' => (function () use ($id) {
-                $c = StaffBackgroundCheck::with('user')->find($id);
-                return [$c?->user, ucfirst(str_replace('_', ' ', (string) $c?->check_type)), optional($c?->expires_at)->toDateString()];
-            })(),
-            'driver' => (function () use ($id, $tenantId) {
-                $d = HrDriverEligibility::where('tenant_id', $tenantId)->with('user')->find($id);
-                return [$d?->user, 'Driver licence', optional($d?->licence_expires_at)->toDateString()];
-            })(),
-            default => [null, '', null],
+        $query = match ($type) {
+            'compliance' => HrStaffComplianceStatus::query(),
+            'vetting' => StaffBackgroundCheck::query(),
+            'driver' => HrDriverEligibility::query(),
+            default => null,
         };
+        if (! $query) {
+            return null;
+        }
+        $query->whereKey($id)
+            ->whereIn('user_id', $this->visibleCurrentStaffQuery($viewer)->select('users.id'));
+        if ($forUpdate) {
+            $query->lockForUpdate();
+        }
+        $record = $type === 'compliance'
+            ? $query->with(['user', 'requirement:id,name'])->first()
+            : $query->with('user')->first();
+        if (! $record || ! $record->user) {
+            return null;
+        }
+
+        return [
+            'type' => $type,
+            'entity_id' => (int) $record->id,
+            'user_id' => (int) $record->user_id,
+            'recipient' => $record->user,
+            'label' => match ($type) {
+                'compliance' => $record->requirement?->name ?? 'Compliance requirement',
+                'vetting' => ucfirst(str_replace('_', ' ', (string) $record->check_type)),
+                'driver' => 'Driver licence',
+            },
+            'date' => optional($type === 'driver' ? $record->licence_expires_at : $record->expires_at)
+                ->toDateString(),
+        ];
     }
 
-    /** Active in-tenant users for the given ids (guards cross-tenant bulk writes). */
-    private function tenantUsers(array $userIds, ?int $tenantId)
-    {
-        $scoped = HrEmployeeProfile::where('tenant_id', $tenantId)
-            ->whereIn('user_id', $userIds)
-            ->pluck('user_id');
+    /**
+     * @param  array{type:string,entity_id:int,user_id:int,recipient:User,label:string,date:?string}  $renewable
+     * @return array{0:User,1:array{type:string,entity_id:int,user_id:int,recipient:User,label:string,date:?string}}
+     */
+    private function lockAndReauthoriseRenewable(
+        User $actor,
+        array $renewable,
+        string $permission,
+    ): array {
+        $locked = $this->mutationLocks->lock([$actor->id, $renewable['user_id']]);
+        $lockedActor = $locked['users']->get($actor->id);
+        abort_unless($lockedActor instanceof User && $lockedActor->canDo($permission), 403);
 
-        return User::whereIn('id', $scoped)->get();
+        $lockedRenewable = $this->visibleRenewable(
+            $renewable['type'],
+            $renewable['entity_id'],
+            $lockedActor,
+            true,
+        );
+        abort_unless($lockedRenewable && $lockedRenewable['user_id'] === $renewable['user_id'], 404);
+
+        return [$lockedActor, $lockedRenewable];
+    }
+
+    /** @return Collection<int, User> */
+    private function visibleStaffSelection(User $viewer, array $userIds): Collection
+    {
+        $ids = collect($userIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->sort()
+            ->values();
+        $query = $this->visibleCurrentStaffQuery($viewer)
+            ->whereIn('id', $ids)
+            ->orderBy('id');
+        $selection = $query->get();
+        if ($ids->isEmpty() || $selection->pluck('id')->values()->all() !== $ids->all()) {
+            throw ValidationException::withMessages([
+                'user_ids' => 'Every selected person must be current staff at an accessible Site.',
+            ]);
+        }
+
+        return $selection;
+    }
+
+    /**
+     * @param  Collection<int, User>  $selection
+     * @return array{0:User,1:Collection<int, User>}
+     */
+    private function lockAndReauthoriseSelection(User $actor, Collection $selection): array
+    {
+        $ids = $selection->pluck('id')->map(fn ($id) => (int) $id)->sort()->values();
+        $locked = $this->mutationLocks->lock([$actor->id, ...$ids->all()]);
+        $lockedActor = $locked['users']->get($actor->id);
+        abort_unless(
+            $lockedActor instanceof User && $lockedActor->canDo('hr.compliance.manage'),
+            403,
+        );
+
+        $freshAccess = new UserSiteAccessService;
+        $visible = User::query()->whereIn('id', $ids)->orderBy('id');
+        $freshAccess->applyStaffScope($visible, $lockedActor);
+        $lockedSelection = $visible->get();
+        if ($lockedSelection->pluck('id')->values()->all() !== $ids->all()) {
+            throw ValidationException::withMessages([
+                'user_ids' => 'Every selected person must be current staff at an accessible Site.',
+            ]);
+        }
+
+        return [$lockedActor, $lockedSelection];
+    }
+
+    /** @return Builder<User> */
+    private function visibleCurrentStaffQuery(User $viewer): Builder
+    {
+        $query = User::query();
+        $this->siteAccess->applyStaffScope($query, $viewer);
+
+        return $query;
+    }
+
+    private function currentVisibleStaff(string $routeStaffId, User $viewer): User
+    {
+        $staff = $this->visibleCurrentStaffQuery($viewer)
+            ->with([
+                'hrEmployeeProfile:id,user_id,work_email,primary_site_id',
+                'hrEmployeeProfile.primarySite:id,type',
+            ])
+            ->whereKey($this->boundedRouteId($routeStaffId))
+            ->first();
+        abort_unless($staff, 404);
+
+        return $staff;
+    }
+
+    private function currentVisibleStatus(string $routeStatusId, User $viewer): HrStaffComplianceStatus
+    {
+        $status = HrStaffComplianceStatus::query()
+            ->whereKey($this->boundedRouteId($routeStatusId))
+            ->whereIn('user_id', $this->visibleCurrentStaffQuery($viewer)->select('users.id'))
+            ->first();
+        abort_unless($status, 404);
+
+        return $status;
+    }
+
+    /** @return array{0:User,1:User} */
+    private function lockAndReauthoriseStaff(User $actor, User $staff): array
+    {
+        $locked = $this->mutationLocks->lock([$actor->id, $staff->id]);
+        $lockedActor = $locked['users']->get($actor->id);
+        $lockedStaff = $locked['users']->get($staff->id);
+        abort_unless(
+            $lockedActor instanceof User
+                && $lockedStaff instanceof User
+                && $lockedActor->canDo('hr.compliance.manage'),
+            404,
+        );
+
+        $freshAccess = new UserSiteAccessService;
+        $visible = User::query()->whereKey($lockedStaff->id);
+        $freshAccess->applyStaffScope($visible, $lockedActor);
+        abort_unless($visible->exists(), 404);
+
+        return [$lockedActor, $lockedStaff];
+    }
+
+    /** @return array{0:User,1:HrStaffComplianceStatus} */
+    private function lockAndReauthoriseStatus(
+        User $actor,
+        HrStaffComplianceStatus $status,
+    ): array {
+        $target = User::query()->whereKey($status->user_id)->first();
+        abort_unless($target, 404);
+        [$lockedActor, $lockedStaff] = $this->lockAndReauthoriseStaff($actor, $target);
+        $lockedStatus = HrStaffComplianceStatus::query()
+            ->whereKey($status->id)
+            ->lockForUpdate()
+            ->first();
+        abort_unless($lockedStatus && $lockedStatus->user_id === $lockedStaff->id, 404);
+
+        return [$lockedActor, $lockedStatus];
+    }
+
+    private function boundedRouteId(string $value): int
+    {
+        $normalized = ltrim($value, '0');
+        $maximum = (string) PHP_INT_MAX;
+        abort_unless(
+            ctype_digit($value)
+                && $normalized !== ''
+                && (strlen($normalized) < strlen($maximum)
+                    || (strlen($normalized) === strlen($maximum) && strcmp($normalized, $maximum) <= 0)),
+            404,
+        );
+
+        return (int) $normalized;
     }
 }

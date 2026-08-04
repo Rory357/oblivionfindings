@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Contracts\Timeline\EmitsToTimeline;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -12,6 +13,7 @@ class ClientNote extends Model implements EmitsToTimeline
 {
     use AuditableChanges;
     use SoftDeletes;
+    use WritesLegacyOrganizationStorageContext;
 
     protected $table = 'client_notes';
 
@@ -38,7 +40,6 @@ class ClientNote extends Model implements EmitsToTimeline
         'is_private',
         'attachments',
         'mood_rating',
-        'organization_id',
         'category',
         'behaviour_tags',
         'concerns_flags',
@@ -148,13 +149,11 @@ class ClientNote extends Model implements EmitsToTimeline
 
     public function scopeForUser($query, ?User $user)
     {
-        if ($user?->organization_id) {
-            $query->where(function ($q) use ($user) {
-                $q->whereNull('organization_id')->orWhere('organization_id', $user->organization_id);
-            });
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
         }
 
-        return $query->where(function ($visibility) use ($user) {
+        $query->where(function ($visibility) use ($user) {
             $visibility
                 ->where(function ($submitted) {
                     $submitted->whereNull('is_draft')->orWhere('is_draft', false);
@@ -165,6 +164,17 @@ class ClientNote extends Model implements EmitsToTimeline
                         ->where('user_id', $user?->id ?? 0);
                 });
         });
+
+        if (! $user->canDo('progress_notes.review')) {
+            $query->where(function ($privacy) use ($user) {
+                $privacy
+                    ->whereNull('is_private')
+                    ->orWhere('is_private', false)
+                    ->orWhere('user_id', $user->id);
+            });
+        }
+
+        return $query;
     }
 
     public function scopeShiftLinked($query)

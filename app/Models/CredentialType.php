@@ -2,19 +2,21 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Tenant-scoped credential-type registry. The seven built-ins are defined in
- * {@see self::defaults()} and merged with any stored per-tenant overrides at
- * read time, so the defaults always appear even on a tenant with no rows yet
- * (no seeder required). Stored rows hold overrides (label/icon/active/order)
- * and custom types.
+ * Application credential-type catalogue. The seven built-ins are defined in
+ * {@see self::defaults()} and merged with stored application overrides at read
+ * time, so the defaults always appear even before rows are seeded. Stored rows
+ * hold overrides (label/icon/active/order) and custom types.
  */
 class CredentialType extends Model
 {
+    use WritesLegacyStorageContext;
+
     protected $fillable = [
         'tenant_id',
         'key',
@@ -76,18 +78,18 @@ class CredentialType extends Model
     }
 
     /**
-     * The effective registry for a tenant: built-in defaults overlaid with any
-     * stored overrides, followed by custom stored types, ordered by sort_order.
+     * The application catalogue: built-in defaults overlaid with stored
+     * overrides, followed by custom stored types, ordered by sort_order.
      *
      * @return Collection<int, array{key:string,label:string,icon:string,description:?string,active:bool,sort_order:int,system:bool}>
      */
-    public static function effectiveForTenant(?int $tenantId): Collection
+    public static function applicationCatalogue(): Collection
     {
         // Guard the table-existence check so a not-yet-migrated server (the
         // deploy window before `migrate` runs) falls back to the built-in
         // defaults instead of 500-ing every page that reads the registry.
-        $stored = $tenantId && Schema::hasTable('credential_types')
-            ? static::query()->where('tenant_id', $tenantId)->get()->keyBy('key')
+        $stored = Schema::hasTable('credential_types')
+            ? static::query()->get()->keyBy('key')
             : collect();
 
         $result = collect();
@@ -132,9 +134,9 @@ class CredentialType extends Model
      *
      * @return Collection<int, array{key:string,label:string,icon:string,description:?string}>
      */
-    public static function pickerOptionsForTenant(?int $tenantId): Collection
+    public static function pickerOptions(): Collection
     {
-        return self::effectiveForTenant($tenantId)
+        return self::applicationCatalogue()
             ->where('active', true)
             ->map(fn (array $type) => [
                 'key' => $type['key'],

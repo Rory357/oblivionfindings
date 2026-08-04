@@ -27,12 +27,19 @@ beforeEach(function () {
     }
 
     $this->site = Site::factory()->create([
-        'tenant_id' => 1,
         'type' => 'house',
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'position_role' => 'hr',
+        'is_active' => true,
+        'start_date' => today()->subYear(),
+        'end_date' => null,
     ]);
 
     HrOnboardingTemplate::query()->create([
-        'tenant_id' => 1,
         'role' => 'support_worker',
         'site_type' => 'all',
         'tasks' => [],
@@ -43,7 +50,6 @@ beforeEach(function () {
 
 test('hr user can approve send and accept an offer workflow', function () {
     $candidate = HrCandidate::factory()->create([
-        'tenant_id' => 1,
         'first_name' => 'Mia',
         'last_name' => 'Candidate',
         'personal_email' => 'mia.candidate@example.test',
@@ -53,7 +59,6 @@ test('hr user can approve send and accept an offer workflow', function () {
     ]);
 
     $application = HrApplication::factory()->create([
-        'tenant_id' => 1,
         'candidate_id' => $candidate->id,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
@@ -114,7 +119,6 @@ test('hr user can approve send and accept an offer workflow', function () {
 function hrAcceptedOfferFixture(User $hr, Site $site, string $email, string $role = 'support_worker'): array
 {
     $candidate = HrCandidate::factory()->create([
-        'tenant_id' => 1,
         'first_name' => 'Mia',
         'last_name' => 'Candidate',
         'personal_email' => $email,
@@ -124,7 +128,6 @@ function hrAcceptedOfferFixture(User $hr, Site $site, string $email, string $rol
     ]);
 
     $application = HrApplication::factory()->create([
-        'tenant_id' => 1,
         'candidate_id' => $candidate->id,
         'position_title' => 'Support Worker',
         'position_role' => $role,
@@ -187,7 +190,6 @@ test('converting a candidate cannot rebind an existing user profile from another
         'approved_at' => now(),
     ]);
     $existingCandidate = HrCandidate::factory()->create([
-        'tenant_id' => 1,
         'first_name' => 'Existing',
         'last_name' => 'Candidate',
         'personal_email' => 'first.candidate@example.test',
@@ -196,7 +198,6 @@ test('converting a candidate cannot rebind an existing user profile from another
         'created_by' => $this->hr->id,
     ]);
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $existingUser->id,
         'employee_number' => 'EMP-EXISTING',
         'work_email' => $existingUser->email,

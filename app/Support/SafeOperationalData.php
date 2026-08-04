@@ -40,8 +40,8 @@ final class SafeOperationalData
     ];
 
     private const SAFE_LOG_FIELDS = [
-        'tenant_id', 'organization_id', 'site_id', 'device_id',
-        'integration_id', 'sync_log_id', 'provider', 'status', 'action',
+        'site_id', 'device_id', 'integration_id', 'sync_log_id',
+        'provider', 'status', 'action',
         'integration_event_id', 'signal_id', 'alert_id', 'severity',
         'items_processed', 'items_created', 'items_updated', 'items_errored',
         'error_category', 'failure_category',
@@ -111,12 +111,10 @@ final class SafeOperationalData
 
         if ($model instanceof DeviceGroupMember) {
             $deviceScope = self::deviceRelationScope($model);
-            $groupTenantId = $model->group()->withTrashed()->value('tenant_id');
 
-            return is_numeric($groupTenantId)
-                && (int) $groupTenantId === ($deviceScope['tenant_id'] ?? null)
-                    ? $deviceScope
-                    : [];
+            return $deviceScope !== [] && $model->group()->withTrashed()->exists()
+                ? $deviceScope
+                : [];
         }
 
         if ($model instanceof DeviceRelationship) {
@@ -128,7 +126,7 @@ final class SafeOperationalData
         }
 
         $scope = [];
-        foreach (['tenant_id', 'organization_id', 'site_id', 'device_id'] as $field) {
+        foreach (['site_id', 'device_id'] as $field) {
             $value = $model->getAttribute($field);
             if (is_numeric($value)) {
                 $scope[$field] = (int) $value;
@@ -239,20 +237,18 @@ final class SafeOperationalData
     private static function assignmentScope(DeviceAssignment $assignment): array
     {
         $device = $assignment->device()->withTrashed()->first();
-        if (! $device instanceof Device || ! is_numeric($device->tenant_id)) {
+        if (! $device instanceof Device) {
             return [];
         }
 
-        $tenantId = (int) $device->tenant_id;
-        if (! self::assignmentTargetMatchesTenant($assignment, $tenantId)) {
+        $siteIds = self::assignmentSiteIds($assignment);
+        if ($siteIds === null) {
             return [];
         }
 
         $scope = [
-            'tenant_id' => $tenantId,
             'device_id' => (int) $device->getKey(),
         ];
-        $siteIds = self::assignmentSiteIds($assignment);
         if ($siteIds !== []) {
             $scope['site_ids'] = $siteIds;
             if (count($siteIds) === 1) {
@@ -263,79 +259,6 @@ final class SafeOperationalData
         return $scope;
     }
 
-    private static function assignmentTargetMatchesTenant(DeviceAssignment $assignment, int $tenantId): bool
-    {
-        return match ($assignment->assignable_type) {
-            DeviceAssignment::TARGET_SITE => Site::withTrashed()
-                ->whereKey($assignment->assignable_id)->where('tenant_id', $tenantId)->exists(),
-            DeviceAssignment::TARGET_ROOM => (function () use ($assignment, $tenantId): bool {
-                $room = SiteRoom::query()->whereKey($assignment->assignable_id)->first(['tenant_id', 'site_id']);
-
-                return $room
-                    && is_numeric($room->tenant_id)
-                    && (int) $room->tenant_id === $tenantId
-                    && is_numeric($room->site_id)
-                    && Site::withTrashed()->whereKey((int) $room->site_id)
-                        ->where('tenant_id', $tenantId)->exists();
-            })(),
-            DeviceAssignment::TARGET_CLIENT => (function () use ($assignment, $tenantId): bool {
-                $client = Client::withTrashed()->whereKey($assignment->assignable_id)
-                    ->first(['organization_id', 'site_id']);
-
-                return $client
-                    && is_numeric($client->organization_id)
-                    && (int) $client->organization_id === $tenantId
-                    && (! is_numeric($client->site_id) || Site::withTrashed()
-                        ->whereKey((int) $client->site_id)->where('tenant_id', $tenantId)->exists());
-            })(),
-            DeviceAssignment::TARGET_STAFF => User::query()
-                ->whereKey($assignment->assignable_id)
-                ->where(function ($organization) use ($tenantId): void {
-                    $organization->where('organization_id', $tenantId);
-                    if ($tenantId === 1) {
-                        $organization->orWhereNull('organization_id');
-                    }
-                })->exists(),
-            DeviceAssignment::TARGET_VEHICLE => (function () use ($assignment, $tenantId): bool {
-                $asset = Asset::query()->find($assignment->assignable_id);
-
-                return $asset instanceof Asset && self::vehicleAssetMatchesTenant($asset, $tenantId);
-            })(),
-            default => false,
-        };
-    }
-
-    private static function vehicleAssetMatchesTenant(Asset $asset, int $tenantId): bool
-    {
-        $hasTenantEvidence = false;
-        foreach ([$asset->site_id, $asset->home_site_id] as $siteId) {
-            if ($siteId === null) {
-                continue;
-            }
-
-            $hasTenantEvidence = true;
-            if (! is_numeric($siteId) || ! Site::withTrashed()
-                ->whereKey((int) $siteId)->where('tenant_id', $tenantId)->exists()) {
-                return false;
-            }
-        }
-
-        if ($asset->client_id !== null) {
-            $hasTenantEvidence = true;
-            $client = Client::withTrashed()->whereKey($asset->client_id)
-                ->first(['organization_id', 'site_id']);
-            if (! $client
-                || ! is_numeric($client->organization_id)
-                || (int) $client->organization_id !== $tenantId
-                || ($client->site_id !== null && (! is_numeric($client->site_id) || ! Site::withTrashed()
-                    ->whereKey((int) $client->site_id)->where('tenant_id', $tenantId)->exists()))) {
-                return false;
-            }
-        }
-
-        return $hasTenantEvidence;
-    }
-
     /** @return array<string, int|array<int, int>> */
     private static function relationshipScope(DeviceRelationship $relationship): array
     {
@@ -344,21 +267,20 @@ final class SafeOperationalData
             $relationship->child()->withTrashed()->first(),
         ])->filter(fn ($device): bool => $device instanceof Device)->values();
 
-        $tenantIds = $devices->pluck('tenant_id')
-            ->filter(fn ($tenantId): bool => is_numeric($tenantId))
-            ->map(fn ($tenantId): int => (int) $tenantId)
-            ->unique()->values();
+        if ($devices->count() !== 2) {
+            return [];
+        }
 
-        if ($devices->count() !== 2 || $tenantIds->count() !== 1) {
+        $deviceScopes = $devices->map(fn (Device $device): array => self::auditScope($device));
+        if ($deviceScopes->contains(fn (array $scope): bool => ($scope['site_ids'] ?? []) === [])) {
             return [];
         }
 
         $scope = [
-            'tenant_id' => $tenantIds->first(),
             'device_ids' => $devices->pluck('id')->map(fn ($id): int => (int) $id)->all(),
         ];
-        $siteIds = $devices
-            ->flatMap(fn (Device $device): array => self::auditScope($device)['site_ids'] ?? [])
+        $siteIds = $deviceScopes
+            ->flatMap(fn (array $deviceScope): array => $deviceScope['site_ids'])
             ->unique()->values()->all();
         if ($siteIds !== []) {
             $scope['site_ids'] = $siteIds;
@@ -370,50 +292,114 @@ final class SafeOperationalData
         return $scope;
     }
 
-    /** @return array<int, int> */
-    private static function assignmentSiteIds(DeviceAssignment $assignment): array
+    /** @return array<int, int>|null */
+    private static function assignmentSiteIds(DeviceAssignment $assignment): ?array
     {
-        $tenantId = $assignment->device()->withTrashed()->value('tenant_id');
-        if (! is_numeric($tenantId)) {
+        return match ($assignment->assignable_type) {
+            DeviceAssignment::TARGET_SITE => self::siteTargetIds((int) $assignment->assignable_id),
+            DeviceAssignment::TARGET_ROOM => self::roomTargetIds((int) $assignment->assignable_id),
+            DeviceAssignment::TARGET_CLIENT => self::clientTargetIds((int) $assignment->assignable_id),
+            DeviceAssignment::TARGET_STAFF => self::staffTargetIds((int) $assignment->assignable_id),
+            DeviceAssignment::TARGET_VEHICLE => self::vehicleTargetIds((int) $assignment->assignable_id),
+            default => null,
+        };
+    }
+
+    /** @return array<int, int>|null */
+    private static function siteTargetIds(int $siteId): ?array
+    {
+        $siteIds = self::canonicalSiteIds([$siteId]);
+
+        return $siteIds === [] ? null : $siteIds;
+    }
+
+    /** @return array<int, int>|null */
+    private static function roomTargetIds(int $roomId): ?array
+    {
+        $siteId = SiteRoom::query()->whereKey($roomId)->value('site_id');
+        if (! is_numeric($siteId)) {
+            return null;
+        }
+
+        $siteIds = self::canonicalSiteIds([(int) $siteId]);
+
+        return $siteIds === [] ? null : $siteIds;
+    }
+
+    /** @return array<int, int>|null */
+    private static function clientTargetIds(int $clientId): ?array
+    {
+        $client = Client::withTrashed()->whereKey($clientId)->first(['site_id']);
+        if (! $client instanceof Client) {
+            return null;
+        }
+
+        return self::canonicalSiteIds([$client->site_id]);
+    }
+
+    /** @return array<int, int>|null */
+    private static function staffTargetIds(int $userId): ?array
+    {
+        if (! User::query()->whereKey($userId)->exists()) {
+            return null;
+        }
+
+        $siteIds = HrEmployeeProfile::query()
+            ->where('user_id', $userId)
+            ->get(['primary_site_id', 'secondary_site_ids'])
+            ->flatMap(fn (HrEmployeeProfile $profile): array => array_merge(
+                [$profile->primary_site_id],
+                is_array($profile->secondary_site_ids) ? $profile->secondary_site_ids : [],
+            ))->all();
+
+        return self::canonicalSiteIds($siteIds);
+    }
+
+    /** @return array<int, int>|null */
+    private static function vehicleTargetIds(int $assetId): ?array
+    {
+        $asset = Asset::query()->vehicles()->whereKey($assetId)->first([
+            'id', 'site_id', 'room_id', 'home_site_id', 'client_id', 'primary_driver_user_id',
+        ]);
+        if (! $asset instanceof Asset) {
+            return null;
+        }
+
+        $siteIds = [$asset->site_id, $asset->home_site_id];
+        if (is_numeric($asset->room_id)) {
+            $siteIds[] = SiteRoom::query()->whereKey((int) $asset->room_id)->value('site_id');
+        }
+        if (is_numeric($asset->client_id)) {
+            $siteIds[] = Client::withTrashed()->whereKey((int) $asset->client_id)->value('site_id');
+        }
+        if (is_numeric($asset->primary_driver_user_id)) {
+            $siteIds = [
+                ...$siteIds,
+                ...(self::staffTargetIds((int) $asset->primary_driver_user_id) ?? []),
+            ];
+        }
+
+        return self::canonicalSiteIds($siteIds);
+    }
+
+    /**
+     * @param  array<int, mixed>  $siteIds
+     * @return array<int, int>
+     */
+    private static function canonicalSiteIds(array $siteIds): array
+    {
+        $ids = collect($siteIds)
+            ->filter(fn (mixed $siteId): bool => is_numeric($siteId) && (int) $siteId > 0)
+            ->map(fn (mixed $siteId): int => (int) $siteId)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
             return [];
         }
 
-        $siteIds = match ($assignment->assignable_type) {
-            DeviceAssignment::TARGET_SITE => [(int) $assignment->assignable_id],
-            DeviceAssignment::TARGET_ROOM => [(int) SiteRoom::query()
-                ->whereKey($assignment->assignable_id)->where('tenant_id', (int) $tenantId)
-                ->value('site_id')],
-            DeviceAssignment::TARGET_CLIENT => [(int) Client::withTrashed()
-                ->whereKey($assignment->assignable_id)->where('organization_id', (int) $tenantId)
-                ->value('site_id')],
-            DeviceAssignment::TARGET_STAFF => (array) HrEmployeeProfile::query()
-                ->where('user_id', $assignment->assignable_id)->where('tenant_id', (int) $tenantId)
-                ->get(['primary_site_id', 'secondary_site_ids'])
-                ->flatMap(fn (HrEmployeeProfile $profile): array => array_merge(
-                    [$profile->primary_site_id],
-                    is_array($profile->secondary_site_ids) ? $profile->secondary_site_ids : [],
-                ))->all(),
-            DeviceAssignment::TARGET_VEHICLE => (function () use ($assignment, $tenantId): array {
-                $asset = Asset::query()->find($assignment->assignable_id);
-                if (! $asset) {
-                    return [];
-                }
-
-                $ids = [$asset->site_id, $asset->home_site_id];
-                if ($asset->client_id) {
-                    $ids[] = Client::withTrashed()
-                        ->whereKey($asset->client_id)->where('organization_id', (int) $tenantId)
-                        ->value('site_id');
-                }
-
-                return $ids;
-            })(),
-            default => [],
-        };
-
         return Site::withTrashed()
-            ->where('tenant_id', (int) $tenantId)
-            ->whereIn('id', collect($siteIds)->filter(fn ($id): bool => is_numeric($id) && (int) $id > 0)->all())
+            ->whereKey($ids->all())
             ->pluck('id')->map(fn ($id): int => (int) $id)->values()->all();
     }
 }

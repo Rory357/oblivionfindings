@@ -3,6 +3,7 @@
 namespace App\Domain\Roadmap\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +16,7 @@ class QuarterlyRoadmapPlan extends Model
     use AuditableChanges;
     use HasFactory;
     use SoftDeletes;
+    use WritesLegacyStorageContext;
 
     public const STATUS_DRAFT = 'draft';
 
@@ -31,7 +33,6 @@ class QuarterlyRoadmapPlan extends Model
     protected $table = 'roadmap_quarterly_plans';
 
     protected $fillable = [
-        'tenant_id',
         'fiscal_year',
         'quarter',
         'status',
@@ -82,15 +83,6 @@ class QuarterlyRoadmapPlan extends Model
     public function reports(): HasMany
     {
         return $this->hasMany(ReportSnapshot::class, 'quarterly_plan_id');
-    }
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        if ($tenantId === null) {
-            return $query;
-        }
-
-        return $query->where('tenant_id', $tenantId);
     }
 
     public function isPublished(): bool

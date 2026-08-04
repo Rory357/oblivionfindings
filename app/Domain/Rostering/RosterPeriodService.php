@@ -25,16 +25,15 @@ class RosterPeriodService
         return $this->weekStart($week)->addDays(7);
     }
 
-    public function findOrCreate(?int $organizationId, int $siteId, CarbonInterface|string $week): RosterPeriod
+    public function findOrCreate(int $siteId, CarbonInterface|string $week): RosterPeriod
     {
         $weekStart = $this->weekStart($week);
 
         return RosterPeriod::query()->firstOrCreate(
             [
-                'organization_id' => $organizationId,
                 'site_id' => $siteId,
                 'week_start' => $weekStart->toDateString(),
-                'version' => $this->nextVersionFor($organizationId, $siteId, $weekStart->toDateString()),
+                'version' => $this->nextVersionFor($siteId, $weekStart->toDateString()),
             ],
             [
                 'week_end' => $weekStart->copy()->addDays(7)->toDateString(),
@@ -44,12 +43,11 @@ class RosterPeriodService
         );
     }
 
-    public function activeFor(?int $organizationId, int $siteId, CarbonInterface|string $week): ?RosterPeriod
+    public function activeFor(int $siteId, CarbonInterface|string $week): ?RosterPeriod
     {
         $weekStart = $this->weekStart($week)->toDateString();
 
         return RosterPeriod::query()
-            ->where('organization_id', $organizationId)
             ->where('site_id', $siteId)
             ->whereDate('week_start', $weekStart)
             ->where('status', '!=', RosterPeriod::STATUS_ARCHIVED)
@@ -68,22 +66,20 @@ class RosterPeriodService
         $weekEnd = $localWeekStart->copy()->addDays(7)->utc();
 
         return Shift::query()
+            ->where('site_id', $period->site_id)
             ->where(function (Builder $query) use ($period, $weekStart, $weekEnd) {
                 $query->where('roster_period_id', $period->id)
-                    ->orWhere(function (Builder $fallback) use ($period, $weekStart, $weekEnd) {
+                    ->orWhere(function (Builder $fallback) use ($weekStart, $weekEnd) {
                         $fallback->whereNull('roster_period_id')
-                            ->where('site_id', $period->site_id)
-                            ->where('organization_id', $period->organization_id)
                             ->where('starts_at', '<', $weekEnd)
                             ->where('ends_at', '>', $weekStart);
                     });
             });
     }
 
-    private function nextVersionFor(?int $organizationId, int $siteId, string $weekStart): int
+    private function nextVersionFor(int $siteId, string $weekStart): int
     {
         $active = RosterPeriod::query()
-            ->where('organization_id', $organizationId)
             ->where('site_id', $siteId)
             ->whereDate('week_start', $weekStart)
             ->where('status', '!=', RosterPeriod::STATUS_ARCHIVED)
@@ -95,7 +91,6 @@ class RosterPeriodService
         }
 
         $latestVersion = RosterPeriod::query()
-            ->where('organization_id', $organizationId)
             ->where('site_id', $siteId)
             ->whereDate('week_start', $weekStart)
             ->max('version');

@@ -4,6 +4,7 @@ use App\Domain\Hr\Models\HrBenefitEnrollment;
 use App\Domain\Hr\Models\HrBenefitPlan;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -11,36 +12,39 @@ use Database\Seeders\SeedHrPermissionsSeeder;
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
+    $this->site = Site::factory()->create(['name' => 'Benefits visible Site']);
 
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
     ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+    ]);
 
     $this->worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
 
     $this->profile = HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'employee_number' => 'EMP-'.$this->worker->id,
         'work_email' => $this->worker->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
+        'primary_site_id' => $this->site->id,
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
     ]);
 
     $this->plan = HrBenefitPlan::query()->create([
-        'tenant_id' => 1,
         'name' => 'KiwiSaver 3%',
         'type' => 'kiwisaver',
         'employer_contribution_rate' => 3,
@@ -48,7 +52,6 @@ beforeEach(function () {
     ]);
 
     $this->enrollment = HrBenefitEnrollment::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $this->profile->id,
         'benefit_plan_id' => $this->plan->id,
         'enrollment_date' => now()->subMonths(2)->toDateString(),
@@ -58,9 +61,7 @@ beforeEach(function () {
     ]);
 });
 
-test('the benefits index lists tenant enrollments and ships employees', function () {
-    // Regression: index used forTenant($user->tenant_id) — null — which becomes
-    // whereNull(tenant_id), so real (profile-tenant) enrollments never appeared.
+test('the benefits index lists canonically visible enrollments and current employees', function () {
     $response = $this->actingAs($this->hr)->get('/hr/compensation/benefits');
     $response->assertOk();
 
@@ -86,8 +87,7 @@ test('an enrollment can be updated from the UI endpoint', function () {
     ]);
 });
 
-test('creating a benefit plan resolves the tenant', function () {
-    // Regression: storePlan wrote tenant_id => null but the column is NOT NULL.
+test('creating an application benefit plan supplies storage compatibility', function () {
     $response = $this->actingAs($this->hr)->post('/hr/compensation/benefits/plans', [
         'name' => 'Health Cover',
         'type' => 'health_insurance',
@@ -97,7 +97,6 @@ test('creating a benefit plan resolves the tenant', function () {
     $response->assertSessionHas('success');
 
     $this->assertDatabaseHas('hr_benefit_plans', [
-        'tenant_id' => 1,
         'name' => 'Health Cover',
         'type' => 'health_insurance',
     ]);

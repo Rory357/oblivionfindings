@@ -32,12 +32,15 @@ interface Profile {
     end_date: string | null;
     probation_end_date: string | null;
     hours_per_week: number | null;
-    pay_rate: number | null;
-    pay_frequency: string | null;
+    hourly_rate?: number | null;
+    annual_salary?: number | null;
+    pay_frequency?: string | null;
     primary_site_id: number | null;
-    emergency_contact_name: string | null;
-    emergency_contact_phone: string | null;
-    emergency_contact_relationship: string | null;
+    emergency_contacts: Array<{
+        name: string;
+        phone: string;
+        relationship: string;
+    }>;
     notes: string | null;
     user: { id: number; name: string; email: string };
 }
@@ -67,6 +70,7 @@ export default function EmployeeEdit({
         { title: profile.user.name, href: `/hr/people/${profile.id}` },
         { title: 'Edit', href: `/hr/people/${profile.id}/edit` },
     ];
+    const canEditFinancial = 'hourly_rate' in profile;
 
     const form = useForm({
         employee_number: profile.employee_number || '',
@@ -82,20 +86,37 @@ export default function EmployeeEdit({
         end_date: profile.end_date || '',
         probation_end_date: profile.probation_end_date || '',
         hours_per_week: profile.hours_per_week ?? '',
-        pay_rate: profile.pay_rate ?? '',
-        pay_frequency: profile.pay_frequency || '',
+        ...(canEditFinancial
+            ? {
+                  hourly_rate: profile.hourly_rate ?? '',
+                  pay_frequency: profile.pay_frequency || '',
+              }
+            : {}),
         primary_site_id: profile.primary_site_id
             ? String(profile.primary_site_id)
             : '',
-        emergency_contact_name: profile.emergency_contact_name || '',
-        emergency_contact_phone: profile.emergency_contact_phone || '',
-        emergency_contact_relationship:
-            profile.emergency_contact_relationship || '',
+        emergency_contacts:
+            profile.emergency_contacts.length > 0
+                ? profile.emergency_contacts
+                : [{ name: '', phone: '', relationship: '' }],
         work_rights_status: profile.work_rights_status || '',
         visa_type: profile.visa_type || '',
         visa_expires_at: profile.visa_expires_at || '',
         notes: profile.notes || '',
     });
+    const emergencyContact = form.data.emergency_contacts[0] ?? {
+        name: '',
+        phone: '',
+        relationship: '',
+    };
+    const setEmergencyContact = (
+        field: 'name' | 'phone' | 'relationship',
+        value: string,
+    ) =>
+        form.setData('emergency_contacts', [
+            { ...emergencyContact, [field]: value },
+            ...form.data.emergency_contacts.slice(1),
+        ]);
 
     const handleSubmit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -107,7 +128,8 @@ export default function EmployeeEdit({
             <Head title={`Edit ${profile.user.name}`} />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         variant="compact"
                         backHref="/hr/people"
                         title={`Edit ${profile.user.name}`}
@@ -209,9 +231,7 @@ export default function EmployeeEdit({
                                     )}
                                 </div>
                                 <div>
-                                    <Label htmlFor="visa_type">
-                                        Visa Type
-                                    </Label>
+                                    <Label htmlFor="visa_type">Visa Type</Label>
                                     <Input
                                         id="visa_type"
                                         value={form.data.visa_type}
@@ -245,8 +265,8 @@ export default function EmployeeEdit({
                                         }
                                     />
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        Expiry reminders are sent at 90, 60,
-                                        30, 14 and 7 days
+                                        Expiry reminders are sent at 90, 60, 30,
+                                        14 and 7 days
                                     </p>
                                     {form.errors.visa_expires_at && (
                                         <p className="mt-1 text-sm text-destructive">
@@ -446,15 +466,21 @@ export default function EmployeeEdit({
                                     <Input
                                         id="team"
                                         value={form.data.team}
-                                        onChange={(e) => form.setData('team', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData('team', e.target.value)
+                                        }
                                         placeholder="e.g. Community Support"
                                         maxLength={255}
                                     />
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        Used by Calendar filters and team audiences. Clear this field to remove the assignment.
+                                        Used by Calendar filters and team
+                                        audiences. Clear this field to remove
+                                        the assignment.
                                     </p>
                                     {form.errors.team && (
-                                        <p className="mt-1 text-sm text-destructive">{form.errors.team}</p>
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.team}
+                                        </p>
                                     )}
                                 </div>
                                 <div>
@@ -521,76 +547,78 @@ export default function EmployeeEdit({
                     </Card>
 
                     {/* Financial */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Financial</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <Label htmlFor="pay_rate">
-                                        Pay Rate ($)
-                                    </Label>
-                                    <Input
-                                        id="pay_rate"
-                                        type="number"
-                                        step="0.01"
-                                        value={form.data.pay_rate}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'pay_rate',
-                                                e.target.value
-                                                    ? Number(e.target.value)
-                                                    : '',
-                                            )
-                                        }
-                                    />
-                                    {form.errors.pay_rate && (
-                                        <p className="mt-1 text-sm text-destructive">
-                                            {form.errors.pay_rate}
-                                        </p>
-                                    )}
-                                </div>
-                                <div>
-                                    <Label>Pay Frequency</Label>
-                                    <Select
-                                        value={
-                                            form.data.pay_frequency ||
-                                            '__none__'
-                                        }
-                                        onValueChange={(v) =>
-                                            form.setData(
-                                                'pay_frequency',
-                                                v === '__none__' ? '' : v,
-                                            )
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select frequency" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="__none__">
-                                                Select frequency
-                                            </SelectItem>
-                                            {payFrequencies.map((f) => (
-                                                <SelectItem
-                                                    key={f.value}
-                                                    value={f.value}
-                                                >
-                                                    {f.label}
+                    {canEditFinancial && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Financial</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <Label htmlFor="hourly_rate">
+                                            Pay Rate ($)
+                                        </Label>
+                                        <Input
+                                            id="hourly_rate"
+                                            type="number"
+                                            step="0.01"
+                                            value={form.data.hourly_rate}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'hourly_rate',
+                                                    e.target.value
+                                                        ? Number(e.target.value)
+                                                        : '',
+                                                )
+                                            }
+                                        />
+                                        {form.errors.hourly_rate && (
+                                            <p className="mt-1 text-sm text-destructive">
+                                                {form.errors.hourly_rate}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <Label>Pay Frequency</Label>
+                                        <Select
+                                            value={
+                                                form.data.pay_frequency ||
+                                                '__none__'
+                                            }
+                                            onValueChange={(v) =>
+                                                form.setData(
+                                                    'pay_frequency',
+                                                    v === '__none__' ? '' : v,
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select frequency" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__none__">
+                                                    Select frequency
                                                 </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {form.errors.pay_frequency && (
-                                        <p className="mt-1 text-sm text-destructive">
-                                            {form.errors.pay_frequency}
-                                        </p>
-                                    )}
+                                                {payFrequencies.map((f) => (
+                                                    <SelectItem
+                                                        key={f.value}
+                                                        value={f.value}
+                                                    >
+                                                        {f.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {form.errors.pay_frequency && (
+                                            <p className="mt-1 text-sm text-destructive">
+                                                {form.errors.pay_frequency}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {/* Site Assignment */}
                     <Card>
@@ -650,19 +678,14 @@ export default function EmployeeEdit({
                                     </Label>
                                     <Input
                                         id="emergency_contact_name"
-                                        value={form.data.emergency_contact_name}
+                                        value={emergencyContact.name}
                                         onChange={(e) =>
-                                            form.setData(
-                                                'emergency_contact_name',
+                                            setEmergencyContact(
+                                                'name',
                                                 e.target.value,
                                             )
                                         }
                                     />
-                                    {form.errors.emergency_contact_name && (
-                                        <p className="mt-1 text-sm text-destructive">
-                                            {form.errors.emergency_contact_name}
-                                        </p>
-                                    )}
                                 </div>
                                 <div>
                                     <Label htmlFor="emergency_contact_phone">
@@ -670,24 +693,14 @@ export default function EmployeeEdit({
                                     </Label>
                                     <Input
                                         id="emergency_contact_phone"
-                                        value={
-                                            form.data.emergency_contact_phone
-                                        }
+                                        value={emergencyContact.phone}
                                         onChange={(e) =>
-                                            form.setData(
-                                                'emergency_contact_phone',
+                                            setEmergencyContact(
+                                                'phone',
                                                 e.target.value,
                                             )
                                         }
                                     />
-                                    {form.errors.emergency_contact_phone && (
-                                        <p className="mt-1 text-sm text-destructive">
-                                            {
-                                                form.errors
-                                                    .emergency_contact_phone
-                                            }
-                                        </p>
-                                    )}
                                 </div>
                                 <div>
                                     <Label htmlFor="emergency_contact_relationship">
@@ -695,28 +708,21 @@ export default function EmployeeEdit({
                                     </Label>
                                     <Input
                                         id="emergency_contact_relationship"
-                                        value={
-                                            form.data
-                                                .emergency_contact_relationship
-                                        }
+                                        value={emergencyContact.relationship}
                                         onChange={(e) =>
-                                            form.setData(
-                                                'emergency_contact_relationship',
+                                            setEmergencyContact(
+                                                'relationship',
                                                 e.target.value,
                                             )
                                         }
                                     />
-                                    {form.errors
-                                        .emergency_contact_relationship && (
-                                        <p className="mt-1 text-sm text-destructive">
-                                            {
-                                                form.errors
-                                                    .emergency_contact_relationship
-                                            }
-                                        </p>
-                                    )}
                                 </div>
                             </div>
+                            {form.errors.emergency_contacts && (
+                                <p className="text-sm text-destructive">
+                                    {form.errors.emergency_contacts}
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
 

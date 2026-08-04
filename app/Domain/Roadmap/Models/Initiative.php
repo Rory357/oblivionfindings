@@ -5,8 +5,10 @@ namespace App\Domain\Roadmap\Models;
 use App\Domain\Governance\Models\RiskRegisterEntry;
 use App\Domain\Governance\Models\StrategicGoal;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\References\ReferenceNumberGenerator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,6 +21,7 @@ class Initiative extends Model
     use AuditableChanges;
     use HasFactory;
     use SoftDeletes;
+    use WritesLegacyStorageContext;
 
     public const STATUS_DRAFT = 'draft';
 
@@ -41,7 +44,6 @@ class Initiative extends Model
     protected $table = 'roadmap_initiatives';
 
     protected $fillable = [
-        'tenant_id',
         'strategic_goal_id',
         'code',
         'title',
@@ -94,7 +96,7 @@ class Initiative extends Model
 
         static::creating(function (self $initiative): void {
             if (empty($initiative->code)) {
-                $initiative->code = self::generateCode($initiative->tenant_id);
+                $initiative->code = self::generateCode();
             }
 
             if (empty($initiative->status)) {
@@ -103,15 +105,23 @@ class Initiative extends Model
         });
     }
 
-    public static function generateCode(?int $tenantId): string
+    public static function generateCode(): string
     {
-        $prefix = now()->format('Y').'-RI-';
-        $count = self::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->whereYear('created_at', now()->year)
-            ->count() + 1;
+        $year = now()->year;
+        $sequenceFloor = self::query()
+            ->where('code', 'like', $year.'-RI-%')
+            ->pluck('code')
+            ->map(function (string $code): int {
+                return preg_match('/\A\d{4}-RI-(\d+)\z/', $code, $matches) === 1
+                    ? (int) $matches[1]
+                    : 0;
+            })
+            ->max() + 1;
+        $generator = app(ReferenceNumberGenerator::class);
+        $generator->ensureAtLeast('RI-'.$year, max(1, $sequenceFloor));
+        [, $allocatedYear, $sequence] = explode('-', $generator->next('RI', $year, 4), 3);
 
-        return $prefix.str_pad((string) $count, 4, '0', STR_PAD_LEFT);
+        return $allocatedYear.'-RI-'.$sequence;
     }
 
     public function category(): BelongsTo
@@ -221,15 +231,6 @@ class Initiative extends Model
     public function linkedRisks()
     {
         return RiskRegisterEntry::query()->whereIn('id', $this->riskLinks()->pluck('risk_register_entry_id'));
-    }
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        if ($tenantId === null) {
-            return $query;
-        }
-
-        return $query->where('tenant_id', $tenantId);
     }
 
     public function scopeActive($query)

@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
@@ -12,11 +13,21 @@ use Inertia\Testing\AssertableInertia as Assert;
 
 // Pest.php applies Tests\TestCase + RefreshDatabase to the whole Feature folder.
 
-function makeRosteringManager(): User
+function makeRosteringManager(Site $site): User
 {
     $manager = User::factory()->create([
-        'organization_id' => 1,
         'approved_at' => now(),
+    ]);
+
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $manager->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $manager->id,
+        'updated_by' => $manager->id,
     ]);
 
     $role = Role::query()->create([
@@ -47,9 +58,8 @@ function makeRosteringManager(): User
 }
 
 it('emits openShiftEligibility blocked entry when a candidate has overlapping time off', function () {
-    $manager = makeRosteringManager();
-
     $site = Site::factory()->create();
+    $manager = makeRosteringManager($site);
     $serviceContext = ServiceContext::factory()->create();
     $client = Client::factory()->create([
         'site_id' => $site->id,
@@ -57,13 +67,21 @@ it('emits openShiftEligibility blocked entry when a candidate has overlapping ti
     ]);
 
     $candidate = User::factory()->create([
-        'organization_id' => 1,
         'name' => 'Aroha Blocked',
         'approved_at' => now(),
     ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $candidate->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $manager->id,
+        'updated_by' => $manager->id,
+    ]);
 
     $shift = Shift::factory()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'site_id' => $site->id,
         'service_context_id' => $serviceContext->id,
@@ -94,7 +112,8 @@ it('emits openShiftEligibility blocked entry when a candidate has overlapping ti
 });
 
 it('includes the openShiftEligibility payload on the rostering page', function () {
-    $manager = makeRosteringManager();
+    $site = Site::factory()->create();
+    $manager = makeRosteringManager($site);
 
     $this->actingAs($manager)
         ->get(route('operations.rostering.index', ['week' => '2026-05-25']))

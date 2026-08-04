@@ -48,7 +48,7 @@ class ControlRoomShellConsistencyTest extends TestCase
             'reports.tsx' => 'Reports',
             'messaging.tsx' => 'Messaging',
             'settings.tsx' => 'Settings',
-            'devices/index.tsx' => 'Devices',
+            'devices/index.tsx' => 'Device signals',
             'playbooks/index.tsx' => 'Playbooks',
             'sla/index.tsx' => 'SLA performance',
             'broadcast.tsx' => 'Broadcasts',

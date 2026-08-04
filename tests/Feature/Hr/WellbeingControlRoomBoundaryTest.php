@@ -1,7 +1,9 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\WellbeingCareService;
 use App\Models\ControlRoomAlert;
+use App\Models\Site;
 use App\Models\User;
 
 /**
@@ -30,20 +32,31 @@ use App\Models\User;
  * (which is Decision D-10 for Chane, not a unilateral build).
  */
 test('S15 seam: HR wellbeing duty-of-care actions stay in HR and raise no Control Room alert', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    $staff = User::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create(['name' => 'Wellbeing boundary site']);
+    $manager = User::factory()->create();
+    $staff = User::factory()->create();
+    foreach ([$manager, $staff] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+    }
 
     $service = app(WellbeingCareService::class);
 
     // Representative duty-of-care writes: flag triage, a welfare check-in, and a
     // confidential EAP referral (the most safety-sensitive of the three).
-    $flag = $service->recordFlagAction($manager, 1, $staff->id, 'acknowledge', 'checking in');
-    $checkin = $service->createCheckin($manager, 1, [
+    $flag = $service->recordFlagAction($manager, $staff->id, 'acknowledge', 'checking in');
+    $checkin = $service->createCheckin($manager, [
         'staff_user_id' => $staff->id,
         'type' => 'welfare',
         'notes' => 'Quiet week, keeping an eye on them.',
     ]);
-    $eap = $service->createEapReferral($manager, 1, [
+    $eap = $service->createEapReferral($manager, [
         'staff_user_id' => $staff->id,
         'consent_given' => true,
     ]);

@@ -15,7 +15,6 @@ class SiteCertification extends Model
     protected $table = 'site_certifications';
 
     protected $fillable = [
-        'organization_id',
         'site_id',
         'certification_type',
         'name',
@@ -68,10 +67,10 @@ class SiteCertification extends Model
     {
         return $query->where(function ($q) {
             $q->where('status', 'expired')
-              ->orWhere(function ($q2) {
-                  $q2->whereNotNull('expiry_date')
-                     ->where('expiry_date', '<', now());
-              });
+                ->orWhere(function ($q2) {
+                    $q2->whereNotNull('expiry_date')
+                        ->where('expiry_date', '<', now());
+                });
         });
     }
 

@@ -2,7 +2,8 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Domain\Hr\Models\HrAssetAssignment;
+use App\Domain\Hr\Models\HrApplication;
+use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrCompetencyAssessment;
 use App\Domain\Hr\Models\HrCourseEnrollment;
@@ -13,6 +14,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEmployeeSkill;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPerformanceReview;
@@ -23,11 +25,11 @@ use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Notifications\EmployeeInviteNotification;
 use App\Domain\Hr\Services\EmployeeIntakeService;
+use App\Domain\Hr\Services\HrEquipmentAccessProjectionService;
 use App\Domain\Hr\Services\OrgChartService;
-use App\Domain\Hr\Services\PositionService;
+use App\Domain\Hr\Services\PeopleMutationLockService;
 use App\Domain\It\Services\ItProvisioningWorkflowService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreEmployeeRequest;
 use App\Http\Requests\Hr\UpdateEmployeeProfileRequest;
 use App\Models\ProcedureAcknowledgement;
@@ -38,17 +40,18 @@ use App\Models\StaffBackgroundCheck;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class EmployeeProfileController extends Controller
 {
-    use ResolvesHrTenant;
-
     /* ------------------------------------------------------------------ */
     /*  Index — paginated employee list */
     /* ------------------------------------------------------------------ */
@@ -57,11 +60,16 @@ class EmployeeProfileController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.viewAny'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $siteAccess = app(UserSiteAccessService::class);
+        $accessibleSiteIds = $siteAccess->accessibleSiteIds($user);
 
         $search = trim((string) $request->query('q', ''));
         $status = $request->query('status'); // 'active', 'inactive', or null for all
         $siteId = $request->query('site_id');
+        $requestedSiteId = is_numeric($siteId) && (int) $siteId > 0 ? (int) $siteId : null;
+        $hasSiteFilter = $siteId !== null && $siteId !== '';
+        $canFilterSite = $requestedSiteId !== null
+            && in_array($requestedSiteId, $accessibleSiteIds, true);
         $department = $request->query('department');
         $employmentType = $request->query('employment_type');
         $joined = $request->query('joined');       // '30' = hired within the last 30 days
@@ -82,6 +90,12 @@ class EmployeeProfileController extends Controller
         $sortKey = (string) $request->query('sort', 'name');
         $sortColumn = $sortColumns[$sortKey] ?? 'users.name';
         $sortDir = strtolower((string) $request->query('dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $siteSortExpression = $accessibleSiteIds === []
+            ? 'NULL'
+            : sprintf(
+                'CASE WHEN hr_employee_profiles.primary_site_id IN (%s) THEN sites.name ELSE NULL END',
+                implode(', ', array_fill(0, count($accessibleSiteIds), '?')),
+            );
 
         $profiles = User::query()
             ->staff()
@@ -94,33 +108,49 @@ class EmployeeProfileController extends Controller
                     ->whereNull('hr_employee_profiles.deleted_at');
             })
             ->leftJoin('sites', 'sites.id', '=', 'hr_employee_profiles.primary_site_id')
-            ->with([
-                'hrEmployeeProfile.primarySite:id,name',
-            ])
+            ->with(['hrEmployeeProfile' => fn ($profileQuery) => $profileQuery
+                ->withTrashed()
+                ->with('primarySite:id,name')]);
+        $siteAccess->applyHistoricalStaffSiteScope($profiles, $user);
+        $profiles = $profiles
             ->when($search !== '', fn ($q) => $q->where(function ($inner) use ($search) {
                 $inner->where('users.name', 'like', "%{$search}%")
                     ->orWhere('users.email', 'like', "%{$search}%");
             })
             )
             ->when($status === 'active', fn ($q) => $q->where(function ($statusQuery) {
-                $statusQuery
-                    ->whereDoesntHave('hrEmployeeProfile')
-                    ->orWhereHas('hrEmployeeProfile', fn ($profile) => $profile->where('is_active', true));
+                $statusQuery->whereHas('hrEmployeeProfile', fn ($profile) => $profile
+                    ->withTrashed()
+                    ->whereNull('deleted_at')
+                    ->where('is_active', true));
             })
             )
-            ->when($status === 'inactive', fn ($q) => $q->whereHas('hrEmployeeProfile', fn ($profile) => $profile->where('is_active', false))
+            ->when($status === 'inactive', fn ($q) => $q->whereHas('hrEmployeeProfile', fn ($profile) => $profile
+                ->withTrashed()
+                ->where(fn ($inactive) => $inactive
+                    ->where('is_active', false)
+                    ->orWhereNotNull('deleted_at')))
             )
-            ->when($siteId, fn ($q) => $q->whereHas('hrEmployeeProfile', function ($profileQuery) use ($siteId) {
-                $profileQuery->where(function ($siteQuery) use ($siteId) {
-                    $siteQuery
-                        ->where('primary_site_id', (int) $siteId)
-                        ->orWhereJsonContains('secondary_site_ids', (int) $siteId);
+            ->when($hasSiteFilter, function ($q) use ($canFilterSite, $requestedSiteId) {
+                if (! $canFilterSite) {
+                    return $q->whereRaw('1 = 0');
+                }
+
+                return $q->whereHas('hrEmployeeProfile', function ($profileQuery) use ($requestedSiteId) {
+                    $profileQuery->withTrashed()->where(function ($siteQuery) use ($requestedSiteId) {
+                        $siteQuery
+                            ->where('primary_site_id', $requestedSiteId)
+                            ->orWhereJsonContains('secondary_site_ids', $requestedSiteId);
+                    });
                 });
             })
+            ->when($department, fn ($q) => $q->whereHas('hrEmployeeProfile', fn ($p) => $p
+                ->withTrashed()
+                ->where('department_id', (int) $department))
             )
-            ->when($department, fn ($q) => $q->whereHas('hrEmployeeProfile', fn ($p) => $p->where('department_id', (int) $department))
-            )
-            ->when($employmentType, fn ($q) => $q->whereHas('hrEmployeeProfile', fn ($p) => $p->where('employment_type', $employmentType))
+            ->when($employmentType, fn ($q) => $q->whereHas('hrEmployeeProfile', fn ($p) => $p
+                ->withTrashed()
+                ->where('employment_type', $employmentType))
             )
             ->when($joined === '30', fn ($q) => $q->whereHas('hrEmployeeProfile', fn ($p) => $p
                 ->where('is_active', true)
@@ -131,12 +161,24 @@ class EmployeeProfileController extends Controller
                 ->whereNotNull('probation_end_date')
                 ->where('probation_end_date', '>=', now()))
             )
-            ->orderBy($sortColumn, $sortDir)
+            ->when(
+                $sortKey === 'site',
+                fn ($q) => $q->orderByRaw("{$siteSortExpression} {$sortDir}", $accessibleSiteIds),
+                fn ($q) => $q->orderBy($sortColumn, $sortDir),
+            )
             ->orderBy('users.name')
+            ->orderBy('users.id')
             ->paginate(20)
-            ->through(function (User $staffUser) {
+            ->through(function (User $staffUser) use ($accessibleSiteIds) {
                 $profile = $staffUser->hrEmployeeProfile;
-                $primarySite = $profile?->primarySite;
+                $isActive = $profile !== null
+                    && ! $profile->trashed()
+                    && (bool) $profile->is_active;
+                $primarySite = $profile
+                    && $profile->primarySite
+                    && in_array((int) $profile->primary_site_id, $accessibleSiteIds, true)
+                        ? $profile->primarySite
+                        : null;
 
                 return [
                     'id' => $staffUser->id,
@@ -145,17 +187,17 @@ class EmployeeProfileController extends Controller
                     'position_title' => $profile?->position_title,
                     'employment_type' => $profile?->employment_type,
                     'department' => $profile?->department,
-                    'is_active' => $profile ? (bool) $profile->is_active : true,
+                    'is_active' => $isActive,
                     'start_date' => $profile?->start_date?->toDateString(),
                     // Re-hire wizard prefill — only meaningful (and only sent)
                     // for former employees.
-                    'end_date' => $profile && ! $profile->is_active ? $profile->end_date?->toDateString() : null,
-                    'position_role' => $profile && ! $profile->is_active ? $profile->position_role : null,
-                    'hours_per_week' => $profile && ! $profile->is_active && $profile->hours_per_week !== null
+                    'end_date' => $profile && ! $isActive ? $profile->end_date?->toDateString() : null,
+                    'position_role' => $profile && ! $isActive ? $profile->position_role : null,
+                    'hours_per_week' => $profile && ! $isActive && $profile->hours_per_week !== null
                         ? (float) $profile->hours_per_week
                         : null,
-                    'employment_history' => $profile && ! $profile->is_active
-                        ? ($profile->employment_history ?? [])
+                    'employment_history' => $profile && ! $isActive
+                        ? $this->shapedEmploymentHistory($profile->employment_history)
                         : null,
                     // Directory-tab card fields (single source — the standalone directory is folded in).
                     'preferred_name' => $profile?->preferred_name,
@@ -175,31 +217,44 @@ class EmployeeProfileController extends Controller
             })
             ->withQueryString();
 
-        $sites = Site::orderBy('name')
-            ->get(['id', 'name']);
+        $sitesQuery = Site::query()->orderBy('name');
+        $siteAccess->applySiteScope($sitesQuery, $user);
+        $sites = $sitesQuery->get(['id', 'name']);
 
         // Summary stats for mini dashboard
-        $activeCount = HrEmployeeProfile::where('is_active', true)->count();
-        $inactiveCount = HrEmployeeProfile::where('is_active', false)->count();
-        $newHires = HrEmployeeProfile::where('is_active', true)
+        $activeCount = $this->visibleProfilesQuery($user, $siteAccess)
+            ->where('is_active', true)
+            ->count();
+        $inactiveCount = $this->visibleProfilesQuery($user, $siteAccess, includeArchived: true)
+            ->where(fn ($inactive) => $inactive
+                ->where('is_active', false)
+                ->orWhereNotNull('deleted_at'))
+            ->count();
+        $newHires = $this->visibleProfilesQuery($user, $siteAccess)
+            ->where('is_active', true)
             ->where('start_date', '>=', now()->subDays(30))
             ->count();
-        $onProbation = HrEmployeeProfile::where('is_active', true)
+        $onProbation = $this->visibleProfilesQuery($user, $siteAccess)
+            ->where('is_active', true)
             ->whereNotNull('probation_end_date')
             ->where('probation_end_date', '>=', now())
             ->count();
-        $complianceAlerts = HrStaffComplianceStatus::whereIn('status', ['expired', 'expiring_soon'])->count();
+        $complianceAlerts = HrStaffComplianceStatus::query()
+            ->whereIn('user_id', $this->visibleStaffQuery($user, $siteAccess)->select('users.id'))
+            ->whereIn('status', ['expired', 'expiring_soon'])
+            ->count();
         // Pending invites — active employee profiles whose login is not active yet.
-        $pendingInvites = User::query()->staff()
+        $pendingInvitesQuery = User::query()->staff()
             ->whereNull('approved_at')
             ->whereNull('last_login_at')
             ->whereHas('hrEmployeeProfile', fn ($p) => $p
-                ->where('tenant_id', $tenantId)
-                ->where('is_active', true))
-            ->count();
+                ->where('is_active', true));
+        $siteAccess->applyHistoricalStaffSiteScope($pendingInvitesQuery, $user);
+        $pendingInvites = $pendingInvitesQuery->count();
 
         // Employment type breakdown
-        $typeCounts = HrEmployeeProfile::where('is_active', true)
+        $typeCounts = $this->visibleProfilesQuery($user, $siteAccess)
+            ->where('is_active', true)
             ->selectRaw('employment_type, count(*) as count')
             ->groupBy('employment_type')
             ->pluck('count', 'employment_type')
@@ -207,7 +262,6 @@ class EmployeeProfileController extends Controller
 
         // Departments list for filter (from managed departments table)
         $departments = HrDepartment::query()
-            ->where(fn ($q) => $q->where('tenant_id', $user->tenant_id)->orWhereNull('tenant_id'))
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name']);
@@ -216,12 +270,13 @@ class EmployeeProfileController extends Controller
         $canManage = $user->canDo('hr.employees.manage');
         $formData = $canManage ? [
             'positions' => HrPosition::query()
-                ->where(fn ($q) => $q->where('tenant_id', $user->tenant_id)->orWhereNull('tenant_id'))
                 ->orderBy('title')
                 ->get(['id', 'title'])
                 ->map(fn ($p) => ['id' => $p->id, 'title' => $p->title])
                 ->values(),
-            'managers' => User::query()->staff()->orderBy('name')->get(['id', 'name'])
+            'managers' => $this->currentVisibleStaffQuery($user, $siteAccess)
+                ->orderBy('name')
+                ->get(['id', 'name'])
                 ->map(fn ($u) => ['value' => (string) $u->id, 'label' => $u->name])
                 ->values(),
             'roles' => Role::query()->orderBy('name')->get(['name'])
@@ -233,13 +288,13 @@ class EmployeeProfileController extends Controller
         ] : null;
 
         // --- Positions tab (folds /hr/positions; namespaced filters + paginator) ---
-        // Users carry no tenant_id column, so all folded tabs reuse the resolved
-        // HR tenant from the start of the request.
+        // Positions and departments are application-global configuration. Their
+        // people-derived counts are still limited to the viewer's approved Sites.
         $posSearch = trim((string) $request->query('pq', ''));
         $posDepartment = $request->query('pdepartment');
         $posStatus = $request->query('pstatus');
 
-        $positions = HrPosition::forTenant($tenantId)
+        $positions = HrPosition::query()
             ->when($posStatus === 'active', fn ($q) => $q->where('is_active', true))
             ->when($posStatus === 'inactive', fn ($q) => $q->where('is_active', false))
             ->when($posDepartment, fn ($q) => $q->where('department', $posDepartment))
@@ -248,8 +303,12 @@ class EmployeeProfileController extends Controller
                     ->orWhere('code', 'like', "%{$posSearch}%")
                     ->orWhere('department', 'like', "%{$posSearch}%");
             }))
-            ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
-            ->withSum(['requisitions as open_req_openings' => fn ($q) => $q->whereNotIn('status', ['closed'])], 'openings')
+            ->withCount(['employees' => fn ($q) => $q
+                ->where('is_active', true)
+                ->whereIn('user_id', $this->visibleStaffQuery($user, $siteAccess)->select('users.id'))])
+            ->withSum(['requisitions as open_req_openings' => fn ($q) => $q
+                ->whereNotIn('status', ['closed'])
+                ->whereIn('site_id', $accessibleSiteIds)], 'openings')
             ->orderBy('department')
             ->orderBy('title')
             ->paginate(20, ['*'], 'pos_page')
@@ -277,21 +336,42 @@ class EmployeeProfileController extends Controller
             'reports_to_position_id' => $pos->reports_to_position_id,
         ]);
 
-        $parentPositions = HrPosition::forTenant($tenantId)
+        $parentPositions = HrPosition::query()
             ->where('is_active', true)
             ->orderBy('title')
             ->get(['id', 'title', 'code']);
 
-        $understaffedCount = app(PositionService::class)->getUnderstaffed($tenantId)->count();
+        $understaffedQuery = HrPosition::query()
+            ->select(['hr_positions.id', 'hr_positions.headcount_budget'])
+            ->active()
+            ->withCount(['employees' => fn ($q) => $q
+                ->where('is_active', true)
+                ->whereIn('user_id', $this->visibleStaffQuery($user, $siteAccess)->select('users.id'))])
+            ->withSum(['requisitions as open_req_openings' => fn ($q) => $q
+                ->whereNotIn('status', ['closed'])
+                ->whereIn('site_id', $accessibleSiteIds)], 'openings');
+        $understaffedCount = DB::query()
+            ->fromSub($understaffedQuery, 'understaffed_positions')
+            ->whereRaw('headcount_budget - employees_count - COALESCE(open_req_openings, 0) > 0')
+            ->count();
 
         // --- Departments tab (folds /hr/departments; own filters + paginator) ---
         $deptSearch = trim((string) $request->query('dept_q', ''));
         $deptStatus = $request->query('dept_status');
 
         $departmentsPane = HrDepartment::query()
-            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
-            ->with(['manager:id,name', 'parent:id,name', 'sites:id,name'])
-            ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
+            ->with([
+                'manager' => fn ($query) => $query
+                    ->whereIn('users.id', $this->currentVisibleStaffQuery($user, $siteAccess)->select('users.id'))
+                    ->select(['users.id', 'users.name']),
+                'parent:id,name',
+                'sites' => fn ($query) => $query
+                    ->whereIn('sites.id', $accessibleSiteIds)
+                    ->select(['sites.id', 'sites.name']),
+            ])
+            ->withCount(['employees' => fn ($q) => $q
+                ->where('is_active', true)
+                ->whereIn('user_id', $this->visibleStaffQuery($user, $siteAccess)->select('users.id'))])
             ->when($deptSearch !== '', fn ($q) => $q->where(fn ($i) => $i
                 ->where('name', 'like', "%{$deptSearch}%")
                 ->orWhere('code', 'like', "%{$deptSearch}%")))
@@ -302,21 +382,28 @@ class EmployeeProfileController extends Controller
             ->paginate(25, ['*'], 'dept_page')
             ->withQueryString();
 
-        $departmentManagers = User::query()->staff()->orderBy('name')->get(['id', 'name']);
+        $departmentManagers = $this->currentVisibleStaffQuery($user, $siteAccess)
+            ->orderBy('name')
+            ->get(['id', 'name']);
         $departmentParents = HrDepartment::query()
-            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name']);
         $canDept = $user->canDo('hr.settings.manage') || $user->canDo('hr.employees.manage');
 
         // --- Org chart tab (folds /hr/orgchart) ---
-        $orgHierarchy = app(OrgChartService::class)->getHierarchy($tenantId);
-        $orgPeople = HrEmployeeProfile::forTenant($tenantId)
-            ->active()
-            ->with('user:id,name')
+        $orgProfiles = HrEmployeeProfile::query()
+            ->whereIn('user_id', $this->currentVisibleStaffQuery($user, $siteAccess)->select('users.id'))
+            ->with([
+                'user:id,name',
+                'primarySite' => fn ($query) => $query
+                    ->whereIn('sites.id', $accessibleSiteIds)
+                    ->select(['sites.id', 'sites.name']),
+            ])
             ->orderBy('position_title')
-            ->get()
+            ->get();
+        $orgHierarchy = app(OrgChartService::class)->getHierarchy($orgProfiles);
+        $orgPeople = $orgProfiles
             ->map(fn ($p) => [
                 'user_id' => $p->user_id,
                 'name' => $p->user?->name ?? 'Unknown',
@@ -327,7 +414,7 @@ class EmployeeProfileController extends Controller
         $canOrgManage = $user->canDo('hr.orgchart.manage') || $user->canDo('hr.employees.manage');
 
         // --- "Needs attention" triage (drill-down modal from the hero chips) ---
-        $triage = $this->buildTriage($tenantId);
+        $triage = $this->buildTriage($user, $siteAccess);
 
         return Inertia::render('hr/employees/index', [
             'profiles' => $profiles,
@@ -387,10 +474,11 @@ class EmployeeProfileController extends Controller
      * pending login invites. Each list is capped (the rail shows the true total
      * from `summary`, with the list as the actionable head of the queue).
      */
-    private function buildTriage(int $tenantId): array
+    private function buildTriage(User $viewer, UserSiteAccessService $siteAccess): array
     {
         // Compliance — expired first, then expiring soon, soonest expiry up top.
         $compliance = HrStaffComplianceStatus::query()
+            ->whereIn('user_id', $this->visibleStaffQuery($viewer, $siteAccess)->select('users.id'))
             ->whereIn('status', ['expired', 'expiring_soon'])
             ->with(['user:id,name', 'requirement:id,name'])
             ->orderByRaw("FIELD(status, 'expired', 'expiring_soon')")
@@ -404,7 +492,7 @@ class EmployeeProfileController extends Controller
             ->whereIn('user_id', $compliance->pluck('user_id')->filter()->unique())
             ->pluck('id', 'user_id');
 
-        $probation = HrEmployeeProfile::query()->forTenant($tenantId)
+        $probation = $this->visibleProfilesQuery($viewer, $siteAccess)
             ->where('is_active', true)
             ->whereNotNull('probation_end_date')
             ->where('probation_end_date', '>=', now())
@@ -417,8 +505,9 @@ class EmployeeProfileController extends Controller
             ->whereNull('approved_at')
             ->whereNull('last_login_at')
             ->whereHas('hrEmployeeProfile', fn ($p) => $p
-                ->where('tenant_id', $tenantId)
-                ->where('is_active', true))
+                ->where('is_active', true));
+        $siteAccess->applyHistoricalStaffSiteScope($invites, $viewer);
+        $invites = $invites
             ->with('hrEmployeeProfile:id,user_id,position_title')
             ->orderBy('name')
             ->limit(50)
@@ -452,34 +541,263 @@ class EmployeeProfileController extends Controller
         ];
     }
 
+    /** @return Builder<User> */
+    private function visibleStaffQuery(User $viewer, UserSiteAccessService $siteAccess): Builder
+    {
+        $query = User::query()->staff();
+        $siteAccess->applyHistoricalStaffSiteScope($query, $viewer);
+
+        return $query;
+    }
+
+    /** @return Builder<User> */
+    private function currentVisibleStaffQuery(User $viewer, UserSiteAccessService $siteAccess): Builder
+    {
+        $query = User::query();
+        $siteAccess->applyStaffScope($query, $viewer);
+
+        return $query;
+    }
+
+    /** @return Builder<HrEmployeeProfile> */
+    private function visibleProfilesQuery(
+        User $viewer,
+        UserSiteAccessService $siteAccess,
+        bool $includeArchived = false,
+    ): Builder {
+        $query = $includeArchived
+            ? HrEmployeeProfile::withTrashed()
+            : HrEmployeeProfile::query();
+
+        return $query->whereIn(
+            'user_id',
+            $this->visibleStaffQuery($viewer, $siteAccess)->select('users.id'),
+        );
+    }
+
+    private function assertProfileReadAccess(
+        User $viewer,
+        HrEmployeeProfile $profile,
+        ?UserSiteAccessService $siteAccess = null,
+    ): void {
+        $siteAccess ??= app(UserSiteAccessService::class);
+        $visibleProfile = $this->visibleProfilesQuery($viewer, $siteAccess, includeArchived: true)
+            ->whereKey($profile->id)
+            ->exists();
+
+        abort_unless($visibleProfile, 404);
+    }
+
+    private function assertProfileMutationAccess(
+        User $viewer,
+        HrEmployeeProfile $profile,
+        ?UserSiteAccessService $siteAccess = null,
+        bool $allowArchived = false,
+    ): void {
+        abort_if($profile->trashed() && ! $allowArchived, 404);
+        $siteAccess ??= app(UserSiteAccessService::class);
+        $this->assertProfileReadAccess($viewer, $profile, $siteAccess);
+
+        $assignedSiteIds = collect([
+            $profile->primary_site_id,
+            ...($profile->secondary_site_ids ?? []),
+        ])
+            ->filter(fn ($siteId) => is_numeric($siteId) && (int) $siteId > 0)
+            ->map(fn ($siteId) => (int) $siteId)
+            ->unique()
+            ->values();
+
+        abort_unless(
+            $assignedSiteIds->isNotEmpty()
+                && $assignedSiteIds->diff($siteAccess->accessibleSiteIds($viewer))->isEmpty(),
+            404,
+        );
+    }
+
+    /** @return Builder<HrDepartment> */
+    private function accessibleDepartmentsQuery(
+        User $viewer,
+        UserSiteAccessService $siteAccess,
+    ): Builder {
+        $accessibleSiteIds = $siteAccess->accessibleSiteIds($viewer);
+
+        return HrDepartment::query()
+            ->where('is_active', true)
+            ->where(function (Builder $query) use ($accessibleSiteIds): void {
+                $query->whereDoesntHave('sites');
+                if ($accessibleSiteIds !== []) {
+                    $query->orWhereHas('sites', fn (Builder $siteQuery) => $siteQuery
+                        ->whereIn('sites.id', $accessibleSiteIds));
+                }
+            });
+    }
+
+    private function invalidSelection(string $field): never
+    {
+        throw ValidationException::withMessages([
+            $field => "The selected {$field} is invalid.",
+        ]);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function shapedEmploymentHistory(mixed $history): array
+    {
+        return collect(is_array($history) ? $history : [])
+            ->filter(fn ($entry) => is_array($entry))
+            ->map(fn (array $entry) => collect($entry)->only([
+                'start_date',
+                'end_date',
+                'position_title',
+                'position_role',
+                'employment_type',
+                'archived_at',
+            ])->all())
+            ->values()
+            ->all();
+    }
+
+    /**
+     * LOCK ORDER: all affected Users by ID, all affected Profiles by ID, then
+     * Site/department/offer destinations by ID.
+     *
+     * @param  iterable<int>  $userIds
+     * @param  iterable<int>  $profileIds
+     * @return array{users: Collection<int, User>, profiles: Collection<int, HrEmployeeProfile>}
+     */
+    private function lockPeopleMutationGraph(iterable $userIds, iterable $profileIds = []): array
+    {
+        return app(PeopleMutationLockService::class)->lock($userIds, $profileIds);
+    }
+
+    /**
+     * @param  array{users: Collection<int, User>, profiles: Collection<int, HrEmployeeProfile>}  $locks
+     * @return array{0: User, 1: UserSiteAccessService}
+     */
+    private function lockedPeopleMutationActor(array $locks, int $actorId): array
+    {
+        $actor = $locks['users']->get($actorId);
+        abort_unless($actor, 403);
+        abort_unless($actor->canDo('hr.employees.manage'), 403);
+
+        $actorProfile = $locks['profiles']->first(
+            fn (HrEmployeeProfile $profile) => (int) $profile->user_id === (int) $actor->id,
+        );
+        $actor->setRelation(
+            'hrEmployeeProfile',
+            $actorProfile && ! $actorProfile->trashed() ? $actorProfile : null,
+        );
+
+        return [$actor, new UserSiteAccessService];
+    }
+
+    private function lockedCurrentAccessibleManager(
+        int $managerUserId,
+        User $actor,
+        UserSiteAccessService $siteAccess,
+        array $locks,
+    ): ?User {
+        $manager = $locks['users']->get($managerUserId);
+        if (! $manager) {
+            return null;
+        }
+
+        $managerProfile = $locks['profiles']->first(
+            fn (HrEmployeeProfile $profile) => (int) $profile->user_id === (int) $manager->id,
+        );
+        $manager->setRelation(
+            'hrEmployeeProfile',
+            $managerProfile && ! $managerProfile->trashed() ? $managerProfile : null,
+        );
+
+        $managerQuery = User::query()->whereKey($manager->id);
+        $siteAccess->applyStaffScope($managerQuery, $actor);
+
+        return $managerQuery->exists() ? $manager : null;
+    }
+
+    private function hasLockedAccessibleAcceptedOffer(
+        string $email,
+        int $requestedSiteId,
+        array $accessibleSiteIds,
+    ): bool {
+        if ($accessibleSiteIds === []) {
+            return false;
+        }
+
+        $candidate = HrCandidate::query()
+            ->where('personal_email', $email)
+            ->lockForUpdate()
+            ->first();
+        if (! $candidate) {
+            return false;
+        }
+
+        $application = HrApplication::query()
+            ->where('candidate_id', $candidate->id)
+            ->where('target_site_id', $requestedSiteId)
+            ->whereIn('target_site_id', $accessibleSiteIds)
+            ->whereIn('status', ['offer_accepted', 'onboarding', 'hired'])
+            ->lockForUpdate()
+            ->first();
+        if (! $application) {
+            return false;
+        }
+
+        return HrOffer::query()
+            ->where('application_id', $application->id)
+            ->where('approval_status', 'approved')
+            ->where('response', 'accepted')
+            ->where('primary_site_id', $requestedSiteId)
+            ->whereIn('primary_site_id', $accessibleSiteIds)
+            ->lockForUpdate()
+            ->first() !== null;
+    }
+
     /* ------------------------------------------------------------------ */
     /*  resendInvite — (re)send a login invite from the triage modal */
     /* ------------------------------------------------------------------ */
 
     public function resendInvite(Request $request, HrEmployeeProfile $profile)
     {
-        abort_unless($request->user()?->canDo('hr.employees.manage'), 403);
+        $viewer = $request->user();
+        abort_unless($viewer?->canDo('hr.employees.manage'), 403);
+        $actorId = (int) $request->user()->id;
+        $targetUserId = (int) $profile->user_id;
+        $profileId = (int) $profile->id;
+        $invite = DB::transaction(function () use ($actorId, $profileId, $targetUserId): array {
+            $locks = $this->lockPeopleMutationGraph([$actorId, $targetUserId], [$profileId]);
+            [$viewer, $siteAccess] = $this->lockedPeopleMutationActor($locks, $actorId);
+            $account = $locks['users']->get($targetUserId);
+            $profile = $locks['profiles']->get($profileId);
+            abort_unless($profile, 404);
+            abort_unless($account && (int) $profile->user_id === (int) $account->id, 404);
+            $this->assertProfileMutationAccess($viewer, $profile, $siteAccess);
 
-        $account = $profile->user;
-        $this->assertHrTenantAccess(
-            $this->resolveHrTenantIdForUser($request->user()),
-            $profile->tenant_id,
-        );
+            if ($account->approved_at !== null) {
+                throw ValidationException::withMessages([
+                    'invite' => 'This employee already has an active login and does not need another invitation.',
+                ]);
+            }
 
-        if (! $account) {
-            return back()->with('error', 'This employee has no login account to invite.');
-        }
+            return [
+                'account_id' => (int) $account->id,
+                'account_name' => $account->name,
+                'profile_id' => (int) $profile->id,
+            ];
+        }, attempts: 3);
 
-        if ($account->approved_at !== null) {
-            return back()->withErrors([
-                'invite' => 'This employee already has an active login and does not need another invitation.',
-            ]);
-        }
+        DB::afterCommit(function () use ($invite): void {
+            $account = User::query()->find($invite['account_id']);
+            $profile = HrEmployeeProfile::query()->find($invite['profile_id']);
+            if (! $account || ! $profile || $account->approved_at !== null) {
+                return;
+            }
 
-        $token = Password::broker()->createToken($account);
-        $account->notify(new EmployeeInviteNotification($token, $profile));
+            $token = Password::broker()->createToken($account);
+            $account->notify(new EmployeeInviteNotification($token, $profile));
+        });
 
-        return back()->with('success', "Login invite sent to {$account->name}.");
+        return back()->with('success', "Login invite sent to {$invite['account_name']}.");
     }
 
     /* ------------------------------------------------------------------ */
@@ -488,61 +806,118 @@ class EmployeeProfileController extends Controller
 
     public function store(StoreEmployeeRequest $request, EmployeeIntakeService $intake)
     {
-        $actor = $request->user();
         $data = $request->validated();
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $data['team'] = HrEmployeeProfile::canonicalTeamForTenant($data['team'] ?? null, $tenantId);
-        $roleName = $data['role'] ?? 'support_worker';
-
-        $positionTitle = $data['position_title'] ?? null;
-        if (empty($positionTitle) && ! empty($data['position_id'])) {
-            $positionTitle = HrPosition::find($data['position_id'])?->title;
-        }
-
-        // Dedupe gate: if this email already belongs to a staff member who has a
-        // profile, require explicit confirmation before linking/overwriting it
-        // (the modal's "Link to existing record" callout). A user without a
-        // profile (e.g. a candidate-created account) links silently.
-        $existingUser = User::where('email', $data['email'])->first();
-        if ($existingUser?->hrEmployeeProfile && ! $request->boolean('link_existing')) {
-            return back()
-                ->withInput()
-                ->withErrors([
-                    'email' => 'A staff member already uses this email. Enable “Link to existing record” to update their profile.',
-                ]);
-        }
+        $actorId = (int) $request->user()->id;
+        $managerUserId = isset($data['manager_user_id']) ? (int) $data['manager_user_id'] : null;
+        $existingUserId = User::query()->where('email', $data['email'])->value('id');
 
         try {
-            $profile = $intake->intake(
-                name: $data['name'],
-                email: $data['email'],
-                roleName: $roleName,
-                profileAttributes: [
-                    'preferred_name' => $data['preferred_name'] ?? null,
-                    'position_id' => $data['position_id'] ?? null,
-                    'position_title' => $positionTitle ?: 'New starter',
-                    'position_role' => $roleName,
-                    'employment_type' => $data['employment_type'] ?? 'full_time',
-                    'department' => $data['department'] ?? null,
-                    'team' => $data['team'],
-                    'primary_site_id' => $data['primary_site_id'] ?? null,
-                    'manager_user_id' => $data['manager_user_id'] ?? null,
-                    'start_date' => $data['start_date'] ?? now()->toDateString(),
-                    'work_phone' => $data['work_phone'] ?? null,
-                    'work_rights_status' => $data['work_rights_status'] ?? null,
-                    'visa_type' => $data['visa_type'] ?? null,
-                    'visa_expires_at' => $data['visa_expires_at'] ?? null,
-                    'emergency_contacts' => $data['emergency_contacts'] ?? null,
-                ],
-                actorId: $actor->id,
-                tenantId: $tenantId,
-                startOnboarding: $request->boolean('start_onboarding', true),
-                sendInvite: $request->boolean('send_invite', false),
-                source: 'manual',
-            );
+            $profile = DB::transaction(function () use ($actorId, $data, $existingUserId, $intake, $managerUserId, $request): HrEmployeeProfile {
+                $locks = $this->lockPeopleMutationGraph([$actorId, $existingUserId, $managerUserId]);
+                [$actor, $siteAccess] = $this->lockedPeopleMutationActor($locks, $actorId);
+                $accessibleSiteIds = $siteAccess->accessibleSiteIds($actor);
+
+                $existingUser = $existingUserId ? $locks['users']->get((int) $existingUserId) : null;
+                if ($existingUser && $existingUser->email !== $data['email']) {
+                    throw ValidationException::withMessages([
+                        'email' => 'This existing email cannot be linked through employee intake.',
+                    ]);
+                }
+                $existingProfile = $existingUser
+                    ? $locks['profiles']->first(
+                        fn (HrEmployeeProfile $lockedProfile) => (int) $lockedProfile->user_id === (int) $existingUser->id,
+                    )
+                    : null;
+
+                if ($existingProfile) {
+                    abort_if($existingProfile->trashed(), 404);
+                    $this->assertProfileMutationAccess($actor, $existingProfile, $siteAccess);
+                    if (! $request->boolean('link_existing')) {
+                        throw ValidationException::withMessages([
+                            'email' => 'A staff member already uses this email. Enable “Link to existing record” to update their profile.',
+                        ]);
+                    }
+                } elseif ($existingUser
+                    && ! $this->hasLockedAccessibleAcceptedOffer(
+                        $data['email'],
+                        (int) $data['primary_site_id'],
+                        $accessibleSiteIds,
+                    )) {
+                    throw ValidationException::withMessages([
+                        'email' => 'This existing email cannot be linked through employee intake.',
+                    ]);
+                }
+
+                if ($managerUserId
+                    && ! $this->lockedCurrentAccessibleManager((int) $managerUserId, $actor, $siteAccess, $locks)) {
+                    $this->invalidSelection('manager_user_id');
+                }
+
+                $primarySite = Site::query()
+                    ->active()
+                    ->notArchived()
+                    ->whereKey($data['primary_site_id'])
+                    ->whereIn('id', $accessibleSiteIds)
+                    ->lockForUpdate()
+                    ->first();
+                if (! $primarySite) {
+                    $this->invalidSelection('primary_site_id');
+                }
+
+                $department = null;
+                if (! empty($data['department_id'])) {
+                    $department = $this->accessibleDepartmentsQuery($actor, $siteAccess)
+                        ->whereKey($data['department_id'])
+                        ->lockForUpdate()
+                        ->first();
+                    if (! $department) {
+                        $this->invalidSelection('department_id');
+                    }
+                }
+
+                $positionTitle = $data['position_title'] ?? null;
+                if (empty($positionTitle) && ! empty($data['position_id'])) {
+                    $positionTitle = HrPosition::query()
+                        ->whereKey($data['position_id'])
+                        ->lockForUpdate()
+                        ->value('title');
+                }
+
+                $roleName = $data['role'] ?? 'support_worker';
+
+                return $intake->intake(
+                    name: $data['name'],
+                    email: $data['email'],
+                    roleName: $roleName,
+                    profileAttributes: [
+                        'preferred_name' => $data['preferred_name'] ?? null,
+                        'position_id' => $data['position_id'] ?? null,
+                        'position_title' => $positionTitle ?: 'New starter',
+                        'position_role' => $roleName,
+                        'employment_type' => $data['employment_type'] ?? 'full_time',
+                        'department_id' => $department?->id,
+                        'department' => $department?->name,
+                        'team' => HrEmployeeProfile::canonicalTeam($data['team'] ?? null),
+                        'primary_site_id' => $primarySite->id,
+                        'manager_user_id' => $managerUserId,
+                        'start_date' => $data['start_date'] ?? now()->toDateString(),
+                        'work_phone' => $data['work_phone'] ?? null,
+                        'work_rights_status' => $data['work_rights_status'] ?? null,
+                        'visa_type' => $data['visa_type'] ?? null,
+                        'visa_expires_at' => $data['visa_expires_at'] ?? null,
+                        'emergency_contacts' => $data['emergency_contacts'] ?? null,
+                    ],
+                    actorId: $actor->id,
+                    startOnboarding: $request->boolean('start_onboarding', true),
+                    sendInvite: $request->boolean('send_invite', false),
+                    source: 'manual',
+                    authorizedExistingUserId: $existingUser?->id,
+                );
+            }, attempts: 3);
         } catch (\InvalidArgumentException $e) {
-            // D-2 role-assignment guard (admin-grade / external personas).
-            return back()->withInput()->withErrors(['role' => $e->getMessage()]);
+            $field = str_contains(strtolower($e->getMessage()), 'existing') ? 'email' : 'role';
+
+            return back()->withInput()->withErrors([$field => $e->getMessage()]);
         }
 
         return redirect()
@@ -556,28 +931,43 @@ class EmployeeProfileController extends Controller
 
     public function setActive(Request $request, HrEmployeeProfile $profile)
     {
-        abort_unless($request->user()?->canDo('hr.employees.manage'), 403);
+        $viewer = $request->user();
+        abort_unless($viewer?->canDo('hr.employees.manage'), 403);
+        // Conceal hidden direct objects before payload validation so malformed
+        // requests cannot distinguish an inaccessible ID from a missing one.
+        $this->assertProfileMutationAccess($viewer, $profile, new UserSiteAccessService);
 
         $data = $request->validate([
             'is_active' => ['required', 'boolean'],
         ]);
 
-        $profile->update(['is_active' => $data['is_active']]);
+        $actorId = (int) $request->user()->id;
+        $targetUserId = (int) $profile->user_id;
+        $profileId = (int) $profile->id;
+        $profile = DB::transaction(function () use ($actorId, $data, $profileId, $targetUserId): HrEmployeeProfile {
+            $locks = $this->lockPeopleMutationGraph([$actorId, $targetUserId], [$profileId]);
+            [$viewer, $siteAccess] = $this->lockedPeopleMutationActor($locks, $actorId);
+            $account = $locks['users']->get($targetUserId);
+            $profile = $locks['profiles']->get($profileId);
+            abort_unless($profile, 404);
+            abort_unless($account && (int) $profile->user_id === (int) $account->id, 404);
+            $this->assertProfileMutationAccess($viewer, $profile, $siteAccess);
 
-        // Re-hiring a leaver whose login was revoked on offboarding completion
-        // must restore their access, or the "reactivated" employee can never
-        // sign in again (approval is what gates login).
-        if ($data['is_active'] && $profile->user && is_null($profile->user->approved_at)) {
-            $profile->user->forceFill(['approved_at' => now()])->save();
+            $profile->update(['is_active' => $data['is_active']]);
 
-            // D-3: lightweight reactivation restores login approval directly,
-            // so record the User write just like the full re-hire workflow.
-            AuditLogger::log('user.login_reactivated', $profile->user, [
-                'actor_id' => $request->user()->id,
-                'employee_profile_id' => $profile->id,
-                'reason' => 'employee_profile_reactivated',
-            ]);
-        }
+            if ($data['is_active'] && $account && is_null($account->approved_at)) {
+                $account->forceFill(['approved_at' => now()])->save();
+                AuditLogger::log('user.login_reactivated', $account, [
+                    'actor_id' => $viewer->id,
+                    'employee_profile_id' => $profile->id,
+                    'reason' => 'employee_profile_reactivated',
+                ]);
+            }
+
+            $profile->setRelation('user', $account);
+
+            return $profile;
+        }, attempts: 3);
 
         return back()->with(
             'success',
@@ -595,18 +985,25 @@ class EmployeeProfileController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $profile->tenant_id);
-
-        if ($profile->is_active) {
-            return back()->with('error', "{$profile->user?->name} is already active — nothing to re-hire.");
-        }
+        $siteAccess = app(UserSiteAccessService::class);
+        // Preserve enumeration-safe 404s before field validation, then repeat
+        // the authorization against locked rows inside the transaction.
+        $this->assertProfileMutationAccess($user, $profile, $siteAccess, allowArchived: true);
 
         $data = $request->validate([
             'start_date' => ['required', 'date'],
             'position_title' => ['nullable', 'string', 'max:255'],
             'position_role' => ['nullable', 'string', 'max:255'],
             'employment_type' => ['nullable', 'string', 'in:full_time,part_time,casual,fixed_term,contractor,permanent'],
-            'primary_site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'primary_site_id' => [
+                'nullable',
+                'integer',
+                function (string $attribute, mixed $value, \Closure $fail) use ($siteAccess, $user): void {
+                    if (! in_array((int) $value, $siteAccess->accessibleSiteIds($user), true)) {
+                        $fail('The selected primary site is invalid.');
+                    }
+                },
+            ],
             'hours_per_week' => ['nullable', 'numeric', 'min:0', 'max:168'],
             'send_invite' => ['nullable', 'boolean'],
             'start_onboarding' => ['nullable', 'boolean'],
@@ -616,15 +1013,48 @@ class EmployeeProfileController extends Controller
             ->only(['start_date', 'position_title', 'position_role', 'employment_type', 'primary_site_id', 'hours_per_week'])
             ->filter(fn ($value) => $value !== null && $value !== '')
             ->all();
+        $actorId = (int) $request->user()->id;
+        $targetUserId = (int) $profile->user_id;
+        $profileId = (int) $profile->id;
 
         try {
-            $profile = $intake->rehire(
-                $profile,
-                $attributes,
-                $user->id,
-                sendInvite: $request->boolean('send_invite', true),
-                startOnboarding: $request->boolean('start_onboarding', true),
-            );
+            $profile = DB::transaction(function () use ($actorId, $attributes, $intake, $profileId, $request, $targetUserId): HrEmployeeProfile {
+                $locks = $this->lockPeopleMutationGraph([$actorId, $targetUserId], [$profileId]);
+                [$user, $siteAccess] = $this->lockedPeopleMutationActor($locks, $actorId);
+                $profileUser = $locks['users']->get($targetUserId);
+                $profile = $locks['profiles']->get($profileId);
+                abort_unless($profile, 404);
+                abort_unless($profileUser && (int) $profile->user_id === (int) $profileUser->id, 404);
+                $profile->setRelation('user', $profileUser);
+                $this->assertProfileMutationAccess($user, $profile, $siteAccess, allowArchived: true);
+
+                if ($profile->is_active) {
+                    throw new \InvalidArgumentException("{$profile->user?->name} is already active — nothing to re-hire.");
+                }
+
+                if (! empty($attributes['primary_site_id'])) {
+                    $site = Site::query()
+                        ->whereKey($attributes['primary_site_id'])
+                        ->whereIn('id', $siteAccess->accessibleSiteIds($user))
+                        ->lockForUpdate()
+                        ->first();
+                    if (! $site) {
+                        $this->invalidSelection('primary_site_id');
+                    }
+                }
+
+                if ($profile->trashed()) {
+                    $profile->restore();
+                }
+
+                return $intake->rehire(
+                    $profile,
+                    $attributes,
+                    $user->id,
+                    sendInvite: $request->boolean('send_invite', true),
+                    startOnboarding: $request->boolean('start_onboarding', true),
+                );
+            }, attempts: 3);
         } catch (\InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -640,47 +1070,91 @@ class EmployeeProfileController extends Controller
     {
         $user = $request->user();
         abort_unless($user?->canDo('hr.employees.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
             'action' => ['required', 'string', 'in:deactivate,reactivate,assign_site,assign_department,assign_manager'],
             'ids' => ['required', 'array', 'min:1'],
-            'ids.*' => ['integer'],
-            'site_id' => ['required_if:action,assign_site', 'nullable', 'integer', 'exists:sites,id'],
-            'department_id' => ['required_if:action,assign_department', 'nullable', 'integer', 'exists:hr_departments,id'],
-            'manager_user_id' => ['required_if:action,assign_manager', 'nullable', 'integer', 'exists:users,id'],
+            'ids.*' => ['integer', 'distinct'],
+            'site_id' => ['required_if:action,assign_site', 'nullable', 'integer'],
+            'department_id' => ['required_if:action,assign_department', 'nullable', 'integer'],
+            'manager_user_id' => ['required_if:action,assign_manager', 'nullable', 'integer'],
         ]);
-
-        if ($data['action'] === 'assign_department') {
-            // keep the denormalised label column in sync with the FK so the
-            // table + filter stay consistent (see departments brief).
-            $department = HrDepartment::where('tenant_id', $tenantId)->find($data['department_id']);
-            abort_unless($department !== null, 422, 'That department does not belong to this organisation.');
-        }
-
-        $attributes = match ($data['action']) {
-            'deactivate' => ['is_active' => false],
-            'reactivate' => ['is_active' => true],
-            'assign_site' => ['primary_site_id' => $data['site_id']],
-            'assign_department' => [
-                'department_id' => $data['department_id'],
-                'department' => $department->name,
-            ],
-            'assign_manager' => ['manager_user_id' => $data['manager_user_id']],
-        };
 
         // Update model-by-model (not a mass query update): bulk query updates
         // skip Eloquent events, so AuditableChanges would never log the rows
         // and the change would be invisible in /hr/settings/audit-log.
-        $profiles = HrEmployeeProfile::where('tenant_id', $tenantId)
-            ->whereIn('id', $data['ids'])
-            ->get();
+        $profileIds = collect($data['ids'])->map(fn ($id) => (int) $id)->unique()->values();
+        $actorId = (int) $request->user()->id;
+        $targetUserIds = HrEmployeeProfile::withTrashed()
+            ->whereIn('id', $profileIds)
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id);
+        $managerUserId = $data['action'] === 'assign_manager'
+            ? (int) $data['manager_user_id']
+            : null;
+        $count = DB::transaction(function () use ($actorId, $data, $managerUserId, $profileIds, $targetUserIds): int {
+            $locks = $this->lockPeopleMutationGraph(
+                [$actorId, ...$targetUserIds, $managerUserId],
+                $profileIds,
+            );
+            [$user, $siteAccess] = $this->lockedPeopleMutationActor($locks, $actorId);
+            $profiles = $profileIds
+                ->map(fn (int $profileId) => $locks['profiles']->get($profileId))
+                ->filter()
+                ->values();
+            abort_unless($profiles->count() === $profileIds->count(), 404);
+            foreach ($profiles as $profile) {
+                $this->assertProfileMutationAccess($user, $profile, $siteAccess);
+            }
 
-        foreach ($profiles as $profile) {
-            $profile->update($attributes);
-        }
+            $department = null;
+            if ($data['action'] === 'assign_site') {
+                $site = Site::query()
+                    ->whereKey($data['site_id'])
+                    ->whereIn('id', $siteAccess->accessibleSiteIds($user))
+                    ->lockForUpdate()
+                    ->first();
+                if (! $site) {
+                    $this->invalidSelection('site_id');
+                }
+            }
 
-        $count = $profiles->count();
+            if ($data['action'] === 'assign_department') {
+                $department = $this->accessibleDepartmentsQuery($user, $siteAccess)
+                    ->whereKey($data['department_id'])
+                    ->lockForUpdate()
+                    ->first();
+                if (! $department) {
+                    $this->invalidSelection('department_id');
+                }
+            }
+
+            if ($data['action'] === 'assign_manager') {
+                if (! $this->lockedCurrentAccessibleManager(
+                    $managerUserId,
+                    $user,
+                    $siteAccess,
+                    $locks,
+                )) {
+                    $this->invalidSelection('manager_user_id');
+                }
+            }
+
+            $attributes = match ($data['action']) {
+                'deactivate' => ['is_active' => false],
+                'reactivate' => ['is_active' => true],
+                'assign_site' => ['primary_site_id' => $data['site_id']],
+                'assign_department' => [
+                    'department_id' => $data['department_id'],
+                    'department' => $department->name,
+                ],
+                'assign_manager' => ['manager_user_id' => $data['manager_user_id']],
+            };
+
+            $profiles->each(fn (HrEmployeeProfile $profile) => $profile->update($attributes));
+
+            return $profiles->count();
+        }, attempts: 3);
 
         return back()->with('success', "{$count} ".($count === 1 ? 'person' : 'people').' updated.');
     }
@@ -693,8 +1167,13 @@ class EmployeeProfileController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.viewAny'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
+        $siteAccess = app(UserSiteAccessService::class);
+        $accessibleSiteIds = $siteAccess->accessibleSiteIds($user);
+        $this->assertProfileReadAccess($user, $profile, $siteAccess);
+        $accessibleDepartmentIds = $this->accessibleDepartmentsQuery($user, $siteAccess)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
 
         $profile->load([
             'user:id,name,email',
@@ -713,6 +1192,7 @@ class EmployeeProfileController extends Controller
         $workplaceInjuries = $canViewInjuries
             ? WorkplaceInjury::query()
                 ->forWorker($userId)
+                ->whereIn('site_id', $accessibleSiteIds)
                 ->with([
                     'site:id,name',
                     'returnToWorkPlans' => fn ($query) => $query->orderByDesc('created_at'),
@@ -756,7 +1236,10 @@ class EmployeeProfileController extends Controller
         // Manager
         $manager = null;
         if ($profile->manager_user_id) {
-            $mp = HrEmployeeProfile::where('user_id', $profile->manager_user_id)->with('user:id,name')->first();
+            $mp = HrEmployeeProfile::where('user_id', $profile->manager_user_id)
+                ->whereIn('user_id', $this->currentVisibleStaffQuery($user, $siteAccess)->select('users.id'))
+                ->with('user:id,name')
+                ->first();
             if ($mp) {
                 $manager = ['id' => $mp->id, 'name' => $mp->user?->name ?? 'Unknown', 'position_title' => $mp->position_title, 'profile_photo_path' => $mp->profile_photo_path];
             }
@@ -764,6 +1247,7 @@ class EmployeeProfileController extends Controller
 
         // Direct reports
         $directReports = HrEmployeeProfile::where('manager_user_id', $userId)
+            ->whereIn('user_id', $this->currentVisibleStaffQuery($user, $siteAccess)->select('users.id'))
             ->where('is_active', true)->with('user:id,name')->limit(20)->get()
             ->map(fn ($r) => ['id' => $r->id, 'name' => $r->user?->name ?? 'Unknown', 'position_title' => $r->position_title]);
 
@@ -956,15 +1440,9 @@ class EmployeeProfileController extends Controller
                 ])
             : collect();
 
-        // Asset assignments
-        $assetAssignments = HrAssetAssignment::where('employee_profile_id', $profile->id)
-            ->with('asset:id,asset_tag,name,category,serial_number')->orderByDesc('assigned_at')->get()
-            ->map(fn ($a) => [
-                'id' => $a->id, 'asset_name' => $a->asset?->name, 'asset_tag' => $a->asset?->asset_tag,
-                'category' => $a->asset?->category, 'serial_number' => $a->asset?->serial_number,
-                'assigned_at' => $a->assigned_at?->toDateString(), 'returned_at' => $a->returned_at?->toDateString(),
-                'condition' => $a->condition_on_assign,
-            ]);
+        // Read-only cross-module projection. Security & Devices, Fleet & Assets,
+        // and IT keep lifecycle ownership; HR receives only access-approved rows.
+        $equipmentAccess = app(HrEquipmentAccessProjectionService::class)->present($user, $profile);
 
         // Policy attestations
         $policyAttestations = HrPolicyAttestation::where('user_id', $userId)
@@ -982,14 +1460,17 @@ class EmployeeProfileController extends Controller
                 'position_role' => $profile->position_role,
                 'employment_type' => $profile->employment_type,
                 'contract_type' => $profile->contract_type,
-                'department' => $profile->departmentRelation?->name ?? $profile->department,
+                'department' => $profile->department_id === null
+                    || in_array((int) $profile->department_id, $accessibleDepartmentIds, true)
+                        ? ($profile->departmentRelation?->name ?? $profile->department)
+                        : null,
                 'team' => $profile->team,
                 'is_active' => (bool) $profile->is_active,
                 'start_date' => $profile->start_date?->toDateString(),
                 'end_date' => $profile->end_date?->toDateString(),
                 'probation_end_date' => $profile->probation_end_date?->toDateString(),
                 'hours_per_week' => $profile->hours_per_week,
-                'employment_history' => $profile->employment_history ?? [],
+                'employment_history' => $this->shapedEmploymentHistory($profile->employment_history),
                 'pay_rate' => $user->canDo('hr.employees.viewFinancial') ? $profile->hourly_rate : null,
                 'pay_frequency' => $user->canDo('hr.employees.viewFinancial') ? $profile->pay_frequency : null,
                 'bio' => $profile->bio,
@@ -1006,7 +1487,10 @@ class EmployeeProfileController extends Controller
                 'emergency_contact_phone' => $profile->emergency_contact_phone ?? ($profile->emergency_contacts[0]['phone'] ?? null),
                 'emergency_contact_relationship' => $profile->emergency_contact_relationship ?? ($profile->emergency_contacts[0]['relationship'] ?? null),
                 'user' => ['id' => $profile->user->id, 'name' => $profile->user->name, 'email' => $profile->user->email],
-                'primary_site' => $profile->primarySite ? ['id' => $profile->primarySite->id, 'name' => $profile->primarySite->name] : null,
+                'primary_site' => $profile->primarySite
+                    && in_array((int) $profile->primary_site_id, $accessibleSiteIds, true)
+                        ? ['id' => $profile->primarySite->id, 'name' => $profile->primarySite->name]
+                        : null,
                 'documents' => $profile->documents->map(fn ($d) => [
                     'id' => $d->id, 'title' => $d->title, 'category' => $d->category,
                     'original_name' => $d->original_name, 'created_at' => $d->created_at?->toDateString(),
@@ -1034,14 +1518,17 @@ class EmployeeProfileController extends Controller
             'backgroundChecks' => $backgroundChecks,
             'supervisionNotes' => $supervisionNotes,
             'cases' => $cases,
-            'assetAssignments' => $assetAssignments,
+            'equipmentAccess' => $equipmentAccess,
             'policyAttestations' => $policyAttestations,
             'safeWorkProcedures' => $this->employeeProcedures($user, $profile),
             ...($canViewInjuries ? ['workplaceInjuries' => $workplaceInjuries] : []),
             // Re-hire wizard site options — only needed when the viewer can
             // manage AND the profile is a former employee.
             'rehireSites' => $user->canDo('hr.employees.manage') && ! $profile->is_active
-                ? Site::orderBy('name')->get(['id', 'name'])
+                ? Site::query()
+                    ->whereIn('id', $accessibleSiteIds)
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
                 : [],
             'can' => [
                 'manage' => $user->canDo('hr.employees.manage'),
@@ -1089,21 +1576,59 @@ class EmployeeProfileController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $profile->tenant_id);
+        $siteAccess = app(UserSiteAccessService::class);
+        $accessibleSiteIds = $siteAccess->accessibleSiteIds($user);
+        $this->assertProfileReadAccess($user, $profile, $siteAccess);
+        $accessibleDepartmentIds = $this->accessibleDepartmentsQuery($user, $siteAccess)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
 
         $profile->load('user:id,name,email');
 
-        $profilePayload = $profile->toArray();
-        foreach (['start_date', 'end_date', 'probation_end_date', 'visa_expires_at'] as $dateField) {
-            $profilePayload[$dateField] = $profile->{$dateField}?->toDateString();
+        $profilePayload = [
+            'id' => $profile->id,
+            'employee_number' => $profile->employee_number,
+            'position_title' => $profile->position_title,
+            'employment_type' => $profile->employment_type,
+            'contract_type' => $profile->contract_type,
+            'department_id' => in_array((int) $profile->department_id, $accessibleDepartmentIds, true)
+                ? $profile->department_id
+                : null,
+            'team' => $profile->team,
+            'work_rights_status' => $profile->work_rights_status,
+            'visa_type' => $profile->visa_type,
+            'visa_expires_at' => $profile->visa_expires_at?->toDateString(),
+            'is_active' => (bool) $profile->is_active,
+            'start_date' => $profile->start_date?->toDateString(),
+            'end_date' => $profile->end_date?->toDateString(),
+            'probation_end_date' => $profile->probation_end_date?->toDateString(),
+            'hours_per_week' => $profile->hours_per_week !== null ? (float) $profile->hours_per_week : null,
+            'primary_site_id' => in_array((int) $profile->primary_site_id, $accessibleSiteIds, true)
+                ? $profile->primary_site_id
+                : null,
+            'emergency_contacts' => $profile->emergency_contacts ?? [],
+            'notes' => $profile->notes,
+            'user' => [
+                'id' => $profile->user->id,
+                'name' => $profile->user->name,
+                'email' => $profile->user->email,
+            ],
+        ];
+        if ($user->canDo('hr.employees.viewFinancial')) {
+            $profilePayload = [
+                ...$profilePayload,
+                'hourly_rate' => $profile->hourly_rate !== null ? (float) $profile->hourly_rate : null,
+                'annual_salary' => $profile->annual_salary !== null ? (float) $profile->annual_salary : null,
+                'pay_frequency' => $profile->pay_frequency,
+            ];
         }
 
         $sites = Site::orderBy('name')
+            ->whereIn('id', $accessibleSiteIds)
             ->get(['id', 'name']);
 
-        $departments = HrDepartment::query()
-            ->where(fn ($q) => $q->where('tenant_id', $user->tenant_id)->orWhereNull('tenant_id'))
-            ->where('is_active', true)
+        $departments = $this->accessibleDepartmentsQuery($user, $siteAccess)
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -1133,17 +1658,91 @@ class EmployeeProfileController extends Controller
         HrEmployeeProfile $profile,
         ItProvisioningWorkflowService $provisioningWorkflows,
     ) {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
-
         $validated = $request->validated();
-        if (array_key_exists('team', $validated)) {
-            $validated['team'] = HrEmployeeProfile::canonicalTeamForTenant($validated['team'], $tenantId);
-        }
-        $validated['updated_by'] = $user->id;
+        $actorId = (int) $request->user()->id;
+        $targetUserId = (int) $profile->user_id;
+        $profileId = (int) $profile->id;
+        $managerUserId = ! empty($validated['manager_user_id'])
+            ? (int) $validated['manager_user_id']
+            : null;
+        DB::transaction(function () use ($actorId, $managerUserId, $profileId, $provisioningWorkflows, $targetUserId, $validated): void {
+            $locks = $this->lockPeopleMutationGraph(
+                [$actorId, $targetUserId, $managerUserId],
+                [$profileId],
+            );
+            [$user, $siteAccess] = $this->lockedPeopleMutationActor($locks, $actorId);
+            $profileUser = $locks['users']->get($targetUserId);
+            $profile = $locks['profiles']->get($profileId);
+            abort_unless($profile, 404);
+            abort_unless($profileUser && (int) $profile->user_id === (int) $profileUser->id, 404);
+            $this->assertProfileMutationAccess($user, $profile, $siteAccess);
 
-        DB::transaction(function () use ($profile, $validated, $user, $provisioningWorkflows): void {
+            $financialFields = ['hourly_rate', 'annual_salary', 'pay_frequency', 'bank_account', 'ird_number', 'tax_code', 'kiwisaver_rate'];
+            if (collect($financialFields)->contains(fn (string $field) => array_key_exists($field, $validated))
+                && ! $user->canDo('hr.employees.viewFinancial')) {
+                throw ValidationException::withMessages([
+                    'hourly_rate' => 'You do not have permission to update financial details.',
+                ]);
+            }
+
+            $finalPrimarySiteId = array_key_exists('primary_site_id', $validated)
+                ? $validated['primary_site_id']
+                : $profile->primary_site_id;
+            $finalSecondarySiteIds = array_key_exists('secondary_site_ids', $validated)
+                ? ($validated['secondary_site_ids'] ?? [])
+                : ($profile->secondary_site_ids ?? []);
+            $finalSiteIds = collect([$finalPrimarySiteId, ...$finalSecondarySiteIds])
+                ->filter(fn ($siteId) => is_numeric($siteId) && (int) $siteId > 0)
+                ->map(fn ($siteId) => (int) $siteId)
+                ->unique()
+                ->values();
+            if ($finalSiteIds->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'primary_site_id' => 'An accessible primary or secondary site is required.',
+                ]);
+            }
+
+            if ($managerUserId
+                && ! $this->lockedCurrentAccessibleManager(
+                    $managerUserId,
+                    $user,
+                    $siteAccess,
+                    $locks,
+                )) {
+                $this->invalidSelection('manager_user_id');
+            }
+
+            $lockedSiteIds = Site::query()
+                ->active()
+                ->notArchived()
+                ->whereIn('id', $finalSiteIds)
+                ->whereIn('id', $siteAccess->accessibleSiteIds($user))
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->pluck('id')
+                ->map(fn ($siteId) => (int) $siteId);
+            if ($lockedSiteIds->count() !== $finalSiteIds->count()) {
+                $this->invalidSelection('primary_site_id');
+            }
+
+            if (array_key_exists('department_id', $validated)) {
+                $department = $validated['department_id']
+                    ? $this->accessibleDepartmentsQuery($user, $siteAccess)
+                        ->whereKey($validated['department_id'])
+                        ->lockForUpdate()
+                        ->first()
+                    : null;
+                if ($validated['department_id'] && ! $department) {
+                    $this->invalidSelection('department_id');
+                }
+                $validated['department'] = $department?->name;
+            }
+
+            if (array_key_exists('team', $validated)) {
+                $validated['team'] = HrEmployeeProfile::canonicalTeam($validated['team']);
+            }
+            $validated['updated_by'] = $user->id;
+
             $tracked = ['position_role', 'primary_site_id', 'employment_type'];
             $before = collect($tracked)->mapWithKeys(fn (string $field) => [$field => $profile->{$field}])->all();
             $profile->update($validated);
@@ -1168,7 +1767,7 @@ class EmployeeProfileController extends Controller
                     effectiveAt: now(),
                 );
             }
-        });
+        }, attempts: 3);
 
         return redirect()->back()->with('success', 'Employee profile updated successfully.');
     }

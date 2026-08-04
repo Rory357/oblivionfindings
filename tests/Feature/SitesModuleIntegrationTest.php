@@ -54,9 +54,11 @@ class SitesModuleIntegrationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('calendar/global')
+                ->where('scope', 'global')
                 ->has('sites')
-                ->has('events')
+                ->has('sources')
                 ->has('eventTypes')
+                ->missing('events')
             );
     }
 

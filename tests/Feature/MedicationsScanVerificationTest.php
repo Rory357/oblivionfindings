@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\Role;
 use App\Models\ServiceContext;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\MedicationScanVerificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,11 +22,21 @@ class MedicationsScanVerificationTest extends TestCase
     {
         $this->seed(\Database\Seeders\RbacSeeder::class);
 
-        $admin = User::factory()->create([
-            'role' => 'admin',
+        $actor = User::factory()->create([
+            'role' => 'support_worker',
             'approved_at' => now(),
         ]);
-        $admin->roles()->attach(Role::query()->where('name', 'admin')->first());
+        $actor->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
+
+        $site = Site::factory()->create(['name' => 'Scan Verification Site']);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $actor->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
 
         $serviceContext = ServiceContext::factory()->create([
             'name' => 'Scan Verification',
@@ -34,7 +46,9 @@ class MedicationsScanVerificationTest extends TestCase
 
         $client = Client::factory()->create([
             'service_context_id' => $serviceContext->id,
+            'site_id' => $site->id,
         ]);
+        $client->supportWorkers()->attach($actor->id);
 
         $medication = ClientMedication::query()->create([
             'client_id' => $client->id,
@@ -49,7 +63,7 @@ class MedicationsScanVerificationTest extends TestCase
         $internalCode = app(MedicationScanVerificationService::class)
             ->internalCode($client, $medication);
 
-        $this->actingAs($admin, 'sanctum')
+        $this->actingAs($actor, 'sanctum')
             ->postJson(
                 "/api/medications/clients/{$client->id}/medications/{$medication->id}/scan-verify",
                 [
@@ -80,13 +94,24 @@ class MedicationsScanVerificationTest extends TestCase
     {
         $this->seed(\Database\Seeders\RbacSeeder::class);
 
-        $admin = User::factory()->create([
-            'role' => 'admin',
+        $actor = User::factory()->create([
+            'role' => 'support_worker',
             'approved_at' => now(),
         ]);
-        $admin->roles()->attach(Role::query()->where('name', 'admin')->first());
+        $actor->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
 
-        $client = Client::factory()->create();
+        $site = Site::factory()->create(['name' => 'Rejected Scan Site']);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $actor->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $client->supportWorkers()->attach($actor->id);
         $medication = ClientMedication::query()->create([
             'client_id' => $client->id,
             'name' => 'Omeprazole',
@@ -97,7 +122,7 @@ class MedicationsScanVerificationTest extends TestCase
             'state' => 'active',
         ]);
 
-        $this->actingAs($admin, 'sanctum')
+        $this->actingAs($actor, 'sanctum')
             ->postJson(
                 "/api/medications/clients/{$client->id}/medications/{$medication->id}/scan-verify",
                 [

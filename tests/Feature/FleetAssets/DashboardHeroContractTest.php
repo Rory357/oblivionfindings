@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\FleetAssets;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
-use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
@@ -14,7 +14,7 @@ use Tests\TestCase;
 /**
  * Contract for the /fleet-assets hero redesign: the new compliance / resident-
  * movement stats, and the ?scope=mine cluster lens (scoped cluster counts,
- * org-wide attention strip + badges).
+ * accessible-Site attention strip + badges).
  */
 class DashboardHeroContractTest extends TestCase
 {
@@ -47,7 +47,7 @@ class DashboardHeroContractTest extends TestCase
 
     public function test_dashboard_exposes_hero_stats_contract_and_hides_lens_without_site(): void
     {
-        $user = $this->makeFleetUser();
+        $user = $this->makeFleetUser(['fleet.viewAny', 'fleet.manage']);
         $site = Site::factory()->create();
         Asset::factory()->vehicle()->forSite($site)->create([
             'registration_expires_at' => now()->addDays(10),
@@ -79,16 +79,21 @@ class DashboardHeroContractTest extends TestCase
             );
     }
 
-    public function test_scope_mine_filters_cluster_counts_but_not_org_wide_totals(): void
+    public function test_scope_mine_filters_cluster_counts_but_not_accessible_site_totals(): void
     {
         $user = $this->makeFleetUser();
 
         $mySite = Site::factory()->create();
         $otherSite = Site::factory()->create();
 
-        // The user's site resolves through their first assigned client.
-        $client = Client::factory()->create(['site_id' => $mySite->id]);
-        $user->assignedClients()->attach($client->id);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $mySite->id,
+            'secondary_site_ids' => [$otherSite->id],
+            'is_active' => true,
+            'start_date' => now()->subMonth(),
+            'end_date' => null,
+        ]);
 
         Asset::factory()->vehicle()->forSite($mySite)->count(2)->create();
         Asset::factory()->vehicle()->forSite($otherSite)->count(3)->create();
@@ -115,7 +120,7 @@ class DashboardHeroContractTest extends TestCase
 
     public function test_scope_mine_falls_back_to_all_when_user_has_no_site(): void
     {
-        $user = $this->makeFleetUser();
+        $user = $this->makeFleetUser(['fleet.viewAny', 'fleet.manage']);
         $site = Site::factory()->create();
         Asset::factory()->vehicle()->forSite($site)->count(3)->create();
 

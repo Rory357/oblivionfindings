@@ -39,7 +39,6 @@ function hrSeamDriverShift(int $driverId): Shift
 test('S3 seam: an expired driving licence BLOCKS eligibility for a driver shift', function () {
     $driver = User::factory()->create();
     HrDriverEligibility::query()->create([
-        'tenant_id' => 1,
         'user_id' => $driver->id,
         'licence_number' => 'EXP-001',
         'licence_class' => '2',
@@ -58,7 +57,6 @@ test('S3 seam: an expired driving licence BLOCKS eligibility for a driver shift'
 test('S3 seam: the rostering publish gate HARD-STOPS a roster with an expired-licence driver', function () {
     $driver = User::factory()->create();
     HrDriverEligibility::query()->create([
-        'tenant_id' => 1,
         'user_id' => $driver->id,
         'licence_number' => 'EXP-002',
         'licence_class' => '2',
@@ -79,7 +77,6 @@ test('S3 seam: the rostering publish gate HARD-STOPS a roster with an expired-li
 test('S3 seam: a current driving licence does NOT trip the driver hard-stop', function () {
     $driver = User::factory()->create();
     HrDriverEligibility::query()->create([
-        'tenant_id' => 1,
         'user_id' => $driver->id,
         'licence_number' => 'OK-001',
         'licence_class' => '2',

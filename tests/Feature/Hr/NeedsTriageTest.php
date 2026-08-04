@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Notifications\EmployeeInviteNotification;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Notification;
@@ -20,19 +21,28 @@ beforeEach(function () {
     if ($adminRole) {
         $this->manager->roles()->syncWithoutDetaching([$adminRole->id]);
     }
+    $this->site = Site::factory()->create(['name' => 'Triage Test Site']);
+    triageStaff('HR Manager Profile', [
+        'email' => $this->manager->email,
+    ], [
+        'user_id' => $this->manager->id,
+        'employee_number' => 'EMP-TRIAGE-VIEWER',
+        'primary_site_id' => $this->site->id,
+    ]);
 });
 
 function triageStaff(string $name, array $userOverrides = [], array $profileOverrides = []): HrEmployeeProfile
 {
-    $staff = User::factory()->create(array_merge([
-        'name' => $name,
-        'email' => str($name)->slug().'@example.test',
-        'role' => 'support_worker',
-        'approved_at' => now(),
-    ], $userOverrides));
+    $staff = isset($profileOverrides['user_id'])
+        ? User::query()->findOrFail($profileOverrides['user_id'])
+        : User::factory()->create(array_merge([
+            'name' => $name,
+            'email' => str($name)->slug().'@example.test',
+            'role' => 'support_worker',
+            'approved_at' => now(),
+        ], $userOverrides));
 
     return HrEmployeeProfile::query()->create(array_merge([
-        'tenant_id' => 1,
         'user_id' => $staff->id,
         'employee_number' => 'EMP-'.$staff->id,
         'work_email' => $staff->email,
@@ -41,6 +51,7 @@ function triageStaff(string $name, array $userOverrides = [], array $profileOver
         'employment_type' => 'full_time',
         'start_date' => now()->subMonth()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => Site::query()->orderBy('id')->value('id'),
     ], $profileOverrides));
 }
 

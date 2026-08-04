@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FamilyPortalSetting extends Model
 {
+    use WritesLegacyOrganizationStorageContext;
+
     protected $table = 'family_portal_settings';
 
     protected $fillable = [
-        'organization_id',
         'client_id',
         'show_shift_schedule',
         'show_respite',

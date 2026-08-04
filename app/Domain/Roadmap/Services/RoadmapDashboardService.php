@@ -11,21 +11,20 @@ use Illuminate\Support\Facades\Schema;
 
 class RoadmapDashboardService
 {
-    public function governanceWidget(?int $tenantId = null): array
+    public function governanceWidget(): array
     {
         if (! $this->schemaReady()) {
             return $this->emptySummary('roadmap module not migrated');
         }
 
         $latestPlan = QuarterlyRoadmapPlan::query()
-            ->forTenant($tenantId)
             ->where('status', QuarterlyRoadmapPlan::STATUS_PUBLISHED)
             ->orderByDesc('fiscal_year')
             ->orderByDesc('quarter')
             ->orderByDesc('revision_no')
             ->first();
 
-        $initiativeQuery = Initiative::query()->forTenant($tenantId);
+        $initiativeQuery = Initiative::query();
 
         if ($latestPlan) {
             $initiativeIds = $latestPlan->items()->pluck('initiative_id');
@@ -41,7 +40,6 @@ class RoadmapDashboardService
         });
 
         $siteProgress = DB::table('roadmap_initiative_site_scope_sites')
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
             ->pluck('count', 'status')
@@ -49,7 +47,6 @@ class RoadmapDashboardService
 
         $pendingDecisions = DecisionRequest::query()
             ->where('status', 'pending')
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->count();
 
         $governanceBudget = $this->getGovernanceBudget();
@@ -105,7 +102,7 @@ class RoadmapDashboardService
         ];
     }
 
-    public function decisionsRequired(?int $tenantId = null, int $limit = 10): array
+    public function decisionsRequired(int $limit = 10): array
     {
         if (! Schema::hasTable('roadmap_decision_requests')) {
             return [
@@ -116,7 +113,6 @@ class RoadmapDashboardService
         }
 
         $requests = DecisionRequest::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->where('status', 'pending')
             ->orderBy('due_date')
             ->limit($limit)

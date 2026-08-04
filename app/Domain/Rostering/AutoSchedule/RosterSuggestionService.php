@@ -10,6 +10,7 @@ use App\Models\RosterSuggestionRun;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\ShiftStaffEligibilityService;
+use App\Services\UserSiteAccessService;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -21,11 +22,13 @@ class RosterSuggestionService
         private readonly RosterPeriodService $periods,
         private readonly EligibilityScoringStrategy $strategy,
         private readonly ShiftStaffEligibilityService $eligibility,
+        private readonly UserSiteAccessService $siteAccess,
     ) {
     }
 
     public function generate(User $actor, CarbonInterface|string|null $week, int $siteId, int $limitPerShift = 3): RosterSuggestionRun
     {
+        $this->siteAccess->assertCanAccessSiteId($actor, $siteId, ['shifts.manageAny']);
         $weekStart = $this->periods->weekStart($week);
         $weekEnd = $weekStart->copy()->addDays(7);
         $estimatedEvaluations = $this->estimateEvaluationCount($actor, $weekStart, $weekEnd, $siteId);
@@ -43,6 +46,7 @@ class RosterSuggestionService
         int $limitPerShift = 3,
         ?int $queueThreshold = null,
     ): RosterSuggestionRun {
+        $this->siteAccess->assertCanAccessSiteId($actor, $siteId, ['shifts.manageAny']);
         $weekStart = $this->periods->weekStart($week);
         $weekEnd = $weekStart->copy()->addDays(7);
         $queueThreshold ??= (int) config('features.rostering.auto_schedule_queue_threshold', 1000);
@@ -86,14 +90,27 @@ class RosterSuggestionService
 
     public function estimateEvaluationCount(User $actor, CarbonInterface $weekStart, CarbonInterface $weekEnd, int $siteId): int
     {
-        $openShiftCount = $this->openShiftsQuery($actor->organization_id, $siteId, $weekStart, $weekEnd)->count();
+        $openShiftCount = $this->openShiftsQuery($siteId, $weekStart, $weekEnd)->count();
 
         if ($openShiftCount === 0) {
             return 0;
         }
 
         $candidateCount = User::staff()
-            ->when($actor->organization_id, fn ($query) => $query->where('organization_id', $actor->organization_id))
+            ->whereNotNull('approved_at')
+            ->whereHas('hrEmployeeProfile', function (Builder $profileQuery) use ($siteId): void {
+                $profileQuery
+                    ->where('is_active', true)
+                    ->whereDate('start_date', '<=', today())
+                    ->where(function (Builder $employmentQuery): void {
+                        $employmentQuery->whereNull('end_date')
+                            ->orWhereDate('end_date', '>=', today());
+                    })
+                    ->where(function (Builder $siteQuery) use ($siteId): void {
+                        $siteQuery->where('primary_site_id', $siteId)
+                            ->orWhereJsonContains('secondary_site_ids', $siteId);
+                    });
+            })
             ->count();
 
         return $openShiftCount * max(1, $candidateCount);
@@ -108,10 +125,9 @@ class RosterSuggestionService
         string $status,
         array $parameters = [],
     ): RosterSuggestionRun {
-        $period = $this->periods->activeFor($actor->organization_id, $siteId, $weekStart);
+        $period = $this->periods->activeFor($siteId, $weekStart);
 
         $run = RosterSuggestionRun::query()->create([
-            'organization_id' => $actor->organization_id,
             'site_id' => $siteId,
             'roster_period_id' => $period?->id,
             'requested_by' => $actor->id,
@@ -132,6 +148,8 @@ class RosterSuggestionService
 
     private function processRun(RosterSuggestionRun $run, User $actor): RosterSuggestionRun
     {
+        $this->siteAccess->assertCanAccessSiteId($actor, (int) $run->site_id, ['shifts.manageAny']);
+
         $run->forceFill([
             'status' => RosterSuggestionRun::STATUS_RUNNING,
             'started_at' => $run->started_at ?? now(),
@@ -144,7 +162,7 @@ class RosterSuggestionService
         $limitPerShift = (int) ($run->parameters['limit_per_shift'] ?? 3);
 
         try {
-            $shifts = $this->openShiftsQuery($run->organization_id, (int) $run->site_id, $weekStart, $weekEnd)
+            $shifts = $this->openShiftsQuery((int) $run->site_id, $weekStart, $weekEnd)
                 ->with(['client:id,first_name,last_name,site_id', 'site:id,name'])
                 ->orderBy('starts_at')
                 ->get();
@@ -199,10 +217,9 @@ class RosterSuggestionService
         return $run->fresh(['suggestions']) ?? $run;
     }
 
-    private function openShiftsQuery(?int $organizationId, int $siteId, CarbonInterface $weekStart, CarbonInterface $weekEnd): Builder
+    private function openShiftsQuery(int $siteId, CarbonInterface $weekStart, CarbonInterface $weekEnd): Builder
     {
         return Shift::query()
-            ->where('organization_id', $organizationId)
             ->where('site_id', $siteId)
             ->whereNull('user_id')
             ->where('status', '!=', 'cancelled')

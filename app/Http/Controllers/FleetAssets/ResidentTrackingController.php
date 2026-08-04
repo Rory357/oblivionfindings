@@ -6,6 +6,8 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
+use App\Domain\SecurityDevices\Services\PersonalTrackingLocationExportService;
+use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\AssetGeofence;
@@ -35,6 +37,8 @@ class ResidentTrackingController extends Controller
         private readonly DeviceAssignmentService $assignmentService,
         private readonly GeofenceStatusService $geofenceStatus,
         private readonly SecurityDevicesAccessService $deviceAccess,
+        private readonly PersonalTrackingPrivacyService $trackingPrivacy,
+        private readonly PersonalTrackingLocationExportService $locationExport,
     ) {}
 
     public function index(Request $request)
@@ -47,13 +51,16 @@ class ResidentTrackingController extends Controller
             ->where('domain', 'tracking')
             ->whereHas('assignments', function ($q) use ($authorizedClientIds) {
                 $q->active()
+                    ->collectionActive()
                     ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
                     ->whereIn('assignable_id', $authorizedClientIds);
             })
             ->with(['assignments' => fn ($q) => $q
                 ->active()
+                ->collectionActive()
                 ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
-                ->whereIn('assignable_id', $authorizedClientIds)])
+                ->whereIn('assignable_id', $authorizedClientIds)
+                ->with('consent.consentType')])
             ->get();
 
         // Site-authoritative geofences. Asset provenance is only a fallback
@@ -82,19 +89,22 @@ class ResidentTrackingController extends Controller
             ->whereIn('id', $clientIds)
             ->get()
             ->keyBy('id');
-        $consentedClientIds = $this->trackingConsentQuery()
-            ->whereIn('client_id', $authorizedClientIds)
-            ->pluck('client_id')
-            ->map(fn ($clientId) => (int) $clientId)
+        $clientDevices = $clientDevices
+            ->filter(function (Device $device) use ($clients): bool {
+                $assignment = $device->assignments->first();
+                $client = $assignment
+                    ? $clients->get($assignment->assignable_id)
+                    : null;
+
+                return $assignment !== null
+                    && $client !== null
+                    && $this->trackingPrivacy->assignmentAuthorisesClient($assignment, $client);
+            });
+        $consentedClientIds = $clientDevices
+            ->map(fn (Device $device): int => (int) $device->assignments->first()->assignable_id)
             ->unique()
             ->values()
             ->all();
-        $clientDevices = $clientDevices
-            ->filter(fn (Device $device) => in_array(
-                (int) $device->assignments->first()?->assignable_id,
-                $consentedClientIds,
-                true,
-            ));
 
         // Load active outings.
         $activeOutingClientIds = [];
@@ -268,7 +278,7 @@ class ResidentTrackingController extends Controller
                 'manage' => (bool) $user?->canDo('fleet.manage'),
                 'manage_alerts' => (bool) ($user?->canDo('fleet.manage') || $user?->canDo('assets.alerts.manage')),
             ],
-        ]);
+        ])->toResponse($request)->withHeaders($this->privateLocationHeaders());
     }
 
     /**
@@ -569,12 +579,8 @@ class ResidentTrackingController extends Controller
     {
         $user = $request->user();
         $this->assertCanAccessClient($user, $client);
-        $this->assertHasActiveTrackingConsent($client);
-        // Canonical device lookup.
-        $device = $this->registry
-            ->forClient($client->id)
-            ->where('domain', 'tracking')
-            ->first();
+        $assignment = $this->assertHasActiveTrackingConsent($client);
+        $device = $assignment->device;
 
         // Range pills: today | 24h | 7d | 30d | custom. Default 24h.
         $range = $request->string('range')->toString() ?: '24h';
@@ -596,7 +602,7 @@ class ResidentTrackingController extends Controller
         ];
 
         $locations = app(IntegrationEventHistoryService::class)
-            ->forDevice($device, $filters, true);
+            ->forDevice($device, $filters, true, $assignment->retention_days);
 
         $availableEventTypes = $locations
             ->pluck('event_type')
@@ -639,7 +645,49 @@ class ResidentTrackingController extends Controller
                 'date_to' => $dateTo ? substr((string) $dateTo, 0, 10) : null,
                 'event_types' => $eventTypes,
             ],
+            'privacy_status_url' => route(
+                'fleet-assets.resident-tracking.privacy-status',
+                ['client' => $client->id],
+                false,
+            ),
+            'export_url' => route(
+                'fleet-assets.resident-tracking.export',
+                ['client' => $client->id],
+                false,
+            ),
+            'can_export' => $user->canDo('assets.telemetry.export'),
+            'retention_days' => (int) $assignment->retention_days,
+        ])->toResponse($request)->withHeaders($this->privateLocationHeaders());
+    }
+
+    public function privacyStatus(Request $request, Client $client)
+    {
+        $user = $request->user();
+        $this->assertCanAccessClient($user, $client);
+        $assignment = $this->trackingPrivacy->authorisedClientAssignment($client);
+
+        return response()->json([
+            'active' => $assignment !== null,
+            'checked_at' => now()->toISOString(),
+            'retention_days' => $assignment?->retention_days,
+            'export_allowed' => $assignment !== null
+                && $user->canDo('assets.telemetry.export'),
+        ])->withHeaders($this->privateLocationHeaders());
+    }
+
+    public function exportHistory(Request $request, Client $client)
+    {
+        $user = $request->user();
+        $this->assertCanAccessClient($user, $client);
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:500'],
+            'date_from' => ['required', 'date', 'before_or_equal:today'],
+            'date_to' => ['required', 'date', 'after_or_equal:date_from', 'before_or_equal:today'],
+            'event_types' => ['sometimes', 'array', 'max:20'],
+            'event_types.*' => ['string', 'max:100'],
         ]);
+
+        return $this->locationExport->export($client, $user, $data);
     }
 
     private function resolveHistoryRange(string $range, mixed $rawFrom, mixed $rawTo): array
@@ -667,11 +715,8 @@ class ResidentTrackingController extends Controller
     {
         $user = $request->user();
         $this->assertCanAccessClient($user, $client);
-        $this->assertHasActiveTrackingConsent($client);
-        $device = $this->registry
-            ->forClient($client->id)
-            ->where('domain', 'tracking')
-            ->first();
+        $assignment = $this->assertHasActiveTrackingConsent($client);
+        $device = $assignment->device;
 
         if (! $device) {
             throw ValidationException::withMessages([
@@ -679,9 +724,12 @@ class ResidentTrackingController extends Controller
             ]);
         }
 
-        $locateNow->queueForDevice($device, $user);
+        $managementUrl = $locateNow->managementUrlForDevice($device);
 
-        return back()->with('success', 'Locate Now queued. The tracker will report on its next connection.');
+        return redirect()->to($managementUrl)->with(
+            'success',
+            'Review the governed location refresh, confirm your identity, and record the operational reason before dispatch.',
+        );
     }
 
     public function acknowledgePanic(
@@ -799,9 +847,22 @@ class ResidentTrackingController extends Controller
         );
     }
 
-    private function assertHasActiveTrackingConsent(Client $client): void
+    private function assertHasActiveTrackingConsent(Client $client): DeviceAssignment
     {
-        abort_unless($this->validTrackingConsentQuery($client)->exists(), 403);
+        $assignment = $this->trackingPrivacy->authorisedClientAssignment($client);
+        abort_unless($assignment, 403);
+
+        return $assignment;
+    }
+
+    private function privateLocationHeaders(): array
+    {
+        return [
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'Pragma' => 'no-cache',
+            'Vary' => 'Cookie',
+            'X-Content-Type-Options' => 'nosniff',
+        ];
     }
 
     private function resolveTrackingConsentId(Client $client, ?int $requestedConsentId): int

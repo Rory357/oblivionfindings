@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Operations;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
@@ -9,6 +10,7 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
 use App\Models\ShiftReplacementRequest;
+use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
@@ -36,36 +38,49 @@ class JobBoardControllerTest extends TestCase
 
     private ServiceContext $serviceContext;
 
+    private Site $site;
+
+    private Site $foreignSite;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         config(['app.worker_timezone' => 'Pacific/Auckland']);
 
-        $this->manager = $this->userWithPermissions(['job_board.viewAny', 'job_board.create', 'job_board.approve', 'shifts.manageAny', 'reports.viewAny'], [
+        $this->site = Site::factory()->create(['name' => 'Harbour House']);
+        $this->foreignSite = Site::factory()->create(['name' => 'Forest House']);
+
+        $this->manager = $this->userWithPermissions(['job_board.viewAny', 'job_board.create', 'job_board.approve', 'shifts.manageAny'], [
             'role' => 'admin',
-            'organization_id' => 1,
         ]);
         $this->attachRole($this->manager, 'admin');
 
         $this->worker = $this->userWithPermissions(['shifts.viewAssigned'], [
             'role' => 'support_worker',
-            'organization_id' => 1,
         ]);
 
         $this->currentStaff = User::factory()->create([
             'role' => 'support_worker',
-            'organization_id' => 1,
         ]);
+        $this->assignToSite($this->currentStaff, $this->site);
 
-        $this->client = Client::factory()->create(['organization_id' => 1]);
+        $this->client = Client::factory()->create(['site_id' => $this->site->id]);
         $this->serviceContext = ServiceContext::factory()->create();
     }
 
-    public function test_index_returns_only_positions_in_the_actors_org(): void
+    public function test_index_returns_only_positions_at_an_accessible_site(): void
     {
-        $visible = $this->positionForShift($this->shiftForOrg(1));
-        $this->positionForShift($this->shiftForOrg(2), ['organization_id' => 2]);
+        $visibleShift = $this->shiftForSite();
+        $visible = $this->positionForShift($visibleShift);
+        $foreign = $this->positionForShift($this->shiftForSite($this->foreignSite));
+        $corrupt = ShiftOpenPosition::query()->create([
+            'shift_id' => $visibleShift->id,
+            'replacement_request_id' => $foreign->replacement_request_id,
+            'status' => 'open',
+            'required_skills' => [],
+            'coverage_roles' => [],
+        ]);
 
         $this->allowEligibility();
 
@@ -76,25 +91,35 @@ class JobBoardControllerTest extends TestCase
                 ->component('operations/job-board/Index')
                 ->has('jobs.data', 1)
                 ->where('jobs.data.0.id', $visible->id));
+
+        $this->assertSame(1, (int) $visible->getRawOriginal('organization_id'));
+        $this->assertArrayNotHasKey('organization_id', $visible->toArray());
+        $this->assertSame(1, (int) $visible->replacementRequest->getRawOriginal('organization_id'));
+        $this->assertArrayNotHasKey('organization_id', $visible->replacementRequest->toArray());
+        $this->assertDatabaseHas('shift_open_positions', ['id' => $corrupt->id]);
+
+        $this->actingAs($this->worker)
+            ->post(route('operations.job_board.claim', $corrupt))
+            ->assertNotFound();
     }
 
     public function test_index_hides_expired_open_positions_but_keeps_claimed_and_filled(): void
     {
-        $freshOpen = $this->positionForShift($this->shiftForOrg(), [
+        $freshOpen = $this->positionForShift($this->shiftForSite(), [
             'status' => 'open',
             'expires_at' => now()->addHour(),
         ]);
-        $expiredOpen = $this->positionForShift($this->shiftForOrg(), [
+        $expiredOpen = $this->positionForShift($this->shiftForSite(), [
             'status' => 'open',
             'expires_at' => now()->subMinute(),
         ]);
-        $expiredClaimed = $this->positionForShift($this->shiftForOrg(), [
+        $expiredClaimed = $this->positionForShift($this->shiftForSite(), [
             'status' => 'claimed',
             'claimed_by' => $this->worker->id,
             'claimed_at' => now()->subHour(),
             'expires_at' => now()->subMinute(),
         ]);
-        $expiredFilled = $this->positionForShift($this->shiftForOrg(), [
+        $expiredFilled = $this->positionForShift($this->shiftForSite(), [
             'status' => 'filled',
             'claimed_by' => $this->worker->id,
             'claimed_at' => now()->subHours(2),
@@ -126,20 +151,20 @@ class JobBoardControllerTest extends TestCase
         // The default "for-you"/"all" board is a claimable-work feed: it shows only
         // open, unexpired positions. Claimed and filled positions live under the
         // "mine"/"approvals" scopes and must not leak onto the default board.
-        $freshOpen = $this->positionForShift($this->shiftForOrg(), [
+        $freshOpen = $this->positionForShift($this->shiftForSite(), [
             'status' => 'open',
             'expires_at' => now()->addHour(),
         ]);
-        $expiredOpen = $this->positionForShift($this->shiftForOrg(), [
+        $expiredOpen = $this->positionForShift($this->shiftForSite(), [
             'status' => 'open',
             'expires_at' => now()->subMinute(),
         ]);
-        $claimed = $this->positionForShift($this->shiftForOrg(), [
+        $claimed = $this->positionForShift($this->shiftForSite(), [
             'status' => 'claimed',
             'claimed_by' => $this->worker->id,
             'claimed_at' => now()->subHour(),
         ]);
-        $filled = $this->positionForShift($this->shiftForOrg(), [
+        $filled = $this->positionForShift($this->shiftForSite(), [
             'status' => 'filled',
             'claimed_by' => $this->worker->id,
             'claimed_at' => now()->subHours(2),
@@ -164,8 +189,8 @@ class JobBoardControllerTest extends TestCase
 
     public function test_index_orders_by_shift_start_time_ascending(): void
     {
-        $later = $this->positionForShift($this->shiftForOrg(startsAt: now()->addDays(3)));
-        $earlier = $this->positionForShift($this->shiftForOrg(startsAt: now()->addDay()));
+        $later = $this->positionForShift($this->shiftForSite(startsAt: now()->addDays(3)));
+        $earlier = $this->positionForShift($this->shiftForSite(startsAt: now()->addDay()));
 
         $this->allowEligibility();
 
@@ -179,7 +204,7 @@ class JobBoardControllerTest extends TestCase
 
     public function test_index_includes_per_viewer_eligibility_for_each_open_card(): void
     {
-        $position = $this->positionForShift($this->shiftForOrg());
+        $position = $this->positionForShift($this->shiftForSite());
 
         $this->blockEligibility('Required qualification is missing.');
 
@@ -194,24 +219,24 @@ class JobBoardControllerTest extends TestCase
 
     public function test_index_scope_mine_returns_only_recent_claims_for_the_actor(): void
     {
-        $mineClaimed = $this->positionForShift($this->shiftForOrg(), [
+        $mineClaimed = $this->positionForShift($this->shiftForSite(), [
             'status' => 'claimed',
             'claimed_by' => $this->worker->id,
             'claimed_at' => now()->subDay(),
         ]);
-        $mineFilled = $this->positionForShift($this->shiftForOrg(), [
+        $mineFilled = $this->positionForShift($this->shiftForSite(), [
             'status' => 'filled',
             'claimed_by' => $this->worker->id,
             'claimed_at' => now()->subDays(2),
             'approved_at' => now()->subDays(2),
         ]);
-        $oldFilled = $this->positionForShift($this->shiftForOrg(), [
+        $oldFilled = $this->positionForShift($this->shiftForSite(), [
             'status' => 'filled',
             'claimed_by' => $this->worker->id,
             'claimed_at' => now()->subDays(20),
             'approved_at' => now()->subDays(20),
         ]);
-        $someoneElsesClaim = $this->positionForShift($this->shiftForOrg(), [
+        $someoneElsesClaim = $this->positionForShift($this->shiftForSite(), [
             'status' => 'claimed',
             'claimed_by' => $this->currentStaff->id,
             'claimed_at' => now()->subDay(),
@@ -235,13 +260,13 @@ class JobBoardControllerTest extends TestCase
 
     public function test_index_filters_by_date_range_and_required_skill(): void
     {
-        $matching = $this->positionForShift($this->shiftForOrg(startsAt: now()->addDays(3)), [
+        $matching = $this->positionForShift($this->shiftForSite(startsAt: now()->addDays(3)), [
             'required_skills' => ['NZSL'],
         ]);
-        $wrongSkill = $this->positionForShift($this->shiftForOrg(startsAt: now()->addDays(4)), [
+        $wrongSkill = $this->positionForShift($this->shiftForSite(startsAt: now()->addDays(4)), [
             'required_skills' => ['Medication'],
         ]);
-        $tooLate = $this->positionForShift($this->shiftForOrg(startsAt: now()->addDays(10)), [
+        $tooLate = $this->positionForShift($this->shiftForSite(startsAt: now()->addDays(10)), [
             'required_skills' => ['NZSL'],
         ]);
 
@@ -272,7 +297,7 @@ class JobBoardControllerTest extends TestCase
             'last_name' => 'Brown',
             'suburb' => 'Kingsland',
         ]);
-        $position = $this->positionForShift($this->shiftForOrg());
+        $position = $this->positionForShift($this->shiftForSite());
 
         $this->allowEligibility();
 
@@ -297,9 +322,9 @@ class JobBoardControllerTest extends TestCase
                 ->where('jobs.data.0.replacement.current_staff.name', $this->currentStaff->name));
     }
 
-    public function test_create_position_refuses_a_shift_from_another_organisation(): void
+    public function test_create_position_refuses_a_shift_from_another_site(): void
     {
-        $foreignShift = $this->shiftForOrg(2);
+        $foreignShift = $this->shiftForSite($this->foreignSite);
 
         $this->actingAs($this->manager)
             ->post(route('operations.job_board.create', $foreignShift), [
@@ -309,13 +334,12 @@ class JobBoardControllerTest extends TestCase
 
         $this->assertDatabaseMissing('shift_open_positions', [
             'shift_id' => $foreignShift->id,
-            'organization_id' => $this->manager->organization_id,
         ]);
     }
 
     public function test_create_position_rejects_when_active_position_already_exists(): void
     {
-        $shift = $this->shiftForOrg();
+        $shift = $this->shiftForSite();
         $this->positionForShift($shift);
 
         $this->actingAs($this->manager)
@@ -330,7 +354,10 @@ class JobBoardControllerTest extends TestCase
     public function test_claim_succeeds_for_an_eligible_worker_and_notifies_staff_and_managers(): void
     {
         Notification::fake();
-        $position = $this->positionForShift($this->shiftForOrg());
+        $foreignManager = $this->siteWorker($this->foreignSite);
+        $foreignManager->update(['role' => 'admin']);
+        $this->attachRole($foreignManager, 'admin');
+        $position = $this->positionForShift($this->shiftForSite());
 
         $this->allowEligibility();
 
@@ -359,11 +386,29 @@ class JobBoardControllerTest extends TestCase
             return $notification->payload['title'] === 'Shift replacement claim submitted';
         });
         Notification::assertSentTo($this->manager, AppEventNotification::class);
+        Notification::assertNotSentTo($foreignManager, AppEventNotification::class);
+    }
+
+    public function test_worker_cannot_claim_a_position_from_another_site(): void
+    {
+        $foreignPosition = $this->positionForShift($this->shiftForSite($this->foreignSite));
+
+        $this->allowEligibility();
+
+        $this->actingAs($this->worker)
+            ->post(route('operations.job_board.claim', $foreignPosition))
+            ->assertNotFound();
+
+        $this->assertDatabaseHas('shift_open_positions', [
+            'id' => $foreignPosition->id,
+            'status' => 'open',
+            'claimed_by' => null,
+        ]);
     }
 
     public function test_claim_is_rejected_when_actor_is_the_assigned_shift_worker(): void
     {
-        $position = $this->positionForShift($this->shiftForOrg(assignedStaff: $this->worker));
+        $position = $this->positionForShift($this->shiftForSite(assignedStaff: $this->worker));
 
         $this->actingAs($this->worker)
             ->from(route('operations.job_board.index'))
@@ -374,7 +419,7 @@ class JobBoardControllerTest extends TestCase
 
     public function test_claim_is_rejected_when_shift_is_completed_or_cancelled(): void
     {
-        $position = $this->positionForShift($this->shiftForOrg(status: 'cancelled'));
+        $position = $this->positionForShift($this->shiftForSite(status: 'cancelled'));
 
         $this->actingAs($this->worker)
             ->from(route('operations.job_board.index'))
@@ -385,7 +430,7 @@ class JobBoardControllerTest extends TestCase
 
     public function test_claim_is_rejected_when_position_is_expired(): void
     {
-        $position = $this->positionForShift($this->shiftForOrg(), [
+        $position = $this->positionForShift($this->shiftForSite(), [
             'expires_at' => now()->subMinute(),
         ]);
 
@@ -398,7 +443,7 @@ class JobBoardControllerTest extends TestCase
 
     public function test_claim_is_blocked_when_eligibility_reports_a_hard_block(): void
     {
-        $position = $this->positionForShift($this->shiftForOrg());
+        $position = $this->positionForShift($this->shiftForSite());
 
         $this->blockEligibility('Contracted hours exceeded.');
 
@@ -413,9 +458,8 @@ class JobBoardControllerTest extends TestCase
     {
         $otherWorker = $this->userWithPermissions(['shifts.viewAssigned'], [
             'role' => 'support_worker',
-            'organization_id' => 1,
         ]);
-        $position = $this->positionForShift($this->shiftForOrg());
+        $position = $this->positionForShift($this->shiftForSite());
 
         $this->allowEligibility();
 
@@ -440,7 +484,7 @@ class JobBoardControllerTest extends TestCase
     public function test_cancelled_shift_cascades_active_job_board_replacement(): void
     {
         Notification::fake();
-        $position = $this->positionForShift($this->shiftForOrg());
+        $position = $this->positionForShift($this->shiftForSite());
 
         $this->actingAs($this->manager)
             ->from(route('operations.job_board.index'))
@@ -465,7 +509,7 @@ class JobBoardControllerTest extends TestCase
     public function test_approve_sets_assignee_fills_position_cancels_siblings_and_notifies(): void
     {
         Notification::fake();
-        $position = $this->positionForShift($this->shiftForOrg(), [
+        $position = $this->positionForShift($this->shiftForSite(), [
             'status' => 'claimed',
             'claimed_by' => $this->worker->id,
             'claimed_at' => now(),
@@ -501,7 +545,7 @@ class JobBoardControllerTest extends TestCase
 
     public function test_approve_refuses_when_claimer_has_become_ineligible(): void
     {
-        $position = $this->positionForShift($this->shiftForOrg(), [
+        $position = $this->positionForShift($this->shiftForSite(), [
             'status' => 'claimed',
             'claimed_by' => $this->worker->id,
             'claimed_at' => now(),
@@ -521,12 +565,41 @@ class JobBoardControllerTest extends TestCase
         ]);
     }
 
-    public function test_approve_refuses_for_a_different_organisations_position(): void
+    public function test_approve_refuses_when_claimant_no_longer_has_shift_site_eligibility(): void
     {
-        $foreignPosition = $this->positionForShift($this->shiftForOrg(2), [
-            'organization_id' => 2,
+        $position = $this->positionForShift($this->shiftForSite(), [
             'status' => 'claimed',
             'claimed_by' => $this->worker->id,
+            'claimed_at' => now(),
+        ]);
+        $this->worker->hrEmployeeProfile()->update([
+            'primary_site_id' => $this->foreignSite->id,
+            'secondary_site_ids' => [],
+        ]);
+
+        $this->allowEligibility();
+
+        $this->actingAs($this->manager)
+            ->post(route('operations.job_board.approve', $position))
+            ->assertSessionHasErrors([
+                'position' => 'The claimed worker is no longer eligible to work at this Shift Site.',
+            ]);
+
+        $this->assertDatabaseHas('shift_open_positions', [
+            'id' => $position->id,
+            'status' => 'claimed',
+        ]);
+        $this->assertDatabaseHas('shifts', [
+            'id' => $position->shift_id,
+            'user_id' => $this->currentStaff->id,
+        ]);
+    }
+
+    public function test_approve_refuses_a_position_from_another_site(): void
+    {
+        $foreignPosition = $this->positionForShift($this->shiftForSite($this->foreignSite), [
+            'status' => 'claimed',
+            'claimed_by' => $this->siteWorker($this->foreignSite)->id,
             'claimed_at' => now(),
         ]);
 
@@ -539,8 +612,8 @@ class JobBoardControllerTest extends TestCase
     {
         Notification::fake();
 
-        $requester = User::factory()->create(['organization_id' => 1]);
-        $position = $this->positionForShift($this->shiftForOrg(), [
+        $requester = $this->siteWorker($this->site);
+        $position = $this->positionForShift($this->shiftForSite(), [
             'status' => 'claimed',
             'claimed_by' => $this->worker->id,
             'claimed_at' => now(),
@@ -563,8 +636,8 @@ class JobBoardControllerTest extends TestCase
 
     public function test_permission_gates_block_view_and_approve_without_capability(): void
     {
-        $noAccess = User::factory()->create(['organization_id' => 1]);
-        $position = $this->positionForShift($this->shiftForOrg(), [
+        $noAccess = User::factory()->create();
+        $position = $this->positionForShift($this->shiftForSite(), [
             'status' => 'claimed',
             'claimed_by' => $this->worker->id,
             'claimed_at' => now(),
@@ -575,7 +648,6 @@ class JobBoardControllerTest extends TestCase
             ->assertForbidden();
 
         $viewerOnly = $this->userWithPermissions(['job_board.viewAny'], [
-            'organization_id' => 1,
         ]);
 
         $this->actingAs($viewerOnly)
@@ -586,12 +658,10 @@ class JobBoardControllerTest extends TestCase
     public function test_index_allows_every_capability_admitted_by_the_workforce_nav_gate(): void
     {
         $claimOnly = $this->userWithPermissions(['job_board.claim'], [
-            'organization_id' => 1,
         ]);
         $assignedShiftViewer = $this->userWithPermissions(['shifts.viewAssigned'], [
-            'organization_id' => 1,
         ]);
-        $noAccess = User::factory()->create(['organization_id' => 1]);
+        $noAccess = User::factory()->create();
 
         $this->allowEligibility();
 
@@ -615,20 +685,20 @@ class JobBoardControllerTest extends TestCase
     public function test_expire_positions_command_cancels_expired_open_positions_and_nudges_stale_claims(): void
     {
         Notification::fake();
-        $expired = $this->positionForShift($this->shiftForOrg(), [
+        $expired = $this->positionForShift($this->shiftForSite(), [
             'status' => 'open',
             'expires_at' => now()->subMinute(),
         ]);
-        $fresh = $this->positionForShift($this->shiftForOrg(), [
+        $fresh = $this->positionForShift($this->shiftForSite(), [
             'status' => 'open',
             'expires_at' => now()->addHour(),
         ]);
-        $staleClaim = $this->positionForShift($this->shiftForOrg(), [
+        $staleClaim = $this->positionForShift($this->shiftForSite(), [
             'status' => 'claimed',
             'claimed_by' => $this->worker->id,
             'claimed_at' => now()->subDays(3),
         ]);
-        $recentClaim = $this->positionForShift($this->shiftForOrg(), [
+        $recentClaim = $this->positionForShift($this->shiftForSite(), [
             'status' => 'claimed',
             'claimed_by' => $this->worker->id,
             'claimed_at' => now()->subHour(),
@@ -665,7 +735,7 @@ class JobBoardControllerTest extends TestCase
     {
         Notification::fake();
 
-        $staleClaim = $this->positionForShift($this->shiftForOrg(), [
+        $staleClaim = $this->positionForShift($this->shiftForSite(), [
             'status' => 'claimed',
             'claimed_by' => $this->worker->id,
             'claimed_at' => now()->subDays(3),
@@ -709,8 +779,9 @@ class JobBoardControllerTest extends TestCase
     {
         $user = User::factory()->create(array_merge([
             'approved_at' => now(),
-            'organization_id' => 1,
         ], $attributes));
+
+        $this->assignToSite($user, $this->site);
 
         foreach ($permissionKeys as $key) {
             $permission = Permission::firstOrCreate(
@@ -740,23 +811,27 @@ class JobBoardControllerTest extends TestCase
         $user->roles()->syncWithoutDetaching([$role->id]);
     }
 
-    private function shiftForOrg(
-        int $organizationId = 1,
+    private function shiftForSite(
+        ?Site $site = null,
         ?User $assignedStaff = null,
         ?Carbon $startsAt = null,
         string $status = 'scheduled',
     ): Shift {
-        $client = $organizationId === (int) $this->client->organization_id
+        $site ??= $this->site;
+        $client = $site->is($this->site)
             ? $this->client
-            : Client::factory()->create(['organization_id' => $organizationId]);
+            : Client::factory()->create(['site_id' => $site->id]);
+        $assignedStaff ??= $site->is($this->site)
+            ? $this->currentStaff
+            : $this->siteWorker($site);
 
         $startsAt ??= now()->addDay()->setTime(9, 0);
 
         return Shift::factory()->create([
-            'organization_id' => $organizationId,
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'service_context_id' => $this->serviceContext->id,
-            'user_id' => ($assignedStaff ?? $this->currentStaff)->id,
+            'user_id' => $assignedStaff->id,
             'starts_at' => $startsAt,
             'ends_at' => $startsAt->copy()->addHours(4),
             'status' => $status,
@@ -773,28 +848,65 @@ class JobBoardControllerTest extends TestCase
         $positionStatus = $overrides['status'] ?? 'open';
 
         $replacement = ShiftReplacementRequest::create([
-            'organization_id' => $shift->organization_id,
             'shift_id' => $shift->id,
             'requested_by' => $requester->id,
             'current_staff_id' => $shift->user_id,
             'replacement_user_id' => $overrides['claimed_by'] ?? null,
-            'status' => $positionStatus === 'claimed' ? 'claimed' : 'requested',
+            'status' => match ($positionStatus) {
+                'claimed' => ShiftReplacementService::CLAIMED,
+                'filled' => ShiftReplacementService::APPROVED,
+                'cancelled' => ShiftReplacementService::CANCELLED,
+                default => ShiftReplacementService::REQUESTED,
+            },
             'reason' => 'Needs cover for readiness test',
             'requested_at' => now()->subHour(),
             'claimed_at' => $overrides['claimed_at'] ?? null,
+            'approved_by' => $positionStatus === 'filled' ? $this->manager->id : null,
+            'approved_at' => $positionStatus === 'filled' ? ($overrides['approved_at'] ?? now()) : null,
+            'cancelled_by' => $positionStatus === 'cancelled' ? $this->manager->id : null,
+            'cancelled_at' => $positionStatus === 'cancelled' ? now() : null,
         ]);
 
         $position = ShiftOpenPosition::create(array_merge([
-            'organization_id' => $shift->organization_id,
             'shift_id' => $shift->id,
             'replacement_request_id' => $replacement->id,
             'status' => 'open',
             'required_skills' => [],
             'coverage_roles' => [],
             'expires_at' => null,
+            'approved_by' => $positionStatus === 'filled' ? $this->manager->id : null,
         ], $overrides));
 
         return $position->fresh(['shift', 'replacementRequest']) ?? $position;
+    }
+
+    private function siteWorker(Site $site): User
+    {
+        $worker = User::factory()->create([
+            'approved_at' => now(),
+            'role' => 'support_worker',
+        ]);
+        $this->assignToSite($worker, $site);
+
+        return $worker;
+    }
+
+    private function assignToSite(User $user, Site $site): void
+    {
+        HrEmployeeProfile::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            [
+                'employee_number' => 'EMP-JOB-'.$user->id,
+                'work_email' => $user->email,
+                'position_title' => 'Support Worker',
+                'position_role' => 'support_worker',
+                'employment_type' => 'full_time',
+                'start_date' => now()->subMonth()->toDateString(),
+                'is_active' => true,
+                'primary_site_id' => $site->id,
+                'secondary_site_ids' => [],
+            ],
+        );
     }
 
     private function allowEligibility(): void

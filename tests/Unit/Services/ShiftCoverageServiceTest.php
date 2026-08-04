@@ -79,7 +79,6 @@ class ShiftCoverageServiceTest extends TestCase
         ]);
 
         CoverageReservation::query()->create([
-            'organization_id' => null,
             'site_id' => $this->site->id,
             'coverage_requirement_id' => $rule->id,
             'reserved_by_user_id' => User::factory()->create()->id,
@@ -219,7 +218,6 @@ class ShiftCoverageServiceTest extends TestCase
         ))->firstWhere('rule_id', $rule->id);
 
         CoverageGapAcknowledgement::query()->create([
-            'organization_id' => null,
             'site_id' => $this->site->id,
             'coverage_requirement_id' => $rule->id,
             'coverage_window_key' => $window['coverage_window_key'],

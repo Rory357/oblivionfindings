@@ -5,9 +5,9 @@ namespace App\Http\Controllers\FleetAssets;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
+use App\Models\Client;
 use App\Models\ControlRoomAlert;
 use App\Models\Site;
-use App\Models\User;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -24,21 +24,10 @@ class LiveMapController extends Controller
     {
         $hasFleetFields = Schema::hasColumn('assets', 'home_site_id');
         $user = $request->user();
-        $organizationId = $this->organizationId($user);
-        $tenantSiteIds = $organizationId === null
-            ? []
-            : Site::query()
-                ->where('tenant_id', $organizationId)
-                ->pluck('id')
-                ->map(fn ($siteId) => (int) $siteId)
-                ->all();
-        $profileSiteIds = array_values(array_intersect(
-            $this->siteAccess->accessibleSiteIds($user),
-            $tenantSiteIds,
-        ));
-        $accessibleSiteIds = $this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS)
-            ? $tenantSiteIds
-            : $profileSiteIds;
+        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(
+            $user,
+            self::SITE_BYPASS_PERMISSIONS,
+        );
 
         $applyAssetScope = function (Builder $query) use ($accessibleSiteIds, $hasFleetFields): Builder {
             if ($accessibleSiteIds === []) {
@@ -59,10 +48,9 @@ class LiveMapController extends Controller
             ->pluck('id')
             ->map(fn ($assetId) => (int) $assetId)
             ->all();
-        $accessibleClientIds = $organizationId === null || $accessibleSiteIds === []
+        $accessibleClientIds = $accessibleSiteIds === []
             ? []
-            : \App\Models\Client::query()
-                ->where('organization_id', $organizationId)
+            : Client::query()
                 ->whereIn('site_id', $accessibleSiteIds)
                 ->pluck('id')
                 ->map(fn ($clientId) => (int) $clientId)
@@ -70,9 +58,7 @@ class LiveMapController extends Controller
 
         $eagerLoads = ['fleetState'];
         if ($hasFleetFields) {
-            $eagerLoads['homeSite'] = fn ($query) => $organizationId === null
-                ? $query->whereRaw('1 = 0')
-                : $query->where('tenant_id', $organizationId);
+            $eagerLoads[] = 'homeSite';
         }
 
         $selectColumns = ['id', 'name', 'asset_tag', 'category', 'status'];
@@ -178,14 +164,5 @@ class LiveMapController extends Controller
             'geofences' => $geofences,
             'open_alerts' => $openAlerts,
         ]);
-    }
-
-    private function organizationId(?User $user): ?int
-    {
-        $organizationId = $user?->organization_id;
-
-        return is_numeric($organizationId) && (int) $organizationId > 0
-            ? (int) $organizationId
-            : null;
     }
 }

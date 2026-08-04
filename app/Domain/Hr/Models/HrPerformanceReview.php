@@ -3,7 +3,9 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
+use Database\Factories\Hr\HrPerformanceReviewFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,11 +14,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrPerformanceReview extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Hr\HrPerformanceReviewFactory::new();
+        return HrPerformanceReviewFactory::new();
     }
 
     protected $fillable = [
@@ -57,7 +59,7 @@ class HrPerformanceReview extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function employee(): BelongsTo
@@ -103,7 +105,6 @@ class HrPerformanceReview extends Model
 
         $this->reviewGoals()->delete();
         $clean->each(fn ($desc, $i) => $this->reviewGoals()->create([
-            'tenant_id' => $this->tenant_id,
             'description' => mb_substr($desc, 0, 500),
             'status' => 'open',
             'sort_order' => $i,
@@ -114,13 +115,8 @@ class HrPerformanceReview extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeDraft(Builder $query): Builder
     {

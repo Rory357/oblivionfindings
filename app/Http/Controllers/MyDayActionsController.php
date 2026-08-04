@@ -204,8 +204,8 @@ class MyDayActionsController extends Controller
      *
      * Returns the normalised allocation array (ready to upsert) or `null`
      * when the request didn't include `client_allocations` at all — that
-     * way an old client / mobile app calling without allocations still
-     * works exactly like before.
+     * way an older web client or API consumer calling without allocations
+     * still works exactly like before.
      *
      * @return array<int, array<string, mixed>>|null
      */

@@ -6,17 +6,16 @@ use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPublicHoliday;
 use App\Domain\Hr\Services\LeaveService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class PublicHolidayController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(private readonly LeaveService $leaveService) {}
 
     public function index(Request $request): Response
@@ -24,14 +23,9 @@ class PublicHolidayController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.leave.viewAny'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $year = (int) $request->query('year', now()->year);
 
         $holidays = HrPublicHoliday::query()
-            ->where(function ($query) use ($tenantId) {
-                $query->whereNull('tenant_id')
-                    ->orWhere('tenant_id', $tenantId);
-            })
             ->where('year', $year)
             ->orderBy('date')
             ->orderByDesc('is_national')
@@ -45,7 +39,7 @@ class PublicHolidayController extends Controller
         return Inertia::render('hr/leave/holidays', [
             'holidays' => $holidays,
             'year' => $year,
-            'hero' => $this->leaveService->hubHeroData($tenantId, $user, $canApprove),
+            'hero' => $this->leaveService->hubHeroData($user, $canApprove),
             'can' => [
                 'manage' => $canManage,
                 'approve' => $canApprove,
@@ -59,18 +53,22 @@ class PublicHolidayController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.leave.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $data = $this->validatedPayload($request);
         $date = Carbon::parse($data['date']);
+        $region = $this->normaliseRegion($data['region'] ?? null, (bool) ($data['is_national'] ?? false));
 
-        HrPublicHoliday::query()->create([
-            'tenant_id' => $tenantId,
-            'name' => $data['name'],
-            'date' => $date->toDateString(),
-            'region' => $this->normaliseRegion($data['region'] ?? null, (bool) ($data['is_national'] ?? false)),
-            'is_national' => (bool) ($data['is_national'] ?? false),
-            'year' => $date->year,
-        ]);
+        $this->assertUniqueIdentity($date->toDateString(), $region);
+        try {
+            HrPublicHoliday::query()->create([
+                'name' => $data['name'],
+                'date' => $date->toDateString(),
+                'region' => $region,
+                'is_national' => (bool) ($data['is_national'] ?? false),
+                'year' => $date->year,
+            ]);
+        } catch (QueryException $exception) {
+            $this->throwDuplicateIdentity($exception);
+        }
 
         return redirect()->route('hr.leave.holidays.index', ['year' => $date->year]);
     }
@@ -80,21 +78,22 @@ class PublicHolidayController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.leave.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        if ($holiday->tenant_id !== null) {
-            $this->assertHrTenantAccess($tenantId, (int) $holiday->tenant_id);
-        }
-
         $data = $this->validatedPayload($request);
         $date = Carbon::parse($data['date']);
+        $region = $this->normaliseRegion($data['region'] ?? null, (bool) ($data['is_national'] ?? false));
 
-        $holiday->update([
-            'name' => $data['name'],
-            'date' => $date->toDateString(),
-            'region' => $this->normaliseRegion($data['region'] ?? null, (bool) ($data['is_national'] ?? false)),
-            'is_national' => (bool) ($data['is_national'] ?? false),
-            'year' => $date->year,
-        ]);
+        $this->assertUniqueIdentity($date->toDateString(), $region, (int) $holiday->id);
+        try {
+            $holiday->update([
+                'name' => $data['name'],
+                'date' => $date->toDateString(),
+                'region' => $region,
+                'is_national' => (bool) ($data['is_national'] ?? false),
+                'year' => $date->year,
+            ]);
+        } catch (QueryException $exception) {
+            $this->throwDuplicateIdentity($exception);
+        }
 
         return redirect()->route('hr.leave.holidays.index', ['year' => $date->year]);
     }
@@ -103,11 +102,6 @@ class PublicHolidayController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.leave.manage'), 403);
-
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        if ($holiday->tenant_id !== null) {
-            $this->assertHrTenantAccess($tenantId, (int) $holiday->tenant_id);
-        }
 
         // Leave hours are engine-calculated AROUND holidays — deleting one
         // that overlaps existing requests silently invalidates those hour
@@ -152,6 +146,35 @@ class PublicHolidayController extends Controller
         $normalised = strtolower(trim((string) $region));
 
         return $normalised !== '' ? $normalised : 'regional';
+    }
+
+    private function assertUniqueIdentity(string $date, string $region, ?int $exceptId = null): void
+    {
+        $exists = HrPublicHoliday::query()
+            ->whereDate('date', $date)
+            ->where('region', $region)
+            ->when($exceptId !== null, fn ($query) => $query->where('id', '!=', $exceptId))
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'date' => 'A public holiday already exists for this date and region.',
+            ]);
+        }
+    }
+
+    private function throwDuplicateIdentity(QueryException $exception): never
+    {
+        $message = $exception->getMessage();
+
+        if (str_contains($message, 'hr_public_holidays_date_region_uq')
+            || str_contains($message, 'hr_public_holidays.date, hr_public_holidays.region')) {
+            throw ValidationException::withMessages([
+                'date' => 'A public holiday already exists for this date and region.',
+            ]);
+        }
+
+        throw $exception;
     }
 
     /**

@@ -5,6 +5,7 @@ import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -12,6 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/fleet-utils';
@@ -29,8 +31,8 @@ import {
     Battery,
     CheckCircle2,
     ChevronDown,
-    ChevronUp,
     ChevronsUpDown,
+    ChevronUp,
     Clock,
     Download,
     Loader2,
@@ -59,7 +61,12 @@ type Device = {
     status: string;
     last_seen_at: string | null;
     paired_at: string | null;
-    asset: { id: number; name: string; asset_tag: string | null } | null;
+    asset: {
+        id: number;
+        name: string;
+        asset_tag: string | null;
+        href: string | null;
+    } | null;
 };
 
 type PaginatedDevices = {
@@ -78,7 +85,12 @@ type DeviceConsent = {
     consent_withdrawn_at: string | null;
     consent_expires_at: string | null;
     consent_given_by: string | null;
-    asset: { id: number; name: string; asset_tag: string | null } | null;
+    asset: {
+        id: number;
+        name: string;
+        asset_tag: string | null;
+        href: string | null;
+    } | null;
     client_name: string | null;
 };
 
@@ -107,8 +119,17 @@ type DeviceDetail = {
         asset_tag: string | null;
         category: string | null;
         status: string | null;
+        href: string | null;
     } | null;
     telemetry_snapshots: TelemetrySnapshot[];
+    telemetry_access: {
+        allowed: boolean;
+        reason:
+            | 'available'
+            | 'permission_required'
+            | 'use_governed_tracking_workspace'
+            | 'personal_assignment_ended';
+    };
 };
 
 type Props = {
@@ -165,6 +186,15 @@ const deviceDetailSteps = [
         label: 'Recent telemetry',
         blurb: 'Latest tracker messages',
         icon: Radio,
+    },
+] as const;
+
+const withdrawConsentSteps = [
+    {
+        key: 'reason',
+        label: 'Reason & impact',
+        blurb: 'Record why tracking must stop',
+        icon: ShieldOff,
     },
 ] as const;
 
@@ -238,7 +268,11 @@ function visitWithQuery(
     router.get(
         `${window.location.pathname}${qs ? `?${qs}` : ''}`,
         {},
-        { preserveState: true, preserveScroll: true, replace: options.replace ?? false },
+        {
+            preserveState: true,
+            preserveScroll: true,
+            replace: options.replace ?? false,
+        },
     );
 }
 
@@ -289,8 +323,12 @@ export default function DevicesIndex({
         () => pairing_options?.assets ?? [],
         [pairing_options?.assets],
     );
-    const [availableDevices, setAvailableDevices] = useState(initialAvailableDevices);
-    const [availableAssets, setAvailableAssets] = useState(initialAvailableAssets);
+    const [availableDevices, setAvailableDevices] = useState(
+        initialAvailableDevices,
+    );
+    const [availableAssets, setAvailableAssets] = useState(
+        initialAvailableAssets,
+    );
     const [deviceOptionSearch, setDeviceOptionSearch] = useState('');
     const [assetOptionSearch, setAssetOptionSearch] = useState('');
     const consentRows = consent_devices ?? [];
@@ -338,18 +376,26 @@ export default function DevicesIndex({
         device_id: '',
         asset_id: '',
     });
-    const selectedDeviceOption = [...availableDevices, ...initialAvailableDevices].find(
-        (device) => String(device.id) === pairForm.data.device_id,
-    );
-    const selectedAssetOption = [...availableAssets, ...initialAvailableAssets].find(
-        (asset) => String(asset.id) === pairForm.data.asset_id,
-    );
-    const visibleDeviceOptions = selectedDeviceOption && !availableDevices.some((device) => device.id === selectedDeviceOption.id)
-        ? [selectedDeviceOption, ...availableDevices]
-        : availableDevices;
-    const visibleAssetOptions = selectedAssetOption && !availableAssets.some((asset) => asset.id === selectedAssetOption.id)
-        ? [selectedAssetOption, ...availableAssets]
-        : availableAssets;
+    const selectedDeviceOption = [
+        ...availableDevices,
+        ...initialAvailableDevices,
+    ].find((device) => String(device.id) === pairForm.data.device_id);
+    const selectedAssetOption = [
+        ...availableAssets,
+        ...initialAvailableAssets,
+    ].find((asset) => String(asset.id) === pairForm.data.asset_id);
+    const visibleDeviceOptions =
+        selectedDeviceOption &&
+        !availableDevices.some(
+            (device) => device.id === selectedDeviceOption.id,
+        )
+            ? [selectedDeviceOption, ...availableDevices]
+            : availableDevices;
+    const visibleAssetOptions =
+        selectedAssetOption &&
+        !availableAssets.some((asset) => asset.id === selectedAssetOption.id)
+            ? [selectedAssetOption, ...availableAssets]
+            : availableAssets;
 
     useEffect(() => {
         const query = deviceOptionSearch.trim();
@@ -360,13 +406,18 @@ export default function DevicesIndex({
         const controller = new AbortController();
         const timer = setTimeout(async () => {
             try {
-                const response = await fetch(`/fleet-assets/devices/options/search?type=devices&q=${encodeURIComponent(query)}`, {
-                    headers: { Accept: 'application/json' },
-                    signal: controller.signal,
-                });
-                if (response.ok) setAvailableDevices((await response.json()).results ?? []);
+                const response = await fetch(
+                    `/fleet-assets/devices/options/search?type=devices&q=${encodeURIComponent(query)}`,
+                    {
+                        headers: { Accept: 'application/json' },
+                        signal: controller.signal,
+                    },
+                );
+                if (response.ok)
+                    setAvailableDevices((await response.json()).results ?? []);
             } catch (error) {
-                if ((error as Error).name !== 'AbortError') setAvailableDevices([]);
+                if ((error as Error).name !== 'AbortError')
+                    setAvailableDevices([]);
             }
         }, 300);
         return () => {
@@ -384,13 +435,18 @@ export default function DevicesIndex({
         const controller = new AbortController();
         const timer = setTimeout(async () => {
             try {
-                const response = await fetch(`/fleet-assets/devices/options/search?type=assets&q=${encodeURIComponent(query)}`, {
-                    headers: { Accept: 'application/json' },
-                    signal: controller.signal,
-                });
-                if (response.ok) setAvailableAssets((await response.json()).results ?? []);
+                const response = await fetch(
+                    `/fleet-assets/devices/options/search?type=assets&q=${encodeURIComponent(query)}`,
+                    {
+                        headers: { Accept: 'application/json' },
+                        signal: controller.signal,
+                    },
+                );
+                if (response.ok)
+                    setAvailableAssets((await response.json()).results ?? []);
             } catch (error) {
-                if ((error as Error).name !== 'AbortError') setAvailableAssets([]);
+                if ((error as Error).name !== 'AbortError')
+                    setAvailableAssets([]);
             }
         }, 300);
         return () => {
@@ -412,7 +468,9 @@ export default function DevicesIndex({
         setPairStepIndex(0);
         setDialogOpen(false);
     };
-    const canReviewPair = Boolean(pairForm.data.device_id && pairForm.data.asset_id);
+    const canReviewPair = Boolean(
+        pairForm.data.device_id && pairForm.data.asset_id,
+    );
     const selectedPairDevice = availableDevices.find(
         (device) => String(device.id) === pairForm.data.device_id,
     );
@@ -443,8 +501,22 @@ export default function DevicesIndex({
 
     /* ── Consent tab state ── */
     const [consentSearch, setConsentSearch] = useState('');
-    const [revokeTarget, setRevokeTarget] = useState<DeviceConsent | null>(null);
+    const [revokeTarget, setRevokeTarget] = useState<DeviceConsent | null>(
+        null,
+    );
+    const [revokeReason, setRevokeReason] = useState('');
+    const [revokeError, setRevokeError] = useState<string | null>(null);
     const [consentProcessing, setConsentProcessing] = useState(false);
+
+    const resetRevokeDialog = () => {
+        setRevokeTarget(null);
+        setRevokeReason('');
+        setRevokeError(null);
+    };
+
+    const closeRevokeDialog = () => {
+        if (!consentProcessing) resetRevokeDialog();
+    };
 
     const filteredConsent = consentRows.filter((d) => {
         const q = consentSearch.toLowerCase();
@@ -471,15 +543,29 @@ export default function DevicesIndex({
 
     const handleRevoke = () => {
         if (!revokeTarget) return;
+        if (revokeReason.trim().length < 3) {
+            setRevokeError(
+                'Record a short reason for withdrawing location tracking consent.',
+            );
+            return;
+        }
         setConsentProcessing(true);
+        setRevokeError(null);
         router.post(
             `/fleet-assets/devices/${revokeTarget.id}/consent/revoke`,
-            {},
+            { reason: revokeReason.trim() },
             {
                 preserveScroll: true,
+                onSuccess: resetRevokeDialog,
+                onError: (errors) => {
+                    setRevokeError(
+                        typeof errors.reason === 'string'
+                            ? errors.reason
+                            : 'Consent could not be withdrawn.',
+                    );
+                },
                 onFinish: () => {
                     setConsentProcessing(false);
-                    setRevokeTarget(null);
                 },
             },
         );
@@ -488,6 +574,14 @@ export default function DevicesIndex({
     /* ── Detail dialog map ── */
     const detail = device_detail ?? null;
     const detailSnapshots = detail?.telemetry_snapshots ?? [];
+    const telemetryUnavailableCopy =
+        detail?.telemetry_access.reason === 'use_governed_tracking_workspace'
+            ? 'Personal location is protected. Use the consent-aware Tracking workspace or Client profile.'
+            : detail?.telemetry_access.reason === 'personal_assignment_ended'
+              ? 'Personal location access ended with the assignment. Retained records remain governed by the assignment retention policy.'
+              : detail?.telemetry_access.reason === 'permission_required'
+                ? 'You do not have permission to view device telemetry.'
+                : 'No telemetry data available.';
     const latestData =
         detailSnapshots.length > 0 ? (detailSnapshots[0]?.data ?? null) : null;
     const detailLat = latestData?.lat ?? latestData?.latitude ?? null;
@@ -511,7 +605,8 @@ export default function DevicesIndex({
     }, [detail, detailLat, detailLng]);
 
     const detailIsOperational =
-        detail?.device_status === 'active' || detail?.device_status === 'degraded';
+        detail?.device_status === 'active' ||
+        detail?.device_status === 'degraded';
 
     return (
         <AppLayout
@@ -527,12 +622,15 @@ export default function DevicesIndex({
                     <div className="flex flex-wrap items-center gap-4">
                         <HeroMedallion icon={Radio} />
                         <div className="min-w-0">
-                            <HeroStatusPill>Device registry · canonical</HeroStatusPill>
+                            <HeroStatusPill>
+                                Device registry · canonical
+                            </HeroStatusPill>
                             <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
                                 Tracking Devices
                             </h1>
                             <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                GPS trackers and IoT devices paired to assets, with tracking consent.
+                                GPS trackers and IoT devices paired to assets,
+                                with tracking consent.
                             </p>
                         </div>
                         <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
@@ -546,7 +644,9 @@ export default function DevicesIndex({
                                 label="Low battery"
                                 value={fmt(lowBatteryCount)}
                                 caption="20% or less"
-                                tone={lowBatteryCount > 0 ? 'warning' : 'success'}
+                                tone={
+                                    lowBatteryCount > 0 ? 'warning' : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 label="Consent granted"
@@ -556,7 +656,9 @@ export default function DevicesIndex({
                                         ? `${fmt(consentBlocked)} blocked`
                                         : 'none blocked'
                                 }
-                                tone={consentBlocked > 0 ? 'warning' : 'success'}
+                                tone={
+                                    consentBlocked > 0 ? 'warning' : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 label="Unpaired"
@@ -567,7 +669,8 @@ export default function DevicesIndex({
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <Button unstyled
+                        <Button
+                            unstyled
                             type="button"
                             onClick={() => {
                                 setPairStepIndex(0);
@@ -592,14 +695,18 @@ export default function DevicesIndex({
                 <div className="inline-flex w-fit items-center gap-1 rounded-lg border bg-muted/40 p-1">
                     {(
                         [
-                            { key: 'devices', label: `Devices (${fmt(totalDevices)})` },
+                            {
+                                key: 'devices',
+                                label: `Devices (${fmt(totalDevices)})`,
+                            },
                             {
                                 key: 'consent',
                                 label: `Consent (${fmt(consent_stats?.total ?? 0)})`,
                             },
                         ] as const
                     ).map((t) => (
-                        <Button unstyled
+                        <Button
+                            unstyled
                             key={t.key}
                             type="button"
                             onClick={() => switchTab(t.key)}
@@ -618,12 +725,18 @@ export default function DevicesIndex({
                 {activeTab === 'devices' ? (
                     <>
                         {/* Table */}
-                        <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto rounded-lg border">
+                        <div
+                            data-fleet-narrow-strategy="horizontal-scroll"
+                            className="overflow-x-auto rounded-lg border"
+                        >
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
                                         {renderSortHeader('provider', 'Vendor')}
-                                        {renderSortHeader('device_uid', 'Device UID')}
+                                        {renderSortHeader(
+                                            'device_uid',
+                                            'Device UID',
+                                        )}
                                         <th className="px-4 py-3 text-left font-medium">
                                             IMEI
                                         </th>
@@ -631,7 +744,10 @@ export default function DevicesIndex({
                                             Paired Asset
                                         </th>
                                         {renderSortHeader('status', 'Status')}
-                                        {renderSortHeader('last_seen_at', 'Last Seen')}
+                                        {renderSortHeader(
+                                            'last_seen_at',
+                                            'Last Seen',
+                                        )}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -640,7 +756,9 @@ export default function DevicesIndex({
                                             <tr
                                                 key={device.id}
                                                 className="cursor-pointer border-b transition-colors hover:bg-muted/30"
-                                                onClick={() => openDevice(device.id)}
+                                                onClick={() =>
+                                                    openDevice(device.id)
+                                                }
                                             >
                                                 <td className="px-4 py-3">
                                                     {device.vendor}
@@ -652,9 +770,12 @@ export default function DevicesIndex({
                                                     {device.imei ?? '---'}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    {device.asset ? (
+                                                    {device.asset?.href ? (
                                                         <Link
-                                                            href={`/fleet-assets/assets/${device.asset.id}`}
+                                                            href={
+                                                                device.asset
+                                                                    .href
+                                                            }
                                                             className="text-primary hover:underline"
                                                             onClick={(e) =>
                                                                 e.stopPropagation()
@@ -662,6 +783,10 @@ export default function DevicesIndex({
                                                         >
                                                             {device.asset.name}
                                                         </Link>
+                                                    ) : device.asset ? (
+                                                        <span>
+                                                            {device.asset.name}
+                                                        </span>
                                                     ) : (
                                                         <span className="text-muted-foreground">
                                                             Not paired
@@ -693,7 +818,10 @@ export default function DevicesIndex({
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={6} className="px-4 py-12">
+                                            <td
+                                                colSpan={6}
+                                                className="px-4 py-12"
+                                            >
                                                 <FleetEmptyState
                                                     icon={Wifi}
                                                     title="No tracking devices paired"
@@ -712,7 +840,9 @@ export default function DevicesIndex({
                                 {paginationLinks.map((link, i) => (
                                     <Button
                                         key={i}
-                                        variant={link.active ? 'default' : 'outline'}
+                                        variant={
+                                            link.active ? 'default' : 'outline'
+                                        }
                                         size="sm"
                                         disabled={!link.url}
                                         onClick={() =>
@@ -723,7 +853,9 @@ export default function DevicesIndex({
                                                 { preserveState: true },
                                             )
                                         }
-                                        dangerouslySetInnerHTML={{ __html: link.label }}
+                                        dangerouslySetInnerHTML={{
+                                            __html: link.label,
+                                        }}
                                     />
                                 ))}
                             </div>
@@ -739,7 +871,9 @@ export default function DevicesIndex({
                                     placeholder="Search by device, asset, or client..."
                                     className="pl-10"
                                     value={consentSearch}
-                                    onChange={(e) => setConsentSearch(e.target.value)}
+                                    onChange={(e) =>
+                                        setConsentSearch(e.target.value)
+                                    }
                                 />
                             </div>
                             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -762,17 +896,34 @@ export default function DevicesIndex({
                             </div>
                         </div>
 
-                        <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto rounded-lg border">
+                        <div
+                            data-fleet-narrow-strategy="horizontal-scroll"
+                            className="overflow-x-auto rounded-lg border"
+                        >
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
-                                        <th className="px-4 py-3 text-left font-medium">Device</th>
-                                        <th className="px-4 py-3 text-left font-medium">Paired Asset</th>
-                                        <th className="px-4 py-3 text-left font-medium">Client</th>
-                                        <th className="px-4 py-3 text-left font-medium">Consent Status</th>
-                                        <th className="px-4 py-3 text-left font-medium">Granted / Revoked</th>
-                                        <th className="px-4 py-3 text-left font-medium">Granted By</th>
-                                        <th className="px-4 py-3 text-right font-medium">Action</th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Device
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Paired Asset
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Client
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Consent Status
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Granted / Revoked
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Granted By
+                                        </th>
+                                        <th className="px-4 py-3 text-right font-medium">
+                                            Action
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -783,19 +934,28 @@ export default function DevicesIndex({
                                                 className="border-b transition-colors hover:bg-muted/30"
                                             >
                                                 <td className="px-4 py-3">
-                                                    <div className="font-medium">{device.vendor}</div>
+                                                    <div className="font-medium">
+                                                        {device.vendor}
+                                                    </div>
                                                     <div className="font-mono text-xs text-muted-foreground">
                                                         {device.device_uid}
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    {device.asset ? (
+                                                    {device.asset?.href ? (
                                                         <Link
-                                                            href={`/fleet-assets/assets/${device.asset.id}`}
+                                                            href={
+                                                                device.asset
+                                                                    .href
+                                                            }
                                                             className="text-primary hover:underline"
                                                         >
                                                             {device.asset.name}
                                                         </Link>
+                                                    ) : device.asset ? (
+                                                        <span>
+                                                            {device.asset.name}
+                                                        </span>
                                                     ) : (
                                                         <span className="text-muted-foreground">
                                                             Not paired
@@ -803,33 +963,51 @@ export default function DevicesIndex({
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-foreground">
-                                                    {device.client_name ?? '---'}
+                                                    {device.client_name ??
+                                                        '---'}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    {consentBadge(device.consent_status)}
+                                                    {consentBadge(
+                                                        device.consent_status,
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-foreground">
-                                                    {device.consent_status === 'consented' &&
+                                                    {device.consent_status ===
+                                                        'consented' &&
                                                     device.consent_given_at
-                                                        ? formatDateTime(device.consent_given_at)
-                                                        : device.consent_status === 'revoked' &&
+                                                        ? formatDateTime(
+                                                              device.consent_given_at,
+                                                          )
+                                                        : device.consent_status ===
+                                                                'revoked' &&
                                                             device.consent_withdrawn_at
-                                                          ? formatDateTime(device.consent_withdrawn_at)
-                                                          : device.consent_status === 'expired' &&
+                                                          ? formatDateTime(
+                                                                device.consent_withdrawn_at,
+                                                            )
+                                                          : device.consent_status ===
+                                                                  'expired' &&
                                                               device.consent_expires_at
                                                             ? `Expired ${formatDateTime(device.consent_expires_at)}`
                                                             : '---'}
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-foreground">
-                                                    {device.consent_given_by ?? '---'}
+                                                    {device.consent_given_by ??
+                                                        '---'}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
-                                                    {device.consent_status === 'consented' ? (
+                                                    {device.consent_status ===
+                                                    'consented' ? (
                                                         <Button
                                                             variant="destructive"
                                                             size="sm"
-                                                            onClick={() => setRevokeTarget(device)}
-                                                            disabled={consentProcessing}
+                                                            onClick={() =>
+                                                                setRevokeTarget(
+                                                                    device,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                consentProcessing
+                                                            }
                                                         >
                                                             <ShieldOff className="mr-1.5 h-3.5 w-3.5" />
                                                             Revoke
@@ -838,8 +1016,14 @@ export default function DevicesIndex({
                                                         <Button
                                                             variant="default"
                                                             size="sm"
-                                                            onClick={() => handleGrant(device)}
-                                                            disabled={consentProcessing}
+                                                            onClick={() =>
+                                                                handleGrant(
+                                                                    device,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                consentProcessing
+                                                            }
                                                         >
                                                             <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
                                                             Grant Consent
@@ -850,7 +1034,10 @@ export default function DevicesIndex({
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={7} className="px-4 py-12">
+                                            <td
+                                                colSpan={7}
+                                                className="px-4 py-12"
+                                            >
                                                 <FleetEmptyState
                                                     icon={Shield}
                                                     title="No tracking devices found"
@@ -863,16 +1050,94 @@ export default function DevicesIndex({
                             </table>
                         </div>
 
-                        {/* Revoke Confirmation Dialog */}
-                        <ConfirmDialog
+                        {/* Governed consent withdrawal */}
+                        <WizardShell
                             open={!!revokeTarget}
-                            onClose={() => setRevokeTarget(null)}
-                            onConfirm={handleRevoke}
-                            title="Revoke Tracking Consent"
-                            description={`Are you sure you want to revoke location tracking consent for ${revokeTarget?.vendor ?? ''} ${revokeTarget?.device_uid ?? ''}? Telemetry data will no longer include GPS coordinates.`}
-                            confirmText="Revoke Consent"
-                            variant="destructive"
-                        />
+                            onClose={closeRevokeDialog}
+                            title="Withdraw tracking consent"
+                            description="Stop personal-location collection and record the operational reason."
+                            railIcon={ShieldOff}
+                            railTitle="Tracking consent"
+                            railSub={
+                                revokeTarget
+                                    ? `${revokeTarget.vendor} ${revokeTarget.device_uid}`
+                                    : 'Selected tracker'
+                            }
+                            steps={withdrawConsentSteps}
+                            stepIndex={0}
+                            onStepClick={() => undefined}
+                            headerLabel="Reason & immediate impact"
+                            footerStart={
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={closeRevokeDialog}
+                                    disabled={consentProcessing}
+                                >
+                                    Cancel
+                                </Button>
+                            }
+                            footerEnd={
+                                <Button
+                                    type="button"
+                                    variant="destructive"
+                                    onClick={handleRevoke}
+                                    disabled={consentProcessing}
+                                >
+                                    {consentProcessing
+                                        ? 'Withdrawing…'
+                                        : 'Withdraw consent'}
+                                </Button>
+                            }
+                        >
+                            <WizardStepPane>
+                                <div className="rounded-lg border border-status-warning/30 bg-status-warning/10 p-4 text-sm">
+                                    <div className="flex items-start gap-3">
+                                        <ShieldOff className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
+                                        <div>
+                                            <p className="font-medium">
+                                                Personal tracking stops
+                                                immediately
+                                            </p>
+                                            <p className="mt-1 text-muted-foreground">
+                                                Live collection and location
+                                                projections are cleared.
+                                                Governed audit history remains
+                                                subject to its retention policy.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="tracking-withdrawal-reason">
+                                        Reason for withdrawal
+                                    </Label>
+                                    <Textarea
+                                        id="tracking-withdrawal-reason"
+                                        value={revokeReason}
+                                        onChange={(event) => {
+                                            setRevokeReason(event.target.value);
+                                            setRevokeError(null);
+                                        }}
+                                        maxLength={1000}
+                                        rows={4}
+                                        placeholder="Record why personal tracking consent is being withdrawn"
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Required for the privacy and audit
+                                        record.
+                                    </p>
+                                    {revokeError ? (
+                                        <p
+                                            role="alert"
+                                            className="text-sm text-destructive"
+                                        >
+                                            {revokeError}
+                                        </p>
+                                    ) : null}
+                                </div>
+                            </WizardStepPane>
+                        </WizardShell>
                     </>
                 )}
 
@@ -888,10 +1153,15 @@ export default function DevicesIndex({
                     steps={pairDeviceSteps}
                     stepIndex={pairStepIndex}
                     onStepClick={(index) => {
-                        if (index === 0 || canReviewPair) setPairStepIndex(index);
+                        if (index === 0 || canReviewPair)
+                            setPairStepIndex(index);
                     }}
                     footerStart={
-                        <Button type="button" variant="outline" onClick={closePairDialog}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={closePairDialog}
+                        >
                             Cancel
                         </Button>
                     }
@@ -932,100 +1202,127 @@ export default function DevicesIndex({
                     {pairStepIndex === 0 ? (
                         <WizardStepPane>
                             <div className="grid gap-5">
-                            <div>
-                                <label htmlFor="pair-device-id" className="text-sm font-medium">
-                                    Tracking Device *
-                                </label>
-                                <Input
-                                    value={deviceOptionSearch}
-                                    onChange={(event) => setDeviceOptionSearch(event.target.value)}
-                                    placeholder="Search devices..."
-                                    className="mb-2"
-                                />
-                                <Select
-                                    value={pairForm.data.device_id}
-                                    onValueChange={(value) =>
-                                        pairForm.setData('device_id', value)
-                                    }
-                                >
-                                    <SelectTrigger id="pair-device-id">
-                                        <SelectValue placeholder="Select an unpaired device" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {visibleDeviceOptions.map((device) => (
-                                            <SelectItem
-                                                key={device.id}
-                                                value={String(device.id)}
-                                            >
-                                                {device.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <label htmlFor="pair-asset-id" className="text-sm font-medium">
-                                    Asset *
-                                </label>
-                                <Input
-                                    value={assetOptionSearch}
-                                    onChange={(event) => setAssetOptionSearch(event.target.value)}
-                                    placeholder="Search assets..."
-                                    className="mb-2"
-                                />
-                                <Select
-                                    value={pairForm.data.asset_id}
-                                    onValueChange={(value) =>
-                                        pairForm.setData('asset_id', value)
-                                    }
-                                >
-                                    <SelectTrigger id="pair-asset-id">
-                                        <SelectValue placeholder="Select an asset" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {visibleAssetOptions.map((asset) => (
-                                            <SelectItem
-                                                key={asset.id}
-                                                value={String(asset.id)}
-                                            >
-                                                {asset.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {availableDevices.length === 0 && (
-                                <p className="text-xs text-muted-foreground">
-                                    No unpaired tracking devices are available. Register
-                                    one in Security & Devices first, then return here to
-                                    link it.
-                                </p>
-                            )}
-                            {pairForm.errors.device_id && (
-                                <p className="text-xs text-destructive">
-                                    {pairForm.errors.device_id}
-                                </p>
-                            )}
-                            {pairForm.errors.asset_id && (
-                                <p className="text-xs text-destructive">
-                                    {pairForm.errors.asset_id}
-                                </p>
-                            )}
+                                <div>
+                                    <label
+                                        htmlFor="pair-device-id"
+                                        className="text-sm font-medium"
+                                    >
+                                        Tracking Device *
+                                    </label>
+                                    <Input
+                                        value={deviceOptionSearch}
+                                        onChange={(event) =>
+                                            setDeviceOptionSearch(
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="Search devices..."
+                                        className="mb-2"
+                                    />
+                                    <Select
+                                        value={pairForm.data.device_id}
+                                        onValueChange={(value) =>
+                                            pairForm.setData('device_id', value)
+                                        }
+                                    >
+                                        <SelectTrigger id="pair-device-id">
+                                            <SelectValue placeholder="Select an unpaired device" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {visibleDeviceOptions.map(
+                                                (device) => (
+                                                    <SelectItem
+                                                        key={device.id}
+                                                        value={String(
+                                                            device.id,
+                                                        )}
+                                                    >
+                                                        {device.label}
+                                                    </SelectItem>
+                                                ),
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <label
+                                        htmlFor="pair-asset-id"
+                                        className="text-sm font-medium"
+                                    >
+                                        Asset *
+                                    </label>
+                                    <Input
+                                        value={assetOptionSearch}
+                                        onChange={(event) =>
+                                            setAssetOptionSearch(
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="Search assets..."
+                                        className="mb-2"
+                                    />
+                                    <Select
+                                        value={pairForm.data.asset_id}
+                                        onValueChange={(value) =>
+                                            pairForm.setData('asset_id', value)
+                                        }
+                                    >
+                                        <SelectTrigger id="pair-asset-id">
+                                            <SelectValue placeholder="Select an asset" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {visibleAssetOptions.map(
+                                                (asset) => (
+                                                    <SelectItem
+                                                        key={asset.id}
+                                                        value={String(asset.id)}
+                                                    >
+                                                        {asset.label}
+                                                    </SelectItem>
+                                                ),
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                {availableDevices.length === 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                        No unpaired tracking devices are
+                                        available. Register one in Security &
+                                        Devices first, then return here to link
+                                        it.
+                                    </p>
+                                )}
+                                {pairForm.errors.device_id && (
+                                    <p className="text-xs text-destructive">
+                                        {pairForm.errors.device_id}
+                                    </p>
+                                )}
+                                {pairForm.errors.asset_id && (
+                                    <p className="text-xs text-destructive">
+                                        {pairForm.errors.asset_id}
+                                    </p>
+                                )}
                             </div>
                         </WizardStepPane>
                     ) : (
                         <WizardStepPane>
                             <dl className="space-y-4 rounded-xl border border-border bg-card/70 p-4 text-sm">
                                 <div>
-                                    <dt className="text-muted-foreground">Tracking device</dt>
+                                    <dt className="text-muted-foreground">
+                                        Tracking device
+                                    </dt>
                                     <dd className="font-medium">
-                                        {selectedPairDevice?.label ?? 'Selected device'}
+                                        {selectedPairDevice?.label ??
+                                            'Selected device'}
                                     </dd>
                                 </div>
                                 <div>
-                                    <dt className="text-muted-foreground">Asset</dt>
+                                    <dt className="text-muted-foreground">
+                                        Asset
+                                    </dt>
                                     <dd className="font-medium">
-                                        {selectedPairAsset?.label ?? 'Selected asset'}
+                                        {selectedPairAsset?.label ??
+                                            'Selected asset'}
                                     </dd>
                                 </div>
                             </dl>
@@ -1037,7 +1334,11 @@ export default function DevicesIndex({
                 <WizardShell
                     open={detailOpen}
                     onClose={closeDevice}
-                    title={detail ? `${detail.vendor} - ${detail.device_uid}` : 'Device detail'}
+                    title={
+                        detail
+                            ? `${detail.vendor} - ${detail.device_uid}`
+                            : 'Device detail'
+                    }
                     description="Canonical tracking device detail, telemetry and pairing status."
                     railIcon={Radio}
                     railTitle="Device detail"
@@ -1047,7 +1348,11 @@ export default function DevicesIndex({
                     onStepClick={setDetailStepIndex}
                     headerLabel={deviceDetailSteps[detailStepIndex]?.label}
                     footerStart={
-                        <Button type="button" variant="outline" onClick={closeDevice}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={closeDevice}
+                        >
                             Close
                         </Button>
                     }
@@ -1084,7 +1389,8 @@ export default function DevicesIndex({
                                             )}
                                             <Badge
                                                 variant={
-                                                    detail.link_status === 'paired'
+                                                    detail.link_status ===
+                                                    'paired'
                                                         ? 'default'
                                                         : 'secondary'
                                                 }
@@ -1098,7 +1404,8 @@ export default function DevicesIndex({
                                                         : 'outline'
                                                 }
                                             >
-                                                {detail.device_status ?? 'unknown'}
+                                                {detail.device_status ??
+                                                    'unknown'}
                                             </Badge>
                                             {detail.battery_level != null && (
                                                 <span className="inline-flex items-center gap-1 text-xs">
@@ -1110,7 +1417,10 @@ export default function DevicesIndex({
                                     </div>
                                     {detail.last_seen_at && (
                                         <div className="mt-1.5 text-xs opacity-70">
-                                            Last seen: {formatDateTime(detail.last_seen_at)}
+                                            Last seen:{' '}
+                                            {formatDateTime(
+                                                detail.last_seen_at,
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -1119,20 +1429,26 @@ export default function DevicesIndex({
                                     {/* Device details */}
                                     <dl className="space-y-2 text-sm">
                                         <div className="rounded-md bg-muted/40 p-3">
-                                            <dt className="text-xs text-muted-foreground">Vendor</dt>
+                                            <dt className="text-xs text-muted-foreground">
+                                                Vendor
+                                            </dt>
                                             <dd className="mt-1 font-medium">
                                                 {detail.vendor ?? '---'}
                                             </dd>
                                         </div>
                                         <div className="rounded-md bg-muted/40 p-3">
-                                            <dt className="text-xs text-muted-foreground">Device UID</dt>
+                                            <dt className="text-xs text-muted-foreground">
+                                                Device UID
+                                            </dt>
                                             <dd className="mt-1 font-mono font-medium">
                                                 {detail.device_uid ?? '---'}
                                             </dd>
                                         </div>
                                         {detail.imei && (
                                             <div className="rounded-md bg-muted/40 p-3">
-                                                <dt className="text-xs text-muted-foreground">IMEI</dt>
+                                                <dt className="text-xs text-muted-foreground">
+                                                    IMEI
+                                                </dt>
                                                 <dd className="mt-1 font-mono font-medium">
                                                     {detail.imei}
                                                 </dd>
@@ -1153,13 +1469,17 @@ export default function DevicesIndex({
                                                 Paired Asset
                                             </dt>
                                             <dd className="mt-1">
-                                                {detail.asset ? (
+                                                {detail.asset?.href ? (
                                                     <Link
-                                                        href={`/fleet-assets/assets/${detail.asset.id}`}
+                                                        href={detail.asset.href}
                                                         className="font-medium text-primary hover:underline"
                                                     >
                                                         {detail.asset.name}
                                                     </Link>
+                                                ) : detail.asset ? (
+                                                    <span className="font-medium">
+                                                        {detail.asset.name}
+                                                    </span>
                                                 ) : (
                                                     <span className="text-muted-foreground">
                                                         Not paired
@@ -1173,7 +1493,9 @@ export default function DevicesIndex({
                                                     Paired At
                                                 </dt>
                                                 <dd className="mt-1 font-medium">
-                                                    {formatDateTime(detail.paired_at)}
+                                                    {formatDateTime(
+                                                        detail.paired_at,
+                                                    )}
                                                 </dd>
                                             </div>
                                         )}
@@ -1187,27 +1509,32 @@ export default function DevicesIndex({
                                             </p>
                                             {latestData ? (
                                                 <dl className="max-h-56 space-y-1.5 overflow-y-auto text-sm">
-                                                    {Object.entries(latestData).map(
-                                                        ([key, value]) => (
-                                                            <div
-                                                                key={key}
-                                                                className="flex justify-between rounded-md bg-muted/40 px-3 py-1.5"
-                                                            >
-                                                                <dt className="text-muted-foreground capitalize">
-                                                                    {key.replace(/_/g, ' ')}
-                                                                </dt>
-                                                                <dd className="font-mono font-medium">
-                                                                    {value != null
-                                                                        ? String(value)
-                                                                        : '---'}
-                                                                </dd>
-                                                            </div>
-                                                        ),
-                                                    )}
+                                                    {Object.entries(
+                                                        latestData,
+                                                    ).map(([key, value]) => (
+                                                        <div
+                                                            key={key}
+                                                            className="flex justify-between rounded-md bg-muted/40 px-3 py-1.5"
+                                                        >
+                                                            <dt className="text-muted-foreground capitalize">
+                                                                {key.replace(
+                                                                    /_/g,
+                                                                    ' ',
+                                                                )}
+                                                            </dt>
+                                                            <dd className="font-mono font-medium">
+                                                                {value != null
+                                                                    ? String(
+                                                                          value,
+                                                                      )
+                                                                    : '---'}
+                                                            </dd>
+                                                        </div>
+                                                    ))}
                                                 </dl>
                                             ) : (
                                                 <p className="text-sm text-muted-foreground">
-                                                    No telemetry data available.
+                                                    {telemetryUnavailableCopy}
                                                 </p>
                                             )}
                                         </div>
@@ -1257,15 +1584,24 @@ export default function DevicesIndex({
                                                         <Radio className="h-3.5 w-3.5 text-primary" />
                                                         <span className="text-muted-foreground">
                                                             {s.created_at
-                                                                ? formatDateTime(s.created_at)
+                                                                ? formatDateTime(
+                                                                      s.created_at,
+                                                                  )
                                                                 : '---'}
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center gap-3 text-muted-foreground">
                                                         {s.data ? (
                                                             <span className="max-w-xs truncate font-mono">
-                                                                {JSON.stringify(s.data).substring(0, 80)}
-                                                                {JSON.stringify(s.data).length > 80
+                                                                {JSON.stringify(
+                                                                    s.data,
+                                                                ).substring(
+                                                                    0,
+                                                                    80,
+                                                                )}
+                                                                {JSON.stringify(
+                                                                    s.data,
+                                                                ).length > 80
                                                                     ? '...'
                                                                     : ''}
                                                             </span>
@@ -1278,18 +1614,18 @@ export default function DevicesIndex({
                                         </div>
                                     ) : (
                                         <p className="text-sm text-muted-foreground">
-                                            No telemetry history.
+                                            {telemetryUnavailableCopy}
                                         </p>
                                     )}
                                 </div>
                             </WizardStepPane>
                         )
-                        ) : (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Loading device detail…
-                            </div>
-                        )}
+                    ) : (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Loading device detail…
+                        </div>
+                    )}
                 </WizardShell>
                 {detail ? (
                     <ConfirmDialog

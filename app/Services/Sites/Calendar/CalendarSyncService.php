@@ -6,9 +6,11 @@ use App\Models\CalendarSyncBusyBlock;
 use App\Models\CalendarSyncConnection;
 use App\Models\CalendarSyncEventLink;
 use App\Models\CalendarSyncMapping;
+use App\Models\Site;
 use App\Models\SiteCalendarEvent;
 use App\Services\GoogleCalendarService;
 use App\Services\MicrosoftGraphService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -71,6 +73,11 @@ class CalendarSyncService
         // per-house .ics feed carries recurring + obligation entries instead).
         if (! $this->isPushable($event)) {
             $this->deleteEvent($event); // e.g. it became pending/cancelled — retract it
+
+            return;
+        }
+
+        if (! $this->siteIsOperational((int) $event->site_id)) {
             return;
         }
 
@@ -131,16 +138,29 @@ class CalendarSyncService
      * present, and (for two-way) pull external busy blocks. Returns counts for the
      * sync log.
      *
-     * @return array{pushed:int,pulled:int}
+     * @return array{pushed:int,pulled:int,failed:int}|null Null when the mapping is skipped.
      */
-    public function syncMapping(CalendarSyncMapping $mapping): array
+    public function syncMapping(CalendarSyncMapping $mapping): ?array
     {
+        if (! $mapping->isSyncable() || ! $this->siteIsOperational((int) $mapping->site_id)) {
+            return null;
+        }
+
+        $activeMappings = $this->activeMappingsForOperationalSite((int) $mapping->site_id);
+        if ($activeMappings->count() !== 1 || ! $activeMappings->first()?->is($mapping)) {
+            $this->recordMappingCardinalityFailure($activeMappings, (int) $mapping->site_id);
+
+            return null;
+        }
+
         $connection = $this->connectionFor($mapping);
-        if (! $connection || ! $mapping->isSyncable()) {
-            return ['pushed' => 0, 'pulled' => 0];
+        if (! $connection) {
+            return null;
         }
 
         $pushed = 0;
+        $failed = 0;
+        $lastPushError = null;
         if ($this->mappingPushesManualEvents($mapping)) {
             $events = SiteCalendarEvent::query()
                 ->where('site_id', $mapping->site_id)
@@ -153,6 +173,8 @@ class CalendarSyncService
                     $this->upsertExternal($event, $mapping, $connection);
                     $pushed++;
                 } catch (\Throwable $e) {
+                    $failed++;
+                    $lastPushError = $e->getMessage();
                     Log::warning('Calendar catch-up push failed', ['event' => $event->id, 'error' => $e->getMessage()]);
                 }
             }
@@ -163,9 +185,22 @@ class CalendarSyncService
             $pulled = $this->pullBusy($mapping, $connection);
         }
 
+        if ($failed > 0) {
+            $mapping->forceFill([
+                'last_error' => sprintf(
+                    '%d calendar event push%s failed. Last error: %s',
+                    $failed,
+                    $failed === 1 ? '' : 'es',
+                    $lastPushError ?? 'Unknown provider failure.',
+                ),
+            ])->save();
+
+            return ['pushed' => $pushed, 'pulled' => $pulled, 'failed' => $failed];
+        }
+
         $mapping->forceFill(['last_synced_at' => now(), 'last_error' => null])->save();
 
-        return ['pushed' => $pushed, 'pulled' => $pulled];
+        return ['pushed' => $pushed, 'pulled' => $pulled, 'failed' => 0];
     }
 
     /* ------------------------------------------------------------------
@@ -186,7 +221,6 @@ class CalendarSyncService
                 'occurrence_key' => '',
             ],
             [
-                'tenant_id' => $mapping->tenant_id,
                 'site_id' => $mapping->site_id,
                 'external_event_id' => '',
                 'last_pushed_at' => now(),
@@ -292,7 +326,6 @@ class CalendarSyncService
                     'external_event_id' => $block['external_event_id'],
                 ],
                 [
-                    'tenant_id' => $mapping->tenant_id,
                     'title' => $block['title'],
                     'starts_at' => $block['starts_at'],
                     'ends_at' => $block['ends_at'],
@@ -476,20 +509,63 @@ class CalendarSyncService
      */
     private function mappingsForSite(int $siteId)
     {
+        $mappings = $this->activeMappingsForOperationalSite($siteId);
+        if ($mappings->count() !== 1) {
+            $this->recordMappingCardinalityFailure($mappings, $siteId);
+
+            return new Collection;
+        }
+
+        return $mappings->filter(fn (CalendarSyncMapping $mapping) => $mapping->isSyncable());
+    }
+
+    /** @return Collection<int, CalendarSyncMapping> */
+    private function activeMappingsForOperationalSite(int $siteId): Collection
+    {
         return CalendarSyncMapping::query()
             ->where('site_id', $siteId)
             ->active()
-            ->get()
-            ->filter(fn (CalendarSyncMapping $m) => $m->isSyncable());
+            ->whereHas('site', fn ($siteQuery) => $siteQuery
+                ->active()
+                ->notArchived()
+                ->whereNull('archived_at'))
+            ->get();
+    }
+
+    /** @param Collection<int, CalendarSyncMapping> $mappings */
+    private function recordMappingCardinalityFailure(Collection $mappings, int $siteId): void
+    {
+        if ($mappings->count() < 2) {
+            return;
+        }
+
+        $error = 'Several active resource calendar mappings exist for this Site; synchronization is disabled until they are reconciled.';
+        CalendarSyncMapping::query()
+            ->whereKey($mappings->modelKeys())
+            ->update(['last_error' => $error]);
+
+        Log::warning('Resource calendar mapping cardinality violation', [
+            'site' => $siteId,
+            'mappings' => $mappings->modelKeys(),
+        ]);
     }
 
     private function connectionFor(CalendarSyncMapping $mapping): ?CalendarSyncConnection
     {
         $connection = CalendarSyncConnection::query()
-            ->where('tenant_id', $mapping->tenant_id)
             ->where('provider', $mapping->provider)
             ->first();
 
         return $connection && $connection->isConnected() ? $connection : null;
+    }
+
+    private function siteIsOperational(int $siteId): bool
+    {
+        return Site::query()
+            ->whereKey($siteId)
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->exists();
     }
 }

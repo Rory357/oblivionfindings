@@ -8,29 +8,33 @@ use App\Domain\Hr\Models\HrAssetDocument;
 use App\Domain\Hr\Models\HrAssetMaintenanceLog;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\AssetService;
+use App\Domain\Hr\Services\HrAssetAccessService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Models\Asset;
 use App\Models\FleetIncident;
-use App\Models\Site;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Encoding\Encoding;
 use Endroid\QrCode\ErrorCorrectionLevel;
 use Endroid\QrCode\Writer\SvgWriter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AssetController extends Controller
 {
-    use ResolvesHrTenant;
+    /** Equipment whose lifecycle remains in HR. */
+    private const HR_CATEGORIES = ['uniform', 'card', 'other'];
 
-    /** HR-owned equipment categories (vehicles/keys federate to Fleet). */
-    private const HR_CATEGORIES = ['laptop', 'phone', 'tablet', 'uniform', 'card', 'other'];
+    /** Historic HR rows remain editable, but new technology lives in Security & Devices. */
+    private const LEGACY_DEVICE_CATEGORIES = ['laptop', 'phone', 'tablet'];
 
     private const FLEET_CATEGORIES = ['vehicle', 'key'];
 
@@ -48,26 +52,26 @@ class AssetController extends Controller
 
     public function __construct(
         protected AssetService $assetService,
+        protected HrAssetAccessService $assetAccess,
     ) {}
 
     /* ================================================================== */
-    /*  Hub                                                               */
+    /*  Hub */
     /* ================================================================== */
 
     /**
      * The Asset Management hub — a single tabbed surface (Overview · Inventory ·
-     * Assignments · Maintenance & Docs) rendered from tenant-wide data.
+     * Assignments · Maintenance & Docs) rendered from access-approved data.
      */
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $canManage = $user->canDo('hr.assets.manage');
+        $visibleAssets = $this->assetAccess->visibleAssets($user);
 
-        $assets = HrAsset::query()
-            ->forTenant($tenantId)
+        $assets = (clone $visibleAssets)
             ->with([
                 'currentAssignment.employeeProfile.user:id,name',
                 'currentAssignment.employeeProfile.primarySite:id,name',
@@ -79,8 +83,7 @@ class AssetController extends Controller
 
         $inventory = $assets->map(fn (HrAsset $a) => $this->mapInventoryRow($a))->values();
 
-        $activeAssignments = HrAssetAssignment::query()
-            ->forTenant($tenantId)
+        $activeAssignments = $this->assetAccess->visibleAssignments($user)
             ->whereNull('returned_at')
             ->whereHas('asset', fn ($q) => $q->where('status', 'assigned'))
             ->with([
@@ -93,8 +96,7 @@ class AssetController extends Controller
             ->map(fn (HrAssetAssignment $asg) => $this->mapAssignmentRow($asg))
             ->values();
 
-        $maintenanceJobs = HrAssetMaintenanceLog::query()
-            ->forTenant($tenantId)
+        $maintenanceJobs = $this->assetAccess->visibleMaintenanceLogs($user)
             ->whereNull('completed_at')
             ->with('asset:id,asset_tag,name,category')
             ->orderByDesc('sent_at')
@@ -113,8 +115,7 @@ class AssetController extends Controller
             ])
             ->values();
 
-        $documents = HrAssetDocument::query()
-            ->forTenant($tenantId)
+        $documents = $this->assetAccess->visibleDocuments($user)
             ->with(['asset:id,asset_tag,name', 'uploadedBy:id,name'])
             ->orderByDesc('created_at')
             ->limit(60)
@@ -132,8 +133,8 @@ class AssetController extends Controller
             ])
             ->values();
 
-        $hero = $this->assetService->aggregates($tenantId);
-        $hero['site_count'] = Site::query()->where('tenant_id', $tenantId)->count();
+        $hero = $this->assetService->aggregates(clone $visibleAssets);
+        $hero['site_count'] = count($this->assetAccess->accessibleSiteIds($user));
 
         return Inertia::render('hr/assets/index', [
             'hero' => $hero,
@@ -141,14 +142,14 @@ class AssetController extends Controller
             'assignments' => $activeAssignments,
             'maintenance' => [
                 'jobs' => $maintenanceJobs,
-                'schedule' => $this->serviceSchedule($tenantId),
+                'schedule' => $this->serviceSchedule($user),
                 'documents' => $documents,
             ],
             'overview' => [
-                'attention' => $this->attentionList($tenantId),
-                'activity' => $this->recentActivity($tenantId),
+                'attention' => $this->attentionList($user),
+                'activity' => $this->recentActivity($user),
             ],
-            'staff' => $this->staffOptions($tenantId),
+            'staff' => $this->staffOptions($user),
             'categories' => $this->categoryOptions(),
             'filters' => [
                 'tab' => $request->query('tab', 'overview'),
@@ -170,7 +171,7 @@ class AssetController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.view'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $asset->tenant_id);
+        $asset = $this->assetAccess->visibleAsset($user, (int) $asset->id) ?? abort(404);
 
         $asset->load([
             'currentAssignment.employeeProfile.user:id,name',
@@ -208,7 +209,7 @@ class AssetController extends Controller
 
         return Inertia::render('hr/assets/show', [
             'asset' => $this->mapAssetDetail($asset),
-            'staff' => $this->staffOptions($asset->tenant_id),
+            'staff' => $this->staffOptions($user),
             'categories' => $this->categoryOptions(),
             'fleetIncidents' => $fleetIncidents,
             'can' => [
@@ -220,19 +221,18 @@ class AssetController extends Controller
     }
 
     /* ================================================================== */
-    /*  Asset CRUD                                                        */
+    /*  Asset CRUD */
     /* ================================================================== */
 
     public function store(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        abort_unless($this->assetAccess->canViewUnassigned($user), 403);
 
-        $data = $this->validateAsset($request, $tenantId, null);
+        $data = $this->validateAsset($request, $user, null);
 
         $asset = HrAsset::create([
-            'tenant_id' => $tenantId,
             'status' => 'available',
             'qr_token' => (string) Str::uuid(),
             ...$data,
@@ -245,26 +245,30 @@ class AssetController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $asset->tenant_id);
+        $asset = DB::transaction(function () use ($request, $user, $asset): HrAsset {
+            $lockedAsset = $this->assetAccess->visibleAsset($user, (int) $asset->id, true)
+                ?? abort(404);
+            $data = $this->validateAsset($request, $user, $lockedAsset->id);
+            $lockedAsset->update($data);
 
-        $data = $this->validateAsset($request, $asset->tenant_id, $asset->id);
-        $asset->update($data);
+            return $lockedAsset;
+        });
 
         return redirect()->back()->with('success', "Asset {$asset->asset_tag} updated.");
     }
 
     /* ================================================================== */
-    /*  Lifecycle                                                         */
+    /*  Lifecycle */
     /* ================================================================== */
 
     public function assign(Request $request, HrAsset $asset)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $asset->tenant_id);
+        $asset = $this->assetAccess->visibleAsset($user, (int) $asset->id) ?? abort(404);
 
         $data = $request->validate([
-            'employee_profile_id' => ['required', 'integer', 'exists:hr_employee_profiles,id'],
+            'employee_profile_id' => ['required', 'integer'],
             'assigned_at' => ['required', 'date'],
             'due_at' => ['nullable', 'date', 'after_or_equal:assigned_at'],
             'condition_on_assign' => ['nullable', 'string', 'in:good,fair,poor'],
@@ -272,18 +276,25 @@ class AssetController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $profile = HrEmployeeProfile::where('tenant_id', $asset->tenant_id)
-            ->findOrFail($data['employee_profile_id']);
-
         try {
-            $this->assetService->assignAsset($asset, $profile, [
-                'assigned_by' => $user->id,
-                'assigned_at' => $data['assigned_at'],
-                'due_at' => $data['due_at'] ?? null,
-                'condition_on_assign' => $data['condition_on_assign'] ?? null,
-                'acknowledged_at' => ! empty($data['acknowledged']) ? now() : null,
-                'notes' => $data['notes'] ?? null,
-            ]);
+            DB::transaction(function () use ($user, $asset, $data): void {
+                $lockedAsset = $this->assetAccess->visibleAsset($user, (int) $asset->id, true)
+                    ?? abort(404);
+                $lockedProfile = $this->assetAccess->assignableProfile(
+                    $user,
+                    (int) $data['employee_profile_id'],
+                    true,
+                ) ?? abort(404);
+
+                $this->assetService->assignAsset($lockedAsset, $lockedProfile, [
+                    'assigned_by' => $user->id,
+                    'assigned_at' => $data['assigned_at'],
+                    'due_at' => $data['due_at'] ?? null,
+                    'condition_on_assign' => $data['condition_on_assign'] ?? null,
+                    'acknowledged_at' => ! empty($data['acknowledged']) ? now() : null,
+                    'notes' => $data['notes'] ?? null,
+                ]);
+            });
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -295,7 +306,7 @@ class AssetController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $assignment->tenant_id);
+        $assignment = $this->assetAccess->visibleAssignment($user, (int) $assignment->id) ?? abort(404);
 
         $data = $request->validate([
             'returned_at' => ['required', 'date'],
@@ -307,12 +318,20 @@ class AssetController extends Controller
         try {
             // A damaged/lost return parks the asset in maintenance so the follow-up
             // repair or write-off has somewhere to land; otherwise it's available.
-            $this->assetService->returnAsset($assignment, [
-                'returned_at' => $data['returned_at'],
-                'condition_on_return' => $data['condition_on_return'] ?? null,
-                'notes' => $data['notes'] ?? null,
-                'next_status' => ! empty($data['damaged']) ? 'maintenance' : 'available',
-            ]);
+            DB::transaction(function () use ($user, $assignment, $data): void {
+                $lockedAssignment = $this->assetAccess->visibleAssignment(
+                    $user,
+                    (int) $assignment->id,
+                    true,
+                ) ?? abort(404);
+
+                $this->assetService->returnAsset($lockedAssignment, [
+                    'returned_at' => $data['returned_at'],
+                    'condition_on_return' => $data['condition_on_return'] ?? null,
+                    'notes' => $data['notes'] ?? null,
+                    'next_status' => ! empty($data['damaged']) ? 'maintenance' : 'available',
+                ]);
+            });
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -324,7 +343,7 @@ class AssetController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $asset->tenant_id);
+        $asset = $this->assetAccess->visibleAsset($user, (int) $asset->id) ?? abort(404);
 
         $data = $request->validate([
             'type' => ['required', 'string', 'in:service,repair,cleaning,calibration'],
@@ -337,7 +356,14 @@ class AssetController extends Controller
         ]);
 
         try {
-            $this->assetService->logMaintenance($asset, [...$data, 'performed_by' => $user->id]);
+            DB::transaction(function () use ($user, $asset, $data): void {
+                $lockedAsset = $this->assetAccess->visibleAsset($user, (int) $asset->id, true)
+                    ?? abort(404);
+                $this->assetService->logMaintenance($lockedAsset, [
+                    ...$data,
+                    'performed_by' => $user->id,
+                ]);
+            });
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -349,7 +375,7 @@ class AssetController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $asset->tenant_id);
+        $asset = $this->assetAccess->visibleAsset($user, (int) $asset->id) ?? abort(404);
 
         $data = $request->validate([
             'outcome' => ['nullable', 'string', 'in:repaired,replaced,no-fault'],
@@ -360,7 +386,11 @@ class AssetController extends Controller
         ]);
 
         try {
-            $this->assetService->returnToService($asset, $data);
+            DB::transaction(function () use ($user, $asset, $data): void {
+                $lockedAsset = $this->assetAccess->visibleAsset($user, (int) $asset->id, true)
+                    ?? abort(404);
+                $this->assetService->returnToService($lockedAsset, $data);
+            });
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -372,7 +402,7 @@ class AssetController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $asset->tenant_id);
+        $asset = $this->assetAccess->visibleAsset($user, (int) $asset->id) ?? abort(404);
 
         $data = $request->validate([
             'disposal_reason' => ['nullable', 'string', 'in:end-of-life,lost,stolen,sold,damaged'],
@@ -382,7 +412,11 @@ class AssetController extends Controller
         ]);
 
         try {
-            $this->assetService->retireAsset($asset, $data);
+            DB::transaction(function () use ($user, $asset, $data): void {
+                $lockedAsset = $this->assetAccess->visibleAsset($user, (int) $asset->id, true)
+                    ?? abort(404);
+                $this->assetService->retireAsset($lockedAsset, $data);
+            });
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -391,28 +425,27 @@ class AssetController extends Controller
     }
 
     /* ================================================================== */
-    /*  Documents                                                         */
+    /*  Documents */
     /* ================================================================== */
 
     public function storeDocument(Request $request, HrAsset $asset)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $asset->tenant_id);
+        $asset = $this->assetAccess->visibleAsset($user, (int) $asset->id) ?? abort(404);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'category' => ['required', 'string', 'in:' . implode(',', self::DOC_CATEGORIES)],
+            'category' => ['required', 'string', 'in:'.implode(',', self::DOC_CATEGORIES)],
             'effective_at' => ['nullable', 'date'],
             'expiry_at' => ['nullable', 'date'],
-            'file' => ['required', 'file', 'max:20480', 'mimetypes:' . implode(',', self::DOC_MIMES)],
+            'file' => ['required', 'file', 'max:20480', 'mimetypes:'.implode(',', self::DOC_MIMES)],
         ]);
 
         $file = $request->file('file');
         $path = $file->store("hr-assets/{$asset->id}", 'local');
 
         HrAssetDocument::create([
-            'tenant_id' => $asset->tenant_id,
             'asset_id' => $asset->id,
             'title' => $data['title'],
             'category' => $data['category'],
@@ -433,7 +466,7 @@ class AssetController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.view'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $document->tenant_id);
+        $document = $this->assetAccess->visibleDocument($user, (int) $document->id) ?? abort(404);
 
         $disk = Storage::disk($document->storage_disk);
         abort_unless($disk->exists($document->storage_path), 404);
@@ -450,7 +483,7 @@ class AssetController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $document->tenant_id);
+        $document = $this->assetAccess->visibleDocument($user, (int) $document->id) ?? abort(404);
 
         Storage::disk($document->storage_disk)->delete($document->storage_path);
         $document->delete();
@@ -459,7 +492,7 @@ class AssetController extends Controller
     }
 
     /* ================================================================== */
-    /*  QR                                                                */
+    /*  QR */
     /* ================================================================== */
 
     /** Scan-to-open: resolve a token to its asset detail page. */
@@ -468,8 +501,8 @@ class AssetController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.view'), 403);
 
-        $asset = HrAsset::where('qr_token', $token)
-            ->where('tenant_id', $this->resolveHrTenantIdForUser($user))
+        $asset = $this->assetAccess->visibleAssets($user)
+            ->where('qr_token', $token)
             ->firstOrFail();
 
         return redirect()->route('hr.assets.show', $asset);
@@ -480,13 +513,13 @@ class AssetController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.view'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $asset->tenant_id);
+        $asset = $this->assetAccess->visibleAsset($user, (int) $asset->id) ?? abort(404);
 
         $token = $this->assetService->ensureQrToken($asset);
         $url = route('hr.assets.qr.redirect', ['token' => $token]);
 
         $result = (new Builder(
-            writer: new SvgWriter(),
+            writer: new SvgWriter,
             data: $url,
             encoding: new Encoding('UTF-8'),
             errorCorrectionLevel: ErrorCorrectionLevel::High,
@@ -501,47 +534,55 @@ class AssetController extends Controller
     }
 
     /* ================================================================== */
-    /*  Bulk + export + federation                                        */
+    /*  Bulk + export + federation */
     /* ================================================================== */
 
     public function bulk(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
             'action' => ['required', 'string', 'in:retire,set-category,label'],
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
-            'category' => ['nullable', 'string', 'in:' . implode(',', self::HR_CATEGORIES)],
+            'category' => ['nullable', 'string', 'in:'.implode(',', self::HR_CATEGORIES)],
             'disposal_reason' => ['nullable', 'string', 'in:end-of-life,lost,stolen,sold,damaged'],
         ]);
 
-        $assets = HrAsset::forTenant($tenantId)->whereIn('id', $data['ids'])->get();
-        $count = 0;
+        $count = DB::transaction(function () use ($user, $data): int {
+            $ids = collect($data['ids'])->unique()->values();
+            $assets = $this->assetAccess->visibleAssets($user)
+                ->whereIn('id', $ids)
+                ->lockForUpdate()
+                ->get();
+            abort_unless($assets->count() === $ids->count(), 404);
+            $updated = 0;
 
-        foreach ($assets as $asset) {
-            // Fleet-linked rows are read-through pointers — never bulk-mutated here.
-            if ($asset->isFleetLinked()) {
-                continue;
-            }
-
-            if ($data['action'] === 'retire') {
-                if (in_array($asset->status, ['available', 'maintenance'], true)) {
-                    $this->assetService->retireAsset($asset, [
-                        'disposal_reason' => $data['disposal_reason'] ?? 'end-of-life',
-                    ]);
-                    $count++;
+            foreach ($assets as $asset) {
+                // Fleet-linked rows are read-through pointers — never bulk-mutated here.
+                if ($asset->isFleetLinked()) {
+                    continue;
                 }
-            } elseif ($data['action'] === 'set-category' && ! empty($data['category'])) {
-                $asset->update(['category' => $data['category']]);
-                $count++;
-            } elseif ($data['action'] === 'label') {
-                $this->assetService->ensureQrToken($asset);
-                $count++;
+
+                if ($data['action'] === 'retire') {
+                    if (in_array($asset->status, ['available', 'maintenance'], true)) {
+                        $this->assetService->retireAsset($asset, [
+                            'disposal_reason' => $data['disposal_reason'] ?? 'end-of-life',
+                        ]);
+                        $updated++;
+                    }
+                } elseif ($data['action'] === 'set-category' && ! empty($data['category'])) {
+                    $asset->update(['category' => $data['category']]);
+                    $updated++;
+                } elseif ($data['action'] === 'label') {
+                    $this->assetService->ensureQrToken($asset);
+                    $updated++;
+                }
             }
-        }
+
+            return $updated;
+        });
 
         return redirect()->back()->with('success', "{$count} assets updated.");
     }
@@ -550,14 +591,13 @@ class AssetController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $assets = HrAsset::forTenant($tenantId)
+        $assets = $this->assetAccess->visibleAssets($user)
             ->with('currentAssignment.employeeProfile.user:id,name')
             ->orderBy('asset_tag')
             ->get();
 
-        $filename = 'hr-assets-' . now()->format('Y-m-d') . '.csv';
+        $filename = 'hr-assets-'.now()->format('Y-m-d').'.csv';
 
         return response()->streamDownload(function () use ($assets) {
             $out = fopen('php://output', 'w');
@@ -591,13 +631,16 @@ class AssetController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.assets.manage'), 403);
 
-        $results = $this->assetService->searchFleetAssets((string) $request->query('q', ''));
+        $results = $this->assetService->searchFleetAssets(
+            (string) $request->query('q', ''),
+            $this->assetAccess->authorizedFleetAssetIds($user),
+        );
 
         return response()->json(['data' => $results]);
     }
 
     /* ================================================================== */
-    /*  Mapping helpers                                                   */
+    /*  Mapping helpers */
     /* ================================================================== */
 
     private function mapInventoryRow(HrAsset $a): array
@@ -733,12 +776,12 @@ class AssetController extends Controller
      *
      * @return array<int,array<string,mixed>>
      */
-    private function serviceSchedule(int $tenantId): array
+    private function serviceSchedule(User $viewer): array
     {
         $now = CarbonImmutable::now()->startOfDay();
         $items = [];
 
-        HrAsset::forTenant($tenantId)
+        $this->assetAccess->visibleAssets($viewer)
             ->whereNotNull('warranty_expiry')
             ->where('status', '!=', 'retired')
             ->orderBy('warranty_expiry')
@@ -750,13 +793,13 @@ class AssetController extends Controller
                     'asset_id' => $a->id,
                     'name' => $a->name,
                     'tag' => $a->asset_tag,
-                    'label' => 'Warranty expires ' . $a->warranty_expiry->format('d M Y'),
+                    'label' => 'Warranty expires '.$a->warranty_expiry->format('d M Y'),
                     'date' => $a->warranty_expiry->toDateString(),
                     'tone' => $days < 0 ? 'crit' : ($days <= 30 ? 'warn' : 'ok'),
                 ];
             });
 
-        HrAssetMaintenanceLog::forTenant($tenantId)
+        $this->assetAccess->visibleMaintenanceLogs($viewer)
             ->whereNotNull('next_due_at')
             ->with('asset:id,name,asset_tag')
             ->orderBy('next_due_at')
@@ -771,7 +814,7 @@ class AssetController extends Controller
                     'asset_id' => $log->asset_id,
                     'name' => $log->asset->name,
                     'tag' => $log->asset->asset_tag,
-                    'label' => 'Next service ' . $log->next_due_at->format('d M Y'),
+                    'label' => 'Next service '.$log->next_due_at->format('d M Y'),
                     'date' => $log->next_due_at->toDateString(),
                     'tone' => $days < 0 ? 'crit' : ($days <= 30 ? 'warn' : 'ok'),
                 ];
@@ -788,12 +831,12 @@ class AssetController extends Controller
      *
      * @return array<int,array<string,mixed>>
      */
-    private function attentionList(int $tenantId): array
+    private function attentionList(User $viewer): array
     {
         $now = CarbonImmutable::now()->startOfDay();
         $items = [];
 
-        HrAssetAssignment::forTenant($tenantId)
+        $this->assetAccess->visibleAssignments($viewer)
             ->whereNull('returned_at')
             ->where(function ($q) use ($now) {
                 $q->where('due_at', '<', $now)
@@ -809,16 +852,16 @@ class AssetController extends Controller
                 $items[] = [
                     'tag' => $asg->asset?->asset_tag,
                     'asset_id' => $asg->asset_id,
-                    'text' => $asg->asset?->name . ' · ' . ($leaver
+                    'text' => $asg->asset?->name.' · '.($leaver
                         ? 'held by leaver — recover'
-                        : 'return overdue ' . abs((int) $overdueDays) . ' days'),
+                        : 'return overdue '.abs((int) $overdueDays).' days'),
                     'who' => $asg->employeeProfile?->user?->name ?? '—',
                     'tone' => 'crit',
                     'target' => 'assignments',
                 ];
             });
 
-        HrAsset::forTenant($tenantId)
+        $this->assetAccess->visibleAssets($viewer)
             ->whereNotNull('warranty_expiry')
             ->whereBetween('warranty_expiry', [$now, $now->addDays(30)])
             ->where('status', '!=', 'retired')
@@ -829,7 +872,7 @@ class AssetController extends Controller
                 $items[] = [
                     'tag' => $a->asset_tag,
                     'asset_id' => $a->id,
-                    'text' => $a->name . ' · warranty expires ' . $a->warranty_expiry->format('d M'),
+                    'text' => $a->name.' · warranty expires '.$a->warranty_expiry->format('d M'),
                     'who' => 'Warranty',
                     'tone' => 'warn',
                     'target' => 'inventory',
@@ -844,11 +887,11 @@ class AssetController extends Controller
      *
      * @return array<int,array<string,mixed>>
      */
-    private function recentActivity(int $tenantId): array
+    private function recentActivity(User $viewer): array
     {
         $events = [];
 
-        HrAssetAssignment::forTenant($tenantId)
+        $this->assetAccess->visibleAssignments($viewer)
             ->with(['asset:id,name', 'employeeProfile.user:id,name'])
             ->latest('updated_at')
             ->limit(8)
@@ -862,7 +905,7 @@ class AssetController extends Controller
                 }
             });
 
-        HrAssetMaintenanceLog::forTenant($tenantId)
+        $this->assetAccess->visibleMaintenanceLogs($viewer)
             ->with('asset:id,name')
             ->latest('updated_at')
             ->limit(6)
@@ -870,10 +913,10 @@ class AssetController extends Controller
             ->each(function (HrAssetMaintenanceLog $log) use (&$events) {
                 $events[] = $log->completed_at
                     ? ['icon' => 'check', 'tone' => 'success', 'text' => "{$log->asset?->name} returned to service", 'at' => $log->completed_at]
-                    : ['icon' => 'wrench', 'tone' => 'warn', 'text' => "{$log->asset?->name} sent to " . ($log->vendor ?: 'repair'), 'at' => $log->sent_at];
+                    : ['icon' => 'wrench', 'tone' => 'warn', 'text' => "{$log->asset?->name} sent to ".($log->vendor ?: 'repair'), 'at' => $log->sent_at];
             });
 
-        HrAssetDocument::forTenant($tenantId)
+        $this->assetAccess->visibleDocuments($viewer)
             ->with('asset:id,name')
             ->latest('created_at')
             ->limit(5)
@@ -896,11 +939,9 @@ class AssetController extends Controller
     /**
      * @return array<int,array<string,mixed>>
      */
-    private function staffOptions(int $tenantId): array
+    private function staffOptions(User $viewer): array
     {
-        return HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
+        return $this->assetAccess->assignableProfiles($viewer)
             ->with(['user:id,name', 'primarySite:id,name'])
             ->orderBy('id')
             ->get(['id', 'user_id', 'position_title', 'primary_site_id', 'is_active'])
@@ -934,6 +975,7 @@ class AssetController extends Controller
             'value' => $value,
             'label' => $label,
             'fleet' => in_array($value, self::FLEET_CATEGORIES, true),
+            'device' => in_array($value, self::LEGACY_DEVICE_CATEGORIES, true),
         ])->values()->all();
     }
 
@@ -943,17 +985,21 @@ class AssetController extends Controller
      *
      * @return array<string,mixed>
      */
-    private function validateAsset(Request $request, int $tenantId, ?int $ignoreId): array
+    private function validateAsset(Request $request, User $viewer, ?int $ignoreId): array
     {
-        $allCategories = array_merge(self::HR_CATEGORIES, self::FLEET_CATEGORIES);
+        $allCategories = array_merge(
+            self::HR_CATEGORIES,
+            self::LEGACY_DEVICE_CATEGORIES,
+            self::FLEET_CATEGORIES,
+        );
 
         $data = $request->validate([
             'asset_tag' => [
                 'required', 'string', 'max:100',
-                "unique:hr_assets,asset_tag,{$ignoreId},id,tenant_id,{$tenantId}",
+                Rule::unique('hr_assets', 'asset_tag')->ignore($ignoreId),
             ],
             'name' => ['required', 'string', 'max:255'],
-            'category' => ['required', 'string', 'in:' . implode(',', $allCategories)],
+            'category' => ['required', 'string', 'in:'.implode(',', $allCategories)],
             'serial_number' => ['nullable', 'string', 'max:255'],
             'make' => ['nullable', 'string', 'max:255'],
             'model' => ['nullable', 'string', 'max:255'],
@@ -964,13 +1010,39 @@ class AssetController extends Controller
             'condition' => ['nullable', 'string', 'in:new,good,refurb'],
             'depreciation_method' => ['nullable', 'string', 'in:straight,diminishing'],
             'useful_life_years' => ['nullable', 'integer', 'min:0', 'max:50'],
-            'fleet_asset_id' => ['nullable', 'integer', 'exists:assets,id'],
+            'fleet_asset_id' => ['nullable', 'integer'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
         // Federation guard: a fleet category must point at a canonical record.
         if (in_array($data['category'], self::FLEET_CATEGORIES, true) && empty($data['fleet_asset_id'])) {
             abort(422, 'Vehicles and keys must be linked to the Fleet register, not entered manually.');
+        }
+
+        if (in_array($data['category'], self::FLEET_CATEGORIES, true)) {
+            $allowedFleetIds = $this->assetAccess->authorizedFleetAssetIds($viewer);
+            abort_unless(
+                Asset::query()
+                    ->whereKey((int) $data['fleet_asset_id'])
+                    ->whereKey($allowedFleetIds)
+                    ->where('category', $data['category'])
+                    ->exists(),
+                404,
+            );
+        } else {
+            $data['fleet_asset_id'] = null;
+        }
+
+        if (in_array($data['category'], self::LEGACY_DEVICE_CATEGORIES, true)) {
+            $existingCategory = $ignoreId === null
+                ? null
+                : HrAsset::query()->whereKey($ignoreId)->value('category');
+
+            abort_unless(
+                $existingCategory === $data['category'],
+                422,
+                'Laptops, phones, and tablets must be registered and assigned in Security & Devices.',
+            );
         }
 
         return $data;

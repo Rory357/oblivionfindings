@@ -4,6 +4,7 @@ namespace App\Domain\Roadmap\Models;
 
 use App\Domain\Governance\Models\RiskRegisterEntry;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,11 +13,11 @@ class InitiativeRiskLink extends Model
 {
     use AuditableChanges;
     use HasFactory;
+    use WritesLegacyStorageContext;
 
     protected $table = 'roadmap_initiative_risk_links';
 
     protected $fillable = [
-        'tenant_id',
         'initiative_id',
         'risk_register_entry_id',
         'link_type',

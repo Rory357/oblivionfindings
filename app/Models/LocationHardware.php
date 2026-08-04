@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\Integration\IntegrationEvent;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -32,24 +33,37 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class LocationHardware extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
     use SoftDeletes;
+    use WritesLegacyStorageContext;
 
     public const STATUS_ONLINE = 'online';
+
     public const STATUS_OFFLINE = 'offline';
+
     public const STATUS_UNKNOWN = 'unknown';
+
     public const STATUS_RETIRED = 'retired';
 
     public const CATEGORY_GATEWAY = 'gateway';
+
     public const CATEGORY_SWITCH = 'switch';
+
     public const CATEGORY_AP = 'ap';
+
     public const CATEGORY_CAMERA = 'camera';
+
     public const CATEGORY_DOOR = 'door';
+
     public const CATEGORY_SENSOR = 'sensor';
+
     public const CATEGORY_NVR = 'nvr';
+
     public const CATEGORY_AI = 'ai';
+
     public const CATEGORY_TRACKER = 'tracker';
+
     public const CATEGORY_OTHER = 'other';
 
     protected $table = 'location_hardware';
@@ -130,15 +144,6 @@ class LocationHardware extends Model
     /* ---------------------------------------------------------------
      * Scopes
      * ------------------------------------------------------------- */
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        if ($tenantId === null) {
-            return $query;
-        }
-
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeOnline($query)
     {

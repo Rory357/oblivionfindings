@@ -13,7 +13,6 @@ class SiteFeedback extends Model
     protected $table = 'site_feedback';
 
     protected $fillable = [
-        'organization_id',
         'site_id',
         'feedback_type',
         'submitted_by_name',

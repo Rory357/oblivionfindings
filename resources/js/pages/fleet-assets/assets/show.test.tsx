@@ -1,7 +1,38 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { UploadAssetDocumentWizard } from './show';
+import { AssetDeviceStatusCard, UploadAssetDocumentWizard } from './show';
+
+describe('AssetDeviceStatusCard', () => {
+    it('distinguishes restricted technology from an authorised empty registry', () => {
+        const { rerender } = render(
+            <AssetDeviceStatusCard
+                linkedDevices={[]}
+                canViewTechnology={false}
+                devicesHref={null}
+            />,
+        );
+
+        expect(screen.getByText('Technology access restricted')).toBeVisible();
+        expect(screen.queryByText('No linked devices')).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('link', { name: /security & devices/i }),
+        ).not.toBeInTheDocument();
+
+        rerender(
+            <AssetDeviceStatusCard
+                linkedDevices={[]}
+                canViewTechnology
+                devicesHref="/security-devices/devices"
+            />,
+        );
+
+        expect(screen.getByText('No linked devices')).toBeVisible();
+        expect(
+            screen.getByRole('link', { name: 'Open Security & Devices' }),
+        ).toHaveAttribute('href', '/security-devices/devices');
+    });
+});
 
 describe('UploadAssetDocumentWizard', () => {
     it('labels file metadata, requires a file and title, reviews, and cancels', () => {
@@ -55,7 +86,9 @@ describe('UploadAssetDocumentWizard', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
         expect(screen.getByText('vehicle-manual.pdf')).toBeVisible();
         expect(screen.getByText('Vehicle manual')).toBeVisible();
-        expect(screen.getByRole('button', { name: 'Upload document' })).toBeVisible();
+        expect(
+            screen.getByRole('button', { name: 'Upload document' }),
+        ).toBeVisible();
 
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
         expect(onClose).toHaveBeenCalledTimes(1);

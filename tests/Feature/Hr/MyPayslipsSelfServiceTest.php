@@ -13,14 +13,12 @@ beforeEach(function () {
 
     // Plain employee — NO role synced, so no hr.payslips.view permission.
     $this->worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
     $this->workerProfile = makePayslipProfile($this->worker->id);
 
     $this->other = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
@@ -30,7 +28,6 @@ beforeEach(function () {
 function makePayslipProfile(int $userId): HrEmployeeProfile
 {
     return HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $userId,
         'employee_number' => 'EMP-'.$userId,
         'work_email' => 'emp'.$userId.'@example.test',
@@ -45,7 +42,6 @@ function makePayslipProfile(int $userId): HrEmployeeProfile
 function makePayslipFor(int $userId, int $profileId, array $overrides = []): HrPayslip
 {
     return HrPayslip::query()->create(array_merge([
-        'tenant_id' => 1,
         'user_id' => $userId,
         'employee_profile_id' => $profileId,
         'pay_period_start' => now()->startOfMonth()->toDateString(),

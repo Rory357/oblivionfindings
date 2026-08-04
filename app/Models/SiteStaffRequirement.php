@@ -13,7 +13,6 @@ class SiteStaffRequirement extends Model
     protected $table = 'site_staff_requirements';
 
     protected $fillable = [
-        'organization_id',
         'site_id',
         'requirement_name',
         'category',

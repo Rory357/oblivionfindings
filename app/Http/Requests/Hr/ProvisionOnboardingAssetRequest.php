@@ -19,10 +19,10 @@ class ProvisionOnboardingAssetRequest extends FormRequest
         return [
             // Either pick a specific asset, or omit it to auto-pick the first
             // available one (optionally constrained to a category).
-            'asset_id' => ['nullable', 'integer', 'exists:assets,id'],
+            'asset_id' => ['nullable', 'integer'],
             'category' => ['nullable', 'string', 'max:100'],
             'purpose' => ['nullable', 'string', 'max:255'],
-            'signed_off_by' => ['nullable', 'integer', 'exists:users,id'],
+            'signed_off_by' => ['nullable', 'integer'],
         ];
     }
 }

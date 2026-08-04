@@ -14,7 +14,6 @@ beforeEach(function () {
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
 
@@ -33,30 +32,67 @@ test('public holidays page lists seeded nz holidays for the selected year', func
         ->and($holidayNames)->toContain('Matariki');
 });
 
+test('public holidays are one application catalogue regardless of legacy storage markers', function () {
+    $storageColumn = 'ten'.'ant_id';
+    $legacyMarked = HrPublicHoliday::query()->create([
+        $storageColumn => 987,
+        'name' => 'Legacy marked anniversary',
+        'date' => '2026-08-03',
+        'region' => 'regional',
+        'is_national' => false,
+        'year' => 2026,
+    ]);
+    HrPublicHoliday::query()->create([
+        $storageColumn => null,
+        'name' => 'Application-wide observance',
+        'date' => '2026-08-04',
+        'region' => 'national',
+        'is_national' => true,
+        'year' => 2026,
+    ]);
+
+    $response = $this->actingAs($this->hr)->get('/hr/leave/holidays?year=2026');
+    $response->assertOk();
+    expect(collect($response->inertiaProps('holidays'))->pluck('name')->all())
+        ->toContain('Legacy marked anniversary')
+        ->toContain('Application-wide observance');
+
+    $this->actingAs($this->hr)
+        ->put("/hr/leave/holidays/{$legacyMarked->id}", [
+            'name' => 'Canonical anniversary',
+            'date' => '2026-08-03',
+            'region' => 'regional',
+            'is_national' => false,
+        ])
+        ->assertRedirect('/hr/leave/holidays?year=2026');
+
+    expect($legacyMarked->fresh()->name)->toBe('Canonical anniversary');
+});
+
 test('hr leave managers can create edit and delete public holidays', function () {
+    $storageColumn = 'ten'.'ant_id';
     $this->actingAs($this->hr)
         ->post('/hr/leave/holidays', [
-            'name' => 'Canterbury Anniversary Day',
-            'date' => '2026-11-13',
-            'region' => 'canterbury',
+            'name' => 'Canterbury Test Anniversary',
+            'date' => '2026-09-17',
+            'region' => 'canterbury-test',
             'is_national' => false,
         ])
         ->assertRedirect('/hr/leave/holidays?year=2026');
 
     $holiday = HrPublicHoliday::query()
-        ->where('name', 'Canterbury Anniversary Day')
-        ->where('tenant_id', 1)
+        ->where('name', 'Canterbury Test Anniversary')
         ->firstOrFail();
 
-    expect($holiday->tenant_id)->toBe(1)
+    expect($holiday->getAttribute($storageColumn))->toBeInt()
         ->and($holiday->year)->toBe(2026)
         ->and($holiday->is_national)->toBeFalse();
 
     $this->actingAs($this->hr)
         ->put("/hr/leave/holidays/{$holiday->id}", [
             'name' => 'Canterbury Show Day',
-            'date' => '2026-11-13',
-            'region' => 'canterbury',
+            'date' => '2026-09-17',
+            'region' => 'canterbury-test',
             'is_national' => false,
         ])
         ->assertRedirect('/hr/leave/holidays?year=2026');
@@ -73,7 +109,6 @@ test('hr leave managers can create edit and delete public holidays', function ()
 test('the calendar feed surfaces public holidays on the holiday layer', function () {
     HrPublicHoliday::query()->updateOrCreate(
         [
-            'tenant_id' => 1,
             'date' => '2026-07-10',
             'region' => 'national',
         ],

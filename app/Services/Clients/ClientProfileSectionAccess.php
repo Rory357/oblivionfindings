@@ -4,9 +4,16 @@ namespace App\Services\Clients;
 
 use App\Models\Client;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 
 class ClientProfileSectionAccess
 {
+    public function __construct(
+        private readonly ClientFamilyCommunicationAccess $familyCommunicationAccess,
+        private readonly ClientWorkerEligibility $workerEligibility,
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     public function canViewTimeline(User $user, Client $client): bool
     {
         return $this->canViewTimelineForAssignment(
@@ -26,20 +33,21 @@ class ClientProfileSectionAccess
     /** @return array<string, bool> */
     public function for(User $user, Client $client): array
     {
-        $sameOrganization = $this->sharesOrganization($user, $client);
         $assignedCareWorker = $this->isAssignedCareWorker($user, $client);
         $canUpdateClient = $user->can('update', $client);
         $dailyLiving = $canUpdateClient
             || $assignedCareWorker
-            || ($sameOrganization && $user->canDo('clients.assignments.update'));
+            || (
+                $user->canDo('clients.assignments.update')
+                && $this->canAccessClientSite($user, $client, ['clients.assignments.update'])
+            );
         $personalAssets = $canUpdateClient
             || $user->canDo('assets.viewAny')
             || ($assignedCareWorker && $user->canDo('assets.viewAssigned'));
-        $portalAccess = $user->canDo('family_portal.viewAny')
-            || $user->canDo('family_portal.manage')
+        $portalAccess = $this->familyCommunicationAccess->canView($user, $client)
+            || $this->familyCommunicationAccess->canManage($user, $client)
             || $canUpdateClient;
-        $familyNotes = app(ClientFamilyCommunicationAccess::class)
-            ->canView($user, $client);
+        $familyNotes = $this->familyCommunicationAccess->canView($user, $client);
         $documents = $canUpdateClient;
         $assessments = $user->canDo('clinical.assessments.viewAny')
             || ($assignedCareWorker && (
@@ -133,22 +141,29 @@ class ClientProfileSectionAccess
 
     private function isAssignedCareWorker(User $user, Client $client): bool
     {
-        if (! $this->sharesOrganization($user, $client)) {
-            return false;
-        }
-
         $assigned = $client->relationLoaded('supportWorkers')
             ? $client->supportWorkers->contains('id', $user->id)
             : $client->supportWorkers()->whereKey($user->id)->exists();
 
         return $assigned
-            && app(ClientWorkerEligibility::class)->isEligible($client, $user);
+            && $this->workerEligibility->isEligible($client, $user);
     }
 
-    private function sharesOrganization(User $user, Client $client): bool
-    {
-        return $user->organization_id === null
-            || $client->organization_id === null
-            || (int) $user->organization_id === (int) $client->organization_id;
+    /** @param array<int, string> $bypassPermissions */
+    private function canAccessClientSite(
+        User $user,
+        Client $client,
+        array $bypassPermissions,
+    ): bool {
+        $siteId = is_numeric($client->site_id) && (int) $client->site_id > 0
+            ? (int) $client->site_id
+            : null;
+
+        return $siteId !== null
+            && in_array(
+                $siteId,
+                $this->siteAccess->accessibleSiteIds($user, $bypassPermissions),
+                true,
+            );
     }
 }

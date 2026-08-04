@@ -3,6 +3,7 @@
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinFiscalPeriod;
+use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Finance\Services\AccountsPayableService;
@@ -10,6 +11,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteDamage;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -21,27 +23,26 @@ uses(RefreshDatabase::class);
  * on the "DAMAGE-{id}" reference. Helper prefixed `drbc_` (unique Pest fn space).
  */
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
     $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
     $this->admin->roles()->attach(Role::where('name', 'admin')->first());
     $this->site = Site::factory()->create(['type' => 'house']);
-    $this->org = $this->site->tenant_id;
+    $this->financeContext = 1;
 
     foreach ([['1000', 'Bank', 'asset'], ['2000', 'Accounts Payable', 'liability'], ['6420', 'Property Maintenance Expense', 'expense'], ['4230', 'Insurance Recoveries', 'revenue']] as [$code, $name, $type]) {
         FinAccount::factory()->create([
-            'organization_id' => $this->org, 'code' => $code, 'name' => $name, 'type' => $type, 'is_active' => true,
+            'organization_id' => $this->financeContext, 'code' => $code, 'name' => $name, 'type' => $type, 'is_active' => true,
         ]);
     }
     FinFiscalPeriod::create([
-        'organization_id' => $this->org, 'name' => 'FY', 'status' => 'open',
+        'organization_id' => $this->financeContext, 'name' => 'FY', 'status' => 'open',
         'start_date' => now()->startOfYear()->toDateString(), 'end_date' => now()->endOfYear()->toDateString(),
     ]);
 });
 
-function drbc_damage(int $siteId, int $reporterId): SiteDamage
+function drbc_damage(Site $site, int $reporterId): SiteDamage
 {
-    return SiteDamage::create([
-        'site_id' => $siteId,
+    return $site->damages()->create([
         'reported_by' => $reporterId,
         'title' => 'Broken window',
         'description' => 'Storm damage in lounge.',
@@ -53,7 +54,7 @@ function drbc_damage(int $siteId, int $reporterId): SiteDamage
 }
 
 it('captures a repaired damage with an actual cost as a draft AP bill', function () {
-    $damage = drbc_damage($this->site->id, $this->admin->id);
+    $damage = drbc_damage($this->site, $this->admin->id);
 
     $this->actingAs($this->admin)
         ->put("/sites/{$this->site->id}/damages/{$damage->id}", ['status' => 'repaired', 'actual_cost' => 500.00])
@@ -62,7 +63,7 @@ it('captures a repaired damage with an actual cost as a draft AP bill', function
     $bill = FinBill::where('vendor_reference', "DAMAGE-{$damage->id}")->first();
     expect($bill)->not->toBeNull()
         ->and($bill->status)->toBe('draft')
-        ->and($bill->organization_id)->toBe($this->org)
+        ->and($bill->organization_id)->toBe($this->financeContext)
         ->and((float) $bill->total_amount)->toBe(500.0)
         ->and((float) $bill->subtotal)->toBe(500.0);
 
@@ -71,7 +72,7 @@ it('captures a repaired damage with an actual cost as a draft AP bill', function
 });
 
 it('is idempotent — re-updating a repaired damage does not create a second bill', function () {
-    $damage = drbc_damage($this->site->id, $this->admin->id);
+    $damage = drbc_damage($this->site, $this->admin->id);
     $url = "/sites/{$this->site->id}/damages/{$damage->id}";
 
     $this->actingAs($this->admin)->put($url, ['status' => 'repaired', 'actual_cost' => 500.00])->assertRedirect();
@@ -81,7 +82,7 @@ it('is idempotent — re-updating a repaired damage does not create a second bil
 });
 
 it('approving the captured bill posts a balanced DR 6420 / CR 2000 journal', function () {
-    $damage = drbc_damage($this->site->id, $this->admin->id);
+    $damage = drbc_damage($this->site, $this->admin->id);
     $this->actingAs($this->admin)
         ->put("/sites/{$this->site->id}/damages/{$damage->id}", ['status' => 'repaired', 'actual_cost' => 500.00])
         ->assertRedirect();
@@ -105,7 +106,7 @@ it('approving the captured bill posts a balanced DR 6420 / CR 2000 journal', fun
 });
 
 it('does not capture a bill when the repair has no actual cost', function () {
-    $damage = drbc_damage($this->site->id, $this->admin->id);
+    $damage = drbc_damage($this->site, $this->admin->id);
 
     $this->actingAs($this->admin)
         ->put("/sites/{$this->site->id}/damages/{$damage->id}", ['status' => 'repaired'])
@@ -115,7 +116,7 @@ it('does not capture a bill when the repair has no actual cost', function () {
 });
 
 it('captures an approved insurance claim as a draft AR invoice to the insurer', function () {
-    $damage = drbc_damage($this->site->id, $this->admin->id);
+    $damage = drbc_damage($this->site, $this->admin->id);
 
     $this->actingAs($this->admin)
         ->put("/sites/{$this->site->id}/damages/{$damage->id}", [
@@ -126,7 +127,7 @@ it('captures an approved insurance claim as a draft AR invoice to the insurer', 
         ])
         ->assertRedirect();
 
-    $invoice = \App\Domain\Finance\Models\FinInvoice::where('source_type', SiteDamage::class)
+    $invoice = FinInvoice::where('source_type', SiteDamage::class)
         ->where('source_id', $damage->id)->first();
 
     expect($invoice)->not->toBeNull()
@@ -135,18 +136,18 @@ it('captures an approved insurance claim as a draft AR invoice to the insurer', 
         ->and($invoice->funding_body)->toBe('Insurance')
         ->and((float) $invoice->total_amount)->toBe(500.0) // zero-rated, mirrors the gst-0 repair bill
         ->and($invoice->lines()->first()->account_id)
-        ->toBe(FinAccount::where('organization_id', $this->org)->where('code', '4230')->value('id'));
+        ->toBe(FinAccount::where('organization_id', $this->financeContext)->where('code', '4230')->value('id'));
 });
 
 it('insurance capture is idempotent and falls back to the estimate when unpriced', function () {
-    $damage = drbc_damage($this->site->id, $this->admin->id);
+    $damage = drbc_damage($this->site, $this->admin->id);
     $damage->update(['estimated_cost' => 350.00]);
     $url = "/sites/{$this->site->id}/damages/{$damage->id}";
 
     $this->actingAs($this->admin)->put($url, ['insurance_status' => 'approved'])->assertRedirect();
     $this->actingAs($this->admin)->put($url, ['insurance_status' => 'approved', 'repair_notes' => 'again'])->assertRedirect();
 
-    $invoices = \App\Domain\Finance\Models\FinInvoice::where('source_type', SiteDamage::class)
+    $invoices = FinInvoice::where('source_type', SiteDamage::class)
         ->where('source_id', $damage->id)->get();
 
     expect($invoices)->toHaveCount(1)
@@ -154,7 +155,7 @@ it('insurance capture is idempotent and falls back to the estimate when unpriced
 });
 
 it('does not raise an insurance invoice for pending or declined claims', function () {
-    $damage = drbc_damage($this->site->id, $this->admin->id);
+    $damage = drbc_damage($this->site, $this->admin->id);
 
     foreach (['pending', 'submitted', 'declined'] as $status) {
         $this->actingAs($this->admin)
@@ -165,6 +166,6 @@ it('does not raise an insurance invoice for pending or declined claims', functio
             ->assertRedirect();
     }
 
-    expect(\App\Domain\Finance\Models\FinInvoice::where('source_type', SiteDamage::class)
+    expect(FinInvoice::where('source_type', SiteDamage::class)
         ->where('source_id', $damage->id)->exists())->toBeFalse();
 });

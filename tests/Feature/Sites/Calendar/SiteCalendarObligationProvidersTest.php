@@ -7,7 +7,7 @@ use App\Models\SiteEmergencyPlan;
 use App\Models\SiteVendor;
 use App\Services\Sites\Calendar\SiteCalendarAggregator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
 
 uses(RefreshDatabase::class);
@@ -15,7 +15,7 @@ uses(RefreshDatabase::class);
 /** Run the aggregator over a today-anchored window for a single site. The window
  *  reaches far enough ahead to include a never-rotated credential's first due
  *  date (created_at + 90-day cadence). */
-function aggregate(Site $site, array $sources = []): \Illuminate\Support\Collection
+function aggregate(Site $site, array $sources = []): Collection
 {
     return collect(app(SiteCalendarAggregator::class)->itemsForRange(
         [$site->id],
@@ -65,7 +65,6 @@ test('emergency plan review obligations surface and can derive the next review d
     // Explicit next review.
     SiteEmergencyPlan::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'plan_type' => 'evacuation',
         'title' => 'Evacuation plan',
         'next_review_at' => now()->addDays(14)->toDateString(),
@@ -75,7 +74,6 @@ test('emergency plan review obligations surface and can derive the next review d
     // No explicit next review — derived from last_reviewed_at + interval (~1 month out).
     SiteEmergencyPlan::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'plan_type' => 'fire',
         'title' => 'Fire plan',
         'last_reviewed_at' => now()->subMonths(11)->toDateString(),
@@ -100,7 +98,6 @@ test('credential reminders now fire for never-rotated credentials (created_at fa
     // No last_rotated_at → due falls at created_at (≈ now) + 90 days.
     SiteCredential::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'label' => 'Wifi Password',
         'credential_type' => 'password',
         'encrypted_value' => Crypt::encryptString('secret'),
@@ -118,7 +115,6 @@ test('vendor reminders cover contract renewal and the next scheduled visit', fun
 
     SiteVendor::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'service_type' => 'plumber',
         'company_name' => 'Pipes Ltd',
         'preferred_contact_method' => 'phone',

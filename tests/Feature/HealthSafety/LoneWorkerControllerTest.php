@@ -3,6 +3,7 @@
 namespace Tests\Feature\HealthSafety;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
@@ -12,6 +13,7 @@ use App\Models\Shift;
 use App\Models\ShiftGpsLog;
 use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -32,7 +34,7 @@ class LoneWorkerControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
             'organization_id' => 1,
@@ -79,7 +81,7 @@ class LoneWorkerControllerTest extends TestCase
 
     public function test_start_session_links_shift_and_prefills_gps(): void
     {
-        $worker = User::factory()->create(['organization_id' => 1]);
+        $worker = $this->supportWorker();
         $site = $this->site;
         $client = Client::factory()->create([
             'organization_id' => 1,
@@ -90,7 +92,11 @@ class LoneWorkerControllerTest extends TestCase
             'user_id' => $worker->id,
             'site_id' => $site->id,
             'client_id' => $client->id,
+            'starts_at' => now()->subHour(),
             'ends_at' => now()->addHours(3),
+            'actual_starts_at' => now()->subHour(),
+            'started_by' => $worker->id,
+            'status' => 'in_progress',
         ]);
         ShiftGpsLog::create([
             'organization_id' => 1,
@@ -383,9 +389,18 @@ class LoneWorkerControllerTest extends TestCase
     {
         $worker = User::factory()->create([
             'organization_id' => 1,
+            'role' => 'support_worker',
             'approved_at' => now(),
         ]);
         $worker->roles()->attach(Role::where('name', 'support_worker')->first());
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $worker->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
 
         return $worker;
     }
@@ -440,19 +455,23 @@ class LoneWorkerControllerTest extends TestCase
             'organization_id' => 1,
             'site_id' => $site->id,
         ]);
-        $mk = fn (bool $flagged) => Shift::create([
-            'organization_id' => 1,
-            'user_id' => User::factory()->create(['organization_id' => 1])->id,
-            'client_id' => $client->id,
-            'site_id' => $site->id,
-            'starts_at' => now()->subHour(),
-            'ends_at' => now()->addHours(2),
-            'actual_starts_at' => now()->subHour(),
-            'status' => 'in_progress',
-            'is_on_call' => false,
-            'is_lone_worker' => $flagged,
-            'created_by' => $this->admin->id,
-        ]);
+        $mk = function (bool $flagged) use ($client, $site): Shift {
+            $worker = $this->supportWorker();
+
+            return Shift::create([
+                'organization_id' => 1,
+                'user_id' => $worker->id,
+                'client_id' => $client->id,
+                'site_id' => $site->id,
+                'starts_at' => now()->subHour(),
+                'ends_at' => now()->addHours(2),
+                'actual_starts_at' => now()->subHour(),
+                'status' => 'in_progress',
+                'is_on_call' => false,
+                'is_lone_worker' => $flagged,
+                'created_by' => $this->admin->id,
+            ]);
+        };
         $mk(true);   // flagged → lone
         $mk(false);  // co-worker at same site → not solo, not on-call, not flagged → not lone
 

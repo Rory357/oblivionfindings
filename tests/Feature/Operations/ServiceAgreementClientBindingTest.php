@@ -1,9 +1,11 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceAgreement;
+use App\Models\Site;
 use App\Models\User;
 
 function grantServiceAgreementBindingPermissions(User $user, array $permissionKeys): void
@@ -26,38 +28,77 @@ function grantServiceAgreementBindingPermissions(User $user, array $permissionKe
     $user->roles()->syncWithoutDetaching([$role->id]);
 }
 
-it('rejects a client from another organisation when creating a service agreement', function () {
-    $actor = User::factory()->create(['organization_id' => 1]);
-    grantServiceAgreementBindingPermissions($actor, ['service_agreements.create']);
-    $foreignClient = Client::factory()->create(['organization_id' => 2]);
+function serviceAgreementActorForSite(Site $site, array $permissionKeys): User
+{
+    $actor = User::factory()->create(['approved_at' => now()]);
+    grantServiceAgreementBindingPermissions($actor, $permissionKeys);
+
+    HrEmployeeProfile::query()->create([
+        'user_id' => $actor->id,
+        'employee_number' => 'EMP-SA-'.$actor->id,
+        'work_email' => $actor->email,
+        'position_title' => 'Service Agreement Manager',
+        'position_role' => 'manager',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subMonth()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+    ]);
+
+    return $actor;
+}
+
+it('rejects an unassigned Site client when creating a service agreement', function () {
+    $assignedSite = Site::factory()->create();
+    $otherSite = Site::factory()->create();
+    $actor = serviceAgreementActorForSite($assignedSite, ['service_agreements.create']);
+    $otherClient = Client::factory()->create(['site_id' => $otherSite->id]);
 
     $this->actingAs($actor)
         ->post('/operations/service-agreements', [
-            'client_id' => $foreignClient->id,
-            'title' => 'Foreign agreement',
+            'client_id' => $otherClient->id,
+            'title' => 'Other Site agreement',
             'agreement_type' => 'individualised_funding',
         ])
-        ->assertSessionHasErrors('client_id');
+        ->assertForbidden();
 
-    expect(ServiceAgreement::query()->where('title', 'Foreign agreement')->exists())
+    expect(ServiceAgreement::query()->where('title', 'Other Site agreement')->exists())
         ->toBeFalse();
 });
 
-it('rejects moving a service agreement to a client from another organisation', function () {
-    $actor = User::factory()->create(['organization_id' => 1]);
-    grantServiceAgreementBindingPermissions($actor, ['service_agreements.update']);
-    $ownClient = Client::factory()->create(['organization_id' => 1]);
-    $foreignClient = Client::factory()->create(['organization_id' => 2]);
+it('rejects moving an accessible service agreement to another Site client', function () {
+    $assignedSite = Site::factory()->create();
+    $otherSite = Site::factory()->create();
+    $actor = serviceAgreementActorForSite($assignedSite, ['service_agreements.update']);
+    $assignedClient = Client::factory()->create(['site_id' => $assignedSite->id]);
+    $otherClient = Client::factory()->create(['site_id' => $otherSite->id]);
     $agreement = ServiceAgreement::factory()->create([
-        'organization_id' => 1,
-        'client_id' => $ownClient->id,
+        'client_id' => $assignedClient->id,
     ]);
 
     $this->actingAs($actor)
         ->put("/operations/service-agreements/{$agreement->id}", [
-            'client_id' => $foreignClient->id,
+            'client_id' => $otherClient->id,
         ])
-        ->assertSessionHasErrors('client_id');
+        ->assertForbidden();
 
-    expect($agreement->fresh()->client_id)->toBe($ownClient->id);
+    expect($agreement->fresh()->client_id)->toBe($assignedClient->id);
+});
+
+it('fails closed when a service agreement client has no canonical Site', function () {
+    $assignedSite = Site::factory()->create();
+    $actor = serviceAgreementActorForSite($assignedSite, ['service_agreements.create']);
+    $clientWithoutSite = Client::factory()->create(['site_id' => null]);
+
+    $this->actingAs($actor)
+        ->post('/operations/service-agreements', [
+            'client_id' => $clientWithoutSite->id,
+            'title' => 'Orphan agreement',
+            'agreement_type' => 'individualised_funding',
+        ])
+        ->assertForbidden();
+
+    expect(ServiceAgreement::query()->where('title', 'Orphan agreement')->exists())
+        ->toBeFalse();
 });

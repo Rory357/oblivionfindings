@@ -8,13 +8,13 @@ import { isValidElement, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
+import { PageHeroActions } from './page-hero-actions';
 import {
     AvatarPopoverContent,
     PageHeroAvatarStack,
     type PageHeroAvatarPopover,
     type PageHeroStackAvatar,
 } from './page-hero-avatar-stack';
-import { PageHeroActions } from './page-hero-actions';
 import { PageHeroBadges, type PageHeroBadge } from './page-hero-badges';
 import { PageHeroMeta, type PageHeroMetaItem } from './page-hero-meta';
 import {
@@ -161,7 +161,13 @@ function HeroVariant(props: PageHeroProps) {
         ? 'bg-[linear-gradient(to_bottom_right,color-mix(in_oklch,var(--hero-base)_90%,transparent),var(--hero-base),color-mix(in_oklch,var(--hero-base)_80%,transparent))]'
         : 'bg-gradient-to-br from-primary/90 via-primary to-primary/80';
 
-    const renderedIcon = avatar || avatarStack ? null : renderIcon(icon, 'h-12 w-12 text-primary-foreground md:h-14 md:w-14');
+    const renderedIcon =
+        avatar || avatarStack
+            ? null
+            : renderIcon(
+                  icon,
+                  'h-12 w-12 text-primary-foreground md:h-14 md:w-14',
+              );
 
     return (
         // OUTER: relative + rounded but NOT overflow-hidden, so hover popovers
@@ -170,7 +176,7 @@ function HeroVariant(props: PageHeroProps) {
         <div
             style={style}
             className={cn(
-                'relative rounded-2xl text-primary-foreground',
+                '@container relative rounded-2xl text-primary-foreground',
                 gradientClass,
                 className,
             )}
@@ -178,9 +184,9 @@ function HeroVariant(props: PageHeroProps) {
             {/* INNER ORB CLIP — purely visual; clipped to the rounded shape so the
                 three decorative circles don't bleed past the banner. */}
             <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-                <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
+                <div className="absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
                 <div className="absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
-                <div className="absolute right-1/3 top-1/4 h-24 w-24 rounded-full bg-primary-foreground/5" />
+                <div className="absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
             </div>
 
             <div className="relative p-6 md:p-8">
@@ -194,7 +200,7 @@ function HeroVariant(props: PageHeroProps) {
                     </Link>
                 ) : null}
 
-                <div className="flex flex-col items-center gap-6 md:flex-row md:items-start">
+                <div className="flex flex-col items-center gap-6 @5xl:flex-row @5xl:items-start">
                     {avatarStack && avatarStack.length > 0 ? (
                         <PageHeroAvatarStack residents={avatarStack} />
                     ) : avatar ? (
@@ -205,19 +211,33 @@ function HeroVariant(props: PageHeroProps) {
                         </div>
                     ) : null}
 
-                    <div className="min-w-0 flex-1 text-center md:text-left">
-                        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{title}</h1>
+                    <div className="min-w-0 flex-1 text-center @5xl:text-left">
+                        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+                            {title}
+                        </h1>
                         {supportingText ? (
-                            <p className="mt-1 text-sm text-primary-foreground/70">{supportingText}</p>
+                            <p className="mt-1 text-sm text-primary-foreground/70">
+                                {supportingText}
+                            </p>
                         ) : null}
-                        {meta && meta.length > 0 ? <PageHeroMeta items={meta} /> : null}
-                        {badges && badges.length > 0 ? <PageHeroBadges badges={badges} /> : null}
-                        {children ? <div className="mt-3">{children}</div> : null}
+                        {meta && meta.length > 0 ? (
+                            <PageHeroMeta items={meta} />
+                        ) : null}
+                        {badges && badges.length > 0 ? (
+                            <PageHeroBadges badges={badges} />
+                        ) : null}
+                        {children ? (
+                            <div className="mt-3">{children}</div>
+                        ) : null}
                     </div>
 
-                    {(actions || (stats && stats.length > 0) || (quickActions && quickActions.length > 0)) && (
-                        <div className="flex w-full flex-col items-center gap-3 md:w-auto md:items-end">
-                            {actions ? <PageHeroActions>{actions}</PageHeroActions> : null}
+                    {(actions ||
+                        (stats && stats.length > 0) ||
+                        (quickActions && quickActions.length > 0)) && (
+                        <div className="flex w-full flex-col items-center gap-3 @5xl:w-auto @5xl:items-end">
+                            {actions ? (
+                                <PageHeroActions>{actions}</PageHeroActions>
+                            ) : null}
                             {stats && stats.length > 0 ? (
                                 <PageHeroStats stats={stats} layout="inline" />
                             ) : null}
@@ -255,13 +275,16 @@ function HeroSingleAvatar({ avatar }: { avatar: PageHeroAvatar }) {
         <Avatar
             className={cn(
                 'h-24 w-24 shrink-0 border-4 border-primary-foreground/20 shadow-xl md:h-28 md:w-28',
-                avatar.popover && 'cursor-pointer transition-shadow duration-200',
+                avatar.popover &&
+                    'cursor-pointer transition-shadow duration-200',
                 avatar.popover &&
                     hover &&
                     'shadow-[0_14px_30px_-10px_rgba(0,0,0,0.45),0_0_0_3px_var(--primary-foreground)]',
             )}
         >
-            {avatar.src ? <AvatarImage src={avatar.src} alt={avatar.fallback} /> : null}
+            {avatar.src ? (
+                <AvatarImage src={avatar.src} alt={avatar.fallback} />
+            ) : null}
             <AvatarFallback className="bg-primary-foreground/10 text-2xl font-semibold text-primary-foreground">
                 {avatar.fallback}
             </AvatarFallback>
@@ -280,14 +303,27 @@ function HeroSingleAvatar({ avatar }: { avatar: PageHeroAvatar }) {
         >
             {avatarEl}
             {hover ? (
-                <AvatarPopoverContent popover={avatar.popover} initials={avatar.fallback} hue={avatar.hue ?? 0} />
+                <AvatarPopoverContent
+                    popover={avatar.popover}
+                    initials={avatar.fallback}
+                    hue={avatar.hue ?? 0}
+                />
             ) : null}
         </div>
     );
 }
 
 function CompactVariant(props: PageHeroProps) {
-    const { backHref, backLabel = 'Back', title, description, subtitle, actions, children, className } = props;
+    const {
+        backHref,
+        backLabel = 'Back',
+        title,
+        description,
+        subtitle,
+        actions,
+        children,
+        className,
+    } = props;
     const supportingText = description ?? subtitle;
     return (
         <div
@@ -306,7 +342,9 @@ function CompactVariant(props: PageHeroProps) {
                         {backLabel}
                     </Link>
                 ) : null}
-                <h1 className="mt-1 text-xl font-semibold tracking-tight md:text-2xl">{title}</h1>
+                <h1 className="mt-1 text-xl font-semibold tracking-tight md:text-2xl">
+                    {title}
+                </h1>
                 {supportingText ? (
                     <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
                         {supportingText}
@@ -315,7 +353,9 @@ function CompactVariant(props: PageHeroProps) {
                 {children ? <div className="mt-3">{children}</div> : null}
             </div>
             {actions ? (
-                <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    {actions}
+                </div>
             ) : null}
         </div>
     );
@@ -325,15 +365,23 @@ function InlineVariant(props: PageHeroProps) {
     const { title, description, subtitle, actions, className } = props;
     const supportingText = description ?? subtitle;
     return (
-        <div className={cn('flex items-start justify-between gap-3', className)}>
+        <div
+            className={cn('flex items-start justify-between gap-3', className)}
+        >
             <div className="min-w-0">
-                <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+                <h1 className="text-lg font-semibold tracking-tight">
+                    {title}
+                </h1>
                 {supportingText ? (
-                    <p className="mt-1 text-sm text-muted-foreground">{supportingText}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        {supportingText}
+                    </p>
                 ) : null}
             </div>
             {actions ? (
-                <div className="flex shrink-0 items-center gap-2">{actions}</div>
+                <div className="flex shrink-0 items-center gap-2">
+                    {actions}
+                </div>
             ) : null}
         </div>
     );

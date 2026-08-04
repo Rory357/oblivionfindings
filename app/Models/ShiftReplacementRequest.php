@@ -3,18 +3,17 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
-use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ShiftReplacementRequest extends Model
 {
-    use HasFactory;
-    use AuditableChanges;
+    use AuditableChanges, HasFactory, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'shift_id',
         'requested_by',
         'current_staff_id',

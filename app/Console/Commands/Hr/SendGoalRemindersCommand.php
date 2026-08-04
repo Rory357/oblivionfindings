@@ -9,7 +9,7 @@ use App\Domain\Hr\Notifications\DevelopmentReviewDueNotification;
 use App\Domain\Hr\Notifications\GoalCheckinDueNotification;
 use App\Domain\Hr\Notifications\GoalOverdueNotification;
 use App\Domain\Hr\Notifications\KeyResultDueNotification;
-use App\Models\User;
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 
@@ -27,7 +27,7 @@ class SendGoalRemindersCommand extends Command
 
     protected $description = 'Send OKR check-in/overdue/KR-due reminders and development-plan review reminders.';
 
-    public function handle(): int
+    public function handle(HrCurrentStaffService $currentStaff): int
     {
         $today = Carbon::today();
         $cadence = [
@@ -41,6 +41,7 @@ class SendGoalRemindersCommand extends Command
 
         // --- Objectives: check-in due + overdue ---
         HrGoal::query()
+            ->whereIn('user_id', $currentStaff->currentUsersQuery()->select('users.id'))
             ->where('status', 'active')
             ->with('user:id,name')
             ->chunkById(200, function ($goals) use (&$sent, $today, $cadence) {
@@ -68,17 +69,21 @@ class SendGoalRemindersCommand extends Command
 
         // --- Key results due within 3 days, not complete ---
         HrKeyResult::query()
+            ->whereHas('goal', fn ($goalQuery) => $goalQuery->whereIn(
+                'user_id',
+                $currentStaff->currentUsersQuery()->select('users.id'),
+            ))
             ->whereNotIn('status', ['completed', 'cancelled'])
             ->whereNotNull('due_date')
             ->whereDate('due_date', '<=', $today->copy()->addDays(3))
             ->with(['owner:id,name', 'goal:id,user_id,status'])
-            ->chunkById(200, function ($krs) use (&$sent) {
+            ->chunkById(200, function ($krs) use (&$sent, $currentStaff) {
                 foreach ($krs as $kr) {
                     if (! $kr->goal || $kr->goal->status !== 'active') {
                         continue;
                     }
                     $recipientId = $kr->owner_id ?? $kr->goal->user_id;
-                    $recipient = $kr->owner ?? User::find($recipientId);
+                    $recipient = $currentStaff->currentUsersQuery()->find($recipientId);
                     if ($recipient) {
                         $recipient->notify(new KeyResultDueNotification($kr));
                         $sent++;
@@ -88,13 +93,14 @@ class SendGoalRemindersCommand extends Command
 
         // --- Development plan reviews due ---
         HrDevelopmentGoal::query()
+            ->whereIn('employee_user_id', $currentStaff->currentUsersQuery()->select('users.id'))
             ->whereIn('status', ['not_started', 'in_progress', 'blocked'])
             ->whereNotNull('review_frequency')
             ->where(function ($q) use ($today) {
                 $q->whereNull('next_review_at')->orWhereDate('next_review_at', '<=', $today);
             })
             ->with(['employee:id,name', 'manager:id,name'])
-            ->chunkById(200, function ($plans) use (&$sent, $today) {
+            ->chunkById(200, function ($plans) use (&$sent, $today, $currentStaff) {
                 foreach ($plans as $plan) {
                     // First-ever reminder seeds next_review_at from due_date/today.
                     if ($plan->next_review_at === null) {
@@ -107,6 +113,9 @@ class SendGoalRemindersCommand extends Command
                     }
 
                     foreach (array_filter([$plan->employee, $plan->manager]) as $person) {
+                        if (! $currentStaff->isCurrent($person)) {
+                            continue;
+                        }
                         $person->notify(new DevelopmentReviewDueNotification($plan));
                         $sent++;
                     }

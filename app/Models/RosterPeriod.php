@@ -3,25 +3,28 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class RosterPeriod extends Model
 {
-    use AuditableChanges;
-    use HasFactory;
-    use SoftDeletes;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_VALIDATING = 'validating';
+
     public const STATUS_READY = 'ready_to_publish';
+
     public const STATUS_PUBLISHED = 'published';
+
     public const STATUS_CHANGED_AFTER_PUBLISH = 'changed_after_publish';
+
     public const STATUS_ARCHIVED = 'archived';
 
     protected $fillable = [
-        'organization_id',
         'site_id',
         'week_start',
         'week_end',

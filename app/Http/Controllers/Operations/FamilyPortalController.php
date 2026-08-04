@@ -6,17 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\FamilyPortalSetting;
 use App\Services\Portal\PortalClientSectionAccess;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 
 class FamilyPortalController extends Controller
 {
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     public function index(Request $request)
     {
         $auth = $request->user();
         abort_unless($auth && $this->canViewPortal($auth), 403);
 
-        $clients = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $clients = $this->siteAccess->applyClientScope(Client::query(), $auth, ['clients.viewAny'])
             ->with(['familyPortalSetting'])
             ->orderBy('first_name')
             ->paginate(20)
@@ -52,8 +54,7 @@ class FamilyPortalController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canViewPortal($auth), 403);
 
-        $client = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $client = $this->siteAccess->applyClientScope(Client::query(), $auth, ['clients.viewAny'])
             ->with(['familyPortalSetting'])
             ->findOrFail($client);
 
@@ -67,8 +68,7 @@ class FamilyPortalController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canManagePortal($auth), 403);
 
-        $client = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $client = $this->siteAccess->applyClientScope(Client::query(), $auth, ['clients.viewAny'])
             ->with(['familyPortalSetting'])
             ->findOrFail($client);
 
@@ -82,8 +82,7 @@ class FamilyPortalController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canManagePortal($auth), 403);
 
-        $clientModel = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $clientModel = $this->siteAccess->applyClientScope(Client::query(), $auth, ['clients.viewAny'])
             ->findOrFail($client);
 
         $data = $request->validate([
@@ -113,7 +112,6 @@ class FamilyPortalController extends Controller
         FamilyPortalSetting::updateOrCreate(
             ['client_id' => $client],
             [
-                'organization_id' => $auth->organization_id,
                 'show_shift_schedule' => $data['show_shift_schedule'] ?? true,
                 'show_respite' => $showRespite,
                 'show_care_notes' => $showCareNotes,

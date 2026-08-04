@@ -5,13 +5,15 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteHouseRoom;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
+use Database\Seeders\SystemCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 });
 
 function sitesModulePlanUser(string $roleName = 'admin'): User
@@ -90,7 +92,6 @@ test('site show exposes readiness and occupancy summaries for active incomplete 
 
     SiteHouseRoom::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'name' => 'Bedroom 1',
         'assigned_client_id' => $client->id,
         'is_active' => true,
@@ -100,7 +101,6 @@ test('site show exposes readiness and occupancy summaries for active incomplete 
 
     SiteHouseRoom::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'name' => 'Bedroom 2',
         'is_active' => true,
         'is_assignable' => true,
@@ -109,7 +109,6 @@ test('site show exposes readiness and occupancy summaries for active incomplete 
 
     SiteHouseRoom::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'name' => 'Kitchen',
         'is_active' => true,
         'is_assignable' => false,
@@ -146,7 +145,6 @@ test('sites index capacity counts assignable bedrooms only', function () {
     foreach (['Bedroom 1', 'Bedroom 2', 'Bedroom 3'] as $index => $name) {
         SiteHouseRoom::create([
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'name' => $name,
             'is_active' => true,
             'is_assignable' => true,
@@ -156,7 +154,6 @@ test('sites index capacity counts assignable bedrooms only', function () {
 
     SiteHouseRoom::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'name' => 'Kitchen',
         'is_active' => true,
         'is_assignable' => false,
@@ -211,7 +208,7 @@ test('system catalog seeder refreshes canonical site fields on repeat runs', fun
         'is_active' => false,
     ]);
 
-    $this->seed(\Database\Seeders\SystemCatalogSeeder::class);
+    $this->seed(SystemCatalogSeeder::class);
 
     $this->assertDatabaseHas('sites', [
         'name' => 'Kauri House',
@@ -234,7 +231,6 @@ test('standard rooms endpoint adds missing defaults and is idempotent', function
 
     SiteHouseRoom::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'name' => 'yuikri',
         'is_active' => true,
         'is_assignable' => true,
@@ -266,10 +262,10 @@ test('published plan emergency markers satisfy emergency plan readiness without 
     ]);
 
     $planId = DB::table('site_type_plans')->insertGetId([
-        'tenant_id' => $site->tenant_id,
         'site_id' => $site->id,
         'site_type' => $site->type,
         'status' => 'published',
+        'current_slot' => 'published',
         'version' => 1,
         'layout' => json_encode(siteOperationalReadinessPlanLayout()),
         'published_at' => now(),
@@ -279,7 +275,6 @@ test('published plan emergency markers satisfy emergency plan readiness without 
 
     DB::table('site_type_plan_pins')->insert([
         [
-            'tenant_id' => $site->tenant_id,
             'site_type_plan_id' => $planId,
             'kind' => 'assembly_point',
             'label' => 'Driveway',
@@ -291,7 +286,6 @@ test('published plan emergency markers satisfy emergency plan readiness without 
             'updated_at' => now(),
         ],
         [
-            'tenant_id' => $site->tenant_id,
             'site_type_plan_id' => $planId,
             'kind' => 'emergency_exit',
             'label' => 'Front exit',
@@ -319,10 +313,10 @@ test('published medication storage pin satisfies med storage readiness without l
     ]);
 
     $planId = DB::table('site_type_plans')->insertGetId([
-        'tenant_id' => $site->tenant_id,
         'site_id' => $site->id,
         'site_type' => $site->type,
         'status' => 'published',
+        'current_slot' => 'published',
         'version' => 1,
         'layout' => json_encode(siteOperationalReadinessPlanLayout()),
         'published_at' => now(),
@@ -331,7 +325,6 @@ test('published medication storage pin satisfies med storage readiness without l
     ]);
 
     DB::table('site_type_plan_pins')->insert([
-        'tenant_id' => $site->tenant_id,
         'site_type_plan_id' => $planId,
         'kind' => 'medication_storage',
         'label' => 'Locked cabinet',

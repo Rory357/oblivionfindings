@@ -3,6 +3,8 @@
 namespace Tests\Feature\ControlRoom;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientConsent;
@@ -11,6 +13,7 @@ use App\Models\ConsentTypeVersion;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoomAlert;
+use App\Models\LocationHardware;
 use App\Models\LoneWorkerSession;
 use App\Models\Permission;
 use App\Models\Role;
@@ -19,6 +22,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Integration\IntegrationContextProvider;
 use Database\Seeders\RbacSeeder;
+use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -36,6 +40,7 @@ class DismissedAlertScopeTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
+        $this->seed(SecurityDevicesPermissionsSeeder::class);
 
         $this->admin = User::factory()->create([
             'organization_id' => 1,
@@ -178,7 +183,7 @@ class DismissedAlertScopeTest extends TestCase
             'site_id' => Site::factory()->create(['tenant_id' => 1])->id,
             'status' => 'active',
         ]);
-        $this->createTrackingConsent($client);
+        $this->createTrackingAssignment($client);
         $open = $this->makeAlert([
             'client_id' => $client->id,
             'source' => 'tracker',
@@ -258,7 +263,7 @@ class DismissedAlertScopeTest extends TestCase
             'site_id' => $site->id,
             'status' => 'active',
         ]);
-        $this->createTrackingConsent($client);
+        $this->createTrackingAssignment($client);
         $open = $this->makeAlert([
             'client_id' => $client->id,
             'source' => 'tracker',
@@ -410,7 +415,11 @@ class DismissedAlertScopeTest extends TestCase
     public function test_resident_tracking_alert_summaries_are_limited_to_clients_at_accessible_sites(): void
     {
         [$visibleSite, $hiddenSite] = [Site::factory()->create(), Site::factory()->create()];
-        $viewer = $this->siteScopedUser($visibleSite, ['fleet.viewAny']);
+        $viewer = $this->siteScopedUser($visibleSite, [
+            'fleet.viewAny',
+            'assets.telemetry.view',
+            'clients.viewAny',
+        ]);
         $visibleClient = Client::factory()->create([
             'organization_id' => 1,
             'site_id' => $visibleSite->id,
@@ -421,8 +430,8 @@ class DismissedAlertScopeTest extends TestCase
             'site_id' => $hiddenSite->id,
             'status' => 'active',
         ]);
-        $this->createTrackingConsent($visibleClient);
-        $this->createTrackingConsent($hiddenClient);
+        $this->createTrackingAssignment($visibleClient);
+        $this->createTrackingAssignment($hiddenClient);
         $visibleAlert = $this->makeAlert([
             'site_id' => $visibleSite->id,
             'client_id' => $visibleClient->id,
@@ -663,7 +672,7 @@ class DismissedAlertScopeTest extends TestCase
         $this->assertSame(0, LoneWorkerSession::query()->count());
     }
 
-    public function test_resident_cross_site_panic_requires_explicit_global_fleet_permission(): void
+    public function test_resident_panic_outside_the_users_sites_requires_explicit_application_wide_permissions(): void
     {
         [$visibleSite, $hiddenSite] = [Site::factory()->create(), Site::factory()->create()];
         $hiddenClient = Client::factory()->create([
@@ -671,21 +680,32 @@ class DismissedAlertScopeTest extends TestCase
             'site_id' => $hiddenSite->id,
             'status' => 'active',
         ]);
-        $this->createTrackingConsent($hiddenClient);
+        $this->createTrackingAssignment($hiddenClient);
         $hiddenAlert = $this->makeAlert([
             'site_id' => $hiddenSite->id,
             'client_id' => $hiddenClient->id,
             'source' => 'tracker',
             'status' => ControlRoomAlert::STATUS_OPEN,
         ]);
-        $siteViewer = $this->siteScopedUser($visibleSite, ['fleet.viewAny']);
+        $siteViewer = $this->siteScopedUser($visibleSite, [
+            'fleet.viewAny',
+            'fleet.manage',
+            'assets.telemetry.view',
+            'clients.viewAny',
+        ]);
 
         $this->actingAs($siteViewer)
             ->post("/fleet-assets/resident-tracking/{$hiddenClient->id}/acknowledge-panic")
             ->assertForbidden();
         $this->assertSame(ControlRoomAlert::STATUS_OPEN, $hiddenAlert->fresh()->status);
 
-        $globalManager = $this->siteScopedUser($visibleSite, ['fleet.viewAny', 'fleet.manage']);
+        $globalManager = $this->siteScopedUser($visibleSite, [
+            'fleet.viewAny',
+            'fleet.manage',
+            'assets.telemetry.view',
+            'clients.viewAny',
+            'securityDevices.devices.viewAllSites',
+        ]);
         $this->actingAs($globalManager)
             ->post("/fleet-assets/resident-tracking/{$hiddenClient->id}/acknowledge-panic")
             ->assertRedirect();
@@ -829,6 +849,32 @@ class DismissedAlertScopeTest extends TestCase
             'status' => 'given',
             'given_at' => now(),
             'given_method' => 'electronic',
+        ]);
+    }
+
+    private function createTrackingAssignment(Client $client): DeviceAssignment
+    {
+        $consent = $this->createTrackingConsent($client);
+        $hardware = LocationHardware::query()->create([
+            'site_id' => $client->site_id,
+            'provider' => 'manual',
+            'category' => LocationHardware::CATEGORY_TRACKER,
+            'name' => 'Resident tracker hardware '.$client->id,
+            'status' => LocationHardware::STATUS_ONLINE,
+        ]);
+        $device = Device::factory()->tracking()->create([
+            'device_uid' => 'DISMISSED-ALERT-TRACKER-'.$client->id,
+            'legacy_location_hardware_id' => $hardware->id,
+        ]);
+
+        return DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_CLIENT,
+            'assignable_id' => $client->id,
+            'assignment_type' => 'permanent',
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $this->admin->id,
+            'consent_id' => $consent->id,
         ]);
     }
 

@@ -2,12 +2,13 @@
 
 namespace Tests\Feature\Domain\Clinical;
 
-use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalObservation;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\ShiftHandoverService;
 use Database\Seeders\ClinicalPermissionsSeeder;
@@ -20,8 +21,15 @@ class HandoverObservationSummaryTest extends TestCase
     use RefreshDatabase;
 
     protected Client $client;
-    protected User $staffUser;
+
+    protected User $incomingStaff;
+
     protected Shift $outgoingShift;
+
+    protected Site $site;
+
+    protected User $staffUser;
+
     protected ShiftHandoverService $service;
 
     protected function setUp(): void
@@ -30,11 +38,14 @@ class HandoverObservationSummaryTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
 
-        $this->client = Client::factory()->create();
+        $this->site = Site::factory()->create();
+        $this->client = Client::factory()->create(['site_id' => $this->site->id]);
         $this->staffUser = $this->createUserWithRole('coordinator');
+        $this->incomingStaff = $this->createUserWithRole('support_worker');
 
         $this->outgoingShift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'user_id' => $this->staffUser->id,
             'starts_at' => now()->subHours(8),
             'ends_at' => now(),
@@ -54,6 +65,16 @@ class HandoverObservationSummaryTest extends TestCase
         if ($role) {
             $user->roles()->attach($role);
         }
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
 
         return $user;
     }
@@ -62,6 +83,8 @@ class HandoverObservationSummaryTest extends TestCase
     {
         return Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'user_id' => $this->incomingStaff->id,
             'starts_at' => now(),
             'ends_at' => now()->addHours(8),
             'status' => 'scheduled',
@@ -75,11 +98,15 @@ class HandoverObservationSummaryTest extends TestCase
         ClinicalObservation::factory()->vitals()->create([
             'client_id' => $this->client->id,
             'shift_id' => $this->outgoingShift->id,
+            'site_id' => $this->site->id,
+            'recorded_by' => $this->staffUser->id,
             'data' => ['systolic' => 130, 'diastolic' => 85, 'pulse' => 78],
         ]);
         ClinicalObservation::factory()->weight()->create([
             'client_id' => $this->client->id,
             'shift_id' => $this->outgoingShift->id,
+            'site_id' => $this->site->id,
+            'recorded_by' => $this->staffUser->id,
             'data' => ['weight_kg' => 72.0],
         ]);
 
@@ -110,6 +137,7 @@ class HandoverObservationSummaryTest extends TestCase
         ClinicalObservation::factory()->weight()->create([
             'client_id' => $this->client->id,
             'shift_id' => $this->outgoingShift->id,
+            'site_id' => $this->site->id,
             'recorded_by' => $this->staffUser->id,
             'data' => ['weight_kg' => 73.5],
         ]);
@@ -143,11 +171,15 @@ class HandoverObservationSummaryTest extends TestCase
     {
         $otherShift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'user_id' => $this->incomingStaff->id,
         ]);
 
         ClinicalObservation::factory()->weight()->create([
             'client_id' => $this->client->id,
             'shift_id' => $otherShift->id,
+            'site_id' => $this->site->id,
+            'recorded_by' => $this->incomingStaff->id,
         ]);
 
         $this->createIncomingShift();
@@ -165,6 +197,8 @@ class HandoverObservationSummaryTest extends TestCase
         ClinicalObservation::factory()->bowel()->create([
             'client_id' => $this->client->id,
             'shift_id' => $this->outgoingShift->id,
+            'site_id' => $this->site->id,
+            'recorded_by' => $this->staffUser->id,
             'data' => ['bristol_type' => 4],
         ]);
 
@@ -186,6 +220,8 @@ class HandoverObservationSummaryTest extends TestCase
         ClinicalObservation::factory()->vitals()->create([
             'client_id' => $this->client->id,
             'shift_id' => $this->outgoingShift->id,
+            'site_id' => $this->site->id,
+            'recorded_by' => $this->staffUser->id,
             'data' => ['systolic' => 120, 'diastolic' => 80, 'pulse' => 72, 'temperature' => 36.8],
         ]);
 

@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
-use App\Models\HouseLedgerEntry;
 use App\Models\Site;
 use App\Models\SiteMealPlanEntry;
 use App\Models\SiteMealShoppingList;
@@ -67,7 +66,9 @@ class SiteMealShoppingListController extends Controller
         $affected = [];
         foreach ($entries as $entry) {
             $clientIds = (array) ($entry->client_ids ?? []);
-            if (empty($clientIds)) continue;
+            if (empty($clientIds)) {
+                continue;
+            }
             $report = $this->conflictChecker->checkRecipeAgainstClients($entry->recipe, $clientIds);
             if ($report['has_hard_blocks']) {
                 foreach ($report['hard_blocks'] as $block) {
@@ -86,7 +87,7 @@ class SiteMealShoppingListController extends Controller
 
         return [
             'count' => count($affected),
-            'unresolved_count' => count(array_filter($affected, fn ($a) => !$a['has_override'])),
+            'unresolved_count' => count(array_filter($affected, fn ($a) => ! $a['has_override'])),
             'details' => $affected,
         ];
     }
@@ -117,14 +118,14 @@ class SiteMealShoppingListController extends Controller
         abort_unless($list->site_id === $site->id, 404);
 
         $data = $request->validate([
-            'status' => 'nullable|in:' . implode(',', SiteMealShoppingList::STATUSES),
+            'status' => 'nullable|in:'.implode(',', SiteMealShoppingList::STATUSES),
             'provider_key' => 'nullable|string|max:64',
             'provider_order_ref' => 'nullable|string|max:255',
             'notes' => 'nullable|string|max:2000',
         ]);
 
         $payload = array_filter($data, fn ($v) => $v !== null);
-        if (($data['status'] ?? null) === 'ordered' && !$list->ordered_at) {
+        if (($data['status'] ?? null) === 'ordered' && ! $list->ordered_at) {
             $payload['ordered_at'] = now();
         }
         $list->update($payload);
@@ -186,7 +187,7 @@ class SiteMealShoppingListController extends Controller
         $receivedCents = 0;
         foreach ($data['items'] ?? [] as $row) {
             $item = $items->get((int) $row['id']);
-            if (!$item || $item->list_id !== $list->id) {
+            if (! $item || $item->list_id !== $list->id) {
                 continue;
             }
             $qty = (float) $row['received_qty'];
@@ -235,13 +236,13 @@ class SiteMealShoppingListController extends Controller
         }
 
         $reference = "shopping-list:{$list->id}";
-        if (HouseLedgerEntry::where('reference', $reference)->exists()) {
-            return;
-        }
-
         try {
             $ledger = $this->houseLedger->getOrCreateLedger($site);
-            $this->houseLedger->addEntry($ledger, [
+            if ($ledger->entries()->where('reference', $reference)->exists()) {
+                return;
+            }
+
+            $this->houseLedger->addEntry($site, [
                 'entry_type' => 'expense',
                 'category' => 'groceries',
                 'description' => "Groceries received — shopping list #{$list->id}",

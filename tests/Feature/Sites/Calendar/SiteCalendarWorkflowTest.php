@@ -7,13 +7,14 @@ use App\Models\SiteCalendarEvent;
 use App\Models\SiteCalendarEventException;
 use App\Models\User;
 use App\Services\Sites\SiteCalendarService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 });
 
 function calendarManager(Site $site): User
@@ -25,7 +26,6 @@ function calendarManager(Site $site): User
     }
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'employee_number' => 'EMP-CALWF-'.$user->id,
         'work_email' => $user->email,
@@ -41,13 +41,65 @@ function calendarManager(Site $site): User
     return $user;
 }
 
+/**
+ * @return array{hidden: User, ended: User, unapproved: User, portal: User}
+ */
+function calendarIneligiblePeople(Site $hiddenSite): array
+{
+    $hidden = User::factory()->create(['role' => 'team_lead', 'approved_at' => now()]);
+    HrEmployeeProfile::query()->create([
+        'user_id' => $hidden->id,
+        'employee_number' => 'EMP-CALWF-HIDDEN-'.$hidden->id,
+        'work_email' => $hidden->email,
+        'position_title' => 'Hidden Site Lead',
+        'position_role' => 'team_lead',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subMonth()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $hiddenSite->id,
+        'secondary_site_ids' => [],
+    ]);
+
+    $ended = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    HrEmployeeProfile::query()->create([
+        'user_id' => $ended->id,
+        'employee_number' => 'EMP-CALWF-ENDED-'.$ended->id,
+        'work_email' => $ended->email,
+        'position_title' => 'Former Support Worker',
+        'position_role' => 'support_worker',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'end_date' => now()->subDay()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $hiddenSite->id,
+        'secondary_site_ids' => [],
+    ]);
+
+    $unapproved = User::factory()->create(['role' => 'support_worker', 'approved_at' => null]);
+    HrEmployeeProfile::query()->create([
+        'user_id' => $unapproved->id,
+        'employee_number' => 'EMP-CALWF-UNAPPROVED-'.$unapproved->id,
+        'work_email' => $unapproved->email,
+        'position_title' => 'Pending Support Worker',
+        'position_role' => 'support_worker',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subMonth()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $hiddenSite->id,
+        'secondary_site_ids' => [],
+    ]);
+
+    $portal = User::factory()->create(['role' => 'client', 'approved_at' => now()]);
+
+    return compact('hidden', 'ended', 'unapproved', 'portal');
+}
+
 test('an approver can approve a pending event', function () {
     $site = Site::factory()->create(['type' => 'house']);
     $user = calendarManager($site);
 
     $event = SiteCalendarEvent::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'event_type' => 'maintenance',
         'title' => 'Boiler service',
         'start_at' => Carbon::parse('2026-05-20 10:00'),
@@ -72,7 +124,6 @@ test('a partial update reschedules without touching other fields', function () {
 
     $event = SiteCalendarEvent::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'event_type' => 'general',
         'title' => 'House meeting',
         'start_at' => Carbon::parse('2026-05-10 09:00'),
@@ -108,7 +159,6 @@ test('a single-occurrence override moves only that occurrence', function () {
     // the NZ date, so exception-date keying lines up.
     $event = SiteCalendarEvent::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'event_type' => 'general',
         'title' => 'Weekly meeting',
         'start_at' => Carbon::parse('2026-05-04 14:00', $tz)->utc(),
@@ -195,6 +245,81 @@ test('creating then editing an event keeps its business-timezone time (no +12h d
     expect($event->title)->toBe('Morning handover (updated)');
     expect($event->start_at->copy()->timezone($tz)->format('Y-m-d H:i'))->toBe('2026-06-05 10:00');
     expect($event->start_at->copy()->utc()->format('Y-m-d H:i'))->toBe('2026-06-04 22:00');
+});
+
+test('creating an event rejects forged owners and attendees outside the current Site staff boundary', function () {
+    $visibleSite = Site::factory()->create(['type' => 'house']);
+    $hiddenSite = Site::factory()->create(['type' => 'house']);
+    $manager = calendarManager($visibleSite);
+    $people = calendarIneligiblePeople($hiddenSite);
+
+    $this->actingAs($manager)
+        ->from("/sites/{$visibleSite->id}/calendar")
+        ->post("/sites/{$visibleSite->id}/calendar/events", [
+            'event_type' => 'general',
+            'title' => 'Forged recipient event',
+            'start_at' => '2026-06-05T10:00',
+            'owner_user_id' => $people['hidden']->id,
+            'attendee_user_ids' => [
+                $people['hidden']->id,
+                $people['ended']->id,
+                $people['unapproved']->id,
+                $people['portal']->id,
+            ],
+        ])
+        ->assertRedirect("/sites/{$visibleSite->id}/calendar")
+        ->assertSessionHasErrors([
+            'owner_user_id',
+            'attendee_user_ids.0',
+            'attendee_user_ids.1',
+            'attendee_user_ids.2',
+            'attendee_user_ids.3',
+        ]);
+
+    expect(SiteCalendarEvent::query()->where('title', 'Forged recipient event')->exists())->toBeFalse();
+});
+
+test('updating an event rejects forged owners and attendees outside the current Site staff boundary', function () {
+    $visibleSite = Site::factory()->create(['type' => 'house']);
+    $hiddenSite = Site::factory()->create(['type' => 'house']);
+    $manager = calendarManager($visibleSite);
+    $people = calendarIneligiblePeople($hiddenSite);
+
+    $event = SiteCalendarEvent::query()->create([
+        'site_id' => $visibleSite->id,
+        'event_type' => 'general',
+        'title' => 'Protected event',
+        'start_at' => Carbon::parse('2026-06-05 10:00'),
+        'created_by_user_id' => $manager->id,
+        'owner_user_id' => $manager->id,
+        'attendee_user_ids' => [$manager->id],
+        'status' => 'approved',
+        'approval_status' => 'not_required',
+    ]);
+
+    $this->actingAs($manager)
+        ->from("/sites/{$visibleSite->id}/calendar")
+        ->put("/sites/{$visibleSite->id}/calendar/events/{$event->id}", [
+            'owner_user_id' => $people['hidden']->id,
+            'attendee_user_ids' => [
+                $people['hidden']->id,
+                $people['ended']->id,
+                $people['unapproved']->id,
+                $people['portal']->id,
+            ],
+        ])
+        ->assertRedirect("/sites/{$visibleSite->id}/calendar")
+        ->assertSessionHasErrors([
+            'owner_user_id',
+            'attendee_user_ids.0',
+            'attendee_user_ids.1',
+            'attendee_user_ids.2',
+            'attendee_user_ids.3',
+        ]);
+
+    $event->refresh();
+    expect($event->owner_user_id)->toBe($manager->id)
+        ->and($event->attendee_user_ids)->toBe([$manager->id]);
 });
 
 test('a manual event persists and round-trips its room/location', function () {

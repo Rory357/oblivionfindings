@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\EmployeeIntakeService;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -27,11 +28,20 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
 
-    $this->hrActor = User::factory()->create(['role' => 'hr', 'approved_at' => now(), 'organization_id' => 1]);
+    $this->hrActor = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->hrActor->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
 
-    $this->adminActor = User::factory()->create(['role' => 'admin', 'approved_at' => now(), 'organization_id' => 1]);
+    $this->adminActor = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
     $this->adminActor->roles()->syncWithoutDetaching([Role::query()->where('name', 'admin')->first()->id]);
+    $this->site = Site::factory()->create(['name' => 'Intake Guard Allowed Site']);
+    foreach ([$this->hrActor, $this->adminActor] as $actor) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $actor->id,
+            'primary_site_id' => $this->site->id,
+            'is_active' => true,
+            'start_date' => now()->subYear()->toDateString(),
+        ]);
+    }
 });
 
 function hrCloseoutIntake(User $actor, string $roleName, string $email): HrEmployeeProfile
@@ -47,7 +57,6 @@ function hrCloseoutIntake(User $actor, string $roleName, string $email): HrEmplo
             'start_date' => now()->toDateString(),
         ],
         actorId: $actor->id,
-        tenantId: 1,
         startOnboarding: false,
         sendInvite: false,
     );
@@ -88,9 +97,8 @@ test('C2: a normal staff intake by a non-admin actor still works (regression)', 
 });
 
 test('C2: rehiring onto an admin-grade role requires an admin actor', function () {
-    $former = User::factory()->create(['role' => 'admin', 'organization_id' => 1]);
+    $former = User::factory()->create(['role' => 'admin']);
     $profile = HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $former->id,
         'position_role' => 'admin',
         'is_active' => false,
@@ -120,6 +128,7 @@ test('C2: the Add Employee endpoint surfaces the guard as a validation error, no
         'name' => 'Sneaky Elevation',
         'email' => 'sneaky.elevation@example.test',
         'role' => 'admin',
+        'primary_site_id' => $this->site->id,
     ]);
 
     $response->assertRedirect();

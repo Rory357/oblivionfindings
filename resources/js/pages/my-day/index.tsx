@@ -75,9 +75,9 @@ import type {
 /*  /my-day — desktop frontline home                                          */
 /* -------------------------------------------------------------------------- */
 /*
- * Site-first redesign that replaces the original mobile-first /my-day. The
- * page is intentionally web-only (≥768 px); native iOS/Android apps own the
- * mobile surface.
+ * Site-first redesign for the desktop web application. The page is
+ * intentionally web-only (≥768 px); no native application surface is part of
+ * this product scope.
  *
  * Top-down composition:
  *   • AppLayout (default experience) with the AppSidebar
@@ -1381,9 +1381,7 @@ function MyTasksCard({ tasks }: { tasks: MyDayMyTasks }) {
                         {/* eslint-disable-next-line no-restricted-syntax -- custom card-row selector (tone-by-overdue), not a shadcn Button */}
                         <button
                             type="button"
-                            onClick={() =>
-                                item.link && router.visit(item.link)
-                            }
+                            onClick={() => item.link && router.visit(item.link)}
                             className={`flex w-full flex-col gap-1 rounded-lg border p-2.5 text-left transition-colors ${
                                 item.overdue
                                     ? 'border-status-critical/30 bg-status-critical-bg hover:bg-status-critical-bg/70'

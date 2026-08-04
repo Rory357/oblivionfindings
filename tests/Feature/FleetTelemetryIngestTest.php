@@ -2,7 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Jobs\DispatchFleetSignalOutbox;
 use App\Models\Asset;
@@ -66,8 +69,10 @@ class FleetTelemetryIngestTest extends TestCase
         $device = Device::factory()->tracking()->create([
             'provider' => 'queclink',
             'imei' => 'QUE-001',
+            'device_uid' => 'QUE-001',
             'legacy_asset_tracker_id' => $tracker->id,
         ]);
+        $this->linkCanonicalDevice($device, $asset);
 
         $payload = [
             'imei' => 'QUE-001',
@@ -111,13 +116,14 @@ class FleetTelemetryIngestTest extends TestCase
             'category' => 'vehicle',
         ]);
 
-        AssetTracker::create([
+        $tracker = AssetTracker::create([
             'asset_id' => $asset->id,
             'vendor' => 'queclink',
             'device_uid' => 'QUE-002',
             'status' => 'paired',
             'paired_at' => now(),
         ]);
+        $this->createCanonicalDevice('QUE-002', $asset, $tracker);
 
         $payload = [
             'imei' => 'QUE-002',
@@ -179,7 +185,7 @@ class FleetTelemetryIngestTest extends TestCase
             'category' => 'vehicle',
         ]);
 
-        AssetTracker::create([
+        $tracker = AssetTracker::create([
             'asset_id' => $asset->id,
             'vendor' => 'queclink',
             'device_uid' => 'QUE-003',
@@ -187,6 +193,7 @@ class FleetTelemetryIngestTest extends TestCase
             'paired_at' => now(),
             'consent_id' => $consent->id,
         ]);
+        $this->createCanonicalDevice('QUE-003', $asset, $tracker);
 
         AssetGeofence::create([
             'asset_id' => $asset->id,
@@ -256,7 +263,7 @@ class FleetTelemetryIngestTest extends TestCase
             'category' => 'vehicle',
         ]);
 
-        AssetTracker::create([
+        $tracker = AssetTracker::create([
             'asset_id' => $asset->id,
             'vendor' => 'queclink',
             'device_uid' => 'QUE-004',
@@ -264,6 +271,7 @@ class FleetTelemetryIngestTest extends TestCase
             'paired_at' => now(),
             'consent_id' => $consent->id,
         ]);
+        $this->createCanonicalDevice('QUE-004', $asset, $tracker);
 
         $this->withHeader('X-Telemetry-Token', 'test-token')
             ->postJson('/telemetry/ingest/queclink', [
@@ -306,13 +314,14 @@ class FleetTelemetryIngestTest extends TestCase
             'category' => 'personal_tracker',
         ]);
 
-        AssetTracker::create([
+        $tracker = AssetTracker::create([
             'asset_id' => $asset->id,
             'vendor' => 'queclink',
             'device_uid' => 'QUE-005',
             'status' => 'paired',
             'paired_at' => now(),
         ]);
+        $this->createCanonicalDevice('QUE-005', $asset, $tracker);
 
         $this->withHeader('X-Telemetry-Token', 'test-token')
             ->postJson('/telemetry/ingest/queclink', [
@@ -345,13 +354,14 @@ class FleetTelemetryIngestTest extends TestCase
             'category' => 'vehicle',
         ]);
 
-        AssetTracker::create([
+        $tracker = AssetTracker::create([
             'asset_id' => $asset->id,
             'vendor' => 'queclink',
             'device_uid' => 'QUE-006',
             'status' => 'paired',
             'paired_at' => now(),
         ]);
+        $this->createCanonicalDevice('QUE-006', $asset, $tracker);
 
         $this->withHeader('X-Telemetry-Token', 'test-token')
             ->postJson('/telemetry/ingest/queclink', [
@@ -375,7 +385,11 @@ class FleetTelemetryIngestTest extends TestCase
         config(['services.telemetry.ingest_token' => 'test-token']);
 
         $site = Site::create(['name' => 'Test Site']);
-        $client = Client::create(['first_name' => 'Amelia', 'last_name' => 'Wilson']);
+        $client = Client::create([
+            'site_id' => $site->id,
+            'first_name' => 'Amelia',
+            'last_name' => 'Wilson',
+        ]);
         $consentType = ConsentType::create([
             'name' => 'Fleet Tracking',
             'category' => 'essential',
@@ -425,6 +439,7 @@ class FleetTelemetryIngestTest extends TestCase
             'device_uid' => 'QUE-AMELIA',
             'legacy_asset_tracker_id' => $tracker->id,
         ]);
+        $this->linkCanonicalDevice($device, $asset);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => 'client',
@@ -452,7 +467,7 @@ class FleetTelemetryIngestTest extends TestCase
         $this->assertEquals(180, $device->meta['heading']);
     }
 
-    public function test_client_tracker_uses_existing_valid_client_consent_when_links_are_missing_consent_id(): void
+    public function test_client_tracker_fails_closed_when_assignment_and_tracker_lack_consent_id(): void
     {
         config(['services.telemetry.ingest_token' => 'test-token']);
 
@@ -475,7 +490,7 @@ class FleetTelemetryIngestTest extends TestCase
             'legal_basis' => 'Consent',
             'effective_from' => now()->subDay(),
         ]);
-        ClientConsent::create([
+        $consent = ClientConsent::create([
             'client_id' => $client->id,
             'consent_type_id' => $consentType->id,
             'consent_type_version_id' => $consentVersion->id,
@@ -483,6 +498,7 @@ class FleetTelemetryIngestTest extends TestCase
             'given_at' => now()->subDay(),
             'expires_at' => now()->addDays(30),
         ]);
+        $this->assertTrue($consent->isValid());
 
         $asset = Asset::create([
             'site_id' => $site->id,
@@ -506,6 +522,7 @@ class FleetTelemetryIngestTest extends TestCase
             'device_uid' => 'QUE-AMELIA-FALLBACK',
             'legacy_asset_tracker_id' => $tracker->id,
         ]);
+        $this->linkCanonicalDevice($device, $asset);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => 'client',
@@ -525,13 +542,13 @@ class FleetTelemetryIngestTest extends TestCase
 
         $event = FleetTelemetryEvent::where('asset_id', $asset->id)->first();
         $this->assertNotNull($event);
-        $this->assertFalse((bool) $event->consent_blocked);
-        $this->assertEqualsWithDelta(-37.723667, (float) $event->latitude, 0.0001);
-        $this->assertEqualsWithDelta(175.2416, (float) $event->longitude, 0.0001);
+        $this->assertTrue((bool) $event->consent_blocked);
+        $this->assertNull($event->latitude);
+        $this->assertNull($event->longitude);
 
         $device->refresh();
-        $this->assertEqualsWithDelta(-37.723667, (float) $device->latitude, 0.0001);
-        $this->assertEqualsWithDelta(175.2416, (float) $device->longitude, 0.0001);
+        $this->assertNull($device->latitude);
+        $this->assertNull($device->longitude);
     }
 
     public function test_gl30_battery_low_updates_device_health_and_event_without_location_change(): void
@@ -641,17 +658,7 @@ class FleetTelemetryIngestTest extends TestCase
             $worker->id,
             $tenantId,
         );
-        $session = LoneWorkerSession::create([
-            'user_id' => $worker->id,
-            'site_id' => $site->id,
-            'started_at' => now()->subHour(),
-            'expected_end_at' => now()->addHour(),
-            'last_check_in_at' => now()->subMinutes(20),
-            'check_in_interval_minutes' => 30,
-            'status' => 'active',
-            'created_by' => $worker->id,
-            'updated_by' => $worker->id,
-        ]);
+        $session = $this->createLiveLoneWorkerSession($worker, $site);
 
         $this->withHeader('X-Telemetry-Token', 'test-token')
             ->postJson('/telemetry/ingest/queclink', [
@@ -678,7 +685,7 @@ class FleetTelemetryIngestTest extends TestCase
                 ->where('signal_type_code', LoneWorkerSignalService::TYPE_EMERGENCY)
                 ->where('site_id', $site->id)
                 ->exists(),
-            'Expected the canonical same-tenant lone-worker emergency signal.',
+            'Expected the canonical same-Site lone-worker emergency signal.',
         );
         $this->assertDatabaseHas('fleet_signals', [
             'asset_id' => $asset->id,
@@ -692,7 +699,7 @@ class FleetTelemetryIngestTest extends TestCase
         $this->assertDatabaseMissing('fleet_signals', ['signal_type' => 'resident.sos']);
     }
 
-    public function test_sos_person_routing_rejects_cross_tenant_staff_assignment(): void
+    public function test_sos_person_routing_rejects_a_staff_assignment_from_another_site(): void
     {
         config(['services.telemetry.ingest_token' => 'test-token']);
 
@@ -767,7 +774,7 @@ class FleetTelemetryIngestTest extends TestCase
         );
     }
 
-    public function test_sos_person_routing_rejects_cross_tenant_primary_driver_fallback(): void
+    public function test_sos_person_routing_rejects_a_primary_driver_from_another_site(): void
     {
         config(['services.telemetry.ingest_token' => 'test-token']);
 
@@ -821,34 +828,38 @@ class FleetTelemetryIngestTest extends TestCase
 
         $this->mutateAfterInitialDeviceResolution($device, function () use ($device, $mutation): void {
             $changes = match ($mutation) {
-                'tenant' => ['tenant_id' => 626],
                 'domain' => ['domain' => 'access_control'],
                 'provider' => ['provider' => 'teltonika'],
-                'tracker_binding' => ['legacy_asset_tracker_id' => null],
                 default => throw new RuntimeException("Unknown device mutation: {$mutation}"),
             };
 
             Device::query()->whereKey($device->id)->update($changes);
         });
 
-        $this->postStaffSos($deviceUid);
+        $this->withHeader('X-Telemetry-Token', 'test-token')
+            ->postJson('/telemetry/ingest/queclink', [
+                'imei' => $deviceUid,
+                'gps_time' => now()->toISOString(),
+                'alarm' => 'sos',
+                'event_type' => 'man_down',
+                'sos_flag' => true,
+                'lat' => -41.5,
+                'lng' => 174.5,
+                'command_word' => 'GTMAN',
+            ])
+            ->assertStatus(409)
+            ->assertJsonPath('error', 'Canonical telemetry binding changed; retry with the current pairing.');
 
-        $this->assertSosRemainsDeviceOnly(
-            $asset,
-            $tracker,
-            null,
-            $worker,
-            $session,
-        );
+        $this->assertSame('active', $session->fresh()->status);
+        $this->assertDatabaseMissing('fleet_telemetry_events', ['asset_id' => $asset->id]);
+        $this->assertDatabaseMissing('fleet_signals', ['asset_id' => $asset->id]);
     }
 
     public static function invalidLockedDeviceMutationProvider(): array
     {
         return [
-            'device tenant changed' => ['tenant'],
             'device domain changed' => ['domain'],
             'device provider changed' => ['provider'],
-            'device tracker binding changed' => ['tracker_binding'],
         ];
     }
 
@@ -874,7 +885,7 @@ class FleetTelemetryIngestTest extends TestCase
         $this->assertSosRemainsDeviceOnly($asset, $tracker, $device->id, $worker, $session);
     }
 
-    public function test_final_telemetry_acceptance_released_staff_history_suppresses_same_tenant_primary_driver_fallback(): void
+    public function test_final_telemetry_acceptance_released_staff_history_suppresses_same_site_primary_driver_fallback(): void
     {
         config(['services.telemetry.ingest_token' => 'test-token']);
 
@@ -913,6 +924,7 @@ class FleetTelemetryIngestTest extends TestCase
         $deviceUid = 'QUE-SENSITIVE-'.strtoupper(str_replace('_', '-', $mutation));
         ['site' => $site, 'client' => $client, 'asset' => $asset, 'tracker' => $tracker, 'device' => $device]
             = $this->createConsentedPersonalTracker($deviceUid, $tenantId);
+        $otherSite = Site::create(['name' => 'Other sensitive attribution Site']);
 
         if ($mutation === 'active_assignment_mismatch') {
             $otherClient = Client::factory()->create([
@@ -931,16 +943,12 @@ class FleetTelemetryIngestTest extends TestCase
             ]);
         } else {
             $this->mutateAfterInitialDeviceResolution($device, function () use (
-                $device,
-                $site,
+                $client,
+                $otherSite,
                 $mutation,
-                $tenantId,
             ): void {
                 match ($mutation) {
-                    'device_domain' => Device::query()->whereKey($device->id)->update(['domain' => 'access_control']),
-                    'device_provider' => Device::query()->whereKey($device->id)->update(['provider' => 'teltonika']),
-                    'device_tracker_binding' => Device::query()->whereKey($device->id)->update(['legacy_asset_tracker_id' => null]),
-                    'tenant_contradiction' => Site::query()->whereKey($site->id)->update(['tenant_id' => $tenantId + 1]),
+                    'client_site_contradiction' => Client::query()->whereKey($client->id)->update(['site_id' => $otherSite->id]),
                     default => throw new RuntimeException("Unknown sensitive attribution mutation: {$mutation}"),
                 };
             });
@@ -1062,10 +1070,7 @@ class FleetTelemetryIngestTest extends TestCase
     {
         return [
             'active client assignment contradicts the asset client' => ['active_assignment_mismatch'],
-            'canonical device domain changed' => ['device_domain'],
-            'canonical device provider changed' => ['device_provider'],
-            'canonical device tracker binding changed' => ['device_tracker_binding'],
-            'device and asset site tenants contradict' => ['tenant_contradiction'],
+            'client and asset Sites contradict' => ['client_site_contradiction'],
         ];
     }
 
@@ -1098,13 +1103,14 @@ class FleetTelemetryIngestTest extends TestCase
             'status' => 'paired',
             'paired_at' => now(),
         ]);
-        Device::factory()->tracking()->create([
+        $device = Device::factory()->tracking()->create([
             'tenant_id' => $tenantId,
             'provider' => 'queclink',
             'imei' => 'QUE-SAFE-ENVELOPE',
             'device_uid' => 'QUE-SAFE-ENVELOPE',
             'legacy_asset_tracker_id' => $tracker->id,
         ]);
+        $this->linkCanonicalDevice($device, $asset);
 
         $this->withHeader('X-Telemetry-Token', 'test-token')
             ->postJson('/telemetry/ingest/queclink', [
@@ -1234,24 +1240,15 @@ class FleetTelemetryIngestTest extends TestCase
             'organization_id' => $tenantId,
             'site_id' => $site->id,
         ]);
-        $otherAsset = Asset::create([
-            'site_id' => $site->id,
-            'client_id' => $client->id,
-            'name' => 'Other resident tracker asset',
-            'status' => 'active',
-            'risk_level' => 'medium',
-            'category' => 'personal_tracker',
-        ]);
+        $otherSite = Site::create(['name' => 'Other late resident Site']);
 
         $this->mutateAfterVehicleSos(function () use (
             $mutation,
             $device,
-            $tracker,
             $asset,
-            $site,
-            $otherAsset,
+            $client,
+            $otherSite,
             $otherClient,
-            $tenantId,
         ): void {
             match ($mutation) {
                 'client_assignment_released' => DeviceAssignment::query()
@@ -1259,11 +1256,8 @@ class FleetTelemetryIngestTest extends TestCase
                     ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
                     ->whereNull('released_at')
                     ->update(['released_at' => now()]),
-                'tracker_unpaired' => AssetTracker::query()->whereKey($tracker->id)->update(['status' => 'retired']),
-                'tracker_asset_changed' => AssetTracker::query()->whereKey($tracker->id)->update(['asset_id' => $otherAsset->id]),
-                'device_binding_changed' => Device::query()->whereKey($device->id)->update(['legacy_asset_tracker_id' => null]),
                 'asset_client_changed' => Asset::query()->whereKey($asset->id)->update(['client_id' => $otherClient->id]),
-                'site_tenant_changed' => Site::query()->whereKey($site->id)->update(['tenant_id' => $tenantId + 1]),
+                'client_site_changed' => Client::query()->whereKey($client->id)->update(['site_id' => $otherSite->id]),
                 default => throw new RuntimeException("Unknown late resident mutation: {$mutation}"),
             };
         });
@@ -1282,11 +1276,8 @@ class FleetTelemetryIngestTest extends TestCase
     {
         return [
             'active client assignment released' => ['client_assignment_released', true],
-            'tracker unpaired' => ['tracker_unpaired', false],
-            'tracker rebound to another asset' => ['tracker_asset_changed', false],
-            'canonical device tracker binding changed' => ['device_binding_changed', false],
             'asset client changed' => ['asset_client_changed', true],
-            'asset site tenant changed' => ['site_tenant_changed', false],
+            'client moved to another Site' => ['client_site_changed', true],
         ];
     }
 
@@ -1450,6 +1441,7 @@ class FleetTelemetryIngestTest extends TestCase
             ->filter(fn (?string $table): bool => in_array($table, [
                 'device_assignments',
                 'devices',
+                'device_asset_links',
                 'asset_trackers',
                 'assets',
                 'lone_worker_sessions',
@@ -1463,8 +1455,9 @@ class FleetTelemetryIngestTest extends TestCase
         $this->assertSame([
             'device_assignments',
             'devices',
-            'asset_trackers',
+            'device_asset_links',
             'assets',
+            'asset_trackers',
             'lone_worker_sessions',
             'users',
             'clients',
@@ -1506,6 +1499,7 @@ class FleetTelemetryIngestTest extends TestCase
             ->filter(fn (?string $table): bool => in_array($table, [
                 'device_assignments',
                 'devices',
+                'device_asset_links',
                 'asset_trackers',
                 'assets',
                 'lone_worker_sessions',
@@ -1519,8 +1513,9 @@ class FleetTelemetryIngestTest extends TestCase
         $this->assertSame([
             'device_assignments',
             'devices',
-            'asset_trackers',
+            'device_asset_links',
             'assets',
+            'asset_trackers',
             'sites',
             'clients',
         ], $relevantTables->all());
@@ -1534,8 +1529,9 @@ class FleetTelemetryIngestTest extends TestCase
     }
 
     #[DataProvider('invalidResidentProvenanceProvider')]
-    public function test_final_sos_acceptance_rejects_invalid_resident_device_and_tenant_provenance(
+    public function test_final_sos_acceptance_rejects_invalid_resident_device_and_site_provenance(
         string $mutation,
+        bool $deviceRemainsCanonical,
     ): void {
         config(['services.telemetry.ingest_token' => 'test-token']);
 
@@ -1543,41 +1539,35 @@ class FleetTelemetryIngestTest extends TestCase
         $deviceUid = 'QUE-RESIDENT-'.strtoupper(str_replace('_', '-', $mutation));
         ['site' => $site, 'client' => $client, 'asset' => $asset, 'tracker' => $tracker, 'device' => $device]
             = $this->createConsentedPersonalTracker($deviceUid, $tenantId);
+        $otherSite = Site::create(['name' => 'Other resident provenance Site']);
 
         $this->mutateAfterInitialDeviceResolution($device, function () use (
-            $device,
-            $site,
             $client,
+            $asset,
+            $otherSite,
             $mutation,
-            $tenantId,
         ): void {
             match ($mutation) {
-                'domain' => Device::query()->whereKey($device->id)->update(['domain' => 'access_control']),
-                'provider' => Device::query()->whereKey($device->id)->update(['provider' => 'teltonika']),
-                'tracker_binding' => Device::query()->whereKey($device->id)->update(['legacy_asset_tracker_id' => null]),
-                'tenant_contradiction' => Device::query()->whereKey($device->id)->update(['tenant_id' => $tenantId + 1]),
-                'site_tenant_missing' => Site::query()->whereKey($site->id)->update(['tenant_id' => null]),
-                'client_tenant_missing' => Client::query()->whereKey($client->id)->update(['organization_id' => null]),
-                'client_tenant_contradiction' => Client::query()->whereKey($client->id)->update(['organization_id' => $tenantId + 1]),
+                'client_site_changed' => Client::query()->whereKey($client->id)->update(['site_id' => $otherSite->id]),
+                'asset_site_changed' => Asset::query()->whereKey($asset->id)->update(['site_id' => $otherSite->id]),
                 default => throw new RuntimeException("Unknown resident mutation: {$mutation}"),
             };
         });
 
         $this->postStaffSos($deviceUid);
 
-        $this->assertOnlyVehicleSafetySignal($asset, $tracker, null);
+        $this->assertOnlyVehicleSafetySignal(
+            $asset,
+            $tracker,
+            $deviceRemainsCanonical ? $device->id : null,
+        );
     }
 
     public static function invalidResidentProvenanceProvider(): array
     {
         return [
-            'device domain changed' => ['domain'],
-            'device provider changed' => ['provider'],
-            'device tracker binding changed' => ['tracker_binding'],
-            'device and site tenants contradict' => ['tenant_contradiction'],
-            'site tenant missing' => ['site_tenant_missing'],
-            'client tenant missing' => ['client_tenant_missing'],
-            'client tenant contradicts device and site' => ['client_tenant_contradiction'],
+            'client moved to another Site' => ['client_site_changed', false],
+            'asset moved away from the client Site' => ['asset_site_changed', false],
         ];
     }
 
@@ -1913,6 +1903,7 @@ class FleetTelemetryIngestTest extends TestCase
             'device_uid' => $deviceUid,
             'legacy_asset_tracker_id' => $tracker->id,
         ]);
+        $this->linkCanonicalDevice($device, $asset);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => 'staff',
@@ -1956,6 +1947,8 @@ class FleetTelemetryIngestTest extends TestCase
 
     private function createLiveLoneWorkerSession(User $worker, Site $site, array $overrides = []): LoneWorkerSession
     {
+        $this->makeCurrentWorkerAtSite($worker, $site);
+
         return LoneWorkerSession::create(array_merge([
             'user_id' => $worker->id,
             'site_id' => $site->id,
@@ -1967,6 +1960,36 @@ class FleetTelemetryIngestTest extends TestCase
             'created_by' => $worker->id,
             'updated_by' => $worker->id,
         ], $overrides));
+    }
+
+    private function makeCurrentWorkerAtSite(User $worker, Site $site): void
+    {
+        $worker->forceFill([
+            'approved_at' => $worker->approved_at ?? now(),
+            'role' => 'support_worker',
+        ])->save();
+
+        $profile = HrEmployeeProfile::query()->where('user_id', $worker->id)->first();
+        if ($profile) {
+            $profile->forceFill([
+                'primary_site_id' => $site->id,
+                'secondary_site_ids' => [],
+                'is_active' => true,
+                'start_date' => $profile->start_date ?? now()->subDay(),
+                'end_date' => null,
+            ])->save();
+        } else {
+            HrEmployeeProfile::factory()->create([
+                'user_id' => $worker->id,
+                'primary_site_id' => $site->id,
+                'secondary_site_ids' => [],
+                'is_active' => true,
+                'start_date' => now()->subDay(),
+                'end_date' => null,
+            ]);
+        }
+
+        $worker->unsetRelation('hrEmployeeProfile');
     }
 
     private function postStaffSos(string $deviceUid): void
@@ -2285,6 +2308,32 @@ class FleetTelemetryIngestTest extends TestCase
         return $matches[1] ?? null;
     }
 
+    private function createCanonicalDevice(
+        string $deviceUid,
+        Asset $asset,
+        ?AssetTracker $historicalTracker = null,
+    ): Device {
+        $device = Device::factory()->tracking()->create([
+            'provider' => 'queclink',
+            'imei' => $deviceUid,
+            'device_uid' => $deviceUid,
+            'legacy_asset_tracker_id' => $historicalTracker?->id,
+        ]);
+        $this->linkCanonicalDevice($device, $asset);
+
+        return $device;
+    }
+
+    private function linkCanonicalDevice(Device $device, Asset $asset): DeviceAssetLink
+    {
+        return DeviceAssetLink::create([
+            'device_id' => $device->id,
+            'asset_id' => $asset->id,
+            'link_type' => LinkType::InstalledIn,
+            'linked_at' => now(),
+        ]);
+    }
+
     /**
      * @return array{site: Site, client: Client, consent: ClientConsent, asset: Asset, tracker: AssetTracker, device: Device}
      */
@@ -2350,6 +2399,7 @@ class FleetTelemetryIngestTest extends TestCase
             'device_uid' => $deviceUid,
             'legacy_asset_tracker_id' => $tracker->id,
         ]);
+        $this->linkCanonicalDevice($device, $asset);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => 'client',

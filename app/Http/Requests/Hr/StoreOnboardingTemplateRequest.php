@@ -17,7 +17,7 @@ class StoreOnboardingTemplateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'template_id' => ['nullable', 'integer', 'exists:hr_onboarding_templates,id'],
+            'template_id' => ['nullable', 'integer'],
             'role' => ['required', 'string', 'max:100'],
             'site_type' => ['nullable', 'string', 'max:100'],
             'is_active' => ['sometimes', 'boolean'],

@@ -2,12 +2,15 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrTimeEntryAmendment extends Model
 {
+    use WritesLegacyStorageContext;
+
     protected $fillable = [
         'tenant_id',
         'hr_time_entry_id',
@@ -26,10 +29,5 @@ class HrTimeEntryAmendment extends Model
     public function amendedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'amended_by');
-    }
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 }

@@ -13,10 +13,10 @@ beforeEach(function () {
 
     $this->manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->manager->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
-    $this->manager->setAttribute('tenant_id', 1);
+    $this->site = ensureCanonicalHrStaffProfile($this->manager);
 
     $this->staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
-    $this->staff->setAttribute('tenant_id', 1);
+    ensureCanonicalHrStaffProfile($this->staff, $this->site);
 });
 
 test('a manager can credit a balance and it writes an adjustment ledger row', function () {

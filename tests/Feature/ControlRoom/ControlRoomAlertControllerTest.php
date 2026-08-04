@@ -44,17 +44,23 @@ class ControlRoomAlertControllerTest extends TestCase
 
         $this->seed(RbacSeeder::class);
 
+        $this->site = Site::factory()->create([
+            'is_active' => true,
+            'archived' => false,
+            'archived_at' => null,
+        ]);
+
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
-        $this->site = Site::factory()->create([
-            'tenant_id' => $this->admin->organization_id,
-        ]);
 
         $this->coordinator = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
         $this->coordinator->roles()->attach(Role::where('name', 'coordinator')->first());
 
         $this->supportWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
         $this->supportWorker->roles()->attach(Role::where('name', 'support_worker')->first());
+
+        $this->scopeUserToSite($this->admin, $this->site);
+        $this->scopeUserToSite($this->coordinator, $this->site);
     }
 
     // ──────────────────────────────────────
@@ -415,7 +421,7 @@ class ControlRoomAlertControllerTest extends TestCase
 
     public function test_individual_and_bulk_assignment_scope_and_lock_the_assignee_in_one_query(): void
     {
-        $site = Site::factory()->create(['tenant_id' => $this->admin->organization_id]);
+        $site = Site::factory()->create();
 
         $individualAlert = $this->alertFactory()->open()->create(['site_id' => $site->id]);
         $individualQueries = $this->captureDatabaseQueries(
@@ -452,11 +458,9 @@ class ControlRoomAlertControllerTest extends TestCase
     public function test_individual_and_bulk_assignment_use_fresh_actor_site_access_inside_the_transaction(): void
     {
         $authorizedSite = Site::factory()->create([
-            'tenant_id' => $this->coordinator->organization_id,
             'type' => 'house',
         ]);
         $revokedToSite = Site::factory()->create([
-            'tenant_id' => $this->coordinator->organization_id,
             'type' => 'house',
         ]);
         $assignee = $this->makeRoleUser('coordinator');
@@ -498,7 +502,7 @@ class ControlRoomAlertControllerTest extends TestCase
 
     public function test_individual_and_bulk_assignment_roll_back_when_strict_audit_writing_fails(): void
     {
-        $site = Site::factory()->create(['tenant_id' => $this->admin->organization_id]);
+        $site = Site::factory()->create();
         $individualAlert = $this->alertFactory()->open()->create(['site_id' => $site->id]);
         $this->assertAssignmentRollsBackOnAuditFailure(
             $individualAlert,
@@ -864,11 +868,8 @@ class ControlRoomAlertControllerTest extends TestCase
 
     public function test_create_alert_accepts_client_site_and_priority(): void
     {
-        $site = Site::factory()->create([
-            'tenant_id' => $this->admin->organization_id,
-        ]);
+        $site = Site::factory()->create();
         $client = Client::factory()->create([
-            'organization_id' => $this->admin->organization_id,
             'site_id' => $site->id,
         ]);
 
@@ -1646,20 +1647,20 @@ class ControlRoomAlertControllerTest extends TestCase
 
     protected function scopeUserToSite(User $user, Site $site): void
     {
-        HrEmployeeProfile::query()->updateOrCreate(
-            ['user_id' => $user->id],
-            [
-                'tenant_id' => 1,
-                'employee_number' => 'EMP-CR-'.$user->id,
-                'work_email' => $user->email,
-                'position_title' => 'Control Room',
-                'position_role' => $user->role,
-                'employment_type' => 'full_time',
-                'start_date' => now()->subMonth()->toDateString(),
-                'is_active' => true,
-                'primary_site_id' => $site->id,
-                'secondary_site_ids' => [],
-            ],
-        );
+        $profile = HrEmployeeProfile::query()->where('user_id', $user->id)->first()
+            ?? HrEmployeeProfile::factory()->make(['user_id' => $user->id]);
+
+        $profile->fill([
+            'employee_number' => 'EMP-CR-'.$user->id,
+            'work_email' => $user->email,
+            'position_title' => 'Control Room',
+            'position_role' => $user->role,
+            'employment_type' => 'full_time',
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+            'is_active' => true,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+        ])->save();
     }
 }

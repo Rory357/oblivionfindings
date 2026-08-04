@@ -1,7 +1,11 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\Permission;
+use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\DB;
@@ -11,9 +15,27 @@ beforeEach(function () {
 });
 
 /** A user with the given permission keys granted via overrides. */
-function makeEscalationUser(array $permissionKeys): User
+function makeEscalationUser(Site $site, array $permissionKeys, ?string $roleName = null): User
 {
-    $user = User::factory()->create(['approved_at' => now()]);
+    $user = User::factory()->create([
+        'approved_at' => now(),
+        'role' => $roleName ?? 'support_worker',
+    ]);
+
+    if ($roleName !== null) {
+        $user->roles()->attach(Role::query()->where('name', $roleName)->firstOrFail());
+    }
+
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $user->id,
+        'updated_by' => $user->id,
+    ]);
 
     foreach ($permissionKeys as $permissionKey) {
         $permission = Permission::query()->firstOrCreate(
@@ -27,8 +49,15 @@ function makeEscalationUser(array $permissionKeys): User
 }
 
 it('records a level-1 escalation for an overdue assigned follow-up and is idempotent', function () {
-    $user = makeEscalationUser(['incidents.viewAny']);
-    $incident = ClientIncident::factory()->create(['status' => 'submitted']);
+    $site = Site::factory()->create();
+    $user = makeEscalationUser($site, ['incidents.viewAny']);
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $incident = ClientIncident::factory()->create([
+        'client_id' => $client->id,
+        'site_id' => $site->id,
+        'reported_by' => $user->id,
+        'status' => 'submitted',
+    ]);
     $followup = $incident->followups()->create([
         'assigned_to_user_id' => $user->id,
         'due_at' => now()->subDay(),
@@ -65,8 +94,15 @@ it('records a level-1 escalation for an overdue assigned follow-up and is idempo
 });
 
 it('escalates a 3-day-overdue item to level 2', function () {
-    $user = makeEscalationUser(['incidents.viewAny']);
-    $incident = ClientIncident::factory()->create(['status' => 'submitted']);
+    $site = Site::factory()->create();
+    $user = makeEscalationUser($site, ['incidents.viewAny'], 'provider_manager');
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $incident = ClientIncident::factory()->create([
+        'client_id' => $client->id,
+        'site_id' => $site->id,
+        'reported_by' => $user->id,
+        'status' => 'submitted',
+    ]);
     $followup = $incident->followups()->create([
         'assigned_to_user_id' => $user->id,
         'due_at' => now()->subDays(4),

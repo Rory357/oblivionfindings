@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -14,6 +15,12 @@ beforeEach(function () {
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
     ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'start_date' => today()->subMonth(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 
     // A role with no recognition permission.
     $noRecRole = Role::query()->firstOrCreate(['name' => 'norec'], ['label' => 'No Recognition']);
@@ -21,6 +28,12 @@ beforeEach(function () {
     $this->outsider->roles()->syncWithoutDetaching([$noRecRole->id]);
 
     $this->recipient = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->recipient->id,
+        'start_date' => today()->subMonth(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 });
 
 test('a user without hr.recognition.view cannot read the feed', function () {

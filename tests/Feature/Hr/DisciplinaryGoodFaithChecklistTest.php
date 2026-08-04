@@ -5,10 +5,16 @@ use App\Domain\Hr\Models\HrCaseEvent;
 use App\Domain\Hr\Models\HrDisciplinaryAction;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
+
+    $this->site = Site::factory()->create([
+        'name' => 'Disciplinary case Site',
+    ]);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -31,7 +37,6 @@ beforeEach(function () {
     }
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->hr->id,
         'employee_number' => 'EMP-HR-1001',
         'work_email' => "hr-{$this->hr->id}@example.test",
@@ -40,10 +45,10 @@ beforeEach(function () {
         'employment_type' => 'full_time',
         'start_date' => now()->subYears(2)->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
     ]);
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'employee_number' => 'EMP-STF-1002',
         'work_email' => "staff-{$this->staff->id}@example.test",
@@ -52,10 +57,10 @@ beforeEach(function () {
         'employment_type' => 'full_time',
         'start_date' => now()->subYears(1)->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
     ]);
 
     $this->case = HrCase::query()->create([
-        'tenant_id' => 1,
         'case_number' => 'HR-90001',
         'user_id' => $this->staff->id,
         'case_type' => 'disciplinary',
@@ -81,7 +86,6 @@ function fullGoodFaithChecklist(): array
 
 test('disciplinary outcome update is blocked without required good faith checklist', function () {
     $action = HrDisciplinaryAction::query()->create([
-        'tenant_id' => 1,
         'case_id' => $this->case->id,
         'employee_user_id' => $this->staff->id,
         'stage' => 'response_period',
@@ -104,7 +108,6 @@ test('disciplinary outcome update is blocked without required good faith checkli
 
 test('disciplinary outcome update succeeds when good faith checklist is complete', function () {
     $action = HrDisciplinaryAction::query()->create([
-        'tenant_id' => 1,
         'case_id' => $this->case->id,
         'employee_user_id' => $this->staff->id,
         'stage' => 'response_period',
@@ -139,7 +142,6 @@ test('disciplinary outcome update succeeds when good faith checklist is complete
 
 test('disciplinary stage cannot advance to outcome without required good faith checklist', function () {
     $action = HrDisciplinaryAction::query()->create([
-        'tenant_id' => 1,
         'case_id' => $this->case->id,
         'employee_user_id' => $this->staff->id,
         'stage' => 'response_period',
@@ -160,6 +162,9 @@ test('disciplinary stage cannot advance to outcome without required good faith c
 
     $action->update([
         'good_faith_checklist' => fullGoodFaithChecklist(),
+        'outcome' => 'Written warning issued.',
+        'outcome_decided_at' => now(),
+        'outcome_decided_by' => $this->hr->id,
     ]);
 
     $this->actingAs($this->hr)
@@ -180,9 +185,76 @@ test('disciplinary stage cannot advance to outcome without required good faith c
     expect((string) ($stageEvent?->description ?? ''))->toContain('outcome decided');
 });
 
+test('recorded disciplinary outcome appeal and good faith evidence cannot be weakened', function () {
+    $action = HrDisciplinaryAction::query()->create([
+        'case_id' => $this->case->id,
+        'employee_user_id' => $this->staff->id,
+        'stage' => 'appeal',
+        'action_type' => 'written_warning',
+        'allegation_summary' => 'Repeated late medication chart updates.',
+        'good_faith_checklist' => fullGoodFaithChecklist(),
+        'outcome' => 'Written warning issued.',
+        'outcome_decided_at' => now()->subDay(),
+        'outcome_decided_by' => $this->hr->id,
+        'appeal_received' => true,
+        'appeal_received_at' => now(),
+        'created_by' => $this->hr->id,
+    ]);
+
+    $this->actingAs($this->hr)
+        ->put("/hr/cases/disciplinary/{$action->id}", [
+            'good_faith_checklist' => [
+                ...fullGoodFaithChecklist(),
+                'response_genuinely_considered' => false,
+            ],
+        ])
+        ->assertSessionHasErrors('good_faith');
+    $this->actingAs($this->hr)
+        ->put("/hr/cases/disciplinary/{$action->id}", ['outcome' => null])
+        ->assertSessionHasErrors('outcome');
+    $this->actingAs($this->hr)
+        ->put("/hr/cases/disciplinary/{$action->id}", ['appeal_received' => false])
+        ->assertSessionHasErrors('appeal_received');
+
+    expect($action->fresh())
+        ->outcome->toBe('Written warning issued.')
+        ->appeal_received->toBeTrue()
+        ->and($action->fresh()->good_faith_checklist)
+        ->toEqual(fullGoodFaithChecklist());
+});
+
+test('disciplinary evidence dates must be truthful and active actions block parent case closure', function () {
+    $action = HrDisciplinaryAction::query()->create([
+        'case_id' => $this->case->id,
+        'employee_user_id' => $this->staff->id,
+        'stage' => 'meeting_scheduled',
+        'action_type' => 'written_warning',
+        'allegation_summary' => 'Repeated late medication chart updates.',
+        'created_by' => $this->hr->id,
+    ]);
+
+    $this->actingAs($this->hr)
+        ->put("/hr/cases/disciplinary/{$action->id}", [
+            'notice_issued_at' => now()->addDay()->toIso8601String(),
+            'meeting_scheduled_at' => now()->addDays(2)->toIso8601String(),
+            'meeting_held_at' => now()->toIso8601String(),
+        ])
+        ->assertSessionHasErrors(['notice_issued_at', 'meeting_held_at']);
+
+    $this->actingAs($this->hr)
+        ->post("/hr/cases/{$this->case->id}/close", [
+            'outcome' => 'Closed while action remains active.',
+            'outcome_type' => 'disciplinary',
+        ])
+        ->assertSessionHasErrors('case');
+
+    expect($action->fresh()->notice_issued_at)->toBeNull()
+        ->and($action->fresh()->meeting_held_at)->toBeNull()
+        ->and($this->case->fresh()->status)->toBe('open');
+});
+
 test('disciplinary edit GET redirects to the case show page which exposes the wizard contract', function () {
     $action = HrDisciplinaryAction::query()->create([
-        'tenant_id' => 1,
         'case_id' => $this->case->id,
         'employee_user_id' => $this->staff->id,
         'stage' => 'response_period',

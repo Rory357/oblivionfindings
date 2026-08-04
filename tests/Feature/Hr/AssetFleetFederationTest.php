@@ -1,9 +1,14 @@
 <?php
 
 use App\Domain\Hr\Models\HrAsset;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
+use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
+use Database\Seeders\SeedHrPermissionsSeeder;
 use Illuminate\Support\Str;
 
 /**
@@ -14,18 +19,27 @@ use Illuminate\Support\Str;
  * runtime rather than by code-reading (see Run 21, F-67/F-68).
  */
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
     // RbacSeeder (the demo seed) does not create the hr.assets.* permissions —
     // SeedHrPermissionsSeeder does, and attaches them to the `hr` role.
-    $this->seed(\Database\Seeders\SeedHrPermissionsSeeder::class);
+    $this->seed(SeedHrPermissionsSeeder::class);
 
     $this->manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $hrRole = Role::query()->where('name', 'hr')->first();
     if ($hrRole) {
         $this->manager->roles()->syncWithoutDetaching([$hrRole->id]);
     }
-    // No HrEmployeeProfile is created, so resolveHrTenantIdForUser falls back to
-    // tenant 1 — the same tenant the fixtures below use.
+    $this->site = Site::factory()->create();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->manager->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+        'start_date' => today()->subYear(),
+    ]);
+    $this->manager->permissionOverrides()->attach(
+        Permission::query()->where('key', 'assets.viewAny')->firstOrFail()->id,
+        ['allowed' => true],
+    );
 });
 
 test('S2 seam: HR cannot hand-type a fleet-category asset — vehicles/keys must link to the Fleet register', function () {
@@ -41,10 +55,13 @@ test('S2 seam: HR cannot hand-type a fleet-category asset — vehicles/keys must
 });
 
 test('S2 seam: an HR asset linked to a Fleet asset reads THROUGH to the canonical Fleet record', function () {
-    $fleetVehicle = Asset::factory()->create(['name' => 'Fleet Van 7']);
+    $fleetVehicle = Asset::factory()->create([
+        'site_id' => $this->site->id,
+        'name' => 'Fleet Van 7',
+        'category' => 'vehicle',
+    ]);
 
     $hrAsset = HrAsset::query()->create([
-        'tenant_id' => 1,
         'asset_tag' => 'VEH-FED-1',
         'name' => 'Van 7 (HR view)',
         'category' => 'vehicle',
@@ -61,10 +78,12 @@ test('S2 seam: an HR asset linked to a Fleet asset reads THROUGH to the canonica
 });
 
 test('S2 seam: bulk-retire skips Fleet-linked rows — Fleet owns disposal, HR must not retire it', function () {
-    $fleetVehicle = Asset::factory()->create();
+    $fleetVehicle = Asset::factory()->create([
+        'site_id' => $this->site->id,
+        'category' => 'vehicle',
+    ]);
 
     $fleetLinked = HrAsset::query()->create([
-        'tenant_id' => 1,
         'asset_tag' => 'VEH-FED-2',
         'name' => 'Fleet-linked van',
         'category' => 'vehicle',
@@ -74,7 +93,6 @@ test('S2 seam: bulk-retire skips Fleet-linked rows — Fleet owns disposal, HR m
     ]);
 
     $hrOwned = HrAsset::query()->create([
-        'tenant_id' => 1,
         'asset_tag' => 'LAP-1',
         'name' => 'MacBook',
         'category' => 'laptop',

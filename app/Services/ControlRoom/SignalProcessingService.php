@@ -98,12 +98,6 @@ class SignalProcessingService
             }
         }
 
-        // Record signal source activity
-        if (! empty($data['signal_source_id'])) {
-            $source = SignalSource::find($data['signal_source_id']);
-            $source?->recordSignal();
-        }
-
         // Ensure occurred_at is never null
         $data['occurred_at'] = $data['occurred_at'] ?? now();
 
@@ -123,6 +117,12 @@ class SignalProcessingService
 
             throw $e;
         }
+
+        // Activity belongs to the successfully persisted signal, not to an
+        // alert outcome. Duplicate deliveries return above without inflating
+        // source counters or rewriting the projection timestamp.
+        $signal->signalSource?->recordSignal();
+        $signal->device?->recordSignal();
 
         Log::info('Signal ingested', [
             'signal_id' => $signal->id,
@@ -209,6 +209,8 @@ class SignalProcessingService
 
         return DB::transaction(function () use ($signal): int {
             $canonicalDeviceId = (int) data_get($signal->normalized_data, 'canonical_device_id');
+            $correlationKey = $this->monitorCorrelationKey($signal);
+            $legacyRecovery = data_get($signal->normalized_data, 'legacy_monitoring_recovery') === true;
 
             if (! $signal->device_id && $canonicalDeviceId <= 0) {
                 $signal->markProcessed(null, 'No device identity was available for recovery matching.');
@@ -216,7 +218,13 @@ class SignalProcessingService
                 return 0;
             }
 
-            $alerts = ControlRoomAlert::query()
+            if ($correlationKey === null && ! $legacyRecovery) {
+                $signal->markProcessed(null, 'Recovery did not include an exact monitoring correlation key.');
+
+                return 0;
+            }
+
+            $alertsQuery = ControlRoomAlert::query()
                 ->unresolved()
                 ->where('source', 'security_devices')
                 ->where(function ($query) use ($signal, $canonicalDeviceId): void {
@@ -229,15 +237,25 @@ class SignalProcessingService
                         $query->{$method}('context->normalized_data->canonical_device_id', $canonicalDeviceId);
                     }
                 })
-                ->whereHas('signals', fn ($query) => $query->where('signal_type_code', 'device_offline'))
-                ->get();
+                ->whereHas('signals', fn ($query) => $query->where('signal_type_code', 'device_offline'));
+
+            if ($correlationKey !== null) {
+                $alertsQuery->where('context->normalized_data->monitor_correlation_key', $correlationKey);
+            } else {
+                $alertsQuery->whereNull('context->normalized_data->monitor_correlation_key');
+            }
+
+            $alerts = $alertsQuery->lockForUpdate()->get();
 
             foreach ($alerts as $alert) {
                 $this->resolveAlert(
                     $alert,
                     'Monitoring confirmed that the device recovered.',
                     'monitoring_recovery',
-                    ['recovery_signal_id' => $signal->id],
+                    [
+                        'recovery_signal_id' => $signal->id,
+                        'monitor_correlation_key' => $correlationKey,
+                    ],
                 );
             }
 
@@ -367,11 +385,6 @@ class SignalProcessingService
             }
         }
 
-        // Update device if applicable
-        if ($signal->device_id) {
-            $signal->device?->recordSignal();
-        }
-
         // Increment shift counters
         $currentShift = Shift::getCurrent();
         $currentShift?->incrementCreated();
@@ -427,6 +440,7 @@ class SignalProcessingService
     {
         $windowMinutes = $rule->dedup_window_minutes ?? 30;
         $normalizedData = $signal->normalized_data ?? [];
+        $canonicalDeviceId = $this->canonicalPositiveId($normalizedData['canonical_device_id'] ?? null);
 
         $query = ControlRoomAlert::query()
             ->unresolved()
@@ -434,7 +448,16 @@ class SignalProcessingService
 
         $query->whereIn('alert_type', $this->correlationAlertTypes($signal, $rule));
 
-        if (! empty($normalizedData['shift_id'])) {
+        $monitorCorrelationKey = $this->monitorCorrelationKey($signal);
+        if ($monitorCorrelationKey !== null) {
+            $query->where('context->normalized_data->monitor_correlation_key', $monitorCorrelationKey);
+            if ($signal->device_id) {
+                $query->where('device_id', $signal->device_id);
+            }
+            if ($canonicalDeviceId !== null) {
+                $query->where('context->normalized_data->canonical_device_id', $canonicalDeviceId);
+            }
+        } elseif (! empty($normalizedData['shift_id'])) {
             $query->whereRaw(
                 "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.shift_id')) = ?",
                 [(string) $normalizedData['shift_id']]
@@ -450,10 +473,16 @@ class SignalProcessingService
             }
         } elseif ($signal->device_id) {
             $query->where('device_id', $signal->device_id);
+        } elseif ($canonicalDeviceId !== null) {
+            $query->where('context->normalized_data->canonical_device_id', $canonicalDeviceId);
         } elseif ($signal->asset_id) {
             $query->where('asset_id', $signal->asset_id);
         } elseif ($signal->site_id) {
             $query->where('site_id', $signal->site_id);
+        }
+
+        if ($signal->signal_type_code === 'device_offline' && $monitorCorrelationKey === null) {
+            $query->whereNull('context->normalized_data->monitor_correlation_key');
         }
 
         if ($signal->signalSource?->slug !== 'lone_worker') {
@@ -531,6 +560,15 @@ class SignalProcessingService
 
         return $candidate && $this->loneWorkerCandidateMatchesSignal($candidate, $signal, $rule)
             ? $candidate
+            : null;
+    }
+
+    private function monitorCorrelationKey(Signal $signal): ?string
+    {
+        $key = data_get($signal->normalized_data, 'monitor_correlation_key');
+
+        return is_string($key) && preg_match('/\A[a-f0-9]{64}\z/', $key) === 1
+            ? $key
             : null;
     }
 

@@ -9,7 +9,9 @@ use App\Models\MedicationAdminRule;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -26,7 +28,7 @@ class OneChartAdministrationSafetyTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
@@ -40,9 +42,14 @@ class OneChartAdministrationSafetyTest extends TestCase
             'type' => 'residential',
             'is_active' => true,
         ]);
+        $site = Site::factory()->create([
+            'type' => 'house',
+            'is_active' => true,
+        ]);
 
         $this->client = Client::factory()->create([
             'service_context_id' => $serviceContext->id,
+            'site_id' => $site->id,
         ]);
     }
 

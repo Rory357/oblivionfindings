@@ -8,11 +8,21 @@ use App\Models\Client;
 use App\Models\PriceBook;
 use App\Models\Quote;
 use App\Models\ServiceAgreement;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class QuoteController extends Controller
 {
+    private const APPLICATION_STORAGE_CONTEXT_ID = 1;
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     public function index(Request $request)
     {
         $auth = $request->user();
@@ -22,8 +32,7 @@ class QuoteController extends Controller
             'status' => ['nullable', 'string', 'in:draft,sent,accepted,declined,expired,converted'],
         ]);
 
-        $baseQuery = fn () => Quote::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id));
+        $baseQuery = fn () => $this->accessibleQuotes($auth);
 
         $quotes = $baseQuery()
             ->with(['client:id,first_name,last_name', 'creator:id,name', 'lineItems'])
@@ -72,8 +81,8 @@ class QuoteController extends Controller
             'stats' => $stats,
             'canManage' => $canManage,
             // Reference data for the create/edit modal.
-            'clients' => $canManage ? $this->clientOptions($auth->organization_id) : [],
-            'priceBooks' => $canManage ? $this->priceBookOptions($auth->organization_id) : [],
+            'clients' => $canManage ? $this->clientOptions($auth) : [],
+            'priceBooks' => $canManage ? $this->priceBookOptions() : [],
         ]);
     }
 
@@ -90,8 +99,7 @@ class QuoteController extends Controller
             'status' => ['nullable', 'string', 'in:draft,sent,accepted,declined,expired,converted'],
         ]);
 
-        $rows = Quote::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $rows = $this->accessibleQuotes($auth)
             ->with('client:id,first_name,last_name')
             ->when(! empty($data['status']), fn ($q) => $q->where('status', $data['status']))
             ->orderByDesc('created_at')
@@ -115,19 +123,21 @@ class QuoteController extends Controller
     }
 
     /** Client options for the quote modal. */
-    private function clientOptions(?int $orgId)
+    private function clientOptions(User $user)
     {
-        return Client::query()
-            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+        return $this->siteAccess->applyClientScope(
+            Client::query(),
+            $user,
+            ['reports.viewAny'],
+        )
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
     }
 
     /** Active price books with their rate items for the quote modal's quick-add. */
-    private function priceBookOptions(?int $orgId)
+    private function priceBookOptions()
     {
         return PriceBook::query()
-            ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
             ->where('is_active', true)
             ->with(['items' => fn ($q) => $q->orderBy('name')])
             ->orderBy('name')
@@ -150,8 +160,7 @@ class QuoteController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('finance.ar.view'), 403);
 
-        $quote = Quote::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $quote = $this->accessibleQuotes($auth)
             ->with(['client:id,first_name,last_name', 'lineItems'])
             ->findOrFail($quote);
 
@@ -176,15 +185,20 @@ class QuoteController extends Controller
             'line_items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ]);
 
+        $this->siteAccess->assertCanAccessClientId(
+            $auth,
+            (int) $data['client_id'],
+            ['reports.viewAny'],
+        );
+
         $now = now();
-        $count = Quote::where('organization_id', $auth->organization_id)
+        $count = Quote::withTrashed()
             ->whereYear('created_at', $now->year)
             ->whereMonth('created_at', $now->month)
             ->count();
         $quoteNumber = sprintf('QTE-%s-%03d', $now->format('Ym'), $count + 1);
 
         $quote = Quote::create([
-            'organization_id' => $auth->organization_id,
             'client_id' => $data['client_id'],
             'quote_number' => $quoteNumber,
             'title' => $data['title'],
@@ -200,7 +214,6 @@ class QuoteController extends Controller
         foreach ($data['line_items'] as $item) {
             $amount = bcmul((string) $item['quantity'], (string) $item['unit_price'], 2);
             $quote->lineItems()->create([
-                'organization_id' => $auth->organization_id,
                 'description' => $item['description'],
                 'quantity' => $item['quantity'],
                 'unit_price' => $item['unit_price'],
@@ -225,9 +238,7 @@ class QuoteController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
-        $quote = Quote::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($quote);
+        $quote = $this->accessibleQuotes($auth)->findOrFail($quote);
 
         $data = $request->validate([
             'client_id' => ['sometimes', 'required', 'integer', 'exists:clients,id'],
@@ -236,6 +247,23 @@ class QuoteController extends Controller
             'notes' => ['nullable', 'string'],
             'status' => ['nullable', 'string', 'in:draft,sent,accepted,declined,expired'],
         ]);
+
+        if (array_key_exists('client_id', $data)) {
+            $this->siteAccess->assertCanAccessClientId(
+                $auth,
+                (int) $data['client_id'],
+                ['reports.viewAny'],
+            );
+
+            if (
+                (int) $data['client_id'] !== (int) $quote->client_id
+                && ($quote->converted_to_agreement_id || $quote->converted_to_invoice_id)
+            ) {
+                throw ValidationException::withMessages([
+                    'client_id' => 'A converted quote cannot be reassigned to another Client.',
+                ]);
+            }
+        }
 
         $quote->update($data);
 
@@ -247,9 +275,7 @@ class QuoteController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
-        $quote = Quote::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($quote);
+        $quote = $this->accessibleQuotes($auth)->findOrFail($quote);
 
         $quote->update([
             'status' => 'sent',
@@ -264,9 +290,7 @@ class QuoteController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
-        $quote = Quote::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($quote);
+        $quote = $this->accessibleQuotes($auth)->findOrFail($quote);
 
         $quote->update([
             'status' => 'accepted',
@@ -281,13 +305,11 @@ class QuoteController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
-        $quote = Quote::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $quote = $this->accessibleQuotes($auth)
             ->with(['lineItems'])
             ->findOrFail($quote);
 
         $agreement = ServiceAgreement::create([
-            'organization_id' => $auth->organization_id,
             'client_id' => $quote->client_id,
             'title' => $quote->title,
             'status' => 'draft',
@@ -299,7 +321,7 @@ class QuoteController extends Controller
                 'description' => $item->description,
                 'quantity' => $item->quantity,
                 'unit_price' => $item->unit_price,
-                'total' => $item->total,
+                'budget_allocated' => $item->amount,
             ]);
         }
 
@@ -321,8 +343,7 @@ class QuoteController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
-        $quote = Quote::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $quote = $this->accessibleQuotes($auth)
             ->with(['lineItems', 'client'])
             ->findOrFail($quote);
 
@@ -354,9 +375,9 @@ class QuoteController extends Controller
             }
 
             $invoice = FinInvoice::create([
-                'organization_id' => $auth->organization_id,
+                'organization_id' => self::APPLICATION_STORAGE_CONTEXT_ID,
                 'client_id' => $quote->client_id,
-                'invoice_number' => FinInvoice::nextNumber($auth->organization_id),
+                'invoice_number' => FinInvoice::nextNumber(self::APPLICATION_STORAGE_CONTEXT_ID),
                 'invoice_date' => now()->toDateString(),
                 'due_date' => now()->addDays(30)->toDateString(),
                 'client_name' => $quote->client_name
@@ -389,5 +410,15 @@ class QuoteController extends Controller
 
         return redirect()->route('finance.invoices.show', $invoice)
             ->with('success', "Quote converted to invoice {$invoice->invoice_number}.");
+    }
+
+    private function accessibleQuotes(User $user): Builder
+    {
+        return Quote::query()
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+                $clientQuery,
+                $user,
+                ['reports.viewAny'],
+            ));
     }
 }

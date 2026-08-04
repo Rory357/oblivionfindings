@@ -1,20 +1,21 @@
+import { type HrTabItem, HrTabs, useHrTab } from '@/components/hr';
 import {
     AmendmentDrawer,
-    EntriesPane,
-    OverviewPane,
     type ApprovalTimesheet,
+    EntriesPane,
     type ExceptionItem,
     type KpiStats,
     type NamedOption,
-    type OnNowItem,
-    type PaginatedData,
     NoteDialog,
+    type OnNowItem,
+    OverviewPane,
+    type PaginatedData,
     type RecentActivityItem,
     ReportsPane,
     type TimeCan,
     type TimeDialogMode,
-    TimeEntryDialog,
     type TimeEntry,
+    TimeEntryDialog,
     type TimeFilters,
     TimeHero,
     type TimeReport,
@@ -22,7 +23,6 @@ import {
     TimesheetsPane,
     type WeeklyDay,
 } from '@/components/hr/time';
-import { HrTabs, type HrTabItem, useHrTab } from '@/components/hr';
 import { PageLayout } from '@/components/page';
 import {
     ShiftContextMenu,
@@ -46,11 +46,11 @@ import {
     Trash2,
 } from 'lucide-react';
 import {
+    type MouseEvent,
+    type ReactNode,
     useEffect,
     useMemo,
     useState,
-    type MouseEvent,
-    type ReactNode,
 } from 'react';
 
 interface Props {
@@ -84,11 +84,11 @@ const KNOWN_TABS = ['overview', 'entries', 'timesheets', 'reports'];
 /** Build a query string from the active server filters (minus tab). */
 function filterQuery(filters: TimeFilters): string {
     const params = new URLSearchParams();
-    (Object.entries(filters) as [keyof TimeFilters, string | undefined][]).forEach(
-        ([k, v]) => {
-            if (v && k !== 'tab') params.set(k, String(v));
-        },
-    );
+    (
+        Object.entries(filters) as [keyof TimeFilters, string | undefined][]
+    ).forEach(([k, v]) => {
+        if (v && k !== 'tab') params.set(k, String(v));
+    });
     return params.toString();
 }
 
@@ -112,7 +112,11 @@ export default function TimeIndex({
     can,
 }: Props) {
     const isManager = !!can.approveAny;
-    const [tab, setTab] = useHrTab(filters.tab && KNOWN_TABS.includes(filters.tab) ? filters.tab : 'overview');
+    const [tab, setTab] = useHrTab(
+        filters.tab && KNOWN_TABS.includes(filters.tab)
+            ? filters.tab
+            : 'overview',
+    );
     const activeTab = KNOWN_TABS.includes(tab) ? tab : 'overview';
 
     const [dialogMode, setDialogMode] = useState<TimeDialogMode | null>(null);
@@ -137,7 +141,12 @@ export default function TimeIndex({
             if (rawPins) {
                 const parsed: unknown = JSON.parse(rawPins);
                 if (Array.isArray(parsed))
-                    setPins(parsed.filter((p): p is string => typeof p === 'string' && KNOWN_TABS.includes(p)));
+                    setPins(
+                        parsed.filter(
+                            (p): p is string =>
+                                typeof p === 'string' && KNOWN_TABS.includes(p),
+                        ),
+                    );
             }
         } catch {
             /* ignore malformed storage */
@@ -154,7 +163,14 @@ export default function TimeIndex({
         const tick = () => {
             if (document.hidden || dialogMode || drawerEntry) return;
             router.reload({
-                only: ['entries', 'onNow', 'recentActivity', 'kpiStats', 'exceptions', 'weeklyTeam'],
+                only: [
+                    'entries',
+                    'onNow',
+                    'recentActivity',
+                    'kpiStats',
+                    'exceptions',
+                    'weeklyTeam',
+                ],
                 preserveState: true,
                 preserveScroll: true,
             });
@@ -314,7 +330,13 @@ export default function TimeIndex({
                 onClick: () => openDialog('void', e),
             });
         }
-        setCtx({ x: ev.clientX, y: ev.clientY, tag: 'Entry', meta: e.user_name, items });
+        setCtx({
+            x: ev.clientX,
+            y: ev.clientY,
+            tag: 'Entry',
+            meta: e.user_name,
+            items,
+        });
     }
 
     function personMenu(p: OnNowItem, ev: MouseEvent) {
@@ -328,7 +350,11 @@ export default function TimeIndex({
                 {
                     icon: <CalendarClock className="h-4 w-4" />,
                     label: 'Correct / close clock-out',
-                    onClick: () => openDialog('correct', correctSeed({ ...p, user_name: p.name })),
+                    onClick: () =>
+                        openDialog(
+                            'correct',
+                            correctSeed({ ...p, user_name: p.name }),
+                        ),
                 },
                 {
                     icon: <List className="h-4 w-4" />,
@@ -362,7 +388,12 @@ export default function TimeIndex({
     }
 
     function runException(e: ExceptionItem) {
-        if (e.action === 'correct' && e.entry_id && e.clock_in && e.entry_date) {
+        if (
+            e.action === 'correct' &&
+            e.entry_id &&
+            e.clock_in &&
+            e.entry_date
+        ) {
             openDialog(
                 'correct',
                 correctSeed({
@@ -389,7 +420,10 @@ export default function TimeIndex({
             label: 'Overview',
             icon: LayoutDashboard,
             tone: 'primary',
-            badge: kpiStats.exceptions_count > 0 ? kpiStats.exceptions_count : undefined,
+            badge:
+                kpiStats.exceptions_count > 0
+                    ? kpiStats.exceptions_count
+                    : undefined,
         },
         {
             id: 'entries',
@@ -431,9 +465,14 @@ export default function TimeIndex({
     };
     const togglePin = (id: string) => {
         setPins((prev) => {
-            const next = prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id];
+            const next = prev.includes(id)
+                ? prev.filter((p) => p !== id)
+                : [...prev, id];
             try {
-                window.localStorage.setItem('hrTime.pinnedTabs', JSON.stringify(next));
+                window.localStorage.setItem(
+                    'hrTime.pinnedTabs',
+                    JSON.stringify(next),
+                );
             } catch {
                 /* ignore */
             }
@@ -448,7 +487,9 @@ export default function TimeIndex({
         if (isDefault || isPinned) {
             tabDecorations[t.id] = (
                 <span className="ml-0.5 inline-flex items-center gap-0.5">
-                    {isDefault ? <Star className="h-3 w-3 fill-current text-status-warning" /> : null}
+                    {isDefault ? (
+                        <Star className="h-3 w-3 fill-current text-status-warning" />
+                    ) : null}
                     {isPinned ? <Pin className="h-3 w-3" /> : null}
                 </span>
             );
@@ -466,7 +507,10 @@ export default function TimeIndex({
             items: [
                 {
                     icon: <Star className="h-4 w-4" />,
-                    label: defaultTab === id ? 'Default view' : 'Set as default view',
+                    label:
+                        defaultTab === id
+                            ? 'Default view'
+                            : 'Set as default view',
                     tone: defaultTab === id ? 'primary' : undefined,
                     onClick: () => setDefaultView(id),
                 },
@@ -481,17 +525,30 @@ export default function TimeIndex({
 
     /* ---- hero alert chips ---- */
     const alerts = useMemo(() => {
-        const byKind = (kind: string) => exceptions.filter((e) => e.kind === kind).length;
+        const byKind = (kind: string) =>
+            exceptions.filter((e) => e.kind === kind).length;
         const chips: { key: string; label: string; onClick: () => void }[] = [];
         const missed = byKind('missed_clock_out');
         const breaks = byKind('break_fail');
         const ot = byKind('overtime');
         if (missed > 0)
-            chips.push({ key: 'missed', label: `${missed} missed clock-out${missed === 1 ? '' : 's'}`, onClick: () => setTab('overview') });
+            chips.push({
+                key: 'missed',
+                label: `${missed} missed clock-out${missed === 1 ? '' : 's'}`,
+                onClick: () => setTab('overview'),
+            });
         if (breaks > 0)
-            chips.push({ key: 'breaks', label: `${breaks} break ${breaks === 1 ? 'fail' : 'fails'}`, onClick: () => setTab('overview') });
+            chips.push({
+                key: 'breaks',
+                label: `${breaks} break ${breaks === 1 ? 'fail' : 'fails'}`,
+                onClick: () => setTab('overview'),
+            });
         if (ot > 0)
-            chips.push({ key: 'ot', label: `${ot} over 40h`, onClick: () => setTab('overview') });
+            chips.push({
+                key: 'ot',
+                label: `${ot} over 40h`,
+                onClick: () => setTab('overview'),
+            });
         return chips;
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [exceptions]);
@@ -503,7 +560,7 @@ export default function TimeIndex({
             <PageLayout
                 hero={
                     <TimeHero
-                        tenantName="the team"
+                        teamName="the team"
                         isManager={isManager}
                         kpi={kpiStats}
                         onNow={onNow}
@@ -512,9 +569,14 @@ export default function TimeIndex({
                         selfHoursWeek={weeklySummary.total_hours}
                         isOnClock={!!activeClock}
                         handlers={{
-                            onAddEntry: isManager ? () => openDialog('add') : undefined,
-                            onClockOnBehalf: can.clockOnBehalf ? () => openDialog('behalf') : undefined,
-                            onReviewTimesheets: () => router.visit('/operations/timesheets'),
+                            onAddEntry: isManager
+                                ? () => openDialog('add')
+                                : undefined,
+                            onClockOnBehalf: can.clockOnBehalf
+                                ? () => openDialog('behalf')
+                                : undefined,
+                            onReviewTimesheets: () =>
+                                router.visit('/operations/timesheets'),
                             onExport: isManager
                                 ? () => {
                                       window.location.href = exportHref;
@@ -556,7 +618,7 @@ export default function TimeIndex({
                     />
                 ) : null}
 
-                {(activeTab === 'entries' || !isManager) ? (
+                {activeTab === 'entries' || !isManager ? (
                     <EntriesPane
                         entries={entries}
                         filters={filters}
@@ -571,11 +633,18 @@ export default function TimeIndex({
                 ) : null}
 
                 {activeTab === 'timesheets' && isManager ? (
-                    <TimesheetsPane timesheets={timesheets} canApproveAny={!!can.approveAny} />
+                    <TimesheetsPane
+                        timesheets={timesheets}
+                        canApproveAny={!!can.approveAny}
+                    />
                 ) : null}
 
                 {activeTab === 'reports' && isManager ? (
-                    <ReportsPane report={report} exportHref={exportHref} pdfHref={pdfHref} />
+                    <ReportsPane
+                        report={report}
+                        exportHref={exportHref}
+                        pdfHref={pdfHref}
+                    />
                 ) : null}
             </PageLayout>
 
@@ -603,7 +672,9 @@ export default function TimeIndex({
 
             <NoteDialog entry={noteEntry} onClose={() => setNoteEntry(null)} />
 
-            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+            {ctx ? (
+                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+            ) : null}
         </AppLayout>
     );
 }

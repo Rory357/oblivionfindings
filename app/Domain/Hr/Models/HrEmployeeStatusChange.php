@@ -2,16 +2,18 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrEmployeeStatusChange extends Model
 {
+    use WritesLegacyStorageContext;
+
     public $timestamps = false;
 
     protected $fillable = [
-        'tenant_id',
         'employee_profile_id',
         'previous_status',
         'new_status',
@@ -26,7 +28,7 @@ class HrEmployeeStatusChange extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function employeeProfile(): BelongsTo
@@ -37,14 +39,5 @@ class HrEmployeeStatusChange extends Model
     public function changedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'changed_by');
-    }
-
-    /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
-    /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 }

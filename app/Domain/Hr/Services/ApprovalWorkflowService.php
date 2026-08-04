@@ -6,43 +6,41 @@ use App\Domain\Hr\Models\HrApprovalAction;
 use App\Domain\Hr\Models\HrApprovalChain;
 use App\Domain\Hr\Models\HrApprovalChainStep;
 use App\Domain\Hr\Models\HrApprovalInstance;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 
 class ApprovalWorkflowService
 {
+    public function __construct(
+        private readonly HrCurrentStaffService $currentStaff,
+    ) {}
+
     /**
      * Initiate an approval workflow for a given approvable model.
      *
-     * Looks up the active approval chain for the process type and tenant,
+     * Looks up the active approval chain for the process type,
      * then creates an approval instance starting at step 1.
      *
-     * @param  Model   $approvable   The model requiring approval (leave request, expense, etc.)
+     * @param  Model  $approvable  The model requiring approval (leave request, expense, etc.)
      * @param  string  $processType  One of: 'leave', 'expense', 'timesheet', 'document'
-     * @param  User    $initiator    The user who initiated the approval
-     * @return HrApprovalInstance
+     * @param  User  $initiator  The user who initiated the approval
      *
      * @throws \LogicException If no active approval chain exists for the process type
      */
     public function initiateApproval(Model $approvable, string $processType, User $initiator): HrApprovalInstance
     {
-        // Users carry their tenant on organization_id (there is no users.tenant_id),
-        // and the /hr/approvals inbox resolves the viewer's tenant the same way. Stamp
-        // the instance with that resolved id — using the raw (always-null) tenant_id
-        // would file every service-created instance under tenant NULL, invisible to
-        // the inbox it is meant to feed.
-        $tenantId = $initiator->tenant_id ?? $initiator->organization_id;
-
-        $chain = $this->getChainForProcess($processType, $tenantId);
+        $chain = $this->getChainForProcess($processType);
 
         if (! $chain) {
             throw new \LogicException("No active approval chain found for process type '{$processType}'.");
         }
 
-        return DB::transaction(function () use ($approvable, $chain, $initiator, $tenantId) {
+        return DB::transaction(function () use ($approvable, $chain, $initiator) {
             return HrApprovalInstance::create([
-                'tenant_id' => $tenantId,
                 'approval_chain_id' => $chain->id,
                 'approvable_type' => get_class($approvable),
                 'approvable_id' => $approvable->getKey(),
@@ -62,11 +60,7 @@ class ApprovalWorkflowService
      * - If approved and this was the final step, mark instance as approved.
      * - If rejected, mark instance as rejected immediately.
      *
-     * @param  HrApprovalInstance  $instance
-     * @param  User                $approver
-     * @param  string              $action   One of: 'approved', 'rejected', 'escalated'
-     * @param  string|null         $notes
-     * @return HrApprovalInstance
+     * @param  string  $action  One of: 'approved', 'rejected', 'escalated'
      *
      * @throws \LogicException If instance is not pending
      */
@@ -76,11 +70,18 @@ class ApprovalWorkflowService
         string $action,
         ?string $notes = null
     ): HrApprovalInstance {
-        if ($instance->status !== 'pending') {
-            throw new \LogicException("Cannot action a '{$instance->status}' approval instance.");
-        }
-
         return DB::transaction(function () use ($instance, $approver, $action, $notes) {
+            $instance = HrApprovalInstance::query()
+                ->with(['chain.steps'])
+                ->lockForUpdate()
+                ->findOrFail($instance->getKey());
+
+            $this->assertCurrentApprover($instance, $approver);
+
+            if ($instance->status !== 'pending') {
+                throw new \LogicException("Cannot action a '{$instance->status}' approval instance.");
+            }
+
             // Record the action
             HrApprovalAction::create([
                 'approval_instance_id' => $instance->id,
@@ -136,9 +137,6 @@ class ApprovalWorkflowService
      * - 'user': returns the specific user configured on the step
      * - 'role': returns the first user with the configured role
      * - 'manager': returns the initiator's manager (if available)
-     *
-     * @param  HrApprovalInstance  $instance
-     * @return User|null
      */
     public function getCurrentApprover(HrApprovalInstance $instance): ?User
     {
@@ -152,24 +150,37 @@ class ApprovalWorkflowService
         }
 
         return match ($step->approver_type) {
-            'user' => $step->approver_user_id ? User::find($step->approver_user_id) : null,
-            'role' => $this->getUserForRoleStep($step, $instance->tenant_id),
+            'user' => $step->approver_user_id ? $this->currentStaffUser((int) $step->approver_user_id) : null,
+            'role' => $this->getUserForRoleStep($step),
             'manager' => $this->getManagerForInitiator($instance),
             default => null,
         };
     }
 
+    public function isCurrentApprover(HrApprovalInstance $instance, User $user): bool
+    {
+        if (! $this->currentStaffUser((int) $user->id)) {
+            return false;
+        }
+
+        return (int) ($this->getCurrentApprover($instance)?->id ?? 0) === (int) $user->id;
+    }
+
+    public function assertCurrentApprover(HrApprovalInstance $instance, User $user): void
+    {
+        if ($this->isCurrentApprover($instance, $user)) {
+            return;
+        }
+
+        throw (new ModelNotFoundException)->setModel(HrApprovalInstance::class, [$instance->getKey()]);
+    }
+
     /**
-     * Get the active approval chain for a given process type and tenant.
-     *
-     * @param  string    $processType
-     * @param  int|null  $tenantId
-     * @return HrApprovalChain|null
+     * Get the active approval chain for a given process type.
      */
-    public function getChainForProcess(string $processType, ?int $tenantId): ?HrApprovalChain
+    public function getChainForProcess(string $processType): ?HrApprovalChain
     {
         return HrApprovalChain::query()
-            ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
             ->where('process_type', $processType)
             ->where('is_active', true)
             ->with('steps')
@@ -177,22 +188,21 @@ class ApprovalWorkflowService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                            */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     /**
      * Get a user who holds the role configured on a step.
      */
-    protected function getUserForRoleStep(HrApprovalChainStep $step, ?int $tenantId): ?User
+    protected function getUserForRoleStep(HrApprovalChainStep $step): ?User
     {
         if (! $step->approver_role_id) {
             return null;
         }
 
-        return User::query()
-            // Users are tenanted by organization_id (there is no users.tenant_id).
-            ->when($tenantId, fn ($q) => $q->where('organization_id', $tenantId))
+        return $this->currentStaff->currentUsersQuery()
             ->whereHas('roles', fn ($q) => $q->where('roles.id', $step->approver_role_id))
+            ->orderBy('users.id')
             ->first();
     }
 
@@ -201,19 +211,29 @@ class ApprovalWorkflowService
      */
     protected function getManagerForInitiator(HrApprovalInstance $instance): ?User
     {
-        $initiator = $instance->initiator ?? User::find($instance->initiated_by);
+        $profileQuery = HrEmployeeProfile::query()->where('user_id', $instance->initiated_by);
+        $this->applyCurrentProfileScope($profileQuery);
+        $managerId = $profileQuery->value('manager_user_id');
 
-        if (! $initiator) {
+        if (! $managerId) {
             return null;
         }
 
-        // Try to find a manager via the employee profile
-        $profile = \App\Domain\Hr\Models\HrEmployeeProfile::where('user_id', $initiator->id)->first();
+        return $this->currentStaffUser((int) $managerId);
+    }
 
-        if ($profile && $profile->manager_user_id) {
-            return User::find($profile->manager_user_id);
-        }
+    private function currentStaffUser(int $userId): ?User
+    {
+        return $this->currentStaff->currentUsersQuery()
+            ->whereKey($userId)
+            ->first();
+    }
 
-        return null;
+    private function applyCurrentProfileScope(Builder $query): Builder
+    {
+        return $query
+            ->where('is_active', true)
+            ->where(fn (Builder $dates) => $dates->whereNull('start_date')->orWhereDate('start_date', '<=', today()))
+            ->where(fn (Builder $dates) => $dates->whereNull('end_date')->orWhereDate('end_date', '>=', today()));
     }
 }

@@ -2,17 +2,18 @@
 
 namespace App\Domain\Hr\Models;
 
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A selectable category for HR calendar events. System rows (tenant_id null) seed
- * the canonical five + holiday; tenants may add their own. `key` mirrors the
- * legacy `hr_calendar_events.event_type` string; `color_token` / `icon` are
- * design-token / lucide names the wizard resolves client-side.
+ * An application-wide selectable category for HR calendar events. `key`
+ * mirrors the legacy `hr_calendar_events.event_type` string; `color_token` /
+ * `icon` are design-token / lucide names the wizard resolves client-side.
  */
 class HrCalendarEventCategory extends Model
 {
+    use WritesLegacyStorageContext;
+
     protected $table = 'hr_calendar_event_categories';
 
     protected $fillable = [
@@ -29,12 +30,4 @@ class HrCalendarEventCategory extends Model
         'is_system' => 'boolean',
         'sort' => 'integer',
     ];
-
-    /** System (tenant-null) categories plus the given tenant's own, sorted. */
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query
-            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId))
-            ->orderBy('sort');
-    }
 }

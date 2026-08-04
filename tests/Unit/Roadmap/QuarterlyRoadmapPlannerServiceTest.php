@@ -42,7 +42,7 @@ class QuarterlyRoadmapPlannerServiceTest extends TestCase
             'status' => 'draft',
         ]);
 
-        $plan = $this->service->generateDraft(now()->year, now()->quarter, 'board_ceo', null, $admin->id);
+        $plan = $this->service->generateDraft(now()->year, now()->quarter, 'board_ceo', $admin->id);
 
         $this->assertSame('draft', $plan->status);
         $this->assertSame(2, $plan->items->count());
@@ -61,7 +61,7 @@ class QuarterlyRoadmapPlannerServiceTest extends TestCase
         $admin = $this->createAdminUser();
         $this->createInitiative($admin, ['status' => 'approved']);
 
-        $plan = $this->service->generateDraft(now()->year, now()->quarter, 'board_ceo', null, $admin->id);
+        $plan = $this->service->generateDraft(now()->year, now()->quarter, 'board_ceo', $admin->id);
 
         $this->expectException(\RuntimeException::class);
         $this->service->submitForExecutiveReview($plan, $admin->id);
@@ -72,7 +72,7 @@ class QuarterlyRoadmapPlannerServiceTest extends TestCase
         $admin = $this->createAdminUser();
         $this->createInitiative($admin, ['status' => 'approved']);
 
-        $plan = $this->service->generateDraft(now()->year, now()->quarter, 'board_ceo', null, $admin->id);
+        $plan = $this->service->generateDraft(now()->year, now()->quarter, 'board_ceo', $admin->id);
 
         $this->expectException(\RuntimeException::class);
         $this->service->publish($plan, $admin->id);
@@ -84,7 +84,7 @@ class QuarterlyRoadmapPlannerServiceTest extends TestCase
         $this->createInitiative($admin, ['status' => 'approved']);
         $this->createInitiative($admin, ['status' => 'in_progress']);
 
-        $plan = $this->service->generateDraft(now()->year, now()->quarter, 'board_ceo', null, $admin->id);
+        $plan = $this->service->generateDraft(now()->year, now()->quarter, 'board_ceo', $admin->id);
         $plan = $this->service->submitForManagerReview($plan, $admin->id);
         $plan = $this->service->submitForExecutiveReview($plan, $admin->id);
         $plan = $this->service->approve($plan, $admin->id);
@@ -110,7 +110,7 @@ class QuarterlyRoadmapPlannerServiceTest extends TestCase
         $admin = $this->createAdminUser();
         $this->createInitiative($admin, ['status' => 'approved']);
 
-        $plan = $this->service->generateDraft(now()->year, now()->quarter, 'board_ceo', null, $admin->id);
+        $plan = $this->service->generateDraft(now()->year, now()->quarter, 'board_ceo', $admin->id);
 
         $this->expectException(\RuntimeException::class);
         $this->service->createRevisionFromPublished($plan, $admin->id);

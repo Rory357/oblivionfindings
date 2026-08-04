@@ -9,6 +9,7 @@ use App\Models\FamilyPortalSetting;
 use App\Models\NextOfKin;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -47,10 +48,8 @@ function makeClientProfilePortalNok(
     Client $client,
     array $flags = [],
     array $permissionKeys = ['clients.viewPortal'],
-    ?int $organizationId = null,
 ): User {
     $user = User::factory()->create([
-        'organization_id' => $organizationId ?? $client->organization_id,
         'role' => 'next_of_kin',
         'approved_at' => now(),
     ]);
@@ -119,7 +118,6 @@ function grantClientProfilePortalFamilyDisclosure(
         'updated_by' => $actor->id,
     ]);
     FamilyPortalSetting::query()->create([
-        'organization_id' => $client->organization_id,
         'client_id' => $client->id,
         'show_shift_schedule' => true,
         'show_respite' => true,
@@ -132,9 +130,8 @@ function grantClientProfilePortalFamilyDisclosure(
 }
 
 it('serves a linked client identity only through portal profile routes', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create();
     $portalClient = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'client',
         'approved_at' => now(),
     ]);
@@ -158,7 +155,7 @@ it('serves a linked client identity only through portal profile routes', functio
 });
 
 it('omits medical payloads from portal client when a linked NOK has no health flags', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create();
     seedClientProfilePortalSensitiveData($client);
     $nok = makeClientProfilePortalNok($client);
 
@@ -185,7 +182,7 @@ it('omits medical payloads from portal client when a linked NOK has no health fl
 });
 
 it('uses the NOK medical flag independently from medication access on both portal surfaces', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create();
     seedClientProfilePortalSensitiveData($client);
     $nok = makeClientProfilePortalNok($client, [
         'can_view_medical' => true,
@@ -217,7 +214,7 @@ it('uses the NOK medical flag independently from medication access on both porta
 });
 
 it('uses the NOK medication flag independently from medical access on both portal surfaces', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create();
     $sensitive = seedClientProfilePortalSensitiveData($client);
     $nok = makeClientProfilePortalNok($client, [
         'can_view_medical' => false,
@@ -252,7 +249,7 @@ it('uses the NOK medication flag independently from medical access on both porta
 });
 
 it('hides portal-visible incidents when the linked NOK lacks portal incident permission', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create();
     $nok = makeClientProfilePortalNok($client);
     ClientIncident::factory()->reviewed()->create([
         'client_id' => $client->id,
@@ -269,7 +266,7 @@ it('hides portal-visible incidents when the linked NOK lacks portal incident per
 });
 
 it('shows only portal-visible incidents when the linked NOK has portal incident permission', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create();
     $nok = makeClientProfilePortalNok(
         $client,
         flags: ['can_view_incidents' => true],
@@ -297,10 +294,9 @@ it('shows only portal-visible incidents when the linked NOK has portal incident 
             ->where('can.viewIncidents', true));
 });
 
-it('forbids an unlinked portal identity even within the client organization', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+it('forbids a portal identity without an exact link to the requested client', function () {
+    $client = Client::factory()->create();
     $nok = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'next_of_kin',
         'approved_at' => now(),
     ]);
@@ -315,18 +311,46 @@ it('forbids an unlinked portal identity even within the client organization', fu
         ->assertForbidden();
 });
 
-it('forbids a cross-organization portal link', function () {
-    $client = Client::factory()->create(['organization_id' => 2]);
-    $nok = makeClientProfilePortalNok(
-        $client,
-        organizationId: 1,
-    );
+it('uses exact client linkage rather than Site as the portal direct-object boundary', function () {
+    $firstSite = Site::factory()->create();
+    $otherSite = Site::factory()->create();
+    $firstLinkedClient = Client::factory()->create(['site_id' => $firstSite->id]);
+    $otherSiteLinkedClient = Client::factory()->create(['site_id' => $otherSite->id]);
+    $unlinkedClient = Client::factory()->create(['site_id' => $otherSite->id]);
+    $nok = makeClientProfilePortalNok($firstLinkedClient);
+    $otherSiteLinkedClient->portalUsers()->attach($nok->id, [
+        'relation' => 'next_of_kin',
+    ]);
 
     $this->actingAs($nok)
-        ->get(route('portal.clients.show', $client, false))
+        ->get(route('portal.clients.show', $otherSiteLinkedClient, false))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('portal/client')
+            ->missing('profile')
+            ->missing('medications')
+            ->missing('conditions')
+            ->missing('emergency_contacts'));
+
+    $this->actingAs($nok)
+        ->get(route('portal.clients.health', $otherSiteLinkedClient, false))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('portal/health')
+            ->where('medicalProfile', null)
+            ->has('medications', 0)
+            ->has('conditions', 0)
+            ->where('permissions.can_view_medical', false)
+            ->where('permissions.can_view_medications', false));
+
+    expect(NextOfKin::query()->where('user_id', $nok->id)->sole()->client_id)
+        ->toBe($firstLinkedClient->id);
+
+    $this->actingAs($nok)
+        ->get(route('portal.clients.show', $unlinkedClient, false))
         ->assertForbidden();
 
     $this->actingAs($nok)
-        ->get(route('portal.clients.health', $client, false))
+        ->get(route('portal.clients.health', $unlinkedClient, false))
         ->assertForbidden();
 });

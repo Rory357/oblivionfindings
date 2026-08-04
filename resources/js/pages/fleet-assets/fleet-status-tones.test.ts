@@ -22,9 +22,7 @@ describe('Fleet semantic status tones', () => {
         expect(dailyCheck).toContain(
             "'border-status-critical/30 bg-status-critical-bg'",
         );
-        expect(dailyCheck).toContain(
-            'text-status-warning shrink-0',
-        );
+        expect(dailyCheck).toContain('text-status-warning shrink-0');
     });
 
     it('maps incident severity to neutral, warning, and critical semantics', () => {
@@ -43,17 +41,17 @@ describe('Fleet semantic status tones', () => {
     });
 
     it('uses visible labels and icons with the incident lifecycle tones', () => {
-        expect(incidents).toContain(
-            "reported: { label: 'Reported', cls: 'bg-status-info-bg text-status-info', icon: Clock }",
+        expect(incidents).toMatch(
+            /reported:\s*{\s*label: 'Reported',\s*cls: 'bg-status-info-bg text-status-info',\s*icon: Clock,?\s*}/,
         );
-        expect(incidents).toContain(
-            "investigating: { label: 'Investigating', cls: 'bg-status-warning-bg text-status-warning', icon: Search }",
+        expect(incidents).toMatch(
+            /investigating:\s*{\s*label: 'Investigating',\s*cls: 'bg-status-warning-bg text-status-warning',\s*icon: Search,?\s*}/,
         );
-        expect(incidents).toContain(
-            "resolved: { label: 'Resolved', cls: 'bg-status-success-bg text-status-success', icon: CheckCircle2 }",
+        expect(incidents).toMatch(
+            /resolved:\s*{\s*label: 'Resolved',\s*cls: 'bg-status-success-bg text-status-success',\s*icon: CheckCircle2,?\s*}/,
         );
-        expect(incidents).toContain(
-            "closed: { label: 'Closed', cls: 'bg-muted text-muted-foreground', icon: CheckCircle2 }",
+        expect(incidents).toMatch(
+            /closed:\s*{\s*label: 'Closed',\s*cls: 'bg-muted text-muted-foreground',\s*icon: CheckCircle2,?\s*}/,
         );
         expect(incidents).toMatch(/<StatusIcon[^>]*\/>/);
         expect(incidents).toContain('{stat.label}');

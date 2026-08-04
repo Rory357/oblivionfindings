@@ -4,8 +4,8 @@ namespace App\Domain\Hr\Models;
 
 use App\Models\Asset;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\FleetIncident;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,10 +15,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HrAsset extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyStorageContext;
 
     protected $fillable = [
-        'tenant_id',
         'asset_tag',
         'name',
         'category',
@@ -51,7 +50,7 @@ class HrAsset extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function assignments(): HasMany
@@ -106,20 +105,15 @@ class HrAsset extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
-
-    public function scopeAvailable(Builder $query): Builder
+    public function scopeAvailable($query)
     {
         return $query->where('status', 'available');
     }
 
-    public function scopeAssigned(Builder $query): Builder
+    public function scopeAssigned($query)
     {
         return $query->where('status', 'assigned');
     }

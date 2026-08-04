@@ -81,7 +81,7 @@ function SiteLineBody({
     return (
         <>
             <DialogHeader>
-                <DialogTitle>Edit site line</DialogTitle>
+                <DialogTitle>Edit phone &amp; email</DialogTitle>
             </DialogHeader>
 
             <div className="space-y-4">
@@ -109,7 +109,11 @@ function SiteLineBody({
             </div>
 
             <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={onClose} disabled={form.processing}>
+                <Button
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={form.processing}
+                >
                     Cancel
                 </Button>
                 <Button onClick={handleSubmit} disabled={form.processing}>
@@ -334,7 +338,11 @@ function LocationBody({
             .map((geofence): MapGeofence | null => {
                 const shape = geofence.shape ?? {};
 
-                if (geofence.type === 'circle' && shape.center && shape.radius_m) {
+                if (
+                    geofence.type === 'circle' &&
+                    shape.center &&
+                    shape.radius_m
+                ) {
                     return {
                         id: geofence.id,
                         name: geofence.name,
@@ -347,7 +355,10 @@ function LocationBody({
                     };
                 }
 
-                if (geofence.type === 'polygon' && Array.isArray(shape.coordinates)) {
+                if (
+                    geofence.type === 'polygon' &&
+                    Array.isArray(shape.coordinates)
+                ) {
                     return {
                         id: geofence.id,
                         name: geofence.name,
@@ -391,7 +402,10 @@ function LocationBody({
             <div className="space-y-4">
                 {/* Headline: address autocomplete */}
                 <div ref={wrapRef}>
-                    <Label htmlFor="loc-search" className="flex items-center gap-1">
+                    <Label
+                        htmlFor="loc-search"
+                        className="flex items-center gap-1"
+                    >
                         <Search className="h-3.5 w-3.5" />
                         Search for an address
                     </Label>
@@ -400,12 +414,14 @@ function LocationBody({
                             id="loc-search"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            onFocus={() => results.length > 0 && setShowResults(true)}
+                            onFocus={() =>
+                                results.length > 0 && setShowResults(true)
+                            }
                             placeholder="Start typing an address…"
                             autoComplete="off"
                         />
                         {searching && (
-                            <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                            <Loader2 className="absolute top-2.5 right-2.5 h-4 w-4 animate-spin text-muted-foreground" />
                         )}
                         {showResults && (
                             <div className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-lg">
@@ -429,7 +445,9 @@ function LocationBody({
                                             className="flex w-full items-start gap-2 border-b border-border/40 p-2 text-left text-sm last:border-0 hover:bg-accent"
                                         >
                                             <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                                            <span className="leading-snug">{r.display_name}</span>
+                                            <span className="leading-snug">
+                                                {r.display_name}
+                                            </span>
                                         </button>
                                     ))
                                 )}
@@ -437,8 +455,8 @@ function LocationBody({
                         )}
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                        Powered by OpenStreetMap. Picking a result fills the address and
-                        map location for you.
+                        Powered by OpenStreetMap. Picking a result fills the
+                        address and map location for you.
                     </p>
                 </div>
 
@@ -463,19 +481,25 @@ function LocationBody({
                         <Input
                             id="loc-l1"
                             value={form.data.address_line_1}
-                            onChange={(e) => form.setData('address_line_1', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('address_line_1', e.target.value)
+                            }
                         />
                         <FieldError message={form.errors.address_line_1} />
                     </div>
                     <div className="sm:col-span-2">
                         <Label htmlFor="loc-l2">
                             Address line 2{' '}
-                            <span className="text-xs text-muted-foreground">(optional)</span>
+                            <span className="text-xs text-muted-foreground">
+                                (optional)
+                            </span>
                         </Label>
                         <Input
                             id="loc-l2"
                             value={form.data.address_line_2}
-                            onChange={(e) => form.setData('address_line_2', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('address_line_2', e.target.value)
+                            }
                         />
                         <FieldError message={form.errors.address_line_2} />
                     </div>
@@ -484,7 +508,9 @@ function LocationBody({
                         <Input
                             id="loc-suburb"
                             value={form.data.suburb}
-                            onChange={(e) => form.setData('suburb', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('suburb', e.target.value)
+                            }
                         />
                         <FieldError message={form.errors.suburb} />
                     </div>
@@ -493,7 +519,9 @@ function LocationBody({
                         <Input
                             id="loc-city"
                             value={form.data.city}
-                            onChange={(e) => form.setData('city', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('city', e.target.value)
+                            }
                         />
                         <FieldError message={form.errors.city} />
                     </div>
@@ -502,7 +530,9 @@ function LocationBody({
                         <Input
                             id="loc-postcode"
                             value={form.data.postcode}
-                            onChange={(e) => form.setData('postcode', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('postcode', e.target.value)
+                            }
                         />
                         <FieldError message={form.errors.postcode} />
                     </div>
@@ -511,7 +541,9 @@ function LocationBody({
                         <Input
                             id="loc-region"
                             value={form.data.region}
-                            onChange={(e) => form.setData('region', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('region', e.target.value)
+                            }
                         />
                         <FieldError message={form.errors.region} />
                     </div>
@@ -520,7 +552,9 @@ function LocationBody({
                         <Input
                             id="loc-country"
                             value={form.data.country}
-                            onChange={(e) => form.setData('country', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('country', e.target.value)
+                            }
                         />
                         <FieldError message={form.errors.country} />
                     </div>
@@ -529,12 +563,16 @@ function LocationBody({
                 <div>
                     <Label htmlFor="loc-access">
                         Access instructions{' '}
-                        <span className="text-xs text-muted-foreground">(optional)</span>
+                        <span className="text-xs text-muted-foreground">
+                            (optional)
+                        </span>
                     </Label>
                     <Textarea
                         id="loc-access"
                         value={form.data.access_instructions}
-                        onChange={(e) => form.setData('access_instructions', e.target.value)}
+                        onChange={(e) =>
+                            form.setData('access_instructions', e.target.value)
+                        }
                         placeholder="Gate code, parking, key location…"
                         className="min-h-[80px]"
                     />
@@ -549,7 +587,8 @@ function LocationBody({
                                 Map & site geofence
                             </Label>
                             <p className="mt-1 text-xs text-muted-foreground">
-                                Save the address here, then set the site boundary.
+                                Save the address here, then set the site
+                                boundary.
                             </p>
                         </div>
                         {onOpenGeofence && (
@@ -576,14 +615,19 @@ function LocationBody({
                         />
                     ) : (
                         <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 p-4 text-center text-xs text-muted-foreground">
-                            Pick an address result to preview the site on the map.
+                            Pick an address result to preview the site on the
+                            map.
                         </div>
                     )}
                 </div>
             </div>
 
             <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={onClose} disabled={form.processing}>
+                <Button
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={form.processing}
+                >
                     Cancel
                 </Button>
                 <Button onClick={handleSubmit} disabled={form.processing}>
@@ -660,7 +704,12 @@ function SafetyBody({
                     <Textarea
                         id="sf-plan"
                         value={form.data.emergency_plan_location}
-                        onChange={(e) => form.setData('emergency_plan_location', e.target.value)}
+                        onChange={(e) =>
+                            form.setData(
+                                'emergency_plan_location',
+                                e.target.value,
+                            )
+                        }
                         placeholder="Where the emergency plan is kept (e.g. binder in kitchen, intranet link)"
                         className="min-h-[80px]"
                     />
@@ -671,16 +720,27 @@ function SafetyBody({
                     <Textarea
                         id="sf-med"
                         value={form.data.medication_storage_location}
-                        onChange={(e) => form.setData('medication_storage_location', e.target.value)}
+                        onChange={(e) =>
+                            form.setData(
+                                'medication_storage_location',
+                                e.target.value,
+                            )
+                        }
                         placeholder="Where medications are stored (e.g. locked cabinet in office)"
                         className="min-h-[80px]"
                     />
-                    <FieldError message={form.errors.medication_storage_location} />
+                    <FieldError
+                        message={form.errors.medication_storage_location}
+                    />
                 </div>
             </div>
 
             <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={onClose} disabled={form.processing}>
+                <Button
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={form.processing}
+                >
                     Cancel
                 </Button>
                 <Button onClick={handleSubmit} disabled={form.processing}>
@@ -711,7 +771,13 @@ export function AddSiteNoteDialog({
     );
 }
 
-function NoteBody({ siteId, onClose }: { siteId: number; onClose: () => void }) {
+function NoteBody({
+    siteId,
+    onClose,
+}: {
+    siteId: number;
+    onClose: () => void;
+}) {
     const form = useForm<{ body: string }>({ body: '' });
 
     const handleSubmit = () => {
@@ -741,12 +807,18 @@ function NoteBody({ siteId, onClose }: { siteId: number; onClose: () => void }) 
             </div>
 
             <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={onClose} disabled={form.processing}>
+                <Button
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={form.processing}
+                >
                     Cancel
                 </Button>
                 <Button
                     onClick={handleSubmit}
-                    disabled={form.processing || form.data.body.trim().length === 0}
+                    disabled={
+                        form.processing || form.data.body.trim().length === 0
+                    }
                 >
                     {form.processing ? 'Saving…' : 'Add Note'}
                 </Button>

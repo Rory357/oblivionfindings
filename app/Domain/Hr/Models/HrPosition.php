@@ -3,7 +3,9 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
+use Database\Factories\Hr\HrPositionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,11 +14,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HrPosition extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Hr\HrPositionFactory::new();
+        return HrPositionFactory::new();
     }
 
     protected $fillable = [
@@ -74,11 +76,6 @@ class HrPosition extends Model
 
     /* Scopes */
 
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
-
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
@@ -98,7 +95,10 @@ class HrPosition extends Model
 
     public function getFteUtilizationAttribute(): float
     {
-        if ($this->headcount_budget === 0) return 0;
+        if ($this->headcount_budget === 0) {
+            return 0;
+        }
+
         return round(($this->current_headcount / $this->headcount_budget) * 100, 1);
     }
 

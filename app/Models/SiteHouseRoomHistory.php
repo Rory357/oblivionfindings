@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SiteHouseRoomHistory extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     // Eloquent would otherwise auto-pluralize the class name to
     // `site_house_room_histories`. The actual migration creates a

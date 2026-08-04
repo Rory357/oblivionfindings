@@ -21,19 +21,19 @@ class RoadmapSuggestionService
         InitiativeSuggestion::STATUS_SNOOZED,
     ];
 
-    public function ingestAll(?int $tenantId = null): array
+    public function ingestAll(): array
     {
         return [
-            'control_room' => $this->ingestControlRoomRecurring($tenantId),
-            'incidents' => $this->ingestIncidentClusters($tenantId),
-            'assets' => $this->ingestAssetLifecycle($tenantId),
-            'fleet' => $this->ingestFleetSignals($tenantId),
-            'hr' => $this->ingestHrCapacity($tenantId),
-            'it_health' => $this->ingestItHealth($tenantId),
+            'control_room' => $this->ingestControlRoomRecurring(),
+            'incidents' => $this->ingestIncidentClusters(),
+            'assets' => $this->ingestAssetLifecycle(),
+            'fleet' => $this->ingestFleetSignals(),
+            'hr' => $this->ingestHrCapacity(),
+            'it_health' => $this->ingestItHealth(),
         ];
     }
 
-    public function ingestControlRoomRecurring(?int $tenantId = null): int
+    public function ingestControlRoomRecurring(): int
     {
         $rows = ControlRoomAlert::query()
             ->where('created_at', '>=', now()->subDays(14))
@@ -46,7 +46,6 @@ class RoadmapSuggestionService
         foreach ($rows as $row) {
             $key = sprintf('control:%s:%s:%s:14d', $row->source, $row->site_id ?? 0, md5((string) $row->alert_type));
             $suggestion = $this->upsertSuggestion([
-                'tenant_id' => $tenantId,
                 'source' => 'control_room',
                 'source_key' => (string) ($row->site_id ?? 'global'),
                 'title' => 'Recurring control room alerts at site '.($row->site_id ?? 'unknown'),
@@ -70,7 +69,7 @@ class RoadmapSuggestionService
         return $created;
     }
 
-    public function ingestIncidentClusters(?int $tenantId = null): int
+    public function ingestIncidentClusters(): int
     {
         $windowStart = now()->subDays(90);
         $rows = ClientIncident::query()
@@ -100,7 +99,6 @@ class RoadmapSuggestionService
 
             $key = sprintf('incident:%s:%s:90d', $row->type, $row->severity);
             $suggestion = $this->upsertSuggestion([
-                'tenant_id' => $tenantId,
                 'source' => 'incidents',
                 'source_key' => $row->type,
                 'title' => 'Recurring incident theme: '.$row->type,
@@ -134,7 +132,7 @@ class RoadmapSuggestionService
         return $created;
     }
 
-    public function ingestAssetLifecycle(?int $tenantId = null): int
+    public function ingestAssetLifecycle(): int
     {
         $warrantyThreshold = now()->addMonths(6)->toDateString();
         $maintenanceThreshold = now()->subDays(30)->toDateString();
@@ -193,7 +191,6 @@ class RoadmapSuggestionService
 
             $key = sprintf('asset:%s:%s:q%s', $row->category ?? 'unknown', $row->site_id ?? 0, now()->quarter);
             $suggestion = $this->upsertSuggestion([
-                'tenant_id' => $tenantId,
                 'source' => 'assets',
                 'source_key' => (string) ($row->site_id ?? 'global'),
                 'title' => 'Asset lifecycle risk at site '.($row->site_id ?? 'unknown'),
@@ -230,7 +227,7 @@ class RoadmapSuggestionService
         return $created;
     }
 
-    public function ingestFleetSignals(?int $tenantId = null): int
+    public function ingestFleetSignals(): int
     {
         $rows = FleetSignal::query()
             ->where('occurred_at', '>=', now()->subDays(30))
@@ -243,7 +240,6 @@ class RoadmapSuggestionService
         foreach ($rows as $row) {
             $key = sprintf('fleet:%s:30d', $row->signal_type);
             $suggestion = $this->upsertSuggestion([
-                'tenant_id' => $tenantId,
                 'source' => 'fleet',
                 'source_key' => $row->signal_type,
                 'title' => 'Fleet safety trend: '.$row->signal_type,
@@ -265,7 +261,7 @@ class RoadmapSuggestionService
         return $created;
     }
 
-    public function ingestHrCapacity(?int $tenantId = null): int
+    public function ingestHrCapacity(): int
     {
         $rows = Timesheet::query()
             ->where('work_date', '>=', now()->subDays(28)->toDateString())
@@ -281,7 +277,6 @@ class RoadmapSuggestionService
 
         $dedupeKey = 'hr:long_shift_cluster:28d';
         $suggestion = $this->upsertSuggestion([
-            'tenant_id' => $tenantId,
             'source' => 'hr',
             'source_key' => 'long_shift_cluster',
             'title' => 'Workforce capacity risk trend',
@@ -298,10 +293,9 @@ class RoadmapSuggestionService
         return $suggestion->wasRecentlyCreated ? 1 : 0;
     }
 
-    public function ingestItHealth(?int $tenantId = null): int
+    public function ingestItHealth(): int
     {
         $rows = IntegrationEvent::query()
-            ->forTenant($tenantId)
             ->where('occurred_at', '>=', now()->subDays(14))
             ->whereIn('severity', ['warn', 'critical'])
             ->selectRaw('provider, event_type, site_id, COUNT(*) as total')
@@ -313,7 +307,6 @@ class RoadmapSuggestionService
         foreach ($rows as $row) {
             $key = sprintf('it:%s:%s:%s:14d', $row->provider, $row->event_type, $row->site_id ?? 0);
             $suggestion = $this->upsertSuggestion([
-                'tenant_id' => $tenantId,
                 'source' => 'it_health',
                 'source_key' => (string) ($row->site_id ?? 'global'),
                 'title' => 'IT reliability issue: '.$row->provider,
@@ -339,12 +332,10 @@ class RoadmapSuggestionService
 
     public function upsertSuggestion(array $payload): InitiativeSuggestion
     {
-        $tenantId = $payload['tenant_id'] ?? null;
         $dedupeKey = $payload['dedupe_key'];
         $rateLimitDays = (int) ($payload['rate_limit_days'] ?? 30);
 
         $existing = InitiativeSuggestion::query()
-            ->forTenant($tenantId)
             ->where('dedupe_key', $dedupeKey)
             ->whereIn('status', self::OPEN_STATUSES)
             ->first();
@@ -369,7 +360,6 @@ class RoadmapSuggestionService
         }
 
         $dailyCount = InitiativeSuggestion::query()
-            ->forTenant($tenantId)
             ->where('source', $payload['source'])
             ->whereDate('created_at', now()->toDateString())
             ->count();
@@ -377,7 +367,6 @@ class RoadmapSuggestionService
         $rateLimitedUntil = $dailyCount >= 20 ? now()->addDay() : null;
 
         $suggestion = InitiativeSuggestion::create([
-            'tenant_id' => $tenantId,
             'source' => $payload['source'],
             'source_key' => $payload['source_key'] ?? null,
             'title' => $payload['title'],
@@ -431,18 +420,14 @@ class RoadmapSuggestionService
         array $overrides,
         int $userId
     ): Initiative {
-        $tenantId = $suggestion->tenant_id;
         $categoryKey = $overrides['category_key'] ?? $this->defaultCategoryForSource($suggestion->source);
 
         $category = InitiativeCategory::query()
-            ->forTenant($tenantId)
             ->where('key', $categoryKey)
-            ->orderByRaw('tenant_id IS NULL')
             ->first();
 
         if (! $category) {
             $category = InitiativeCategory::create([
-                'tenant_id' => $tenantId,
                 'key' => $categoryKey,
                 'name' => ucfirst(str_replace('_', ' ', $categoryKey)),
                 'sort_order' => 999,
@@ -451,7 +436,6 @@ class RoadmapSuggestionService
         }
 
         $initiative = Initiative::create([
-            'tenant_id' => $tenantId,
             'title' => $overrides['title'] ?? $suggestion->title,
             'summary' => $overrides['summary'] ?? $suggestion->summary,
             'category_id' => $category->id,

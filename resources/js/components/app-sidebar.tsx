@@ -130,7 +130,6 @@ type PageProps = {
             email: string;
             avatar?: string;
             role?: string | null;
-            organization_id?: number | null;
         };
         can?: any;
         portalClients?: PortalClient[] | null;
@@ -1353,11 +1352,6 @@ function buildFleetAssetsSubPanelGroups({
                 href: '/fleet-assets/daily-check',
                 icon: CheckCircle2,
             },
-            {
-                title: 'Driver App',
-                href: '/fleet-assets/mobile/dashboard',
-                icon: Smartphone,
-            },
         ],
     };
     groups.push(overview);
@@ -2093,7 +2087,7 @@ function buildControlRoomSubPanelGroups({
     const ops: NavItem[] = [];
     if (can?.controlRoom?.viewAny)
         ops.push({
-            title: 'Devices',
+            title: 'Device signals',
             href: '/control-room/devices',
             icon: Smartphone,
         });

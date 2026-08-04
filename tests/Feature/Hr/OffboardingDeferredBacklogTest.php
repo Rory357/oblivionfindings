@@ -9,6 +9,7 @@ use App\Domain\Hr\Notifications\ExitInterviewScheduledNotification;
 use App\Domain\Hr\Services\AssetService;
 use App\Domain\Hr\Services\ExitInterviewService;
 use App\Domain\Hr\Services\OnboardingService;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
@@ -16,30 +17,31 @@ use Illuminate\Validation\ValidationException;
 function deferredOffboardingProfile(User $employee, ?User $manager = null): HrEmployeeProfile
 {
     return HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $employee->id,
         'manager_user_id' => $manager?->id,
         'position_role' => 'support_worker',
         'is_active' => true,
+        'primary_site_id' => Site::query()->firstOrFail()->id,
+        'start_date' => today()->subYear(),
     ]);
 }
 
 beforeEach(function () {
+    $this->site = Site::factory()->create(['name' => 'Deferred Offboarding Site']);
     $this->actor = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
     $this->interviewer = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'manager',
         'approved_at' => now(),
     ]);
     $this->employee = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
+    deferredOffboardingProfile($this->actor);
+    deferredOffboardingProfile($this->interviewer);
     $this->profile = deferredOffboardingProfile($this->employee, $this->interviewer);
 });
 
@@ -57,7 +59,6 @@ test('a scheduled interview links and completes the exact offboarding task witho
     $task->update(['title' => 'Private departure conversation']);
 
     $interview = app(ExitInterviewService::class)->createExitInterview([
-        'tenant_id' => 1,
         'created_by' => $this->actor->id,
         'employee_profile_id' => $this->profile->id,
         'interviewer_user_id' => $this->interviewer->id,
@@ -75,7 +76,6 @@ test('a scheduled interview links and completes the exact offboarding task witho
 
 test('ambiguous open hr tasks are left unlinked when no explicit task is supplied', function () {
     $checklist = HrOffboardingChecklist::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $this->profile->id,
         'template_key' => 'offboarding:legacy',
         'status' => 'pending',
@@ -95,7 +95,6 @@ test('ambiguous open hr tasks are left unlinked when no explicit task is supplie
     }
 
     $interview = app(ExitInterviewService::class)->createExitInterview([
-        'tenant_id' => 1,
         'created_by' => $this->actor->id,
         'employee_profile_id' => $this->profile->id,
         'interviewer_user_id' => $this->interviewer->id,
@@ -112,7 +111,6 @@ test('interviewer notifications are future-only and repeat only for a material r
     Notification::fake();
 
     app(ExitInterviewService::class)->createExitInterview([
-        'tenant_id' => 1,
         'created_by' => $this->actor->id,
         'employee_profile_id' => $this->profile->id,
         'interviewer_user_id' => $this->interviewer->id,
@@ -122,7 +120,6 @@ test('interviewer notifications are future-only and repeat only for a material r
     Notification::assertNothingSent();
 
     $scheduled = app(ExitInterviewService::class)->createExitInterview([
-        'tenant_id' => 1,
         'created_by' => $this->actor->id,
         'employee_profile_id' => $this->profile->id,
         'interviewer_user_id' => $this->interviewer->id,
@@ -151,7 +148,6 @@ test('a late asset assignment creates one return task and ignores returned or re
         ['end_date' => now()->addWeeks(2)->toDateString()],
     );
     $asset = HrAsset::query()->create([
-        'tenant_id' => 1,
         'asset_tag' => 'LATE-001',
         'name' => 'Late laptop',
         'category' => 'laptop',
@@ -171,7 +167,7 @@ test('a late asset assignment creates one return task and ignores returned or re
     app(AssetService::class)->returnAsset($assignment, []);
     expect(app(OnboardingService::class)->reconcileAssetReturnTask($checklist, $asset, $this->actor->id))->toBeNull();
 
-    $otherEmployee = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $otherEmployee = User::factory()->create(['approved_at' => now()]);
     $otherProfile = deferredOffboardingProfile($otherEmployee);
     $asset->update(['status' => 'available']);
     app(AssetService::class)->assignAsset($asset, $otherProfile, ['assigned_by' => $this->actor->id]);
@@ -181,10 +177,10 @@ test('a late asset assignment creates one return task and ignores returned or re
 
 test('required offboarding tasks fall back from configured role to manager then initiating actor', function () {
     $roleOwner = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'it_admin',
         'approved_at' => now(),
     ]);
+    deferredOffboardingProfile($roleOwner);
 
     $checklist = app(OnboardingService::class)->generateOffboardingChecklist(
         $this->profile,
@@ -197,8 +193,13 @@ test('required offboarding tasks fall back from configured role to manager then 
 
     $this->profile->update(['manager_user_id' => null]);
     User::query()->where('id', '!=', $this->actor->id)->update(['role' => 'support_worker']);
+    $actorFallbackEmployee = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    $actorFallbackProfile = deferredOffboardingProfile($actorFallbackEmployee);
     $actorFallback = app(OnboardingService::class)->generateOffboardingChecklist(
-        $this->profile,
+        $actorFallbackProfile,
         $this->actor->id,
     );
 

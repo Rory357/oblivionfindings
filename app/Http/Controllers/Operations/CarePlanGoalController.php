@@ -16,9 +16,7 @@ class CarePlanGoalController extends Controller
         $auth = $request->user();
         abort_unless($auth, 403);
 
-        $carePlan = CarePlan::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($carePlan);
+        $carePlan = CarePlan::query()->findOrFail($carePlan);
         $this->authorize('update', $carePlan);
 
         $this->ensureMutableCarePlan($carePlan);
@@ -34,9 +32,7 @@ class CarePlanGoalController extends Controller
             'steps.*' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $goal = CarePlanGoal::create([
-            'organization_id' => $auth->organization_id,
-            'care_plan_id' => $carePlan->id,
+        $goal = $carePlan->goals()->create([
             'client_id' => $carePlan->client_id,
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
@@ -54,7 +50,6 @@ class CarePlanGoalController extends Controller
         ));
         foreach ($titles as $i => $title) {
             $goal->steps()->create([
-                'organization_id' => $auth->organization_id,
                 'title' => $title,
                 'sort_order' => $i + 1,
                 'created_by' => $auth->id,
@@ -189,7 +184,6 @@ class CarePlanGoalController extends Controller
         ]);
 
         $goal->steps()->create([
-            'organization_id' => $goal->organization_id ?? $request->user()->organization_id,
             'title' => $data['title'],
             'target_date' => $data['target_date'] ?? null,
             'sort_order' => (int) ($goal->steps()->max('sort_order') ?? 0) + 1,
@@ -264,7 +258,7 @@ class CarePlanGoalController extends Controller
     }
 
     /**
-     * Authorize the caller, scope the care plan to their organization, and
+     * Authorize the caller through the care plan's canonical Client Site, and
      * resolve a goal that belongs to that plan. Returns [carePlan, goal].
      */
     private function authorizeGoal(
@@ -276,9 +270,7 @@ class CarePlanGoalController extends Controller
         $auth = $request->user();
         abort_unless($auth, 403);
 
-        $carePlan = CarePlan::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($carePlan);
+        $carePlan = CarePlan::query()->findOrFail($carePlan);
         $this->authorize('update', $carePlan);
 
         if ($requiresMutablePlan) {
@@ -336,7 +328,6 @@ class CarePlanGoalController extends Controller
         ?string $flaggedReason = null,
     ): ClientNote {
         return ClientNote::create([
-            'organization_id' => $request->user()->organization_id,
             'client_id' => $goal->client_id,
             'care_plan_goal_id' => $goal->id,
             'user_id' => $request->user()->id,

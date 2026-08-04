@@ -2,10 +2,11 @@
 
 namespace Tests\Feature\Domain\Clinical;
 
-use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalObservation;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
@@ -18,12 +19,18 @@ class ClientClinicalControllerTest extends TestCase
 
     protected Client $client;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
-        $this->client = Client::factory()->create();
+        $this->site = Site::factory()->create(['is_active' => true]);
+        $this->client = Client::factory()->create([
+            'site_id' => $this->site->id,
+            'status' => 'active',
+        ]);
     }
 
     protected function createUserWithRole(string $roleName): User
@@ -36,6 +43,14 @@ class ClientClinicalControllerTest extends TestCase
         if ($role) {
             $user->roles()->attach($role);
         }
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => today()->subDay(),
+            'end_date' => null,
+        ]);
 
         return $user;
     }
@@ -74,7 +89,10 @@ class ClientClinicalControllerTest extends TestCase
     public function test_observations_exclude_other_clients(): void
     {
         $user = $this->createUserWithRole('coordinator');
-        $otherClient = Client::factory()->create();
+        $otherClient = Client::factory()->create([
+            'site_id' => $this->site->id,
+            'status' => 'active',
+        ]);
 
         ClinicalObservation::factory()->create(['client_id' => $this->client->id]);
         ClinicalObservation::factory()->create(['client_id' => $otherClient->id]);

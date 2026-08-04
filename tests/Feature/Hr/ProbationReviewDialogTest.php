@@ -1,7 +1,9 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrProbationReview;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -9,6 +11,7 @@ use Database\Seeders\SeedHrPermissionsSeeder;
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
+    $this->site = Site::factory()->create(['name' => 'Probation Review Site']);
 
     $this->hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->hr->roles()->syncWithoutDetaching([
@@ -16,7 +19,21 @@ beforeEach(function () {
     ]);
 
     $this->employee = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    probationReviewProfile($this->hr, $this->site);
+    probationReviewProfile($this->employee, $this->site);
 });
+
+function probationReviewProfile(User $user, Site $site): HrEmployeeProfile
+{
+    return HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+}
 
 test('a probation review can be recorded via the dialog endpoint', function () {
     $this->actingAs($this->hr)
@@ -43,7 +60,6 @@ test('a probation review can be recorded via the dialog endpoint', function () {
 
 test('a probation review can be edited via the dialog endpoint', function () {
     $review = HrProbationReview::query()->create([
-        'tenant_id' => 1,
         'employee_user_id' => $this->employee->id,
         'reviewer_user_id' => $this->hr->id,
         'review_number' => 1,

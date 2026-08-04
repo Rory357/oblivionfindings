@@ -3,6 +3,9 @@
 namespace Tests\Feature\Governance;
 
 use App\Domain\Governance\Models\ComplianceEvidence;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Site;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -23,6 +26,7 @@ class GovernanceComplianceTest extends TestCase
     public function test_admin_can_create_obligation(): void
     {
         $admin = $this->createAdminUser();
+        $this->makeCurrentStaff($admin);
 
         $response = $this->actingAs($admin)->post('/governance/compliance', [
             'framework' => 'privacy_act',
@@ -112,6 +116,7 @@ class GovernanceComplianceTest extends TestCase
     public function test_modal_create_persists_priority_requirements_and_frequency(): void
     {
         $admin = $this->createAdminUser();
+        $this->makeCurrentStaff($admin);
 
         // The /compliance command-centre wizard posts the extra fields with _modal:true.
         $response = $this->actingAs($admin)->post('/governance/compliance', [
@@ -151,5 +156,20 @@ class GovernanceComplianceTest extends TestCase
                 ->has('relatedIncidents')
                 ->has('frameworks')
             );
+    }
+
+    private function makeCurrentStaff(User $user): void
+    {
+        $site = Site::factory()->create();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
     }
 }

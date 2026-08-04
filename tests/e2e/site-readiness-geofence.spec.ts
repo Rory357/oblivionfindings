@@ -16,7 +16,6 @@ function seedSiteGeofenceFixture(): { siteId: number } {
 $site = \\App\\Models\\Site::query()->updateOrCreate(
     ['name' => 'Playwright Geofence House'],
     [
-        'tenant_id' => 1,
         'type' => 'house',
         'address_line_1' => '1 Queen Street',
         'suburb' => 'Auckland Central',
@@ -37,7 +36,6 @@ $site = \\App\\Models\\Site::query()->updateOrCreate(
 \\App\\Models\\SiteContact::query()->updateOrCreate(
     ['site_id' => $site->id, 'type' => 'site_lead', 'name' => 'Geofence Site Lead'],
     [
-        'tenant_id' => $site->tenant_id,
         'role' => 'Site Lead',
         'phone' => '021 555 010',
         'is_primary' => true,
@@ -47,7 +45,6 @@ $site = \\App\\Models\\Site::query()->updateOrCreate(
 \\App\\Models\\SiteContact::query()->updateOrCreate(
     ['site_id' => $site->id, 'type' => 'emergency', 'name' => 'Geofence After Hours'],
     [
-        'tenant_id' => $site->tenant_id,
         'role' => 'After hours',
         'phone' => '0800 555 010',
     ],

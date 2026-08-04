@@ -3,7 +3,9 @@
 namespace App\Services\Clients;
 
 use App\Models\Client;
+use App\Models\Site;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 
 class ClientWorkerEligibility
@@ -16,24 +18,81 @@ class ClientWorkerEligibility
         'provider_manager',
     ];
 
-    /**
-     * Staff who may be assigned to this client.
-     *
-     * Portal identities are excluded by User::staff(). When both records carry
-     * an organisation, assignments are confined to that organisation.
-     *
-     * @return Builder<User>
-     */
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
+    /** @return Builder<User> */
     public function query(Client $client): Builder
     {
-        return $this->queryForOrganization($client->organization_id);
+        return $this->queryForSite($this->siteId($client->site_id));
     }
 
     /** @return Builder<User> */
-    public function queryForOrganization(?int $organizationId): Builder
+    public function queryForSite(?int $siteId): Builder
+    {
+        $query = $this->roleEligibleQuery();
+
+        if (
+            ! $siteId
+            || $siteId < 1
+            || ! Site::query()
+                ->whereKey($siteId)
+                ->active()
+                ->notArchived()
+                ->whereNull('archived_at')
+                ->exists()
+        ) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $this->siteAccess->applyFleetRecipientEligibility($query, $siteId);
+    }
+
+    /**
+     * Current eligible staff visible to the viewer. This is used for the
+     * create-client picker before a specific client record exists.
+     *
+     * @param  array<int, string>  $bypassPermissions
+     * @return Builder<User>
+     */
+    public function queryForViewer(?User $viewer, array $bypassPermissions = []): Builder
+    {
+        $query = $this->roleEligibleQuery();
+        $siteIds = $this->siteAccess->accessibleSiteIds($viewer, $bypassPermissions);
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function (Builder $eligibleAtSite) use ($siteIds): void {
+            foreach ($siteIds as $siteId) {
+                $eligibleAtSite->orWhere(function (Builder $candidate) use ($siteId): void {
+                    $this->siteAccess->applyFleetRecipientEligibility($candidate, $siteId);
+                });
+            }
+        });
+    }
+
+    public function contains(Client $client, int $userId): bool
+    {
+        return $this->query($client)->whereKey($userId)->exists();
+    }
+
+    public function containsForSite(?int $siteId, int $userId): bool
+    {
+        return $this->queryForSite($siteId)->whereKey($userId)->exists();
+    }
+
+    public function isEligible(Client $client, User $user): bool
+    {
+        return $user->exists
+            && $this->contains($client, (int) $user->getKey());
+    }
+
+    /** @return Builder<User> */
+    private function roleEligibleQuery(): Builder
     {
         return User::query()
-            ->staff()
             ->where(function (Builder $query) {
                 $query->whereHas(
                     'roles',
@@ -42,32 +101,13 @@ class ClientWorkerEligibility
                         self::ASSIGNABLE_ROLE_NAMES,
                     ),
                 )->orWhereIn('role', self::ASSIGNABLE_ROLE_NAMES);
-            })
-            ->when(
-                $organizationId !== null,
-                fn (Builder $query) => $query->where(
-                    'organization_id',
-                    $organizationId,
-                ),
-            );
+            });
     }
 
-    public function contains(Client $client, int $userId): bool
+    private function siteId(mixed $value): ?int
     {
-        return $this->query($client)->whereKey($userId)->exists();
-    }
-
-    public function isEligible(Client $client, User $user): bool
-    {
-        if (
-            $client->organization_id !== null
-            && $user->organization_id !== null
-            && (int) $client->organization_id !== (int) $user->organization_id
-        ) {
-            return false;
-        }
-
-        return $user->hasRole(...self::ASSIGNABLE_ROLE_NAMES)
-            || in_array($user->role, self::ASSIGNABLE_ROLE_NAMES, true);
+        return is_numeric($value) && (int) $value > 0
+            ? (int) $value
+            : null;
     }
 }

@@ -23,6 +23,7 @@ class CoverageReservationService
 
     public function __construct(
         protected ShiftCoverageService $coverage,
+        protected UserSiteAccessService $siteAccess,
     ) {
     }
 
@@ -36,6 +37,8 @@ class CoverageReservationService
         array $meta = [],
         int $ttlMinutes = 10,
     ): CoverageReservation {
+        $this->assertActorCanReserveAtSite($actor, $siteId, $coverageRequirementId);
+
         return DB::transaction(function () use ($actor, $siteId, $windowStartsAt, $windowEndsAt, $coverageRequirementId, $roleKey, $meta, $ttlMinutes) {
             $this->expireStaleReservations();
             if ($coverageRequirementId) {
@@ -83,7 +86,6 @@ class CoverageReservationService
             }
 
             return CoverageReservation::create([
-                'organization_id' => $actor->organization_id,
                 'site_id' => $siteId,
                 'coverage_requirement_id' => $coverageRequirementId,
                 'reserved_by_user_id' => $actor->id,
@@ -120,6 +122,12 @@ class CoverageReservationService
                 'coverage_reservation_token' => 'This coverage hold has expired. Re-open the gap and try again.',
             ]);
         }
+
+        $this->siteAccess->assertCanAccessSiteId(
+            $actor,
+            (int) $reservation->site_id,
+            ['reports.viewAny'],
+        );
 
         foreach ($context as $key => $expected) {
             if ($expected === null || $expected === '') {
@@ -227,6 +235,18 @@ class CoverageReservationService
             return null;
         }
 
+        $siteId = $this->siteAccess->shiftSiteId($shift);
+        abort_unless(
+            $siteId !== null && $siteId === (int) $coverage['site_id'],
+            403,
+            UserSiteAccessService::DEFAULT_MESSAGE,
+        );
+        $this->assertActorCanReserveAtSite(
+            $actor,
+            $siteId,
+            ! empty($coverage['rule_id']) ? (int) $coverage['rule_id'] : null,
+        );
+
         return DB::transaction(function () use ($shift, $actor, $reason, $coverage) {
             $this->expireStaleReservations();
             Shift::query()->lockForUpdate()->find($shift->id);
@@ -239,7 +259,6 @@ class CoverageReservationService
             }
 
             return CoverageReservation::create([
-                'organization_id' => $actor->organization_id,
                 'site_id' => $coverage['site_id'],
                 'coverage_requirement_id' => $coverage['rule_id'] ?? null,
                 'shift_id' => $shift->id,
@@ -271,6 +290,7 @@ class CoverageReservationService
         $windowStartsAt = Carbon::parse((string) $startsAt);
         $windowEndsAt = Carbon::parse((string) $endsAt);
         $coverageRequirementId = ! empty($payload['coverage_rule_id']) ? (int) $payload['coverage_rule_id'] : null;
+        $this->assertActorCanReserveAtSite($actor, $siteId, $coverageRequirementId);
         $roleKey = ! empty($payload['role_key'])
             ? trim((string) $payload['role_key'])
             : collect($payload['coverage_roles'] ?? [])
@@ -336,7 +356,6 @@ class CoverageReservationService
             }
 
             return CoverageReservation::create([
-                'organization_id' => $actor->organization_id,
                 'site_id' => $siteId,
                 'coverage_requirement_id' => $coverageRequirementId,
                 'reserved_by_user_id' => $actor->id,
@@ -404,6 +423,27 @@ class CoverageReservationService
         ?int $coverageRequirementId = null,
     ): ?array {
         return $this->coverage->findCoverageWindow($siteId, $windowStartsAt, $windowEndsAt, $coverageRequirementId);
+    }
+
+    protected function assertActorCanReserveAtSite(
+        User $actor,
+        int $siteId,
+        ?int $coverageRequirementId,
+    ): void {
+        $this->siteAccess->assertCanAccessSiteId($actor, $siteId, ['reports.viewAny']);
+
+        if (! $coverageRequirementId) {
+            return;
+        }
+
+        abort_unless(
+            SiteCoverageRequirement::query()
+                ->whereKey($coverageRequirementId)
+                ->where('site_id', $siteId)
+                ->exists(),
+            403,
+            UserSiteAccessService::DEFAULT_MESSAGE,
+        );
     }
 
     /**

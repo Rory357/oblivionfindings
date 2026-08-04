@@ -35,7 +35,6 @@ class ClientSeizureChartController extends Controller
         ClientSeizureEntry::query()->create([
             ...$data,
             'client_id' => $client->id,
-            'organization_id' => $request->user()?->organization_id ?? $client->organization_id,
             'occurred_at' => WorkerClock::toUtc($data['occurred_at'] ?? null) ?? now(),
             'escalated' => (bool) ($data['escalated'] ?? false) || $duration > 300,
             'recorded_by' => $request->user()?->id,

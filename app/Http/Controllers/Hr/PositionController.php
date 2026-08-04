@@ -2,12 +2,11 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Services\PositionService;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -15,8 +14,6 @@ use Inertia\Inertia;
 
 class PositionController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         private readonly PositionService $positionService,
     ) {}
@@ -49,10 +46,8 @@ class PositionController extends Controller
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $parentPositions = HrPosition::forTenant($tenantId)->active()->orderBy('title')->get(['id', 'title', 'code']);
+        $parentPositions = HrPosition::query()->active()->orderBy('title')->get(['id', 'title', 'code']);
         $departments = HrDepartment::query()
-            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name']);
@@ -68,11 +63,9 @@ class PositionController extends Controller
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', Rule::unique('hr_positions')->where('tenant_id', $tenantId)],
+            'code' => ['required', 'string', 'max:50', Rule::unique('hr_positions', 'code')],
             'department' => ['nullable', 'string', 'max:255'],
             'team' => ['nullable', 'string', 'max:255'],
             'summary' => ['nullable', 'string', 'max:5000'],
@@ -91,7 +84,6 @@ class PositionController extends Controller
 
         $position = $this->positionService->createPosition([
             ...$positionData,
-            'tenant_id' => $tenantId,
             'created_by' => $user->id,
         ]);
 
@@ -101,9 +93,8 @@ class PositionController extends Controller
         // its whole budget is the gap. Mirrors the onboarding/invite toggle pattern.
         if ($request->boolean('open_requisition') && $user->canDo('hr.recruitment.manage')) {
             HrJobRequisition::create([
-                'tenant_id' => $tenantId,
                 'title' => $position->title,
-                'slug' => Str::slug($position->title) . '-' . strtolower(Str::random(5)),
+                'slug' => Str::slug($position->title).'-'.strtolower(Str::random(5)),
                 'position_id' => $position->id,
                 'employment_type' => $position->employment_type,
                 'openings' => max(1, (int) $position->headcount_budget),
@@ -176,16 +167,13 @@ class PositionController extends Controller
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $parentPositions = HrPosition::forTenant($tenantId)
+        $parentPositions = HrPosition::query()
             ->active()
             ->where('id', '!=', $position->id)
             ->orderBy('title')
             ->get(['id', 'title', 'code']);
 
         $departments = HrDepartment::query()
-            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name']);
@@ -206,11 +194,9 @@ class PositionController extends Controller
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', Rule::unique('hr_positions')->where('tenant_id', $tenantId)->ignore($position->id)],
+            'code' => ['required', 'string', 'max:50', Rule::unique('hr_positions', 'code')->ignore($position->id)],
             'department' => ['nullable', 'string', 'max:255'],
             'team' => ['nullable', 'string', 'max:255'],
             'summary' => ['nullable', 'string', 'max:5000'],

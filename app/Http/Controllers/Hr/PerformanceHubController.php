@@ -12,10 +12,10 @@ use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrSkill;
-use App\Domain\Hr\Models\HrSuccessionPlan;
 use App\Domain\Hr\Models\HrSupervisionNote;
+use App\Domain\Hr\Services\HrPerformanceAccessService;
+use App\Domain\Hr\Services\HrSuccessionAccessService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -30,28 +30,30 @@ use Inertia\Inertia;
  */
 class PerformanceHubController extends Controller
 {
-    use ResolvesHrTenant;
+    public function __construct(
+        private readonly HrPerformanceAccessService $access,
+        private readonly HrSuccessionAccessService $successionAccess,
+    ) {}
 
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $canManage = $user->canDo('hr.performance.manage');
-        $roleMap = $this->roleMap($tenantId);
+        $roleMap = $this->roleMap($user);
 
-        $reviews = $this->reviews($tenantId, $roleMap);
-        $supervision = $this->supervision($tenantId, $roleMap);
-        $goals = $this->goals($tenantId);
-        $development = $this->development($tenantId, $roleMap);
-        $feedback = $this->feedback($tenantId, $roleMap);
-        $pips = $this->pips($tenantId, $roleMap);
-        $competencies = $this->competencies($tenantId);
-        $succession = $this->succession($tenantId);
+        $reviews = $this->reviews($user, $roleMap);
+        $supervision = $this->supervision($user, $roleMap);
+        $goals = $this->goals($user);
+        $development = $this->development($user, $roleMap);
+        $feedback = $this->feedback($user, $roleMap);
+        $pips = $this->pips($user, $roleMap);
+        $competencies = $this->competencies($user);
+        $succession = $this->succession($user);
 
         return Inertia::render('hr/performance/index', [
-            'hero' => $this->hero($tenantId, $reviews, $supervision, $goals, $feedback, $pips, $succession),
+            'hero' => $this->hero($user, $reviews, $supervision, $goals, $feedback, $pips, $succession),
             'reviews' => $reviews,
             'supervision' => $supervision,
             'goals' => $goals,
@@ -60,17 +62,9 @@ class PerformanceHubController extends Controller
             'pips' => $pips,
             'competencies' => $competencies,
             'succession' => $succession,
-            'staff' => $this->staffOptions($tenantId),
+            'staff' => $this->staffOptions($user),
             'sessionTypes' => HrSupervisionNote::sessionTypeOptions(),
-            'successionEmployees' => HrEmployeeProfile::where('tenant_id', $tenantId)
-                ->where('is_active', true)
-                ->with('user:id,name')
-                ->orderBy('user_id')
-                ->limit(500)
-                ->get(['id', 'user_id'])
-                ->map(fn ($p) => ['value' => $p->id, 'label' => $p->user?->name ?? 'Unknown'])
-                ->all(),
-            'competencyOptions' => HrCompetency::forTenant($tenantId)->active()
+            'competencyOptions' => HrCompetency::query()->active()
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->map(fn ($c) => ['value' => $c->id, 'label' => $c->name])
@@ -93,18 +87,17 @@ class PerformanceHubController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $roleMap = $this->roleMap($tenantId);
+        $roleMap = $this->roleMap($user);
         $tab = (string) $request->query('tab', 'reviews');
 
         $rows = match ($tab) {
-            'reviews' => $this->reviews($tenantId, $roleMap),
-            'supervision' => $this->supervision($tenantId, $roleMap)['rows'],
-            'goals' => $this->goals($tenantId),
-            'development' => $this->development($tenantId, $roleMap),
-            'feedback' => array_map(fn ($r) => collect($r)->except('ids')->all(), $this->feedback($tenantId, $roleMap)),
-            'pips' => $this->pips($tenantId, $roleMap),
-            'competencies' => $this->competencies($tenantId)['coverage'],
+            'reviews' => $this->reviews($user, $roleMap),
+            'supervision' => $this->supervision($user, $roleMap)['rows'],
+            'goals' => $this->goals($user),
+            'development' => $this->development($user, $roleMap),
+            'feedback' => array_map(fn ($r) => collect($r)->except('ids')->all(), $this->feedback($user, $roleMap)),
+            'pips' => $this->pips($user, $roleMap),
+            'competencies' => $this->competencies($user)['coverage'],
             default => [],
         };
 
@@ -143,7 +136,7 @@ class PerformanceHubController extends Controller
     /*  Hero — clickable stats, compliance, needs-you */
     /* ------------------------------------------------------------------ */
 
-    private function hero(int $tenantId, array $reviews, array $supervision, array $goals, array $feedback, array $pips, array $succession): array
+    private function hero(User $viewer, array $reviews, array $supervision, array $goals, array $feedback, array $pips, array $succession): array
     {
         $reviewsDue = collect($reviews)->whereIn('status', ['draft', 'in_progress', 'pending'])->count();
         $reviewsOverdue = collect($reviews)->where('status', 'overdue')->count();
@@ -167,7 +160,7 @@ class PerformanceHubController extends Controller
                 ['key' => 'pips', 'label' => 'Active PIPs', 'value' => $activePips, 'tab' => 'pips', 'amber' => true],
                 ['key' => 'succession', 'label' => 'Succession risk', 'value' => $successionRisk, 'tab' => 'succession', 'amber' => true],
             ],
-            'compliance' => $this->compliance($tenantId, $reviews),
+            'compliance' => $this->compliance($viewer, $reviews),
             'needs' => array_values(array_filter([
                 $reviewsOverdue ? ['label' => $reviewsOverdue.' overdue '.str('review')->plural($reviewsOverdue), 'icon' => 'award', 'tab' => 'reviews', 'status' => 'overdue'] : null,
                 $supDue ? ['label' => $supDue.' supervisions due', 'icon' => 'supervision', 'tab' => 'supervision', 'status' => 'overdue'] : null,
@@ -177,15 +170,16 @@ class PerformanceHubController extends Controller
         ];
     }
 
-    private function compliance(int $tenantId, array $reviews): array
+    private function compliance(User $viewer, array $reviews): array
     {
-        $probationDue = HrPerformanceReview::where('tenant_id', $tenantId)
+        $reviewsQuery = $this->access->applyHistoricalSubjectScope(HrPerformanceReview::query(), $viewer);
+        $probationDue = (clone $reviewsQuery)
             ->where('review_type', 'ad_hoc')
             ->whereIn('status', ['draft', 'in_progress'])
             ->whereBetween('next_review_date', [now()->startOfDay(), now()->addDays(7)->endOfDay()])
             ->count();
 
-        $signedThisQuarter = HrPerformanceReview::where('tenant_id', $tenantId)
+        $signedThisQuarter = (clone $reviewsQuery)
             ->where('status', 'signed_off')
             ->where('manager_signed_off_at', '>=', now()->startOfQuarter())
             ->count();
@@ -203,9 +197,10 @@ class PerformanceHubController extends Controller
     /*  Reviews */
     /* ------------------------------------------------------------------ */
 
-    private function reviews(int $tenantId, array $roleMap): array
+    private function reviews(User $viewer, array $roleMap): array
     {
-        return HrPerformanceReview::where('tenant_id', $tenantId)
+        return $this->access
+            ->applyHistoricalSubjectScope(HrPerformanceReview::query(), $viewer)
             ->with(['employee:id,name'])
             ->orderByDesc('created_at')
             ->limit(200)
@@ -234,9 +229,10 @@ class PerformanceHubController extends Controller
     /*  Supervision */
     /* ------------------------------------------------------------------ */
 
-    private function supervision(int $tenantId, array $roleMap): array
+    private function supervision(User $viewer, array $roleMap): array
     {
-        $notes = HrSupervisionNote::forTenant($tenantId)
+        $notesQuery = $this->access->applyHistoricalSubjectScope(HrSupervisionNote::query(), $viewer);
+        $notes = (clone $notesQuery)
             ->with(['employee:id,name'])
             ->orderByDesc('session_date')
             ->limit(200)
@@ -271,7 +267,7 @@ class PerformanceHubController extends Controller
         $spark = [];
         for ($i = 7; $i >= 0; $i--) {
             $month = Carbon::now()->subMonths($i);
-            $spark[] = HrSupervisionNote::forTenant($tenantId)
+            $spark[] = (clone $notesQuery)
                 ->whereBetween('session_date', [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()])
                 ->count();
         }
@@ -287,7 +283,7 @@ class PerformanceHubController extends Controller
             'rows' => $rows,
             'overdue_count' => $overdue,
             'due_soon_count' => $dueSoon,
-            'sessions_quarter' => HrSupervisionNote::forTenant($tenantId)->where('session_date', '>=', now()->startOfQuarter())->count(),
+            'sessions_quarter' => (clone $notesQuery)->where('session_date', '>=', now()->startOfQuarter())->count(),
             'sla_pct' => $slaPct,
             'spark' => $spark,
         ];
@@ -297,9 +293,10 @@ class PerformanceHubController extends Controller
     /*  Goals & OKRs */
     /* ------------------------------------------------------------------ */
 
-    private function goals(int $tenantId): array
+    private function goals(User $viewer): array
     {
-        return HrGoal::forTenant($tenantId)
+        return $this->access
+            ->applyHistoricalSubjectScope(HrGoal::query(), $viewer, 'user_id')
             ->with(['user:id,name'])
             ->withCount('keyResults')
             ->orderByDesc('created_at')
@@ -334,9 +331,10 @@ class PerformanceHubController extends Controller
     /*  Development */
     /* ------------------------------------------------------------------ */
 
-    private function development(int $tenantId, array $roleMap): array
+    private function development(User $viewer, array $roleMap): array
     {
-        return HrDevelopmentGoal::where('tenant_id', $tenantId)
+        return $this->access
+            ->applyHistoricalSubjectScope(HrDevelopmentGoal::query(), $viewer)
             ->with(['employee:id,name'])
             ->orderByDesc('updated_at')
             ->limit(200)
@@ -367,9 +365,10 @@ class PerformanceHubController extends Controller
     /*  360 Feedback (grouped into subject × type cycles) */
     /* ------------------------------------------------------------------ */
 
-    private function feedback(int $tenantId, array $roleMap): array
+    private function feedback(User $viewer, array $roleMap): array
     {
-        $requests = HrFeedbackRequest::forTenant($tenantId)
+        $requests = $this->access
+            ->applyHistoricalSubjectScope(HrFeedbackRequest::query(), $viewer, 'subject_user_id')
             ->with(['subject:id,name'])
             ->orderByDesc('created_at')
             ->limit(400)
@@ -412,9 +411,10 @@ class PerformanceHubController extends Controller
     /*  PIPs */
     /* ------------------------------------------------------------------ */
 
-    private function pips(int $tenantId, array $roleMap): array
+    private function pips(User $viewer, array $roleMap): array
     {
-        return HrPerformanceImprovementPlan::where('tenant_id', $tenantId)
+        return $this->access
+            ->applyHistoricalSubjectScope(HrPerformanceImprovementPlan::query(), $viewer)
             ->with(['employee:id,name', 'milestones'])
             ->orderByDesc('created_at')
             ->limit(200)
@@ -446,18 +446,18 @@ class PerformanceHubController extends Controller
     /*  Competencies — matrix + coverage + skills */
     /* ------------------------------------------------------------------ */
 
-    private function competencies(int $tenantId): array
+    private function competencies(User $viewer): array
     {
-        $competencies = HrCompetency::forTenant($tenantId)->active()
+        $competencies = HrCompetency::query()->active()
             ->orderBy('sort_order')->orderBy('name')->limit(12)->get(['id', 'name', 'category']);
 
-        $profiles = HrEmployeeProfile::where('tenant_id', $tenantId)
-            ->where('is_active', true)
+        $profiles = $this->access
+            ->applyCurrentProfileScope(HrEmployeeProfile::query(), $viewer)
             ->with('user:id,name')
             ->limit(12)->get(['id', 'user_id']);
 
         // Latest assessed level per (profile, competency).
-        $assessments = HrCompetencyAssessment::where('tenant_id', $tenantId)
+        $assessments = HrCompetencyAssessment::query()
             ->whereIn('employee_profile_id', $profiles->pluck('id'))
             ->orderByDesc('assessment_date')
             ->get(['employee_profile_id', 'competency_id', 'assessed_level', 'target_level', 'assessment_date']);
@@ -501,9 +501,10 @@ class PerformanceHubController extends Controller
         })->values();
 
         // Skills coverage.
-        $skills = HrSkill::where('tenant_id', $tenantId)->where('is_active', true)
+        $skills = HrSkill::query()->where('is_active', true)
             ->orderBy('name')->limit(20)->get(['id', 'name']);
-        $skillCounts = HrEmployeeSkill::where('tenant_id', $tenantId)
+        $skillCounts = HrEmployeeSkill::query()
+            ->whereIn('employee_profile_id', $profiles->pluck('id'))
             ->selectRaw('skill_id, COUNT(DISTINCT employee_profile_id) as cnt')
             ->groupBy('skill_id')->pluck('cnt', 'skill_id');
 
@@ -526,10 +527,13 @@ class PerformanceHubController extends Controller
     /*  Succession — 9-box + readiness + critical roles */
     /* ------------------------------------------------------------------ */
 
-    private function succession(int $tenantId): array
+    private function succession(User $viewer): array
     {
-        $plans = HrSuccessionPlan::where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
-            ->with(['candidates.employeeProfile.user:id,name'])
+        $plans = $this->successionAccess->visiblePlans($viewer)
+            ->with([
+                'candidates.employeeProfile' => fn ($query) => $query->withTrashed(),
+                'candidates.employeeProfile.user:id,name',
+            ])
             ->withCount('candidates')
             ->get();
 
@@ -592,9 +596,10 @@ class PerformanceHubController extends Controller
     /* ------------------------------------------------------------------ */
 
     /** Map of user_id => "Position · Department" for role sub-labels. */
-    private function roleMap(int $tenantId): array
+    private function roleMap(User $viewer): array
     {
-        return HrEmployeeProfile::where('tenant_id', $tenantId)
+        return $this->access
+            ->applyHistoricalProfileScope(HrEmployeeProfile::query(), $viewer)
             ->get(['user_id', 'position_title', 'department'])
             ->mapWithKeys(function ($p) {
                 $parts = array_filter([$p->position_title, $p->department]);
@@ -604,12 +609,10 @@ class PerformanceHubController extends Controller
             ->all();
     }
 
-    private function staffOptions(int $tenantId): array
+    private function staffOptions(User $viewer): array
     {
-        $ids = $this->hrStaffUserIdsForTenant($tenantId);
-
-        return User::query()
-            ->when($ids !== [], fn ($q) => $q->whereIn('id', $ids))
+        return $this->access
+            ->currentUserIds($viewer)
             ->orderBy('name')
             ->limit(500)
             ->get(['id', 'name'])

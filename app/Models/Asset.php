@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domain\Hr\Models\HrAsset;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -160,10 +161,25 @@ class Asset extends Model
     }
 
     /**
+     * Canonical Security & Devices link history for this operational asset.
+     */
+    public function deviceLinks(): HasMany
+    {
+        return $this->hasMany(DeviceAssetLink::class);
+    }
+
+    /**
+     * Devices currently installed in or otherwise linked to this asset.
+     */
+    public function activeDeviceLinks(): HasMany
+    {
+        return $this->deviceLinks()->whereNull('unlinked_at');
+    }
+
+    /**
      * @deprecated Use DeviceAssetLink::active()->forAsset($this->id) instead.
      * Legacy relationship — AssetTracker is retired as active source of truth.
-     * Kept for telemetry ingestion bridge, consent compatibility, and the
-     * legacy asset detail tracker pair/unpair UI.
+     * Kept only for telemetry ingestion and consent compatibility.
      */
     public function trackers(): HasMany
     {

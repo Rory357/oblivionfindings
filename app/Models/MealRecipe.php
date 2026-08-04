@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -12,11 +13,9 @@ use Illuminate\Support\Str;
 
 class MealRecipe extends Model
 {
-    use AuditableChanges;
-    use SoftDeletes;
+    use AuditableChanges, SoftDeletes, WritesLegacyStorageContext;
 
     protected $fillable = [
-        'tenant_id',
         'name',
         'slug',
         'description',
@@ -43,18 +42,17 @@ class MealRecipe extends Model
     {
         static::creating(function (MealRecipe $recipe) {
             if (empty($recipe->slug)) {
-                $recipe->slug = static::generateSlug($recipe->name, $recipe->tenant_id);
+                $recipe->slug = static::generateSlug($recipe->name);
             }
         });
     }
 
-    public static function generateSlug(string $name, ?int $tenantId): string
+    public static function generateSlug(string $name): string
     {
         $base = Str::slug($name) ?: 'recipe';
         $slug = $base;
         $i = 2;
         while (static::withTrashed()
-            ->where('tenant_id', $tenantId)
             ->where('slug', $slug)
             ->exists()
         ) {

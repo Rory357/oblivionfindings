@@ -32,10 +32,10 @@ function siteEmergencyPlanUser(): User
 function publishedPlanForSite(Site $site, array $pins = []): int
 {
     $planId = DB::table('site_type_plans')->insertGetId([
-        'tenant_id' => $site->tenant_id,
         'site_id' => $site->id,
         'site_type' => $site->type,
         'status' => 'published',
+        'current_slot' => 'published',
         'version' => 1,
         'layout' => json_encode([
             'schema_version' => 1,
@@ -65,7 +65,6 @@ function publishedPlanForSite(Site $site, array $pins = []): int
 
     foreach ($pins as $pin) {
         DB::table('site_type_plan_pins')->insert(array_merge([
-            'tenant_id' => $site->tenant_id,
             'site_type_plan_id' => $planId,
             'kind' => 'custom_marker',
             'label' => 'Marker',
@@ -102,7 +101,6 @@ test('emergency plan pdf renders for supported paper sizes when plan is ready', 
 
     SiteContact::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'name' => 'On Call',
         'type' => 'emergency',
         'phone' => '021 000 111',
@@ -155,7 +153,6 @@ test('emergency contacts payload includes site contacts and NZ 111 line', functi
 
     SiteContact::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'name' => 'Site Lead',
         'type' => 'site_lead',
         'phone' => '021 222 333',

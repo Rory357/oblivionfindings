@@ -3,6 +3,7 @@
 namespace App\Domain\Roadmap\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,11 +13,11 @@ class InitiativeSiteScope extends Model
 {
     use AuditableChanges;
     use HasFactory;
+    use WritesLegacyStorageContext;
 
     protected $table = 'roadmap_initiative_site_scopes';
 
     protected $fillable = [
-        'tenant_id',
         'initiative_id',
         'scope_type',
         'rollout_mode',
@@ -36,14 +37,5 @@ class InitiativeSiteScope extends Model
     public function sites(): HasMany
     {
         return $this->hasMany(InitiativeSiteScopeSite::class, 'initiative_site_scope_id');
-    }
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        if ($tenantId === null) {
-            return $query;
-        }
-
-        return $query->where('tenant_id', $tenantId);
     }
 }

@@ -217,15 +217,16 @@ class StoreClientRequest extends FormRequest
                 return;
             }
 
+            $siteId = filled($this->input('site_id')) && is_numeric($this->input('site_id'))
+                ? (int) $this->input('site_id')
+                : null;
             $eligible = app(ClientWorkerEligibility::class)
-                ->queryForOrganization($this->user()?->organization_id)
-                ->whereKey((int) $workerId)
-                ->exists();
+                ->containsForSite($siteId, (int) $workerId);
 
             if (! $eligible) {
                 $validator->errors()->add(
                     'key_worker_id',
-                    'Choose an eligible key worker from this organisation.',
+                    'Choose a current key worker assigned to the selected Site.',
                 );
             }
         });

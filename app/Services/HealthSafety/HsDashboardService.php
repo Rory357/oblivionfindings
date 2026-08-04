@@ -141,9 +141,9 @@ class HsDashboardService
     /*  Risk Assessment KPIs */
     /* ------------------------------------------------------------------ */
 
-    public function getRiskAssessmentKpis(int|array|null $siteId = null): array
+    public function getRiskAssessmentKpis(int|array|null $siteId = null, ?User $viewer = null): array
     {
-        $base = $this->riskAssessmentQuery($siteId);
+        $base = $this->riskAssessmentQuery($siteId, $viewer);
 
         return [
             'active_assessments' => (clone $base)->active()->count(),
@@ -317,12 +317,16 @@ class HsDashboardService
      * Each item: {type, type_label, label, due_date, days_until (negative = overdue),
      * register_url, site}. Site views include only attributable risk, SDS, drill and PPE rows.
      */
-    public function expiringFeed(int|array|null $siteId = null, int $withinDays = 60, int $limit = 20): array
-    {
+    public function expiringFeed(
+        int|array|null $siteId = null,
+        int $withinDays = 60,
+        int $limit = 20,
+        ?User $viewer = null,
+    ): array {
         $horizon = now()->copy()->addDays($withinDays)->toDateString();
         $items = [];
 
-        foreach ($this->riskAssessmentQuery($siteId)
+        foreach ($this->riskAssessmentQuery($siteId, $viewer)
             ->active()
             ->whereNotNull('review_due_at')
             ->where('review_due_at', '<=', $horizon)
@@ -464,29 +468,40 @@ class HsDashboardService
             'events' => $this->getEventKpis($since, $siteId, $viewer),
             'investigations' => $this->getInvestigationKpis($siteId),
             'corrective_actions' => $this->getCorrectiveActionKpis($siteId),
-            'risk_assessments' => $this->getRiskAssessmentKpis($siteId),
+            'risk_assessments' => $this->getRiskAssessmentKpis($siteId, $viewer),
             'training' => $this->getTrainingComplianceKpis($siteId),
         ];
     }
 
-    private function riskAssessmentQuery(int|array|null $siteId): Builder
+    private function riskAssessmentQuery(int|array|null $siteId, ?User $viewer = null): Builder
     {
         $query = HsRiskAssessment::query();
-        if ($siteId === null) {
-            return $query;
+
+        if ($viewer !== null) {
+            $this->siteAccess->applyHsRiskAssessmentScope(
+                $query,
+                $viewer,
+                ['healthSafety.viewAllSites'],
+            );
+
+            if ($siteId === null) {
+                return $query;
+            }
+
+            return $this->siteAccess->applyHsRiskAssessmentSiteScopeForSiteIds(
+                $query,
+                $this->normalizeSiteIds($siteId),
+            );
         }
 
-        $siteIds = $this->normalizeSiteIds($siteId);
+        if ($siteId === null) {
+            return $this->siteAccess->applyHsRiskAssessmentApplicationScope($query);
+        }
 
-        return $query->where(function (Builder $scope) use ($siteIds): void {
-            $scope->where(function (Builder $siteScope) use ($siteIds): void {
-                $siteScope->where('assessable_type', Site::class)
-                    ->whereIn('assessable_id', $siteIds);
-            })->orWhere(function (Builder $clientScope) use ($siteIds): void {
-                $clientScope->where('assessable_type', Client::class)
-                    ->whereIn('assessable_id', Client::query()->whereIn('site_id', $siteIds)->select('id'));
-            })->orWhereHas('hsEvent', fn (Builder $eventQuery) => $this->applySiteScope($eventQuery, $siteIds));
-        });
+        return $this->siteAccess->applyHsRiskAssessmentSiteScopeForSiteIds(
+            $query,
+            $this->normalizeSiteIds($siteId),
+        );
     }
 
     private function applyStaffSiteScope(Builder $query, int|array|null $siteId): Builder

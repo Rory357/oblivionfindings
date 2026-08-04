@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,9 +11,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class FleetShiftHandover extends Model
 {
     use AuditableChanges, HasFactory;
+    use WritesLegacyStorageContext;
 
     protected $fillable = [
-        'tenant_id',
         'asset_id',
         'outgoing_user_id',
         'incoming_user_id',

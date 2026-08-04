@@ -4,9 +4,16 @@ namespace App\Policies;
 
 use App\Models\CarePlan;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 
 class CarePlanPolicy
 {
+    private const CLIENT_SITE_BYPASS_PERMISSIONS = ['clients.viewAny'];
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     public function viewAny(User $user): bool
     {
         return $user->canDo('care_plans.viewAny');
@@ -15,7 +22,7 @@ class CarePlanPolicy
     public function view(User $user, CarePlan $carePlan): bool
     {
         return $user->canDo('care_plans.viewAny')
-            && $this->sharesOrganization($user, $carePlan);
+            && $this->canAccessClientSite($user, $carePlan);
     }
 
     public function create(User $user): bool
@@ -26,21 +33,33 @@ class CarePlanPolicy
     public function update(User $user, CarePlan $carePlan): bool
     {
         return $user->canDo('care_plans.update')
-            && $this->sharesOrganization($user, $carePlan);
+            && $this->canAccessClientSite($user, $carePlan);
     }
 
     public function delete(User $user, CarePlan $carePlan): bool
     {
         return $user->canDo('care_plans.delete')
-            && $this->sharesOrganization($user, $carePlan);
+            && $this->canAccessClientSite($user, $carePlan);
     }
 
-    private function sharesOrganization(User $user, CarePlan $carePlan): bool
+    private function canAccessClientSite(User $user, CarePlan $carePlan): bool
     {
-        if ($user->organization_id === null || $carePlan->organization_id === null) {
+        if ($this->siteAccess->canBypass($user, self::CLIENT_SITE_BYPASS_PERMISSIONS)) {
             return true;
         }
 
-        return (int) $user->organization_id === (int) $carePlan->organization_id;
+        $client = $carePlan->client()
+            ->with('site:id')
+            ->first(['id', 'site_id']);
+
+        if (! $client?->site) {
+            return false;
+        }
+
+        return in_array(
+            (int) $client->site_id,
+            $this->siteAccess->accessibleSiteIds($user),
+            true,
+        );
     }
 }

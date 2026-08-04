@@ -1,4 +1,5 @@
 import { OpsStatCard } from '@/components/ops-stat-card';
+import { PageHero } from '@/components/page';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
@@ -42,8 +42,12 @@ type AuditEvent = {
     module?: string | null;
     subject_type?: string | null;
     subject_id?: number | null;
-    properties: Record<string, any>;
-    causer?: { id: number; name: string; email: string } | null;
+    properties: {
+        fields?: string[];
+        before?: Record<string, unknown>;
+        after?: Record<string, unknown>;
+    };
+    actor?: { id: number; name: string } | null;
     created_at?: string | null;
 };
 
@@ -78,6 +82,9 @@ const MODULES = [
     { value: 'fleet', label: 'Fleet' },
     { value: 'settings', label: 'Settings' },
     { value: 'finance', label: 'Finance' },
+    { value: 'it', label: 'IT & Support' },
+    { value: 'security_devices', label: 'Security & Devices' },
+    { value: 'monitoring', label: 'Monitoring' },
     { value: 'default', label: 'General' },
 ];
 
@@ -159,16 +166,30 @@ function moduleBadgeColor(module?: string | null): string {
             return 'border-primary bg-primary/10 text-primary';
         case 'finance':
             return 'border-status-success/30 bg-status-success-bg text-status-success';
+        case 'it':
+            return 'border-status-info/30 bg-status-info-bg text-status-info';
+        case 'security_devices':
+            return 'border-primary bg-primary/10 text-primary';
+        case 'monitoring':
+            return 'border-status-warning/30 bg-status-warning-bg text-status-warning';
         default:
             return 'border-border bg-muted text-foreground';
     }
 }
 
-function DiffViewer({ properties }: { properties: Record<string, any> }) {
-    const old = properties.old ?? {};
-    const attributes = properties.attributes ?? {};
+function moduleLabel(module: string): string {
+    return MODULES.find((option) => option.value === module)?.label ?? module;
+}
+
+function DiffViewer({ properties }: { properties: AuditEvent['properties'] }) {
+    const before = properties.before ?? {};
+    const after = properties.after ?? {};
     const keys = [
-        ...new Set([...Object.keys(old), ...Object.keys(attributes)]),
+        ...new Set([
+            ...(properties.fields ?? []),
+            ...Object.keys(before),
+            ...Object.keys(after),
+        ]),
     ];
 
     if (keys.length === 0) {
@@ -186,14 +207,19 @@ function DiffViewer({ properties }: { properties: Record<string, any> }) {
                     <span className="shrink-0 font-semibold text-muted-foreground">
                         {key}:
                     </span>
-                    {old[key] !== undefined && (
+                    {before[key] !== undefined && (
                         <span className="text-status-critical line-through">
-                            {JSON.stringify(old[key])}
+                            {JSON.stringify(before[key])}
                         </span>
                     )}
-                    {attributes[key] !== undefined && (
+                    {after[key] !== undefined && (
                         <span className="text-status-success">
-                            {JSON.stringify(attributes[key])}
+                            {JSON.stringify(after[key])}
+                        </span>
+                    )}
+                    {before[key] === undefined && after[key] === undefined && (
+                        <span className="text-muted-foreground">
+                            Change recorded
                         </span>
                     )}
                 </div>
@@ -219,12 +245,12 @@ export default function AuditLogs({
     const allData = events?.data ?? [];
     const exportParams = new URLSearchParams();
 
-    if (search) exportParams.set('search', search);
-    if (userFilter !== 'all') exportParams.set('user', userFilter);
-    if (moduleFilter !== 'all') exportParams.set('module', moduleFilter);
-    if (actionFilter !== 'all') exportParams.set('action', actionFilter);
-    if (dateFrom) exportParams.set('date_from', dateFrom);
-    if (dateTo) exportParams.set('date_to', dateTo);
+    if (filters.search) exportParams.set('search', filters.search);
+    if (filters.user) exportParams.set('user', filters.user);
+    if (filters.module) exportParams.set('module', filters.module);
+    if (filters.action) exportParams.set('action', filters.action);
+    if (filters.date_from) exportParams.set('date_from', filters.date_from);
+    if (filters.date_to) exportParams.set('date_to', filters.date_to);
 
     const exportHref = `/settings/audit-logs/export${exportParams.toString() ? `?${exportParams.toString()}` : ''}`;
 
@@ -275,7 +301,11 @@ export default function AuditLogs({
                             { label: 'This month', value: stats.this_month },
                         ]}
                         actions={
-                            <Button variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                            <Button
+                                variant="outline"
+                                asChild
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
                                 <a href={exportHref} dusk="audit-export-link">
                                     <Download className="mr-2 h-4 w-4" />
                                     Export CSV
@@ -453,15 +483,19 @@ export default function AuditLogs({
                                             const isExpanded = expandedIds.has(
                                                 event.id,
                                             );
+                                            const fieldCount = (
+                                                event.properties.fields ?? []
+                                            ).length;
+                                            const beforeCount = Object.keys(
+                                                event.properties.before ?? {},
+                                            ).length;
+                                            const afterCount = Object.keys(
+                                                event.properties.after ?? {},
+                                            ).length;
                                             const hasDetails =
-                                                event.properties &&
-                                                (Object.keys(
-                                                    event.properties.old ?? {},
-                                                ).length > 0 ||
-                                                    Object.keys(
-                                                        event.properties
-                                                            .attributes ?? {},
-                                                    ).length > 0);
+                                                fieldCount > 0 ||
+                                                beforeCount > 0 ||
+                                                afterCount > 0;
 
                                             return (
                                                 <div
@@ -480,18 +514,17 @@ export default function AuditLogs({
                                                             <div className="flex items-center gap-2">
                                                                 <Avatar className="h-6 w-6">
                                                                     <AvatarFallback className="bg-primary/10 text-[10px] text-primary">
-                                                                        {event.causer
+                                                                        {event.actor
                                                                             ? getInitials(
                                                                                   event
-                                                                                      .causer
+                                                                                      .actor
                                                                                       .name,
                                                                               )
                                                                             : 'SY'}
                                                                     </AvatarFallback>
                                                                 </Avatar>
                                                                 <span className="text-sm font-medium">
-                                                                    {event
-                                                                        .causer
+                                                                    {event.actor
                                                                         ?.name ??
                                                                         'System'}
                                                                 </span>
@@ -521,9 +554,9 @@ export default function AuditLogs({
                                                                         variant="outline"
                                                                         className={`text-[10px] ${moduleBadgeColor(event.module)}`}
                                                                     >
-                                                                        {
-                                                                            event.module
-                                                                        }
+                                                                        {moduleLabel(
+                                                                            event.module,
+                                                                        )}
                                                                     </Badge>
                                                                 )}
                                                             </div>

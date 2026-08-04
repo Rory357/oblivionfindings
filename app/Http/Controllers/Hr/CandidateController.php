@@ -8,7 +8,6 @@ use App\Domain\Hr\Models\HrCandidateDocument;
 use App\Domain\Hr\Models\HrCandidateEmailTemplate;
 use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrInterviewScore;
-use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrReferenceCheck;
 use App\Domain\Hr\Models\HrTalentPool;
@@ -21,11 +20,11 @@ use App\Domain\Hr\Notifications\OfferResponseAckNotification;
 use App\Domain\Hr\Notifications\OfferSentNotification;
 use App\Domain\Hr\Notifications\ReferenceRequestNotification;
 use App\Domain\Hr\Notifications\RejectionNotification;
+use App\Domain\Hr\Services\HrRecruitmentAccessService;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Domain\Hr\Services\InterviewNotificationService;
 use App\Domain\Hr\Services\RecruitmentService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\AuditLog;
 use App\Models\Site;
 use App\Models\User;
@@ -33,20 +32,21 @@ use App\Services\AuditLogger;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class CandidateController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         private readonly RecruitmentService $recruitmentService,
         private readonly HrWebhookService $webhookService,
+        private readonly HrRecruitmentAccessService $recruitmentAccess,
     ) {}
 
     /* ------------------------------------------------------------------ */
@@ -58,9 +58,11 @@ class CandidateController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $sites = Site::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->whereIn('id', $this->recruitmentAccess->scope($user)['site_ids'])
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -80,12 +82,6 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $siteRule = Rule::exists('sites', 'id');
-        if ($tenantId !== null) {
-            $siteRule = $siteRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        }
 
         $validated = $request->validate([
             'first_name' => ['required', 'string', 'max:255'],
@@ -101,13 +97,14 @@ class CandidateController extends Controller
             // here and normalise below rather than failing the whole request.
             'tags.*' => ['nullable', 'string', 'max:100'],
 
-            // Optional initial application fields
-            'position_title' => ['nullable', 'string', 'max:255'],
+            // Every candidate needs durable Site provenance from an application.
+            'position_title' => ['required', 'string', 'max:255'],
             'position_role' => ['nullable', 'string', 'max:100'],
-            'target_site_id' => ['nullable', 'integer', $siteRule],
+            'target_site_id' => ['required', 'integer'],
             'cover_letter' => ['nullable', 'string', 'max:10000'],
             'cv' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
         ]);
+        $this->recruitmentAccess->assertSite($user, (int) $validated['target_site_id']);
 
         $validated['tags'] = $this->normaliseTags($validated['tags'] ?? null);
 
@@ -124,35 +121,44 @@ class CandidateController extends Controller
         ]);
 
         $candidate = null;
+        $storedCvPath = null;
 
         try {
-            DB::transaction(function () use (&$candidate, $candidateData, $tenantId, $user, $validated, $request) {
+            DB::transaction(function () use (&$candidate, &$storedCvPath, $candidateData, $user, $validated, $request) {
                 $candidate = $this->recruitmentService->createCandidate(
                     $candidateData,
-                    $tenantId,
                     $user->id,
                 );
 
-                if (! empty($validated['position_title'])) {
-                    $applicationData = [
-                        'position_title' => $validated['position_title'],
-                        'position_role' => $validated['position_role'] ?? null,
-                        'target_site_id' => $validated['target_site_id'] ?? null,
-                        'cover_letter' => $validated['cover_letter'] ?? null,
-                    ];
+                $applicationData = [
+                    'position_title' => $validated['position_title'],
+                    'position_role' => $validated['position_role'] ?? null,
+                    'target_site_id' => (int) $validated['target_site_id'],
+                    'cover_letter' => $validated['cover_letter'] ?? null,
+                ];
 
-                    if ($request->hasFile('cv')) {
-                        $cvPath = $request->file('cv')->store("candidates/{$candidate->id}/cv", 'private');
-                        $applicationData['cv_storage_path'] = $cvPath;
-                        $applicationData['cv_original_name'] = $request->file('cv')->getClientOriginalName();
-                    }
-
-                    $this->recruitmentService->createApplication($candidate, $applicationData);
+                if ($request->hasFile('cv')) {
+                    $storedCvPath = $request->file('cv')->store("candidates/{$candidate->id}/cv", 'private');
+                    $applicationData['cv_storage_path'] = $storedCvPath;
+                    $applicationData['cv_original_name'] = $request->file('cv')->getClientOriginalName();
                 }
+
+                $this->recruitmentService->createApplication($candidate, $applicationData);
             });
         } catch (\InvalidArgumentException|\LogicException $exception) {
-            return redirect()->back()->withErrors(['candidate' => $exception->getMessage()]);
+            if ($storedCvPath) {
+                Storage::disk('private')->delete($storedCvPath);
+            }
+
+            $message = str_contains($exception->getMessage(), 'email already exists')
+                ? 'Candidate could not be created with the supplied details.'
+                : $exception->getMessage();
+
+            return redirect()->back()->withErrors(['candidate' => $message]);
         } catch (\Throwable $exception) {
+            if ($storedCvPath) {
+                Storage::disk('private')->delete($storedCvPath);
+            }
             report($exception);
 
             return redirect()->back()->withErrors(['candidate' => 'Candidate could not be created.']);
@@ -173,8 +179,7 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
+        $candidate = $this->recruitmentAccess->visibleCandidate($user, $candidate);
 
         $candidate->load([
             'applications.targetSite:id,name',
@@ -390,9 +395,11 @@ class CandidateController extends Controller
         ])->values();
 
         // Option data for the in-page Offer wizard (manager-only surface).
-        $offerTenantId = $this->resolveHrTenantIdForUser($user);
         $offerSites = Site::query()
-            ->when($offerTenantId !== null, fn ($query) => $query->where('tenant_id', $offerTenantId))
+            ->whereIn('id', $this->recruitmentAccess->scope($user)['site_ids'])
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
             ->orderBy('name')
             ->get(['id', 'name']);
         $offerRoles = collect(['support_worker', 'team_lead', 'coordinator', 'provider_manager', 'admin'])
@@ -423,8 +430,7 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
+        $candidate = $this->recruitmentAccess->visibleCandidate($user, $candidate);
 
         $validated = $request->validate([
             'first_name' => ['sometimes', 'required', 'string', 'max:255'],
@@ -456,8 +462,7 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
+        $candidate = $this->recruitmentAccess->visibleCandidate($user, $candidate);
 
         $validated = $request->validate([
             'tags' => ['nullable', 'array'],
@@ -495,8 +500,6 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $validated = $request->validate([
             'from' => ['required', 'string', 'max:100'],
             'to' => ['required', 'string', 'max:100'],
@@ -507,7 +510,7 @@ class CandidateController extends Controller
             return redirect()->back()->with('error', 'Both the current and new tag are required.');
         }
 
-        $affected = $this->rewriteTagAcrossCandidates($tenantId, $from, $to, $user->id);
+        $affected = $this->rewriteTagAcrossCandidates($user, $from, $to, $user->id);
 
         return redirect()->back()->with('success', $affected === 0
             ? 'No candidates carried that tag.'
@@ -519,15 +522,13 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $validated = $request->validate(['tag' => ['required', 'string', 'max:100']]);
         $tag = trim($validated['tag']);
         if ($tag === '') {
             return redirect()->back()->with('error', 'Enter a tag to remove.');
         }
 
-        $affected = $this->rewriteTagAcrossCandidates($tenantId, $tag, null, $user->id);
+        $affected = $this->rewriteTagAcrossCandidates($user, $tag, null, $user->id);
 
         return redirect()->back()->with('success', $affected === 0
             ? 'No candidates carried that tag.'
@@ -538,10 +539,9 @@ class CandidateController extends Controller
      * Rename (to != null) or delete (to == null) a tag across every candidate
      * carrying a case-insensitive variant of it. Returns the number changed.
      */
-    private function rewriteTagAcrossCandidates(?int $tenantId, string $from, ?string $to, int $userId): int
+    private function rewriteTagAcrossCandidates(User $viewer, string $from, ?string $to, int $userId): int
     {
-        $candidates = HrCandidate::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+        $candidates = $this->recruitmentAccess->visibleCandidates($viewer)
             ->whereNotNull('tags')
             ->get(['id', 'tags']);
 
@@ -574,8 +574,7 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+        $application = $this->recruitmentAccess->visibleApplication($user, $application);
 
         $validated = $request->validate([
             'target_stage' => ['nullable', 'string', Rule::in(RecruitmentService::STAGES)],
@@ -605,8 +604,7 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+        $application = $this->recruitmentAccess->visibleApplication($user, $application);
 
         $validated = $request->validate([
             'rejection_reason' => ['nullable', 'string', 'max:2000'],
@@ -642,15 +640,14 @@ class CandidateController extends Controller
 
     /**
      * Bulk advance/reject N selected candidates. Per-row (a prerequisite failure
-     * on one candidate doesn't abort the batch) with a summary flash. Tenant-scoped
-     * — foreign-tenant ids are silently excluded by the scoped query.
+     * on one candidate doesn't abort the batch) with a summary flash. Access-controlled
+     * — the whole request is concealed when any selected id is outside the
+     * viewer's canonical Site scope, preventing partial cross-Site actions.
      */
     public function bulkAction(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $validated = $request->validate([
             'action' => ['required', 'string', Rule::in(['advance', 'reject', 'pool', 'tag', 'untag'])],
             'candidate_ids' => ['required', 'array', 'min:1'],
@@ -668,10 +665,7 @@ class CandidateController extends Controller
             return redirect()->back()->with('error', 'Enter a tag to apply or remove.');
         }
 
-        $candidates = HrCandidate::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->whereIn('id', $validated['candidate_ids'])
-            ->get();
+        $candidates = $this->visibleCandidateSelection($user, $validated['candidate_ids']);
 
         $done = 0;
         $skipped = 0;
@@ -749,8 +743,6 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $validated = $request->validate([
             'candidate_ids' => ['required', 'array', 'min:1'],
             'candidate_ids.*' => ['integer'],
@@ -758,10 +750,7 @@ class CandidateController extends Controller
             'body' => ['required', 'string', 'max:10000'],
         ]);
 
-        $candidates = HrCandidate::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->whereIn('id', $validated['candidate_ids'])
-            ->get();
+        $candidates = $this->visibleCandidateSelection($user, $validated['candidate_ids']);
 
         $sent = 0;
         $noEmail = 0;
@@ -810,16 +799,13 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', Rule::unique('hr_candidate_email_templates', 'name')],
             'subject' => ['required', 'string', 'max:255'],
             'body' => ['required', 'string', 'max:10000'],
         ]);
 
         HrCandidateEmailTemplate::query()->create([
-            'tenant_id' => $tenantId,
             'name' => $validated['name'],
             'subject' => $validated['subject'],
             'body' => $validated['body'],
@@ -833,9 +819,6 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
-
         $template->delete();
 
         return redirect()->back()->with('success', 'Email template removed.');
@@ -849,24 +832,27 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
-
-        $requisitionRule = Rule::exists('hr_job_requisitions', 'id')
-            ->where(fn ($q) => $tenantId !== null ? $q->where('tenant_id', $tenantId) : $q);
+        $candidate = $this->recruitmentAccess->visibleCandidate($user, $candidate);
 
         $validated = $request->validate([
             'reason' => ['nullable', 'string', 'max:255'],
-            'requisition_id' => ['nullable', 'integer', $requisitionRule],
+            'requisition_id' => ['nullable', 'integer'],
             'tags' => ['nullable', 'array'],
             // Blank entries arrive as null (ConvertEmptyStringsToNull); tolerate them
             // here and normalise below rather than failing the whole request.
             'tags.*' => ['nullable', 'string', 'max:100'],
         ]);
 
+        $requisitionId = null;
+        if (isset($validated['requisition_id'])) {
+            $requisitionId = $this->recruitmentAccess
+                ->visibleRequisition($user, (int) $validated['requisition_id'])
+                ->id;
+        }
+
         $tags = $this->normaliseTags($validated['tags'] ?? null);
 
-        $this->poolCandidate($candidate, $user->id, $validated['reason'] ?? 'Kept warm', $validated['requisition_id'] ?? null, $tags ?: null);
+        $this->poolCandidate($candidate, $user->id, $validated['reason'] ?? 'Kept warm', $requisitionId, $tags ?: null);
 
         return redirect()->back()->with('success', "{$candidate->full_name} added to the talent pool.");
     }
@@ -875,17 +861,13 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
-
-        $requisitionRule = Rule::exists('hr_job_requisitions', 'id')
-            ->where(fn ($q) => $tenantId !== null ? $q->where('tenant_id', $tenantId) : $q);
+        $candidate = $this->recruitmentAccess->visibleCandidate($user, $candidate);
 
         $validated = $request->validate([
-            'requisition_id' => ['required', 'integer', $requisitionRule],
+            'requisition_id' => ['required', 'integer'],
         ]);
 
-        $requisition = HrJobRequisition::query()->findOrFail($validated['requisition_id']);
+        $requisition = $this->recruitmentAccess->visibleRequisition($user, (int) $validated['requisition_id']);
 
         $duplicate = HrApplication::query()
             ->where('candidate_id', $candidate->id)
@@ -920,7 +902,6 @@ class CandidateController extends Controller
         HrTalentPool::query()->updateOrCreate(
             ['candidate_id' => $candidate->id],
             [
-                'tenant_id' => $candidate->tenant_id,
                 'requisition_id' => $requisitionId,
                 'reason' => $reason,
                 'pooled_by' => $userId,
@@ -937,8 +918,7 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+        $application = $this->recruitmentAccess->visibleApplication($user, $application);
 
         $validated = $request->validate([
             'scheduled_at' => ['required', 'date', 'after_or_equal:today'],
@@ -946,9 +926,19 @@ class CandidateController extends Controller
             'location' => ['nullable', 'string', 'max:255'],
             'interview_type' => ['required', 'string', Rule::in(['phone', 'video', 'in_person', 'panel'])],
             'interviewers' => ['nullable', 'array'],
-            'interviewers.*' => ['integer', 'exists:users,id'],
+            'interviewers.*' => ['integer'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
+
+        $interviewerIds = collect($validated['interviewers'] ?? [])
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values();
+        $applicationSiteId = $this->recruitmentAccess->applicationSiteIdFor($user, $application);
+        $allowedInterviewerIds = $this->recruitmentAccess
+            ->currentUsersAtSite($user, $applicationSiteId)
+            ->pluck('id');
+        abort_unless($interviewerIds->diff($allowedInterviewerIds)->isEmpty(), 404);
 
         $interview = HrInterview::create([
             'application_id' => $application->id,
@@ -956,7 +946,7 @@ class CandidateController extends Controller
             'duration_minutes' => $validated['duration_minutes'],
             'location' => $validated['location'] ?? null,
             'interview_type' => $validated['interview_type'],
-            'interviewers' => $validated['interviewers'] ?? [],
+            'interviewers' => $interviewerIds->all(),
             'status' => 'scheduled',
             'notes' => $validated['notes'] ?? null,
         ]);
@@ -974,10 +964,7 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $application = $interview->application()->firstOrFail();
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+        $interview = $this->recruitmentAccess->visibleInterview($user, $interview);
 
         $validated = $request->validate([
             'status' => ['required', 'string', Rule::in(['scheduled', 'completed', 'cancelled', 'no_show'])],
@@ -1001,10 +988,8 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
+        $interview = $this->recruitmentAccess->visibleInterview($user, $interview);
         $application = $interview->application()->with('interviewKit')->firstOrFail();
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         $validated = $request->validate([
             'overall_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -1067,8 +1052,7 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+        $application = $this->recruitmentAccess->visibleApplication($user, $application);
 
         $validated = $request->validate([
             'referee_name' => ['required', 'string', 'max:255'],
@@ -1108,10 +1092,7 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $application = $reference->application()->firstOrFail();
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+        $reference = $this->recruitmentAccess->visibleReference($user, $reference);
 
         $validated = $request->validate([
             'status' => ['required', 'string', Rule::in(['pending', 'requested', 'contacted', 'completed'])],
@@ -1141,8 +1122,7 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+        $application = $this->recruitmentAccess->visibleApplication($user, $application);
 
         $application->load([
             'candidate.documents',
@@ -1154,7 +1134,10 @@ class CandidateController extends Controller
         $candidate = $application->candidate;
 
         $sites = Site::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->whereIn('id', $this->recruitmentAccess->scope($user)['site_ids'])
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
             ->orderBy('name')
             ->get(['id', 'name']);
         $roles = collect(['support_worker', 'team_lead', 'coordinator', 'provider_manager', 'admin'])
@@ -1213,41 +1196,34 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $applicationRule = Rule::exists('hr_applications', 'id');
-        $siteRule = Rule::exists('sites', 'id');
-        if ($tenantId !== null) {
-            $applicationRule = $applicationRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-            $siteRule = $siteRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        }
-
-        $positionRule = Rule::exists('hr_positions', 'id');
-        if ($tenantId !== null) {
-            $positionRule = $positionRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        }
 
         $validated = $request->validate([
-            'application_id' => ['required', 'integer', $applicationRule],
+            'application_id' => ['required', 'integer'],
             'position_title' => ['required', 'string', 'max:255'],
             'position_role' => ['nullable', 'string', 'max:100'],
-            'position_id' => ['nullable', 'integer', $positionRule],
+            'position_id' => ['nullable', 'integer', Rule::exists('hr_positions', 'id')],
             'proposed_start_date' => ['required', 'date', 'after_or_equal:today'],
             'employment_type' => ['required', 'string', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])],
             'hours_per_week' => ['required', 'numeric', 'min:1', 'max:60'],
             'hourly_rate' => ['nullable', 'numeric', 'min:0'],
             'annual_salary' => ['nullable', 'numeric', 'min:0'],
-            'primary_site_id' => ['required', 'integer', $siteRule],
+            'primary_site_id' => ['required', 'integer'],
             'conditions' => ['nullable', 'string', 'max:5000'],
             'offer_letter' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:20480'],
         ]);
 
-        $application = HrApplication::query()
-            ->with('candidate')
-            ->where('id', $validated['application_id'])
-            ->firstOrFail();
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+        $application = $this->recruitmentAccess
+            ->visibleApplication($user, (int) $validated['application_id']);
+        $application->load(['candidate', 'requisition']);
         abort_unless($application->candidate, 404);
+
+        $primarySiteId = (int) $validated['primary_site_id'];
+        $this->recruitmentAccess->assertSite($user, $primarySiteId);
+        if ($primarySiteId !== $this->recruitmentAccess->applicationSiteIdFor($user, $application)) {
+            throw ValidationException::withMessages([
+                'primary_site_id' => 'The offer Site must match the application Site.',
+            ]);
+        }
 
         if (in_array($application->candidate->status, RecruitmentService::TERMINAL, true)) {
             return redirect()->back()->with('error', 'Cannot create an offer for a terminal candidate stage.');
@@ -1267,23 +1243,31 @@ class CandidateController extends Controller
             $letterName = $file->getClientOriginalName();
         }
 
-        HrOffer::create([
-            'application_id' => $application->id,
-            'position_title' => $validated['position_title'],
-            'position_role' => ($validated['position_role'] ?? null) ?: ($application->position_role ?: 'support_worker'),
-            'position_id' => $validated['position_id'] ?? $application->requisition?->position_id,
-            'proposed_start_date' => $validated['proposed_start_date'],
-            'employment_type' => $validated['employment_type'],
-            'hours_per_week' => $validated['hours_per_week'],
-            'hourly_rate' => $validated['hourly_rate'] ?? null,
-            'annual_salary' => $validated['annual_salary'] ?? null,
-            'primary_site_id' => $validated['primary_site_id'],
-            'conditions' => $validated['conditions'] ?? null,
-            'offer_letter_path' => $letterPath,
-            'offer_letter_name' => $letterName,
-            'approval_status' => 'draft',
-            'created_by' => $user->id,
-        ]);
+        try {
+            HrOffer::create([
+                'application_id' => $application->id,
+                'position_title' => $validated['position_title'],
+                'position_role' => ($validated['position_role'] ?? null) ?: ($application->position_role ?: 'support_worker'),
+                'position_id' => $validated['position_id'] ?? $application->requisition?->position_id,
+                'proposed_start_date' => $validated['proposed_start_date'],
+                'employment_type' => $validated['employment_type'],
+                'hours_per_week' => $validated['hours_per_week'],
+                'hourly_rate' => $validated['hourly_rate'] ?? null,
+                'annual_salary' => $validated['annual_salary'] ?? null,
+                'primary_site_id' => $primarySiteId,
+                'conditions' => $validated['conditions'] ?? null,
+                'offer_letter_path' => $letterPath,
+                'offer_letter_name' => $letterName,
+                'approval_status' => 'draft',
+                'created_by' => $user->id,
+            ]);
+        } catch (\Throwable $exception) {
+            if ($letterPath) {
+                Storage::disk('private')->delete($letterPath);
+            }
+
+            throw $exception;
+        }
 
         if ($application->candidate) {
             try {
@@ -1300,10 +1284,8 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
+        $offer = $this->recruitmentAccess->visibleOffer($user, $offer);
         $application = $offer->application()->with('candidate')->firstOrFail();
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         if ($offer->approval_status !== 'approved') {
             return redirect()->back()->with('error', 'Offer must be approved before sending.');
@@ -1335,7 +1317,7 @@ class CandidateController extends Controller
             return redirect()->back()->with('error', 'Offer could not be sent.');
         }
 
-        $this->webhookService->publish($application->tenant_id, 'recruitment.offer.sent', [
+        $this->webhookService->publishApplicationEvent('recruitment.offer.sent', [
             'offer_id' => $offer->id,
             'application_id' => $application->id,
             'candidate_id' => $application->candidate?->id,
@@ -1357,10 +1339,8 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
+        $offer = $this->recruitmentAccess->visibleOffer($user, $offer);
         $application = $offer->application()->with('candidate')->firstOrFail();
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         if (! $offer->sent_at) {
             return redirect()->back()->with('error', 'Send the offer before resending the link.');
@@ -1389,10 +1369,7 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $application = $offer->application()->firstOrFail();
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+        $offer = $this->recruitmentAccess->visibleOffer($user, $offer);
 
         $validated = $request->validate([
             'reason' => ['required', 'string', 'max:2000'],
@@ -1430,12 +1407,8 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        // Tenant guard — every sibling offer action asserts this; the letter
-        // download must not be a cross-tenant IDOR hole.
+        $offer = $this->recruitmentAccess->visibleOffer($user, $offer);
         $application = $offer->application()->with('candidate')->firstOrFail();
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         // Prefer a manually-uploaded letter when one exists.
         $disk = Storage::disk('private');
@@ -1463,10 +1436,12 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $offer = $this->recruitmentAccess->visibleOffer($user, $offer);
+        $application = $offer->application()->with(['candidate', 'requisition'])->firstOrFail();
 
-        $application = $offer->application()->with('candidate')->firstOrFail();
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+        if ($offer->approval_status === 'pending_approval' && $application->requisition?->hiring_manager_user_id) {
+            abort_unless((int) $application->requisition->hiring_manager_user_id === (int) $user->id, 403);
+        }
 
         if ($offer->approval_status === 'approved') {
             return redirect()->back()->with('success', 'Offer already approved.');
@@ -1480,7 +1455,7 @@ class CandidateController extends Controller
             'updated_by' => $user->id,
         ]);
 
-        $this->webhookService->publish($application->tenant_id, 'recruitment.offer.approved', [
+        $this->webhookService->publishApplicationEvent('recruitment.offer.approved', [
             'offer_id' => $offer->id,
             'application_id' => $application->id,
             'candidate_id' => $application->candidate?->id,
@@ -1489,7 +1464,10 @@ class CandidateController extends Controller
         ]);
 
         // Tell the offer's creator it's cleared to send (unless they approved it themselves).
-        $creator = $offer->created_by ? User::find($offer->created_by) : null;
+        $applicationSiteId = $this->recruitmentAccess->applicationSiteIdFor($user, $application);
+        $creator = $offer->created_by
+            ? $this->recruitmentAccess->currentUsersAtSite($user, $applicationSiteId)->firstWhere('id', $offer->created_by)
+            : null;
         if ($creator && (int) $creator->id !== (int) $user->id) {
             $this->notifyOfferApproval($creator, $offer, 'approved', $application->candidate?->full_name ?? 'a candidate');
         }
@@ -1502,15 +1480,23 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $offer = $this->recruitmentAccess->visibleOffer($user, $offer);
         $application = $offer->application()->with(['candidate', 'requisition.hiringManager'])->firstOrFail();
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         if ($offer->sent_at) {
             return redirect()->back()->with('error', 'This offer has already been sent.');
         }
         if ($offer->approval_status === 'approved') {
             return redirect()->back()->with('error', 'This offer is already approved.');
+        }
+
+        $applicationSiteId = $this->recruitmentAccess->applicationSiteIdFor($user, $application);
+        $approver = $application->requisition?->hiringManager;
+        $approver = $approver
+            ? $this->recruitmentAccess->currentUsersAtSite($user, $applicationSiteId)->firstWhere('id', $approver->id)
+            : null;
+        if (! $approver) {
+            return redirect()->back()->with('error', 'Assign a current hiring manager at the application Site before requesting approval.');
         }
 
         $offer->update([
@@ -1520,11 +1506,7 @@ class CandidateController extends Controller
             'approval_reminder_sent_at' => null,
             'updated_by' => $user->id,
         ]);
-
-        $approver = $application->requisition?->hiringManager;
-        if ($approver) {
-            $this->notifyOfferApproval($approver, $offer, 'requested', $application->candidate?->full_name ?? 'a candidate');
-        }
+        $this->notifyOfferApproval($approver, $offer, 'requested', $application->candidate?->full_name ?? 'a candidate');
 
         return redirect()->back()->with('success', 'Offer submitted for approval.');
     }
@@ -1534,9 +1516,12 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $application = $offer->application()->with('candidate')->firstOrFail();
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
+        $offer = $this->recruitmentAccess->visibleOffer($user, $offer);
+        $application = $offer->application()->with(['candidate', 'requisition'])->firstOrFail();
+
+        if ($application->requisition?->hiring_manager_user_id) {
+            abort_unless((int) $application->requisition->hiring_manager_user_id === (int) $user->id, 403);
+        }
 
         if ($offer->approval_status === 'approved' || $offer->sent_at) {
             return redirect()->back()->with('error', 'This offer can no longer be declined.');
@@ -1550,7 +1535,10 @@ class CandidateController extends Controller
             'updated_by' => $user->id,
         ]);
 
-        $creator = $offer->created_by ? User::find($offer->created_by) : null;
+        $applicationSiteId = $this->recruitmentAccess->applicationSiteIdFor($user, $application);
+        $creator = $offer->created_by
+            ? $this->recruitmentAccess->currentUsersAtSite($user, $applicationSiteId)->firstWhere('id', $offer->created_by)
+            : null;
         if ($creator) {
             $this->notifyOfferApproval($creator, $offer, 'declined', $application->candidate?->full_name ?? 'a candidate', $validated['reason'] ?? null);
         }
@@ -1621,10 +1609,8 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
+        $offer = $this->recruitmentAccess->visibleOffer($user, $offer);
         $application = $offer->application()->with('candidate')->firstOrFail();
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         $validated = $request->validate([
             'response' => ['required', 'string', Rule::in(['accepted', 'declined', 'withdrawn'])],
@@ -1697,7 +1683,7 @@ class CandidateController extends Controller
             return redirect()->back()->with('error', 'Offer response could not be recorded.');
         }
 
-        $this->webhookService->publish($application->tenant_id, 'recruitment.offer.responded', [
+        $this->webhookService->publishApplicationEvent('recruitment.offer.responded', [
             'offer_id' => $offer->id,
             'application_id' => $application->id,
             'candidate_id' => $application->candidate?->id,
@@ -1712,7 +1698,7 @@ class CandidateController extends Controller
         // A decline/withdrawal must never die silently — the hiring manager
         // needs to know the seat is still open. Best-effort.
         if (in_array($offer->response, ['declined', 'withdrawn'], true)) {
-            $this->notifyHiringManagerOfDecline($offer, $application);
+            $this->notifyHiringManagerOfDecline($offer, $application, $user);
         }
 
         // Accepting an offer flows straight into employment + onboarding — but
@@ -1732,7 +1718,7 @@ class CandidateController extends Controller
                 try {
                     $profile = $this->recruitmentService->convertToEmployee($candidate, $offer->fresh(), $user->id);
 
-                    $this->webhookService->publish($application->tenant_id, 'recruitment.offer.converted', [
+                    $this->webhookService->publishApplicationEvent('recruitment.offer.converted', [
                         'offer_id' => $offer->id,
                         'application_id' => $application->id,
                         'candidate_id' => $candidate->id,
@@ -1740,7 +1726,7 @@ class CandidateController extends Controller
                         'converted_by' => $user->id,
                     ]);
 
-                    $this->notifyHiringManagerOfHire($application, $candidate);
+                    $this->notifyHiringManagerOfHire($application, $candidate, $user);
                     // Welcome the new hire on the auto-accept path too — not only
                     // via the manual Convert action, or the primary flow (accept →
                     // auto-convert) would provision + onboard them but never say hello.
@@ -1770,10 +1756,8 @@ class CandidateController extends Controller
         // Converting mints a User login — gated by hr.employees.manage in addition
         // to hr.recruitment.manage (segregation of duties; the route enforces both).
         abort_unless($user && $user->canDo('hr.recruitment.manage') && $user->canDo('hr.employees.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
+        $offer = $this->recruitmentAccess->visibleOffer($user, $offer);
         $application = $offer->application()->with('candidate')->firstOrFail();
-        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
         $candidate = $application->candidate;
         abort_unless($candidate, 404);
 
@@ -1789,7 +1773,7 @@ class CandidateController extends Controller
             return redirect()->back()->with('error', $e->getMessage());
         }
 
-        $this->webhookService->publish($application->tenant_id, 'recruitment.offer.converted', [
+        $this->webhookService->publishApplicationEvent('recruitment.offer.converted', [
             'offer_id' => $offer->id,
             'application_id' => $application->id,
             'candidate_id' => $candidate->id,
@@ -1797,7 +1781,7 @@ class CandidateController extends Controller
             'converted_by' => $user->id,
         ]);
 
-        $this->notifyHiringManagerOfHire($application, $candidate);
+        $this->notifyHiringManagerOfHire($application, $candidate, $user);
         $this->sendNewHireWelcome($candidate, $offer);
 
         return redirect()->back()->with('success', "Employee profile created (#{$profile->id}).");
@@ -1819,11 +1803,15 @@ class CandidateController extends Controller
     }
 
     /** Best-effort hiring-manager notification when a candidate is converted. */
-    private function notifyHiringManagerOfHire(HrApplication $application, HrCandidate $candidate): void
+    private function notifyHiringManagerOfHire(HrApplication $application, HrCandidate $candidate, User $viewer): void
     {
         try {
             $requisition = $application->requisition()->with('hiringManager')->first();
+            $siteId = $this->recruitmentAccess->applicationSiteIdFor($viewer, $application);
             $manager = $requisition?->hiringManager;
+            $manager = $manager
+                ? $this->recruitmentAccess->currentUsersAtSite($viewer, $siteId)->firstWhere('id', $manager->id)
+                : null;
             if ($manager) {
                 $manager->notify(new CandidateHiredNotification($candidate, $requisition));
             }
@@ -1837,7 +1825,7 @@ class CandidateController extends Controller
      * offer's author, deduped) when a candidate declines or withdraws from an
      * offer — the acceptance path already notifies via CandidateHiredNotification.
      */
-    private function notifyHiringManagerOfDecline(HrOffer $offer, HrApplication $application): void
+    private function notifyHiringManagerOfDecline(HrOffer $offer, HrApplication $application, User $viewer): void
     {
         try {
             $candidate = $application->candidate;
@@ -1846,13 +1834,19 @@ class CandidateController extends Controller
             }
 
             $requisition = $application->requisition()->with('hiringManager')->first();
+            $siteId = $this->recruitmentAccess->applicationSiteIdFor($viewer, $application);
+            $currentRecipientIds = $this->recruitmentAccess
+                ->currentUsersAtSite($viewer, $siteId)
+                ->pluck('id');
             $reason = $offer->response === 'withdrawn' ? 'withdrawn' : 'declined';
             $declineReason = $reason === 'declined' ? ($offer->response_notes ?: null) : null;
 
             $recipients = collect([
                 $requisition?->hiringManager,
                 $offer->created_by ? User::find($offer->created_by) : null,
-            ])->filter()->unique('id');
+            ])
+                ->filter(fn (?User $recipient): bool => $recipient !== null && $currentRecipientIds->contains($recipient->id))
+                ->unique('id');
 
             foreach ($recipients as $recipient) {
                 $recipient->notify(new OfferDeclinedNotification(
@@ -1987,47 +1981,54 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
-
-        $applicationRule = Rule::exists('hr_applications', 'id')
-            ->where(fn ($q) => $q->where('candidate_id', $candidate->id));
+        $candidate = $this->recruitmentAccess->visibleCandidate($user, $candidate);
 
         $validated = $request->validate([
             'file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,jpg,jpeg,png'],
             'category' => ['required', 'string', Rule::in(array_keys(HrCandidateDocument::CATEGORIES))],
-            'application_id' => ['nullable', 'integer', $applicationRule],
+            'application_id' => ['nullable', 'integer'],
             'notes' => ['nullable', 'string', 'max:500'],
             'expires_at' => ['nullable', 'date'],
         ]);
 
         // Carry the application context: explicit param wins, else fall back to the
         // candidate's most-recent active application so the doc isn't orphaned.
-        $applicationId = $validated['application_id']
-            ?? $candidate->applications()
-                ->whereNotIn('status', ['rejected', 'withdrawn'])
-                ->latest('id')
-                ->value('id');
+        $applicationId = $candidate->applications()
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
+            ->latest('id')
+            ->value('id');
+        if (isset($validated['application_id'])) {
+            $application = $this->recruitmentAccess
+                ->visibleApplication($user, (int) $validated['application_id']);
+            abort_unless((int) $application->candidate_id === (int) $candidate->id, 404);
+            $applicationId = $application->id;
+        }
+        abort_unless($applicationId !== null, 422, 'A candidate document requires an application.');
 
         $file = $request->file('file');
         $path = $file->store("candidates/{$candidate->id}/documents", 'private');
 
         $categoryLabel = HrCandidateDocument::CATEGORIES[$validated['category']] ?? $validated['category'];
 
-        HrCandidateDocument::create([
-            'tenant_id' => $candidate->tenant_id,
-            'candidate_id' => $candidate->id,
-            'application_id' => $applicationId,
-            'category' => $validated['category'],
-            'title' => $categoryLabel.' - '.$file->getClientOriginalName(),
-            'storage_path' => $path,
-            'original_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getMimeType(),
-            'size_bytes' => $file->getSize(),
-            'uploaded_by' => $user->id,
-            'notes' => $validated['notes'] ?? null,
-            'expires_at' => $validated['expires_at'] ?? null,
-        ]);
+        try {
+            HrCandidateDocument::create([
+                'candidate_id' => $candidate->id,
+                'application_id' => $applicationId,
+                'category' => $validated['category'],
+                'title' => $categoryLabel.' - '.$file->getClientOriginalName(),
+                'storage_path' => $path,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getMimeType(),
+                'size_bytes' => $file->getSize(),
+                'uploaded_by' => $user->id,
+                'notes' => $validated['notes'] ?? null,
+                'expires_at' => $validated['expires_at'] ?? null,
+            ]);
+        } catch (\Throwable $exception) {
+            Storage::disk('private')->delete($path);
+
+            throw $exception;
+        }
 
         return redirect()->back()->with('success', 'Document uploaded.');
     }
@@ -2036,8 +2037,7 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $document->tenant_id);
+        $document = $this->recruitmentAccess->visibleDocument($user, $document);
 
         $disk = Storage::disk('private');
         abort_unless($disk->exists($document->storage_path), 404);
@@ -2049,12 +2049,40 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $document->tenant_id);
+        $storagePath = DB::transaction(function () use ($user, $document): string {
+            $document = $this->recruitmentAccess->visibleDocument($user, $document, true);
+            $storagePath = $document->storage_path;
+            $document->delete();
 
-        Storage::disk('private')->delete($document->storage_path);
-        $document->delete();
+            return $storagePath;
+        });
+        Storage::disk('private')->delete($storagePath);
 
         return redirect()->back()->with('success', 'Document deleted.');
+    }
+
+    /**
+     * Resolve an entire bulk selection through canonical Site scope. If even one
+     * id is hidden or invalid, conceal the whole operation rather than applying
+     * a surprising partial mutation.
+     *
+     * @param  array<int, mixed>  $candidateIds
+     * @return Collection<int, HrCandidate>
+     */
+    private function visibleCandidateSelection(User $viewer, array $candidateIds): Collection
+    {
+        $requestedIds = collect($candidateIds)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->sort()
+            ->values();
+        $candidates = $this->recruitmentAccess->visibleCandidates($viewer)
+            ->whereKey($requestedIds->all())
+            ->get();
+        $visibleIds = $candidates->pluck('id')->map(fn (mixed $id): int => (int) $id)->sort()->values();
+
+        abort_unless($visibleIds->all() === $requestedIds->all(), 404);
+
+        return $candidates;
     }
 }

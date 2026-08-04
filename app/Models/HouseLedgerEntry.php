@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domain\Finance\Models\FinJournal;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,12 +11,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HouseLedgerEntry extends Model
 {
-    use HasFactory;
-    use SoftDeletes;
+    use HasFactory, SoftDeletes, WritesLegacyStorageContext;
 
     protected $fillable = [
-        'tenant_id',
-        'house_ledger_id',
         'entry_type',
         'category',
         'description',

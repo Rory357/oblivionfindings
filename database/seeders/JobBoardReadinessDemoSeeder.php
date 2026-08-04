@@ -37,7 +37,9 @@ class JobBoardReadinessDemoSeeder extends Seeder
             $client->forceFill(['suburb' => 'Mount Eden'])->save();
         }
 
-        $this->grantSiteAccess($worker, $client);
+        foreach ([$worker, $currentStaff, $admin] as $staff) {
+            $this->grantSiteAccess($staff, $client);
+        }
 
         $this->seedOpenPosition($admin, $currentStaff, $client, $serviceContext);
         $this->seedPendingClaim($admin, $worker, $currentStaff, $client, $serviceContext);
@@ -57,7 +59,6 @@ class JobBoardReadinessDemoSeeder extends Seeder
         $replacement = ShiftReplacementRequest::updateOrCreate(
             ['shift_id' => $shift->id],
             [
-                'organization_id' => $shift->organization_id,
                 'requested_by' => $admin->id,
                 'current_staff_id' => $currentStaff->id,
                 'replacement_user_id' => null,
@@ -77,7 +78,6 @@ class JobBoardReadinessDemoSeeder extends Seeder
         ShiftOpenPosition::updateOrCreate(
             ['replacement_request_id' => $replacement->id],
             [
-                'organization_id' => $shift->organization_id,
                 'shift_id' => $shift->id,
                 'status' => 'open',
                 'required_skills' => ['NZSL'],
@@ -112,7 +112,6 @@ class JobBoardReadinessDemoSeeder extends Seeder
         $replacement = ShiftReplacementRequest::updateOrCreate(
             ['shift_id' => $shift->id],
             [
-                'organization_id' => $shift->organization_id,
                 'requested_by' => $admin->id,
                 'current_staff_id' => $currentStaff->id,
                 'replacement_user_id' => $worker->id,
@@ -132,7 +131,6 @@ class JobBoardReadinessDemoSeeder extends Seeder
         ShiftOpenPosition::updateOrCreate(
             ['replacement_request_id' => $replacement->id],
             [
-                'organization_id' => $shift->organization_id,
                 'shift_id' => $shift->id,
                 'status' => 'claimed',
                 'required_skills' => ['NZSL'],
@@ -157,7 +155,6 @@ class JobBoardReadinessDemoSeeder extends Seeder
     ): Shift {
         $shift = Shift::query()->where('notes', $notes)->first();
         $attributes = [
-            'organization_id' => $client->organization_id ?? 1,
             'client_id' => $client->id,
             'site_id' => $client->site_id,
             'service_context_id' => $serviceContext->id,
@@ -188,7 +185,6 @@ class JobBoardReadinessDemoSeeder extends Seeder
         $profile = HrEmployeeProfile::query()->where('user_id', $worker->id)->first();
         if (! $profile) {
             HrEmployeeProfile::create([
-                'tenant_id' => $worker->tenant_id ?? 1,
                 'user_id' => $worker->id,
                 'employee_number' => 'EMP-JOB-BOARD-'.$worker->id,
                 'work_email' => $worker->email,
@@ -206,10 +202,17 @@ class JobBoardReadinessDemoSeeder extends Seeder
 
         $secondary = is_array($profile->secondary_site_ids) ? $profile->secondary_site_ids : [];
         if ($profile->primary_site_id === $client->site_id || in_array($client->site_id, $secondary, true)) {
+            $profile->update([
+                'is_active' => true,
+                'end_date' => null,
+            ]);
+
             return;
         }
 
         $profile->update([
+            'is_active' => true,
+            'end_date' => null,
             'secondary_site_ids' => array_values(array_unique([...$secondary, $client->site_id])),
         ]);
     }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domain\Finance\Models\FinPaymentAllocation;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,9 +15,9 @@ class Invoice extends Model
 {
     use HasFactory;
     use SoftDeletes;
+    use WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'client_id',
         'funding_body',
         'invoice_number',

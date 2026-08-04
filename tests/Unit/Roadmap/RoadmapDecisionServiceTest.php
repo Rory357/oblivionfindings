@@ -44,8 +44,8 @@ class RoadmapDecisionServiceTest extends TestCase
 
     public function test_resolve_applicable_rule_selects_matching_amount_band(): void
     {
-        $small = $this->service->resolveApplicableRule(null, 'initiative_budget', 5000);
-        $large = $this->service->resolveApplicableRule(null, 'initiative_budget', 25000);
+        $small = $this->service->resolveApplicableRule('initiative_budget', 5000);
+        $large = $this->service->resolveApplicableRule('initiative_budget', 25000);
 
         $this->assertNotNull($small);
         $this->assertNotNull($large);

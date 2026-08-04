@@ -4,6 +4,7 @@ use App\Domain\Hr\Models\HrCompetency;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -17,12 +18,22 @@ beforeEach(function () {
         'role' => 'hr',
         'approved_at' => now(),
     ]);
-    $this->hr->setAttribute('tenant_id', 1);
-
     $hrRole = Role::query()->where('name', 'hr')->first();
     if ($hrRole) {
         $this->hr->roles()->syncWithoutDetaching([$hrRole->id]);
     }
+    $this->site = Site::factory()->create(['name' => 'Employee Detail Allowed Site']);
+    HrEmployeeProfile::query()->create([
+        'user_id' => $this->hr->id,
+        'employee_number' => 'EMP-DETAIL-VIEWER',
+        'work_email' => $this->hr->email,
+        'position_title' => 'HR Manager',
+        'position_role' => 'hr',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $this->site->id,
+    ]);
 
     $this->staff = User::factory()->create([
         'name' => 'Employee Detail Staff',
@@ -30,10 +41,7 @@ beforeEach(function () {
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
-    $this->staff->setAttribute('tenant_id', 1);
-
     $this->profile = HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'employee_number' => 'EMP-DETAIL',
         'work_email' => $this->staff->email,
@@ -42,12 +50,12 @@ beforeEach(function () {
         'employment_type' => 'full_time',
         'start_date' => now()->subMonth()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
     ]);
 });
 
 test('employee profile detail renders PIPs keyed by employee user', function () {
     HrPerformanceImprovementPlan::query()->create([
-        'tenant_id' => 1,
         'employee_user_id' => $this->staff->id,
         'manager_user_id' => $this->hr->id,
         'title' => 'Improve medication documentation',
@@ -70,7 +78,6 @@ test('employee profile detail renders PIPs keyed by employee user', function () 
 
 test('PIP list and detail pages resolve employee users', function () {
     $pip = HrPerformanceImprovementPlan::query()->create([
-        'tenant_id' => 1,
         'employee_user_id' => $this->staff->id,
         'manager_user_id' => $this->hr->id,
         'title' => 'Strengthen incident follow-up',
@@ -99,7 +106,6 @@ test('PIP list and detail pages resolve employee users', function () {
 
 test('competency assessments store and render from the profile keyed table', function () {
     $competency = HrCompetency::query()->create([
-        'tenant_id' => 1,
         'name' => 'Safe medication support',
         'description' => 'Demonstrates safe medication support practice.',
         'category' => 'Clinical',

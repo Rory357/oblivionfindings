@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\CarePlan;
 use App\Models\Client;
 use App\Models\ClientBowelEntry;
@@ -27,6 +28,8 @@ class ClientProfileDataGapsBuildTest extends TestCase
 
     protected Client $client;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -35,7 +38,8 @@ class ClientProfileDataGapsBuildTest extends TestCase
 
         $this->admin = User::factory()->create(['name' => 'Z Admin', 'role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
-        $this->client = Client::factory()->create();
+        $this->site = Site::factory()->create(['is_active' => true]);
+        $this->client = Client::factory()->create(['site_id' => $this->site->id]);
     }
 
     public function test_client_room_assignment_updates_profile_and_site_occupancy(): void
@@ -263,8 +267,30 @@ class ClientProfileDataGapsBuildTest extends TestCase
 
     public function test_profile_exposes_assignable_workers_for_worker_editor(): void
     {
-        $assigned = User::factory()->create(['name' => 'Assigned Worker', 'email' => 'assigned@example.test', 'role' => 'support_worker']);
-        $available = User::factory()->create(['name' => 'Available Worker', 'email' => 'available@example.test', 'role' => 'support_worker']);
+        $assigned = User::factory()->create([
+            'name' => 'Assigned Worker',
+            'email' => 'assigned@example.test',
+            'role' => 'support_worker',
+            'approved_at' => now(),
+        ]);
+        $available = User::factory()->create([
+            'name' => 'Available Worker',
+            'email' => 'available@example.test',
+            'role' => 'support_worker',
+            'approved_at' => now(),
+        ]);
+        $supportWorkerRole = Role::query()->where('name', 'support_worker')->firstOrFail();
+        $assigned->roles()->attach($supportWorkerRole);
+        $available->roles()->attach($supportWorkerRole);
+        foreach ([$assigned, $available] as $worker) {
+            HrEmployeeProfile::factory()->create([
+                'user_id' => $worker->id,
+                'primary_site_id' => $this->site->id,
+                'secondary_site_ids' => [],
+                'is_active' => true,
+                'end_date' => null,
+            ]);
+        }
         $this->client->supportWorkers()->attach($assigned->id);
 
         $this->actingAs($this->admin)

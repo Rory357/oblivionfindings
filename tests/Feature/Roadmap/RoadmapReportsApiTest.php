@@ -3,6 +3,7 @@
 namespace Tests\Feature\Roadmap;
 
 use App\Domain\Roadmap\Models\ReportSnapshot;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\RoadmapTestHelpers;
 use Tests\TestCase;
@@ -81,14 +82,13 @@ class RoadmapReportsApiTest extends TestCase
         $publishResponse->assertJsonStructure(['message']);
     }
 
-    public function test_report_snapshot_show_blocks_tenant_mismatch_when_request_tenant_id_set(): void
+    public function test_report_snapshot_show_requires_roadmap_permission(): void
     {
         $admin = $this->createAdminUser();
 
         $snapshot = ReportSnapshot::create([
-            'tenant_id' => 55,
             'report_type' => 'best_all_round',
-            'name' => 'Tenant scoped report',
+            'name' => 'Application roadmap report',
             'checksum' => hash('sha256', 'x'),
             'payload' => ['type' => 'best_all_round'],
             'generated_by' => $admin->id,
@@ -96,8 +96,9 @@ class RoadmapReportsApiTest extends TestCase
             'immutable' => true,
         ]);
 
-        $response = $this->actingAs($admin)
-            ->getJson("/roadmap/reports/snapshots/{$snapshot->id}?tenant_id=56");
+        $unprivileged = User::factory()->create(['approved_at' => now()]);
+        $response = $this->actingAs($unprivileged)
+            ->getJson("/roadmap/reports/snapshots/{$snapshot->id}");
 
         $response->assertForbidden();
     }

@@ -123,6 +123,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('portal.clients.location');
     Route::get('/portal/clients/{client}/location/history', [PortalLocationController::class, 'history'])
         ->name('portal.clients.location.history');
+    Route::get('/portal/clients/{client}/location/privacy-status', [PortalLocationController::class, 'privacyStatus'])
+        ->name('portal.clients.location.privacy-status');
 
     // Photo Gallery
     Route::get('/portal/clients/{client}/photos', [PortalPhotoController::class, 'index'])

@@ -190,10 +190,6 @@ class ControlRoomDeskService
     /** @return array{name: string, lead_name: string|null, started_at: string|null}|null */
     private function activeShift(User $user): ?array
     {
-        if (! $this->siteAccess->isUnrestrictedPlatformUser($user)) {
-            return null;
-        }
-
         $shift = Shift::query()
             ->with('shiftLead:id,name')
             ->active()
@@ -434,7 +430,7 @@ class ControlRoomDeskService
         if ($siteId !== null) {
             return $siteId;
         }
-        if ($this->siteAccess->isUnrestrictedPlatformUser($user)) {
+        if ($this->siteAccess->canBypass($user, self::BYPASS_PERMISSIONS)) {
             return null;
         }
 

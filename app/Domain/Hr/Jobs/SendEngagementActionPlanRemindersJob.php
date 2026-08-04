@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Jobs;
 
 use App\Domain\Hr\Models\HrEngagementActionPlan;
 use App\Domain\Hr\Notifications\EngagementActionPlanDueNotification;
+use App\Domain\Hr\Services\HrWellbeingAccessService;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -16,12 +17,9 @@ class SendEngagementActionPlanRemindersJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(
-        public ?int $tenantId = null
-    ) {}
-
     public function handle(): void
     {
+        $access = app(HrWellbeingAccessService::class);
         $beforeDays = collect(config('hr.engagement.action_plan_reminder_days_before', [14, 7, 3, 1, 0]))
             ->filter(fn ($day) => is_numeric($day))
             ->map(fn ($day) => (int) $day)
@@ -42,12 +40,11 @@ class SendEngagementActionPlanRemindersJob implements ShouldQueue
         $sentCount = 0;
 
         HrEngagementActionPlan::query()
-            ->with(['owner:id,name,email'])
+            ->with(['owner:id,name,email', 'staff:id,name', 'survey:id,title,audience_type,audience_site_ids'])
             ->whereIn('status', ['open', 'in_progress'])
             ->whereNotNull('due_date')
-            ->when($this->tenantId !== null, fn ($query) => $query->where('tenant_id', $this->tenantId))
             ->whereBetween('due_date', [now()->subDays($maxOverdue)->toDateString(), now()->addDays($maxBefore)->toDateString()])
-            ->chunkById(200, function ($plans) use ($beforeDays, $overdueDays, &$sentCount) {
+            ->chunkById(200, function ($plans) use ($access, $beforeDays, $overdueDays, &$sentCount) {
                 foreach ($plans as $plan) {
                     $dueDate = $plan->due_date;
                     if (! $dueDate) {
@@ -76,8 +73,12 @@ class SendEngagementActionPlanRemindersJob implements ShouldQueue
 
                     User::query()
                         ->whereIn('id', $recipientIds->all())
-                        ->chunkById(100, function ($users) use ($plan, $daysUntilDue, $reminderKind, &$sentCount) {
+                        ->chunkById(100, function ($users) use ($access, $plan, $daysUntilDue, $reminderKind, &$sentCount) {
                             foreach ($users as $user) {
+                                if (! $access->canAccessActionPlan($user, $plan)) {
+                                    continue;
+                                }
+
                                 $alreadySent = $user->notifications()
                                     ->where('type', EngagementActionPlanDueNotification::class)
                                     ->where('data->action_plan_id', $plan->id)
@@ -106,11 +107,9 @@ class SendEngagementActionPlanRemindersJob implements ShouldQueue
             });
 
         Log::info('SendEngagementActionPlanRemindersJob completed.', [
-            'tenant_id' => $this->tenantId,
             'sent' => $sentCount,
             'before_days' => $beforeDays->all(),
             'overdue_days' => $overdueDays->all(),
         ]);
     }
 }
-

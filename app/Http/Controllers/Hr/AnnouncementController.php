@@ -7,24 +7,28 @@ use App\Domain\Hr\Models\HrAnnouncementAcknowledgement;
 use App\Domain\Hr\Models\HrAnnouncementAttachment;
 use App\Domain\Hr\Models\HrAnnouncementReminder;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrFeedReaction;
+use App\Domain\Hr\Models\HrFeedReply;
 use App\Domain\Hr\Notifications\AnnouncementPublishedNotification;
 use App\Domain\Hr\Notifications\AnnouncementReminderNotification;
 use App\Domain\Hr\Services\AnnouncementAudienceResolver;
 use App\Domain\Hr\Services\AnnouncementInboxBridge;
-use App\Http\Controllers\Controller;
+use App\Domain\Hr\Services\FeedService;
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Http\Controllers\Controller;
 use App\Models\Site;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class AnnouncementController extends Controller
 {
-    use ResolvesHrTenant, ServesPrivateAttachments;
+    use ServesPrivateAttachments;
 
     private const PRIORITIES = [
         ['value' => 'low', 'label' => 'Low'],
@@ -52,21 +56,30 @@ class AnnouncementController extends Controller
     public function __construct(
         private readonly AnnouncementAudienceResolver $resolver,
         private readonly AnnouncementInboxBridge $bridge,
+        private readonly HrCurrentStaffService $currentStaff,
     ) {}
 
     /* ================================================================== */
-    /*  Command-center hub                                                 */
+    /*  Command-center hub */
     /* ================================================================== */
 
     public function index(Request $request)
     {
         $user = $request->user();
-        $canView = $user && ($user->canDo('hr.announcements.view') || $user->canDo('hr.announcements.manage'));
+        $canView = $this->canViewAnnouncements($user);
         abort_unless($canView, 403);
 
-        $canManage = (bool) $user->canDo('hr.announcements.manage');
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $canManage = $this->canManageAnnouncements($user);
         $tab = (string) $request->query('tab', 'all');
+        $managerTabs = ['tracking', 'scheduled', 'insights'];
+
+        if (! $canManage && in_array($tab, $managerTabs, true)) {
+            abort(403);
+        }
+
+        $viewerAnnouncementIds = $canManage
+            ? null
+            : $this->viewerAnnouncementIds($user);
 
         $filters = [
             'search' => $request->query('search'),
@@ -82,30 +95,39 @@ class AnnouncementController extends Controller
             'priorities' => self::PRIORITIES,
             'audiences' => self::AUDIENCES,
             'statuses' => self::STATUSES,
-            'segments' => $this->segmentOptions($tenantId),
-            'summary' => $this->heroSummary($tenantId),
-            'tabCounts' => $this->tabCounts($tenantId),
+            'segments' => $canManage ? $this->segmentOptions() : $this->emptySegments(),
+            'summary' => $canManage
+                ? $this->heroSummary()
+                : $this->viewerSummary($viewerAnnouncementIds ?? [], $user),
+            'tabCounts' => $canManage
+                ? $this->tabCounts()
+                : $this->viewerTabCounts($viewerAnnouncementIds ?? []),
             'can' => ['manage' => $canManage],
         ];
 
         if ($tab === 'scheduled') {
-            $payload['scheduled'] = $this->scheduledList($tenantId);
+            $payload['scheduled'] = $this->scheduledList();
         } elseif ($tab === 'tracking') {
-            $payload['trackingList'] = $this->trackingList($tenantId);
+            $payload['trackingList'] = $this->trackingList();
             $selectedId = (int) $request->query('announcement', 0);
             if (! $selectedId && ! empty($payload['trackingList'])) {
                 $selectedId = (int) $payload['trackingList'][0]['id'];
             }
             if ($selectedId) {
-                $selected = HrAnnouncement::forTenant($tenantId)->with('targets')->find($selectedId);
+                $selected = HrAnnouncement::query()->with('targets')->find($selectedId);
                 if ($selected) {
-                    $payload['tracking'] = $this->trackingData($selected, $tenantId);
+                    $payload['tracking'] = $this->trackingData($selected);
                 }
             }
         } elseif ($tab === 'insights') {
-            $payload['insights'] = $this->insights($tenantId);
+            $payload['insights'] = $this->insights();
         } else {
-            $payload['announcements'] = $this->listAnnouncements($request, $tenantId, $tab, $filters);
+            $payload['announcements'] = $this->listAnnouncements(
+                $request,
+                $tab,
+                $filters,
+                $viewerAnnouncementIds,
+            );
         }
 
         return Inertia::render('hr/announcements/index', $payload);
@@ -116,24 +138,23 @@ class AnnouncementController extends Controller
      */
     public function create(Request $request)
     {
+        abort_unless($this->canManageAnnouncements($request->user()), 403);
+
         return redirect()->route('hr.announcements.index');
     }
 
     /* ================================================================== */
-    /*  Create / update / lifecycle                                       */
+    /*  Create / update / lifecycle */
     /* ================================================================== */
 
     public function store(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.manage'), 403);
+        abort_unless($this->canManageAnnouncements($user), 403);
 
         $data = $this->validatePayload($request);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $announcement = DB::transaction(function () use ($user, $data, $tenantId, $request) {
+        $announcement = DB::transaction(function () use ($user, $data, $request) {
             $announcement = HrAnnouncement::create([
-                'tenant_id' => $tenantId,
                 'created_by' => $user->id,
                 'title' => $data['title'],
                 'content' => $data['content'],
@@ -153,7 +174,7 @@ class AnnouncementController extends Controller
             $this->syncTargets($announcement, $data['targets']);
             $this->storeAttachments($announcement, $request, $user->id);
 
-            $this->afterSave($announcement, $tenantId, $user->id, $data['push_to_bell'], wasPublished: false);
+            $this->afterSave($announcement, $user->id, $data['push_to_bell'], wasPublished: false);
 
             return $announcement;
         });
@@ -165,14 +186,11 @@ class AnnouncementController extends Controller
     public function update(Request $request, HrAnnouncement $announcement)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $announcement->tenant_id);
-
+        abort_unless($this->canManageAnnouncements($user), 403);
         $data = $this->validatePayload($request);
         $wasPublished = $announcement->status === 'published';
 
-        DB::transaction(function () use ($announcement, $data, $request, $user, $tenantId, $wasPublished) {
+        DB::transaction(function () use ($announcement, $data, $request, $user, $wasPublished) {
             $announcement->update([
                 'title' => $data['title'],
                 'content' => $data['content'],
@@ -192,7 +210,7 @@ class AnnouncementController extends Controller
             $this->syncTargets($announcement, $data['targets']);
             $this->storeAttachments($announcement, $request, $user->id);
 
-            $this->afterSave($announcement, $tenantId, $user->id, $data['push_to_bell'], wasPublished: $wasPublished);
+            $this->afterSave($announcement, $user->id, $data['push_to_bell'], wasPublished: $wasPublished);
         });
 
         return redirect()->back(fallback: route('hr.announcements.index'))
@@ -202,10 +220,7 @@ class AnnouncementController extends Controller
     public function destroy(Request $request, HrAnnouncement $announcement)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $announcement->tenant_id);
-
+        abort_unless($this->canManageAnnouncements($user), 403);
         $announcement->update(['status' => 'archived']);
         $this->bridge->withdraw($announcement);
 
@@ -215,17 +230,15 @@ class AnnouncementController extends Controller
     public function restore(Request $request, int $id)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $announcement = HrAnnouncement::withTrashed()->forTenant($tenantId)->findOrFail($id);
+        abort_unless($this->canManageAnnouncements($user), 403);
+        $announcement = HrAnnouncement::withTrashed()->findOrFail($id);
 
         if ($announcement->trashed()) {
             $announcement->restore();
         }
 
         $announcement->update(['status' => $this->statusFromDates($announcement)]);
-        $this->afterSave($announcement->fresh('targets'), $tenantId, $user->id, true, wasPublished: false);
+        $this->afterSave($announcement->fresh('targets'), $user->id, true, wasPublished: false);
 
         return redirect()->back()->with('success', 'Announcement restored.');
     }
@@ -233,55 +246,55 @@ class AnnouncementController extends Controller
     public function publishNow(Request $request, HrAnnouncement $announcement)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $announcement->tenant_id);
-
+        abort_unless($this->canManageAnnouncements($user), 403);
         $wasPublished = $announcement->status === 'published';
         $announcement->update(['status' => 'published', 'published_at' => now()]);
-        $this->afterSave($announcement->fresh('targets'), $tenantId, $user->id, true, wasPublished: $wasPublished);
+        $this->afterSave($announcement->fresh('targets'), $user->id, true, wasPublished: $wasPublished);
 
         return redirect()->back()->with('success', 'Announcement published.');
     }
 
     /* ================================================================== */
-    /*  Detail                                                            */
+    /*  Detail */
     /* ================================================================== */
 
     public function show(Request $request, HrAnnouncement $announcement)
     {
         $user = $request->user();
-        $canView = $user && ($user->canDo('hr.announcements.view') || $user->canDo('hr.announcements.manage'));
+        $canView = $this->canViewAnnouncements($user);
         abort_unless($canView, 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $announcement->tenant_id);
+        $this->assertAnnouncementVisibleTo($announcement, $user);
+        $canManage = $this->canManageAnnouncements($user);
 
         $announcement->load([
             'creator:id,name',
-            'acknowledgements.user:id,name',
             'targets',
             'attachments',
         ]);
+        $announcement->load([
+            'acknowledgements' => fn ($query) => $query
+                ->when(! $canManage, fn ($acks) => $acks->where('user_id', $user->id))
+                ->when($canManage, fn ($acks) => $acks->with('user:id,name')),
+        ]);
 
         $userAcknowledged = $announcement->acknowledgements->contains('user_id', $user->id);
-        $canManage = (bool) $user->canDo('hr.announcements.manage');
 
         // Reuse the existing polymorphic feed reaction/reply rows so the thread
         // shown here is the SAME data as the Community feed (subject_type=announcement).
-        $feed = app(\App\Domain\Hr\Services\FeedService::class);
+        $feed = app(FeedService::class);
         $reactions = $feed->feedReactionSummaries('announcement', [$announcement->id], $user->id)[$announcement->id]
             ?? ['counts' => [], 'mine' => []];
         $replies = $feed->feedReplyThreads('announcement', [$announcement->id])[$announcement->id] ?? [];
 
         return Inertia::render('hr/announcements/show', [
-            'announcement' => $this->detailPayload($announcement, $tenantId),
-            'tracking' => $canManage ? $this->trackingData($announcement, $tenantId) : null,
+            'announcement' => $this->detailPayload($announcement, $canManage),
+            'tracking' => $canManage ? $this->trackingData($announcement) : null,
             'userAcknowledged' => $userAcknowledged,
-            'segments' => $canManage ? $this->segmentOptions($tenantId) : null,
+            'segments' => $canManage ? $this->segmentOptions() : null,
             'reactions' => $reactions,
             'replies' => $replies,
-            'reactionEmojis' => \App\Domain\Hr\Services\FeedService::REACTION_EMOJIS,
+            'reactionEmojis' => FeedService::REACTION_EMOJIS,
             'can' => [
                 'manage' => $canManage,
                 'react' => (bool) $user->canDo('hr.recognition.give'),
@@ -290,13 +303,14 @@ class AnnouncementController extends Controller
     }
 
     /* ================================================================== */
-    /*  Acknowledgement & reminders                                       */
+    /*  Acknowledgement & reminders */
     /* ================================================================== */
 
     public function acknowledge(Request $request, HrAnnouncement $announcement)
     {
         $user = $request->user();
-        abort_unless($user, 403);
+        abort_unless($this->canViewAnnouncements($user), 403);
+        $this->assertAnnouncementVisibleTo($announcement, $user);
 
         HrAnnouncementAcknowledgement::firstOrCreate(
             ['announcement_id' => $announcement->id, 'user_id' => $user->id],
@@ -309,11 +323,12 @@ class AnnouncementController extends Controller
     public function acknowledgeFor(Request $request, HrAnnouncement $announcement)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $announcement->tenant_id);
+        abort_unless($this->canManageAnnouncements($user), 403);
 
         $data = $request->validate(['user_id' => ['required', 'integer']]);
+        $announcement = HrAnnouncement::query()->findOrFail($announcement->getKey());
+        $recipient = User::query()->find($data['user_id']);
+        abort_unless($recipient && $this->resolver->includesCurrentUser($announcement, $recipient), 404);
 
         // Record the manager override (actor + subject) on the ack row so the
         // roster can show "marked by a manager" and the action is auditable.
@@ -332,12 +347,9 @@ class AnnouncementController extends Controller
     public function remind(Request $request, HrAnnouncement $announcement)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $announcement->tenant_id);
-
+        abort_unless($this->canManageAnnouncements($user), 403);
         $data = $request->validate(['user_ids' => ['sometimes', 'array'], 'user_ids.*' => ['integer']]);
-        $sent = $this->sendReminders($announcement, $tenantId, $user->id, $data['user_ids'] ?? null);
+        $sent = $this->sendReminders($announcement, $user->id, $data['user_ids'] ?? null);
 
         return redirect()->back()->with('success', $sent === 0
             ? 'Everyone has already acknowledged — no reminders sent.'
@@ -347,53 +359,46 @@ class AnnouncementController extends Controller
     public function remindBulk(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
+        abort_unless($this->canManageAnnouncements($user), 403);
         $data = $request->validate([
             'announcement_ids' => ['required', 'array', 'min:1'],
             'announcement_ids.*' => ['integer'],
         ]);
 
-        $announcements = HrAnnouncement::forTenant($tenantId)
+        $announcements = HrAnnouncement::query()
             ->whereIn('id', $data['announcement_ids'])
             ->with('targets')
             ->get();
 
         $total = 0;
         foreach ($announcements as $announcement) {
-            $total += $this->sendReminders($announcement, $tenantId, $user->id, null);
+            $total += $this->sendReminders($announcement, $user->id, null);
         }
 
         return redirect()->back()->with('success', "Reminders sent to {$total} ".($total === 1 ? 'person' : 'people').'.');
     }
 
     /* ================================================================== */
-    /*  Tracking                                                          */
+    /*  Tracking */
     /* ================================================================== */
 
     public function tracking(Request $request, HrAnnouncement $announcement)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $announcement->tenant_id);
-
+        abort_unless($this->canManageAnnouncements($user), 403);
         $announcement->load('targets');
 
-        return response()->json($this->trackingData($announcement, $tenantId));
+        return response()->json($this->trackingData($announcement));
     }
 
     /* ================================================================== */
-    /*  Live recipient preview (wizard)                                   */
+    /*  Live recipient preview (wizard) */
     /* ================================================================== */
 
     public function preview(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
+        abort_unless($this->canManageAnnouncements($user), 403);
         // The debounced GET sends targets either as a nested array or a JSON
         // string (easier to serialise from the client) — accept both.
         $raw = $request->input('targets', []);
@@ -402,29 +407,31 @@ class AnnouncementController extends Controller
             $raw = is_array($decoded) ? $decoded : [];
         }
 
-        $targets = $this->normaliseTargets($raw);
-        $count = $this->resolver->count($targets, $tenantId);
+        try {
+            $targets = $this->normaliseTargets($raw, strict: true);
+        } catch (ValidationException) {
+            return response()->json(['count' => 0]);
+        }
+        $count = $this->resolver->count($targets);
 
         return response()->json(['count' => $count]);
     }
 
     /* ================================================================== */
-    /*  Bulk                                                              */
+    /*  Bulk */
     /* ================================================================== */
 
     public function bulk(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
+        abort_unless($this->canManageAnnouncements($user), 403);
         $data = $request->validate([
             'action' => ['required', 'string', 'in:pin,unpin,archive,publish,delete,remind'],
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
         ]);
 
-        $announcements = HrAnnouncement::forTenant($tenantId)
+        $announcements = HrAnnouncement::query()
             ->whereIn('id', $data['ids'])
             ->with('targets')
             ->get();
@@ -445,14 +452,14 @@ class AnnouncementController extends Controller
                 case 'publish':
                     $wasPublished = $announcement->status === 'published';
                     $announcement->update(['status' => 'published', 'published_at' => $announcement->published_at ?? now()]);
-                    $this->afterSave($announcement, $tenantId, $user->id, true, wasPublished: $wasPublished);
+                    $this->afterSave($announcement, $user->id, true, wasPublished: $wasPublished);
                     break;
                 case 'delete':
                     $this->bridge->withdraw($announcement);
                     $announcement->delete();
                     break;
                 case 'remind':
-                    $this->sendReminders($announcement, $tenantId, $user->id, null);
+                    $this->sendReminders($announcement, $user->id, null);
                     break;
             }
             $count++;
@@ -462,15 +469,13 @@ class AnnouncementController extends Controller
     }
 
     /* ================================================================== */
-    /*  Export                                                            */
+    /*  Export */
     /* ================================================================== */
 
     public function export(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
+        abort_unless($this->canManageAnnouncements($user), 403);
         $filters = [
             'search' => $request->query('search'),
             'priority' => $request->query('priority'),
@@ -479,14 +484,14 @@ class AnnouncementController extends Controller
             'sort' => $request->query('sort', 'newest'),
         ];
 
-        $rows = $this->baseListQuery($tenantId, 'all', $filters)
+        $rows = $this->baseListQuery('all', $filters)
             ->withCount('acknowledgements')
             ->with(['creator:id,name', 'targets'])
             ->get();
 
         $headers = ['Title', 'Priority', 'Status', 'Audience', 'Recipients', 'Acknowledged', 'Published', 'Expires', 'Created by'];
-        $records = $rows->map(function (HrAnnouncement $a) use ($tenantId) {
-            $size = $this->resolver->resolveForAnnouncement($a, $tenantId)->count();
+        $records = $rows->map(function (HrAnnouncement $a) {
+            $size = $this->resolver->resolveForAnnouncement($a)->count();
 
             return [
                 $a->title,
@@ -507,12 +512,9 @@ class AnnouncementController extends Controller
     public function trackingExport(Request $request, HrAnnouncement $announcement)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $announcement->tenant_id);
-
+        abort_unless($this->canManageAnnouncements($user), 403);
         $announcement->load('targets');
-        $roster = $this->rosterRows($announcement, $tenantId);
+        $roster = $this->rosterRows($announcement);
 
         $headers = ['Name', 'Role', 'Site', 'Status', 'Acknowledged at'];
         $records = array_map(fn ($r) => [
@@ -520,25 +522,24 @@ class AnnouncementController extends Controller
             $r['acknowledged_at'] ? Carbon::parse($r['acknowledged_at'])->format('Y-m-d H:i') : '',
         ], $roster);
 
-        $slug = \Illuminate\Support\Str::slug($announcement->title) ?: 'announcement';
+        $slug = Str::slug($announcement->title) ?: 'announcement';
 
         return $this->streamCsv("{$slug}-acknowledgements-".now()->format('Y-m-d'), $headers, $records);
     }
 
     /* ================================================================== */
-    /*  Attachments                                                       */
+    /*  Attachments */
     /* ================================================================== */
 
     public function downloadAttachment(Request $request, HrAnnouncementAttachment $attachment)
     {
         $user = $request->user();
-        $canView = $user && ($user->canDo('hr.announcements.view') || $user->canDo('hr.announcements.manage'));
+        $canView = $this->canViewAnnouncements($user);
         abort_unless($canView, 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $announcement = $attachment->announcement()->first();
         abort_if(! $announcement, 404);
-        $this->assertHrTenantAccess($tenantId, $announcement->tenant_id);
+        $this->assertAnnouncementVisibleTo($announcement, $user);
 
         return $this->streamPrivateAttachment(
             $attachment->disk,
@@ -550,8 +551,35 @@ class AnnouncementController extends Controller
     }
 
     /* ================================================================== */
-    /*  Helpers — validation & persistence                                */
+    /*  Helpers — validation & persistence */
     /* ================================================================== */
+
+    private function canViewAnnouncements(?User $user): bool
+    {
+        return $user !== null
+            && $this->currentStaff->isCurrent($user)
+            && ($user->canDo('hr.announcements.view') || $user->canDo('hr.announcements.manage'));
+    }
+
+    private function canManageAnnouncements(?User $user): bool
+    {
+        return $user !== null
+            && $this->currentStaff->isCurrent($user)
+            && $user->canDo('hr.announcements.manage');
+    }
+
+    private function assertAnnouncementVisibleTo(HrAnnouncement $announcement, User $user): void
+    {
+        if ($this->canManageAnnouncements($user)) {
+            return;
+        }
+
+        $isLive = $announcement->status === 'published'
+            && $announcement->published_at?->lte(now())
+            && (! $announcement->expires_at || $announcement->expires_at->isFuture());
+
+        abort_unless($isLive && $this->resolver->includesCurrentUser($announcement, $user), 404);
+    }
 
     /**
      * @return array<string,mixed>
@@ -578,15 +606,16 @@ class AnnouncementController extends Controller
             'attachments.*' => ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx'],
         ]);
 
-        $targets = $this->normaliseTargets($validated['targets'] ?? []);
-        if (empty($targets)) {
+        $targetsProvided = $request->exists('targets');
+        $targets = $this->normaliseTargets($validated['targets'] ?? [], strict: $targetsProvided);
+        if (! $targetsProvided && empty($targets)) {
             // Legacy single-segment payload (target_audience + target_value)
             // — keeps the original API shape working alongside multi-segment.
             $legacyType = (string) $request->input('target_audience', '');
             if ($legacyType !== '' && $legacyType !== 'all') {
                 $targets = $this->normaliseTargets([
                     ['type' => $legacyType, 'value' => $request->input('target_value')],
-                ]);
+                ], strict: true);
             }
         }
         if (empty($targets)) {
@@ -645,29 +674,75 @@ class AnnouncementController extends Controller
      * @param  mixed  $raw
      * @return array<int,array{type:string,value:?string}>
      */
-    private function normaliseTargets($raw): array
+    private function normaliseTargets($raw, bool $strict = false): array
     {
         if (! is_array($raw)) {
+            if ($strict) {
+                throw ValidationException::withMessages(['targets' => 'Choose a valid announcement audience.']);
+            }
+
             return [];
         }
 
         $out = [];
         foreach ($raw as $target) {
             if (! is_array($target) || empty($target['type'])) {
+                if ($strict) {
+                    throw ValidationException::withMessages(['targets' => 'Every audience target needs a valid type.']);
+                }
+
                 continue;
             }
-            $type = (string) $target['type'];
-            $value = isset($target['value']) && $target['value'] !== '' ? (string) $target['value'] : null;
+            $type = trim((string) $target['type']);
+            $value = isset($target['value']) && trim((string) $target['value']) !== ''
+                ? trim((string) $target['value'])
+                : null;
+
+            if (! in_array($type, ['all', 'site', 'department', 'role', 'user'], true)) {
+                if ($strict) {
+                    throw ValidationException::withMessages(['targets' => 'Choose a supported announcement audience.']);
+                }
+
+                continue;
+            }
+
             if ($type === 'all') {
+                if (count($raw) !== 1) {
+                    throw ValidationException::withMessages(['targets' => 'All staff cannot be combined with another audience.']);
+                }
+
                 return [['type' => 'all', 'value' => null]];
             }
             if ($value === null) {
+                if ($strict) {
+                    throw ValidationException::withMessages(['targets' => 'Every selected audience needs a value.']);
+                }
+
                 continue;
             }
-            $out[] = ['type' => $type, 'value' => $value];
+
+            if ($type === 'site' && (! ctype_digit($value) || ! Site::query()
+                ->active()
+                ->notArchived()
+                ->whereNull('archived_at')
+                ->whereKey((int) $value)
+                ->exists())) {
+                throw ValidationException::withMessages(['targets' => 'The selected Site must be active and available.']);
+            }
+
+            if ($type === 'user' && (! ctype_digit($value) || ! $this->currentStaff->isCurrent((int) $value))) {
+                throw ValidationException::withMessages(['targets' => 'The selected person must be current approved staff.']);
+            }
+
+            $key = $type.'|'.$value;
+            $out[$key] = ['type' => $type, 'value' => $value];
         }
 
-        return $out;
+        if ($strict && $out === []) {
+            throw ValidationException::withMessages(['targets' => 'Choose at least one valid announcement audience.']);
+        }
+
+        return array_values($out);
     }
 
     /**
@@ -711,7 +786,7 @@ class AnnouncementController extends Controller
      * Fire notifications + the header-bell bridge when an announcement is live.
      * Only notifies on the published transition — never on a plain edit.
      */
-    private function afterSave(HrAnnouncement $announcement, int $tenantId, int $creatorId, bool $pushToBell, bool $wasPublished): void
+    private function afterSave(HrAnnouncement $announcement, int $creatorId, bool $pushToBell, bool $wasPublished): void
     {
         $isPublished = $announcement->status === 'published'
             && $announcement->published_at
@@ -719,14 +794,14 @@ class AnnouncementController extends Controller
 
         if ($isPublished) {
             if ($pushToBell) {
-                $this->bridge->publish($announcement->fresh('targets'), $tenantId);
+                $this->bridge->publish($announcement->fresh('targets'));
             } else {
                 $this->bridge->withdraw($announcement);
             }
 
             if (! $wasPublished) {
                 $notification = new AnnouncementPublishedNotification($announcement->fresh());
-                $this->resolver->resolveForAnnouncement($announcement, $tenantId, $creatorId)
+                $this->resolver->resolveForAnnouncement($announcement, $creatorId)
                     ->each(fn ($recipient) => $recipient->notify($notification));
             }
         }
@@ -741,9 +816,9 @@ class AnnouncementController extends Controller
         return $announcement->published_at->isFuture() ? 'scheduled' : 'published';
     }
 
-    private function sendReminders(HrAnnouncement $announcement, int $tenantId, int $actorId, ?array $userIds): int
+    private function sendReminders(HrAnnouncement $announcement, int $actorId, ?array $userIds): int
     {
-        $recipients = $this->resolver->resolveForAnnouncement($announcement, $tenantId);
+        $recipients = $this->resolver->resolveForAnnouncement($announcement);
 
         $acknowledgedIds = $announcement->acknowledgements()->pluck('user_id')->all();
         $outstanding = $recipients->reject(fn ($u) => in_array($u->id, $acknowledgedIds, true));
@@ -777,12 +852,16 @@ class AnnouncementController extends Controller
     }
 
     /* ================================================================== */
-    /*  Helpers — lists & aggregates                                      */
+    /*  Helpers — lists & aggregates */
     /* ================================================================== */
 
-    private function baseListQuery(int $tenantId, string $tab, array $filters)
+    private function baseListQuery(string $tab, array $filters, ?array $viewerAnnouncementIds = null)
     {
-        $query = HrAnnouncement::forTenant($tenantId);
+        $query = HrAnnouncement::query();
+
+        if ($viewerAnnouncementIds !== null) {
+            $query->active()->whereKey($viewerAnnouncementIds);
+        }
 
         if ($tab === 'pinned') {
             $query->where('is_pinned', true)->whereIn('status', ['published', 'scheduled']);
@@ -819,29 +898,33 @@ class AnnouncementController extends Controller
         return $query;
     }
 
-    private function listAnnouncements(Request $request, int $tenantId, string $tab, array $filters)
-    {
-        $paginator = $this->baseListQuery($tenantId, $tab, $filters)
+    private function listAnnouncements(
+        Request $request,
+        string $tab,
+        array $filters,
+        ?array $viewerAnnouncementIds = null,
+    ) {
+        $paginator = $this->baseListQuery($tab, $filters, $viewerAnnouncementIds)
             ->withCount(['acknowledgements', 'attachments'])
             ->with(['creator:id,name', 'targets'])
             ->paginate(15)
             ->withQueryString();
 
-        $paginator->through(fn (HrAnnouncement $a) => $this->cardPayload($a, $tenantId));
+        $paginator->through(fn (HrAnnouncement $a) => $this->cardPayload($a));
 
         return $paginator;
     }
 
-    private function cardPayload(HrAnnouncement $a, int $tenantId): array
+    private function cardPayload(HrAnnouncement $a): array
     {
-        $audienceSize = $this->resolver->resolveForAnnouncement($a, $tenantId)->count();
-        $reactions = $a->id ? \App\Domain\Hr\Models\HrFeedReaction::where('subject_type', 'announcement')->where('subject_id', $a->id)->count() : 0;
-        $replies = $a->id ? \App\Domain\Hr\Models\HrFeedReply::where('subject_type', 'announcement')->where('subject_id', $a->id)->count() : 0;
+        $audienceSize = $this->resolver->resolveForAnnouncement($a)->count();
+        $reactions = $a->id ? HrFeedReaction::where('subject_type', 'announcement')->where('subject_id', $a->id)->count() : 0;
+        $replies = $a->id ? HrFeedReply::where('subject_type', 'announcement')->where('subject_id', $a->id)->count() : 0;
 
         return [
             'id' => $a->id,
             'title' => $a->title,
-            'excerpt' => \Illuminate\Support\Str::limit($a->content, 220),
+            'excerpt' => Str::limit($a->content, 220),
             'priority' => $a->priority,
             'status' => $a->status,
             'is_pinned' => (bool) $a->is_pinned,
@@ -859,9 +942,9 @@ class AnnouncementController extends Controller
         ];
     }
 
-    private function scheduledList(int $tenantId): array
+    private function scheduledList(): array
     {
-        return HrAnnouncement::forTenant($tenantId)
+        return HrAnnouncement::query()
             ->scheduled()
             ->with('targets')
             ->orderBy('published_at')
@@ -878,17 +961,17 @@ class AnnouncementController extends Controller
             ->all();
     }
 
-    private function trackingList(int $tenantId): array
+    private function trackingList(): array
     {
-        return HrAnnouncement::forTenant($tenantId)
+        return HrAnnouncement::query()
             ->where('requires_acknowledgement', true)
             ->where('status', 'published')
             ->withCount('acknowledgements')
             ->with('targets')
             ->orderByDesc('published_at')
             ->get()
-            ->map(function (HrAnnouncement $a) use ($tenantId) {
-                $size = $this->resolver->resolveForAnnouncement($a, $tenantId)->count();
+            ->map(function (HrAnnouncement $a) {
+                $size = $this->resolver->resolveForAnnouncement($a)->count();
 
                 return [
                     'id' => $a->id,
@@ -905,9 +988,9 @@ class AnnouncementController extends Controller
             ->all();
     }
 
-    private function trackingData(HrAnnouncement $announcement, int $tenantId): array
+    private function trackingData(HrAnnouncement $announcement): array
     {
-        $roster = $this->rosterRows($announcement, $tenantId);
+        $roster = $this->rosterRows($announcement);
         $total = count($roster);
         $acknowledged = count(array_filter($roster, fn ($r) => $r['status'] === 'acknowledged'));
 
@@ -937,11 +1020,11 @@ class AnnouncementController extends Controller
      *
      * @return array<int,array<string,mixed>>
      */
-    private function rosterRows(HrAnnouncement $announcement, int $tenantId): array
+    private function rosterRows(HrAnnouncement $announcement): array
     {
-        $recipients = $this->resolver->resolveForAnnouncement($announcement, $tenantId);
+        $recipients = $this->resolver->resolveForAnnouncement($announcement);
 
-        $profiles = HrEmployeeProfile::forTenant($tenantId)
+        $profiles = HrEmployeeProfile::query()
             ->whereIn('user_id', $recipients->pluck('id'))
             ->with('primarySite:id,name')
             ->get()
@@ -994,13 +1077,13 @@ class AnnouncementController extends Controller
         return $out;
     }
 
-    private function heroSummary(int $tenantId): array
+    private function heroSummary(): array
     {
-        $live = HrAnnouncement::forTenant($tenantId)->published()->count();
-        $pinned = HrAnnouncement::forTenant($tenantId)->where('is_pinned', true)->whereIn('status', ['published', 'scheduled'])->count();
-        $scheduled = HrAnnouncement::forTenant($tenantId)->scheduled()->count();
+        $live = HrAnnouncement::query()->published()->count();
+        $pinned = HrAnnouncement::query()->where('is_pinned', true)->whereIn('status', ['published', 'scheduled'])->count();
+        $scheduled = HrAnnouncement::query()->scheduled()->count();
 
-        $requiresAck = HrAnnouncement::forTenant($tenantId)
+        $requiresAck = HrAnnouncement::query()
             ->where('requires_acknowledgement', true)
             ->where('status', 'published')
             ->withCount('acknowledgements')
@@ -1013,7 +1096,7 @@ class AnnouncementController extends Controller
         $needsYou = [];
 
         foreach ($requiresAck as $a) {
-            $size = $this->resolver->resolveForAnnouncement($a, $tenantId)->count();
+            $size = $this->resolver->resolveForAnnouncement($a)->count();
             $totalRecipients += $size;
             $totalAck += $a->acknowledgements_count;
             $pct = $size > 0 ? (int) round($a->acknowledgements_count / $size * 100) : 0;
@@ -1023,7 +1106,7 @@ class AnnouncementController extends Controller
                     $needsYou[] = [
                         'type' => 'below_target',
                         'announcement_id' => $a->id,
-                        'label' => \Illuminate\Support\Str::limit($a->title, 32)." at {$pct}%",
+                        'label' => Str::limit($a->title, 32)." at {$pct}%",
                     ];
                 }
             }
@@ -1040,7 +1123,7 @@ class AnnouncementController extends Controller
             ]);
         }
 
-        $soon = HrAnnouncement::forTenant($tenantId)
+        $soon = HrAnnouncement::query()
             ->where('status', 'scheduled')
             ->whereBetween('published_at', [now(), now()->addDays(7)])
             ->count();
@@ -1071,19 +1154,95 @@ class AnnouncementController extends Controller
         ];
     }
 
-    private function tabCounts(int $tenantId): array
+    /** @return array<int> */
+    private function viewerAnnouncementIds(User $user): array
     {
+        return HrAnnouncement::query()
+            ->active()
+            ->with('targets')
+            ->get()
+            ->filter(fn (HrAnnouncement $announcement) => $this->resolver->includesCurrentUser($announcement, $user))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    private function viewerSummary(array $announcementIds, User $user): array
+    {
+        $announcements = HrAnnouncement::query()
+            ->whereKey($announcementIds)
+            ->get(['id', 'is_pinned', 'requires_acknowledgement']);
+
+        $requiredIds = $announcements
+            ->where('requires_acknowledgement', true)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+        $acknowledged = HrAnnouncementAcknowledgement::query()
+            ->where('user_id', $user->id)
+            ->whereIn('announcement_id', $requiredIds)
+            ->count();
+        $required = $requiredIds->count();
+        $outstanding = max(0, $required - $acknowledged);
+        $ackPct = $required > 0 ? (int) round($acknowledged / $required * 100) : 100;
+
         return [
-            'all' => HrAnnouncement::forTenant($tenantId)->count(),
-            'pinned' => HrAnnouncement::forTenant($tenantId)->where('is_pinned', true)->whereIn('status', ['published', 'scheduled'])->count(),
-            'tracking' => HrAnnouncement::forTenant($tenantId)->where('requires_acknowledgement', true)->where('status', 'published')->count(),
-            'scheduled' => HrAnnouncement::forTenant($tenantId)->scheduled()->count(),
+            'live' => $announcements->count(),
+            'pinned' => $announcements->where('is_pinned', true)->count(),
+            'scheduled' => 0,
+            'requires_ack' => $required,
+            'requires_ack_pct' => $ackPct,
+            'outstanding_reminders' => $outstanding,
+            'ack_health' => [
+                'pct' => $ackPct,
+                'acknowledged' => $acknowledged,
+                'outstanding' => $outstanding,
+                'required_notices' => $required,
+                'below_target' => 0,
+                'scheduled_soon' => 0,
+            ],
+            'needs_you' => [],
         ];
     }
 
-    private function insights(int $tenantId): array
+    private function viewerTabCounts(array $announcementIds): array
     {
-        $notices = HrAnnouncement::forTenant($tenantId)
+        $announcements = HrAnnouncement::query()
+            ->whereKey($announcementIds)
+            ->get(['id', 'is_pinned']);
+
+        return [
+            'all' => $announcements->count(),
+            'pinned' => $announcements->where('is_pinned', true)->count(),
+            'tracking' => 0,
+            'scheduled' => 0,
+        ];
+    }
+
+    private function emptySegments(): array
+    {
+        return [
+            'all_count' => 0,
+            'sites' => [],
+            'departments' => [],
+            'roles' => [],
+        ];
+    }
+
+    private function tabCounts(): array
+    {
+        return [
+            'all' => HrAnnouncement::query()->count(),
+            'pinned' => HrAnnouncement::query()->where('is_pinned', true)->whereIn('status', ['published', 'scheduled'])->count(),
+            'tracking' => HrAnnouncement::query()->where('requires_acknowledgement', true)->where('status', 'published')->count(),
+            'scheduled' => HrAnnouncement::query()->scheduled()->count(),
+        ];
+    }
+
+    private function insights(): array
+    {
+        $notices = HrAnnouncement::query()
             ->where('requires_acknowledgement', true)
             ->where('status', 'published')
             ->withCount('acknowledgements')
@@ -1098,7 +1257,7 @@ class AnnouncementController extends Controller
         $ackSamples = 0;
 
         foreach ($notices as $a) {
-            $size = $this->resolver->resolveForAnnouncement($a, $tenantId)->count();
+            $size = $this->resolver->resolveForAnnouncement($a)->count();
             $pct = $size > 0 ? (int) round($a->acknowledgements_count / $size * 100) : 0;
             $trend[] = [
                 'label' => optional($a->published_at)->format('j M') ?? '—',
@@ -1126,7 +1285,7 @@ class AnnouncementController extends Controller
 
         $avgAckRate = count($trend) > 0 ? (int) round(collect($trend)->avg('pct')) : 0;
         $avgTimeHours = $ackSamples > 0 ? round($totalAckMinutes / $ackSamples / 60, 1) : 0;
-        $remindersSent = HrAnnouncementReminder::whereHas('announcement', fn ($q) => $q->forTenant($tenantId))
+        $remindersSent = HrAnnouncementReminder::query()
             ->where('reminded_at', '>=', now()->subDays(30))
             ->count();
 
@@ -1142,7 +1301,7 @@ class AnnouncementController extends Controller
         ];
     }
 
-    private function detailPayload(HrAnnouncement $a, int $tenantId): array
+    private function detailPayload(HrAnnouncement $a, bool $includeAcknowledgements): array
     {
         return [
             'id' => $a->id,
@@ -1153,7 +1312,7 @@ class AnnouncementController extends Controller
             'is_pinned' => (bool) $a->is_pinned,
             'requires_acknowledgement' => (bool) $a->requires_acknowledgement,
             'audience' => $this->audienceSummary($a),
-            'audience_size' => $this->resolver->resolveForAnnouncement($a, $tenantId)->count(),
+            'audience_size' => $this->resolver->resolveForAnnouncement($a)->count(),
             'targets' => ($a->relationLoaded('targets') ? $a->targets : $a->targets()->get())
                 ->map(fn ($t) => ['type' => $t->type, 'value' => $t->value])->all(),
             'recurrence' => $a->recurrence,
@@ -1162,10 +1321,12 @@ class AnnouncementController extends Controller
             'expires_at' => optional($a->expires_at)->toIso8601String(),
             'ack_deadline' => optional($a->ack_deadline)->toIso8601String(),
             'creator' => $a->creator ? ['id' => $a->creator->id, 'name' => $a->creator->name] : null,
-            'acknowledgements' => $a->acknowledgements->map(fn ($ack) => [
-                'user' => $ack->user ? ['id' => $ack->user->id, 'name' => $ack->user->name] : null,
-                'acknowledged_at' => optional($ack->acknowledged_at)->toIso8601String(),
-            ])->all(),
+            'acknowledgements' => $includeAcknowledgements
+                ? $a->acknowledgements->map(fn ($ack) => [
+                    'user' => $ack->user ? ['id' => $ack->user->id, 'name' => $ack->user->name] : null,
+                    'acknowledged_at' => optional($ack->acknowledged_at)->toIso8601String(),
+                ])->all()
+                : [],
             'attachments' => $a->attachments->map(fn ($att) => [
                 'id' => $att->id,
                 'name' => $att->original_name,
@@ -1202,7 +1363,7 @@ class AnnouncementController extends Controller
                 $labels = $group->take(2)->map(fn ($t) => $this->labelForTarget($t->type, $t->value))->filter()->all();
                 $label = implode(', ', $labels);
                 if ($n > 2) {
-                    $label .= " +".($n - 2);
+                    $label .= ' +'.($n - 2);
                 }
                 $parts[] = $label;
             }
@@ -1226,11 +1387,18 @@ class AnnouncementController extends Controller
     /**
      * Sites / departments / roles with active-headcount, for the wizard targeting.
      */
-    private function segmentOptions(int $tenantId): array
+    private function segmentOptions(): array
     {
-        $profiles = HrEmployeeProfile::forTenant($tenantId)->active()->whereNotNull('user_id')->get();
+        $profiles = HrEmployeeProfile::query()
+            ->whereIn('user_id', $this->currentStaff->currentUsersQuery()->select('users.id'))
+            ->get();
 
-        $sites = Site::query()->where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name'])
+        $sites = Site::query()
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->orderBy('name')
+            ->get(['id', 'name'])
             ->map(function ($site) use ($profiles) {
                 $count = $profiles->filter(function ($p) use ($site) {
                     $secondary = is_array($p->secondary_site_ids) ? $p->secondary_site_ids : [];
@@ -1258,7 +1426,7 @@ class AnnouncementController extends Controller
     }
 
     /* ================================================================== */
-    /*  Helpers — messaging & CSV                                          */
+    /*  Helpers — messaging & CSV */
     /* ================================================================== */
 
     private function savedMessage(HrAnnouncement $a): string

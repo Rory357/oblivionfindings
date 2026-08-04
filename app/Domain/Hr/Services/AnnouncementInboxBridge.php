@@ -6,8 +6,8 @@ use App\Domain\Hr\Models\HrAnnouncement;
 use App\Models\Announcement;
 
 /**
- * Bridges a tenant-scoped, multi-segment {@see HrAnnouncement} onto the global
- * header-bell {@see Announcement} inbox model. Idempotent via the
+ * Bridges a multi-segment {@see HrAnnouncement} onto the application header-bell
+ * {@see Announcement} inbox model. Idempotent via the
  * hr_announcements.inbox_announcement_id FK so re-publishing or editing never
  * creates a duplicate bell entry.
  *
@@ -19,20 +19,23 @@ use App\Models\Announcement;
  *   expires_at         -> ends_at
  *   status=published   -> is_active=true
  *
- * Note: the inbox Announcement model is role-scoped and NOT tenant-scoped, while
- * HrAnnouncement is tenant-scoped + multi-segment. Non-role segments
- * (site/department/user) don't map onto audience_roles; in this single-tenant
- * deployment we drop those to "all roles" (audience_roles = null = everyone),
- * which is the agreed pragmatic behaviour.
+ * The header-bell model can express all-staff and role audiences only. A Site,
+ * department, person, or mixed audience is deliberately not bridged because
+ * widening it to every role would disclose a targeted notice.
  */
 class AnnouncementInboxBridge
 {
     /**
      * Create or update the linked header-bell announcement.
      */
-    public function publish(HrAnnouncement $announcement, ?int $tenantId = null): ?Announcement
+    public function publish(HrAnnouncement $announcement): ?Announcement
     {
         $roles = $this->roleAudience($announcement);
+        if ($roles === false) {
+            $this->withdraw($announcement);
+
+            return null;
+        }
 
         $attributes = [
             'title' => $announcement->title,
@@ -77,20 +80,33 @@ class AnnouncementInboxBridge
      * Role names amongst the announcement's targets, or null (= everyone) when
      * there are no role segments.
      *
-     * @return array<int,string>|null
+     * @return array<int,string>|false|null
      */
-    private function roleAudience(HrAnnouncement $announcement): ?array
+    private function roleAudience(HrAnnouncement $announcement): array|false|null
     {
         $targets = $announcement->relationLoaded('targets')
             ? $announcement->targets
             : $announcement->targets()->get();
 
-        if ($targets->isEmpty() && $announcement->target_audience === 'role' && $announcement->target_value) {
-            return [$announcement->target_value];
+        if ($targets->isEmpty()) {
+            return match ($announcement->target_audience) {
+                'all', null, '' => null,
+                'role' => $announcement->target_value ? [$announcement->target_value] : false,
+                default => false,
+            };
+        }
+
+        if ($targets->contains(fn ($target) => ! in_array($target->type, ['all', 'role'], true))
+            || ($targets->contains(fn ($target) => $target->type === 'all') && $targets->count() !== 1)) {
+            return false;
+        }
+
+        if ($targets->contains(fn ($target) => $target->type === 'all')) {
+            return null;
         }
 
         $roles = $targets->where('type', 'role')->pluck('value')->filter()->unique()->values()->all();
 
-        return $roles ?: null;
+        return $roles ?: false;
     }
 }

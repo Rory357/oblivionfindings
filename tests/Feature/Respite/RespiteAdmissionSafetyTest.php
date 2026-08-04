@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAlert;
@@ -10,27 +11,44 @@ use App\Models\RespiteMedicationReconciliation;
 use App\Models\RespiteStay;
 use App\Models\Role;
 use App\Models\SafeguardingAlert;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
     $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->admin->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $this->admin->id,
+        'updated_by' => $this->admin->id,
+    ]);
 });
 
 test('check in requires completed admission medication reconciliation for clients with active medicines', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     ClientMedication::factory()->create([
         'client_id' => $client->id,
         'active' => true,
         'state' => 'active',
         'approval_status' => 'verified',
     ]);
-    $booking = RespiteBooking::factory()->create(['client_id' => $client->id, 'status' => 'confirmed']);
+    $booking = RespiteBooking::factory()->create([
+        'client_id' => $client->id,
+        'location_id' => $this->site->id,
+        'status' => 'confirmed',
+    ]);
     $stay = RespiteStay::create([
         'booking_id' => $booking->id,
         'client_id' => $client->id,
@@ -47,14 +65,18 @@ test('check in requires completed admission medication reconciliation for client
 });
 
 test('completed admission medication reconciliation allows check in', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     ClientMedication::factory()->create([
         'client_id' => $client->id,
         'active' => true,
         'state' => 'active',
         'approval_status' => 'verified',
     ]);
-    $booking = RespiteBooking::factory()->create(['client_id' => $client->id, 'status' => 'confirmed']);
+    $booking = RespiteBooking::factory()->create([
+        'client_id' => $client->id,
+        'location_id' => $this->site->id,
+        'status' => 'confirmed',
+    ]);
     $stay = RespiteStay::create([
         'booking_id' => $booking->id,
         'client_id' => $client->id,
@@ -82,7 +104,7 @@ test('completed admission medication reconciliation allows check in', function (
 });
 
 test('life threatening allergies require anaphylaxis acknowledgement before check in and enter the evidence manifest', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     MedicationAllergy::create([
         'client_id' => $client->id,
         'allergen' => 'Peanuts',
@@ -90,7 +112,11 @@ test('life threatening allergies require anaphylaxis acknowledgement before chec
         'severity' => 'life_threatening',
         'recorded_by' => $this->admin->id,
     ]);
-    $booking = RespiteBooking::factory()->create(['client_id' => $client->id, 'status' => 'confirmed']);
+    $booking = RespiteBooking::factory()->create([
+        'client_id' => $client->id,
+        'location_id' => $this->site->id,
+        'status' => 'confirmed',
+    ]);
     $stay = RespiteStay::create([
         'booking_id' => $booking->id,
         'client_id' => $client->id,
@@ -132,14 +158,18 @@ test('life threatening allergies require anaphylaxis acknowledgement before chec
 });
 
 test('admission medication reconciliation can be completed before check in without using override', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
     ClientMedication::factory()->create([
         'client_id' => $client->id,
         'active' => true,
         'state' => 'active',
         'approval_status' => 'verified',
     ]);
-    $booking = RespiteBooking::factory()->create(['client_id' => $client->id, 'status' => 'confirmed']);
+    $booking = RespiteBooking::factory()->create([
+        'client_id' => $client->id,
+        'location_id' => $this->site->id,
+        'status' => 'confirmed',
+    ]);
     $stay = RespiteStay::create([
         'booking_id' => $booking->id,
         'client_id' => $client->id,
@@ -173,8 +203,12 @@ test('admission medication reconciliation can be completed before check in witho
 });
 
 test('workspace stay payload includes critical medication and safeguarding alerts', function () {
-    $client = Client::factory()->create();
-    $booking = RespiteBooking::factory()->create(['client_id' => $client->id, 'status' => 'confirmed']);
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
+    $booking = RespiteBooking::factory()->create([
+        'client_id' => $client->id,
+        'location_id' => $this->site->id,
+        'status' => 'confirmed',
+    ]);
     $stay = RespiteStay::create([
         'booking_id' => $booking->id,
         'client_id' => $client->id,

@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Models\ItMailboxConnection;
-use App\Support\LegacyStorageContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Laravel\Socialite\Facades\Socialite;
@@ -85,7 +84,6 @@ class ItMailboxOAuthController extends Controller
                 'provider' => $provider,
             ],
             [
-                'tenant_id' => LegacyStorageContext::id(),
                 'status' => ItMailboxConnection::STATUS_CONNECTED,
                 'access_token' => $oauthUser->token,
                 'refresh_token' => $oauthUser->refreshToken,
@@ -135,6 +133,6 @@ class ItMailboxOAuthController extends Controller
 
     private function authorizeManage(Request $request): void
     {
-        abort_unless($request->user()?->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($request->user()?->canDo('integrations.manage_secrets'), 403);
     }
 }

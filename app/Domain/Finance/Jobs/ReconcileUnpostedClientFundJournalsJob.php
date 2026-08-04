@@ -33,7 +33,12 @@ class ReconcileUnpostedClientFundJournalsJob implements ShouldBeUnique, ShouldQu
 
         ClientFundTransaction::query()
             ->whereNull('journal_id')
-            ->whereNotNull('organization_id')
+            ->whereHas('fund.client', fn ($clientQuery) => $clientQuery
+                ->whereNotNull('site_id')
+                ->whereHas('site', fn ($siteQuery) => $siteQuery
+                    ->active()
+                    ->notArchived()
+                    ->whereNull('archived_at')))
             ->where('amount', '!=', 0)
             ->where('created_at', '<=', now()->subMinute())
             ->orderBy('id')

@@ -1,7 +1,9 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrSavedReport;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
@@ -10,16 +12,24 @@ beforeEach(function () {
 
     // hr.reports.view/export are granted to provider_manager via RbacSeeder.
     $this->manager = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'provider_manager',
         'approved_at' => now(),
     ]);
     $this->manager->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'provider_manager')->first()->id,
     ]);
+    $site = Site::factory()->create(['name' => 'Saved report manager Site']);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->manager->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'position_role' => 'provider_manager',
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 
     $this->report = HrSavedReport::query()->create([
-        'tenant_id' => null,
         'name' => 'Active Staff',
         'report_type' => 'employee',
         'fields' => ['employee_number', 'name'],
@@ -35,7 +45,13 @@ test('running a saved report returns JSON data (path was 404)', function () {
         ->postJson("/hr/reports/saved/{$this->report->id}/run");
 
     $response->assertOk();
-    $response->assertJsonStructure(['data', 'fields']);
+    $response->assertJsonStructure([
+        'data',
+        'fields',
+        'report' => ['id', 'name', 'report_type', 'last_run_at'],
+    ]);
+    expect($response->json('report.last_run_at'))->not->toBeNull()
+        ->and($this->report->fresh()->last_run_at)->not->toBeNull();
 });
 
 test('exporting a saved report downloads an honest CSV (not a corrupt .xlsx)', function () {

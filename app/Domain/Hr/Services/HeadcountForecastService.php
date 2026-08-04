@@ -5,17 +5,15 @@ namespace App\Domain\Hr\Services;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPosition;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 
 class HeadcountForecastService
 {
     /**
      * Returns: total active, by department, by employment type, FTE total.
      */
-    public function getCurrentHeadcount(?int $tenantId): array
+    public function getCurrentHeadcount(): array
     {
         $profiles = HrEmployeeProfile::where('is_active', true)
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->get(['id', 'department', 'employment_type', 'hours_per_week']);
 
         $total = $profiles->count();
@@ -43,6 +41,7 @@ class HeadcountForecastService
             if (strtolower($p->employment_type ?? '') === 'full_time') {
                 return 1.0;
             }
+
             return ($p->hours_per_week ?? 0) / 40;
         });
 
@@ -58,22 +57,19 @@ class HeadcountForecastService
      * Project headcount based on: current + open positions - anticipated terminations.
      * Returns monthly forecast array with projected headcount.
      */
-    public function getForecast(?int $tenantId, int $months = 12): array
+    public function getForecast(int $months = 12): array
     {
         $now = Carbon::now();
         $currentCount = HrEmployeeProfile::where('is_active', true)
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->count();
 
         // Open positions (vacancies)
         $openPositions = HrPosition::where('is_active', true)
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->get()
             ->sum(fn ($p) => max(0, ($p->headcount_budget ?? 0) - ($p->current_headcount ?? 0)));
 
         // Employees with end_date set in the future (known departures)
         $knownDepartures = HrEmployeeProfile::where('is_active', true)
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->whereNotNull('end_date')
             ->where('end_date', '>', $now)
             ->where('end_date', '<=', $now->copy()->addMonths($months))
@@ -109,10 +105,9 @@ class HeadcountForecastService
      * Compare position headcount_budget vs current_headcount across all positions.
      * Returns: total budgeted, total filled, total vacant, by department.
      */
-    public function getBudgetVsActual(?int $tenantId): array
+    public function getBudgetVsActual(): array
     {
         $positions = HrPosition::where('is_active', true)
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->get(['id', 'title', 'department', 'headcount_budget', 'current_headcount']);
 
         $totalBudgeted = $positions->sum('headcount_budget');
@@ -160,7 +155,7 @@ class HeadcountForecastService
      * Employees approaching milestones (1yr, 2yr, 5yr) -- common turnover points.
      * Returns list of at-risk employees with tenure and risk factors.
      */
-    public function getAttritionRisk(?int $tenantId): array
+    public function getAttritionRisk(): array
     {
         $now = Carbon::now();
 
@@ -179,7 +174,6 @@ class HeadcountForecastService
             $windowEnd = $anniversaryDate->copy()->addMonths(3);
 
             $employees = HrEmployeeProfile::where('is_active', true)
-                ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
                 ->whereBetween('start_date', [$windowStart, $windowEnd])
                 ->with('user:id,name,email')
                 ->get(['id', 'user_id', 'start_date', 'department', 'position_title']);

@@ -7,9 +7,13 @@ use App\Domain\Finance\Models\FinCostAllocation;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinJournalLine;
 use App\Domain\Finance\Models\SiteBudgetLine;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\LegacyStorageContext;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -23,11 +27,10 @@ class SitesFinancialOverviewTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
-            'organization_id' => 1,
             'approved_at' => now(),
         ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -36,12 +39,10 @@ class SitesFinancialOverviewTest extends TestCase
     public function test_sites_financial_overview_returns_sites_and_kpis(): void
     {
         $house = Site::factory()->create([
-            'tenant_id' => 1,
             'type' => 'house',
             'name' => 'Aroha House',
         ]);
         $facility = Site::factory()->create([
-            'tenant_id' => 1,
             'type' => 'facility',
             'name' => 'Kauri Facility',
         ]);
@@ -50,7 +51,7 @@ class SitesFinancialOverviewTest extends TestCase
         $this->createAllocation($facility, 'site_utilities_expense', 300.00, '2026-05-05');
 
         SiteBudgetLine::create([
-            'tenant_id' => 1,
+            ...LegacyStorageContext::attributes(),
             'site_id' => $house->id,
             'period' => '2026-05',
             'category' => 'payroll',
@@ -58,7 +59,7 @@ class SitesFinancialOverviewTest extends TestCase
             'created_by' => $this->admin->id,
         ]);
         SiteBudgetLine::create([
-            'tenant_id' => 1,
+            ...LegacyStorageContext::attributes(),
             'site_id' => $facility->id,
             'period' => '2026-05',
             'category' => 'utilities',
@@ -82,7 +83,6 @@ class SitesFinancialOverviewTest extends TestCase
     {
         $supportWorker = User::factory()->create([
             'role' => 'support_worker',
-            'organization_id' => 1,
             'approved_at' => now(),
         ]);
         $supportWorker->roles()->attach(Role::where('name', 'support_worker')->first());
@@ -92,23 +92,39 @@ class SitesFinancialOverviewTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_sites_financial_overview_respects_tenancy(): void
+    public function test_sites_financial_overview_only_includes_sites_accessible_to_current_employee(): void
     {
         $visibleSite = Site::factory()->create([
-            'tenant_id' => 1,
             'type' => 'house',
             'name' => 'Visible House',
         ]);
         $hiddenSite = Site::factory()->create([
-            'tenant_id' => 2,
             'type' => 'house',
             'name' => 'Hidden House',
+        ]);
+
+        $viewer = User::factory()->create([
+            'role' => 'support_worker',
+            'approved_at' => now(),
+        ]);
+        $viewer->roles()->attach(Role::where('name', 'support_worker')->first());
+        $permission = Permission::query()->where('key', 'finance.dashboard')->firstOrFail();
+        $viewer->permissionOverrides()->syncWithoutDetaching([
+            $permission->id => ['allowed' => true],
+        ]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $visibleSite->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => today()->subDay(),
+            'end_date' => null,
         ]);
 
         $this->createAllocation($visibleSite, 'payroll_cost', 250.00, '2026-05-03');
         $this->createAllocation($hiddenSite, 'payroll_cost', 900.00, '2026-05-03');
 
-        $this->actingAs($this->admin)
+        $this->actingAs($viewer)
             ->get('/finance/sites?from=2026-05-01&to=2026-05-31')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
@@ -122,11 +138,9 @@ class SitesFinancialOverviewTest extends TestCase
     private function createAllocation(Site $site, string $eventType, float $amount, string $date): void
     {
         $account = FinAccount::factory()->create([
-            'organization_id' => $site->tenant_id,
             'type' => 'expense',
         ]);
         $journal = FinJournal::factory()->create([
-            'organization_id' => $site->tenant_id,
             'journal_date' => $date,
             'status' => 'posted',
         ]);

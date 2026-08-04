@@ -1,6 +1,8 @@
 <?php
 
+use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -16,16 +18,28 @@ beforeEach(function () {
 });
 
 test('the candidate page ships the offer wizard option data', function () {
-    Site::factory()->create(['tenant_id' => 1, 'type' => 'house', 'name' => 'Kauri House']);
+    $site = Site::factory()->create(['type' => 'house', 'name' => 'Kauri House']);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $site->id,
+        'is_active' => true,
+        'created_by' => $this->hr->id,
+        'updated_by' => $this->hr->id,
+    ]);
 
     $candidate = HrCandidate::factory()->create([
-        'tenant_id' => 1,
         'first_name' => 'Mia',
         'last_name' => 'Candidate',
         'personal_email' => 'mia.offerdata@example.test',
         'source' => 'direct',
         'status' => 'new',
         'created_by' => $this->hr->id,
+    ]);
+    HrApplication::factory()->create([
+        'candidate_id' => $candidate->id,
+        'target_site_id' => $site->id,
+        'position_title' => 'Support Worker',
+        'position_role' => 'support_worker',
     ]);
 
     $response = $this->actingAs($this->hr)

@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrKudosReaction;
 use App\Domain\Hr\Models\HrKudosReply;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\Notification;
  * Both surfaces are two lenses on ONE dataset, never a fork:
  *   - FeedService::sendKudos writes a single HrKudos (+ a linked HrFeedPost).
  *   - The FEED reads it via the post's hasOne kudos relation (FeedService::getFeed,
- *     org-wide wall).
+ *     application-wide wall).
  *   - The SHOUT-OUTS tab reads the SAME HrKudos directly by to_user_id / from_user_id
  *     (MyHrController::myHrShoutouts, the viewer's received / given boxes).
  *   - Reactions and replies added through the shared FeedService::toggleReaction /
@@ -27,20 +28,20 @@ use Illuminate\Support\Facades\Notification;
  * surface read code runs (not a re-implementation). No HTTP → no permission
  * seeding; Notification::fake isolates the kudos-received side effect.
  */
-function hrSeamMyShoutouts(User $user, int $tenantId, string $box): array
+function hrSeamMyShoutouts(User $user, string $box): array
 {
     $controller = app(MyHrController::class);
     $method = new ReflectionMethod($controller, 'myHrShoutouts');
     $method->setAccessible(true);
 
-    return $method->invoke($controller, $user, $tenantId, $box);
+    return $method->invoke($controller, $user, $box);
 }
 
 /** Pull the kudos-typed feed post carrying a given kudos id from the real feed query. */
-function hrSeamFeedKudosPost(int $tenantId, int $viewerId, int $kudosId)
+function hrSeamFeedKudosPost(int $viewerId, int $kudosId)
 {
     return app(FeedService::class)
-        ->getFeed($tenantId, null, null, $viewerId)
+        ->getFeed(null, null, $viewerId)
         ->getCollection()
         ->first(fn ($post) => $post->post_type === 'kudos' && $post->kudos?->id === $kudosId);
 }
@@ -48,15 +49,16 @@ function hrSeamFeedKudosPost(int $tenantId, int $viewerId, int $kudosId)
 beforeEach(function () {
     Notification::fake();
 
-    $this->giver = User::factory()->create(['name' => 'Ada Giver']);
-    $this->recipient = User::factory()->create(['name' => 'Ben Recipient']);
+    $this->giver = User::factory()->create(['name' => 'Ada Giver', 'approved_at' => now()]);
+    $this->recipient = User::factory()->create(['name' => 'Ben Recipient', 'approved_at' => now()]);
+    HrEmployeeProfile::factory()->create(['user_id' => $this->giver->id, 'is_active' => true]);
+    HrEmployeeProfile::factory()->create(['user_id' => $this->recipient->id, 'is_active' => true]);
 
     $this->kudos = app(FeedService::class)->sendKudos(
         $this->giver,
         $this->recipient->id,
         'teamwork',
         'Outstanding cover on the weekend audit.',
-        1,
         'impressive',
     );
 });
@@ -66,16 +68,16 @@ test('S11 seam: one kudos record is read by BOTH the feed and the my-HR shout-ou
     expect(HrKudos::count())->toBe(1);
 
     // FEED read path — surfaced through the linked feed post.
-    $feedPost = hrSeamFeedKudosPost(1, $this->giver->id, $this->kudos->id);
+    $feedPost = hrSeamFeedKudosPost($this->giver->id, $this->kudos->id);
     expect($feedPost)->not->toBeNull();
     expect($feedPost->kudos->id)->toBe($this->kudos->id);
 
     // SHOUT-OUTS read path — the SAME record in the recipient's "received" box…
-    $received = collect(hrSeamMyShoutouts($this->recipient, 1, 'received'));
+    $received = collect(hrSeamMyShoutouts($this->recipient, 'received'));
     expect($received->firstWhere('id', $this->kudos->id))->not->toBeNull();
 
     // …and in the giver's "given" box.
-    $given = collect(hrSeamMyShoutouts($this->giver, 1, 'given'));
+    $given = collect(hrSeamMyShoutouts($this->giver, 'given'));
     expect($given->firstWhere('id', $this->kudos->id))->not->toBeNull();
 
     // The id the feed shows == the id the shout-outs show == the one HrKudos row.
@@ -94,11 +96,11 @@ test('S11 seam: a reaction added through the shared path is a single row reflect
     expect(HrKudosReaction::where('kudos_id', $this->kudos->id)->count())->toBe(1);
 
     // FEED read reflects the single reaction…
-    $feedPost = hrSeamFeedKudosPost(1, $this->giver->id, $this->kudos->id);
+    $feedPost = hrSeamFeedKudosPost($this->giver->id, $this->kudos->id);
     expect($feedPost->kudos->reactions->where('emoji', 'heart')->count())->toBe(1);
 
     // …and so does the SHOUT-OUTS read (grouped emoji → reactor list).
-    $received = collect(hrSeamMyShoutouts($this->recipient, 1, 'received'));
+    $received = collect(hrSeamMyShoutouts($this->recipient, 'received'));
     $entry = $received->firstWhere('id', $this->kudos->id);
     expect($entry['reactions']['heart'])->toHaveCount(1);
     expect($entry['reactions']['heart'][0]['id'])->toBe($reactor->id);
@@ -111,12 +113,12 @@ test('S11 seam: a reply added through the shared path is a single row reflected 
     expect(HrKudosReply::where('kudos_id', $this->kudos->id)->count())->toBe(1);
 
     // FEED read reflects the reply…
-    $feedPost = hrSeamFeedKudosPost(1, $this->giver->id, $this->kudos->id);
+    $feedPost = hrSeamFeedKudosPost($this->giver->id, $this->kudos->id);
     expect($feedPost->kudos->replies)->toHaveCount(1);
     expect($feedPost->kudos->replies->first()->body)->toBe('Thank you — means a lot!');
 
     // …and the giver sees the very same reply on their "given" shout-out.
-    $given = collect(hrSeamMyShoutouts($this->giver, 1, 'given'));
+    $given = collect(hrSeamMyShoutouts($this->giver, 'given'));
     $entry = $given->firstWhere('id', $this->kudos->id);
     expect($entry['replies'])->toHaveCount(1);
     expect($entry['replies'][0]['body'])->toBe('Thank you — means a lot!');

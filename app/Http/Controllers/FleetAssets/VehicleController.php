@@ -2,20 +2,23 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
+use App\Domain\SecurityDevices\Presenters\FleetVehicleTechnologyProjectionPresenter;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetDriverSession;
 use App\Models\FleetFuelLog;
+use App\Models\FleetIncident;
 use App\Models\FleetServiceSchedule;
 use App\Models\FleetSignal;
 use App\Models\FleetTrip;
-use App\Models\FleetIncident;
 use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Fleet\FleetTimelineService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -23,14 +26,18 @@ use Inertia\Inertia;
 
 class VehicleController extends Controller
 {
-    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly SecurityDevicesAccessService $deviceAccess,
+        private readonly FleetVehicleTechnologyProjectionPresenter $vehicleTechnology,
+    ) {}
 
-    private function canManageFleet(?\App\Models\User $user): bool
+    private function canManageFleet(?User $user): bool
     {
         return (bool) $user?->canDo('fleet.manage');
     }
 
-    private function canManageMaintenance(?\App\Models\User $user): bool
+    private function canManageMaintenance(?User $user): bool
     {
         return $this->canManageFleet($user) || (bool) $user?->canDo('fleet.maintenance.manage');
     }
@@ -50,10 +57,7 @@ class VehicleController extends Controller
         $user = $request->user();
         $hasFleetFields = $this->hasFleetFields();
 
-        $eagerLoads = [
-            'fleetState',
-            'trackers' => fn ($q) => $q->where('status', 'paired'),
-        ];
+        $eagerLoads = ['fleetState'];
         if ($hasFleetFields) {
             $eagerLoads[] = 'homeSite';
         }
@@ -64,6 +68,7 @@ class VehicleController extends Controller
         // CSV export
         if ($request->input('export') === 'csv') {
             $exportQuery = (clone $query)->orderBy('name');
+
             return response()->streamDownload(function () use ($exportQuery, $hasFleetFields) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Name', 'Asset Tag', 'Status', 'Home Site', 'Online Status', 'Last Seen']);
@@ -109,8 +114,12 @@ class VehicleController extends Controller
         $allowedSorts = ['name', 'status', 'asset_tag'];
         $sort = $request->input('sort', 'name');
         $direction = $request->input('direction', 'asc');
-        if (!in_array($sort, $allowedSorts)) $sort = 'name';
-        if (!in_array($direction, ['asc', 'desc'])) $direction = 'asc';
+        if (! in_array($sort, $allowedSorts)) {
+            $sort = 'name';
+        }
+        if (! in_array($direction, ['asc', 'desc'])) {
+            $direction = 'asc';
+        }
         $query->orderBy($sort, $direction);
 
         $vehicles = $query->paginate(25)->withQueryString();
@@ -214,7 +223,6 @@ class VehicleController extends Controller
                         'speed_kph' => $v->fleetState->speed_kph,
                         'battery_pct' => $v->fleetState->battery_pct,
                     ] : null,
-                    'tracker_count' => $v->trackers->count(),
                 ])->values(),
                 'links' => $vehicles->linkCollection()->toArray(),
                 'meta' => [
@@ -234,11 +242,12 @@ class VehicleController extends Controller
     public function show(Request $request, Asset $asset)
     {
         $user = $request->user();
+        abort_unless($user, 403);
+        $asset = $this->deviceAccess->assignableVehicle($user, (int) $asset->getKey()) ?? abort(404);
         $hasFleetFields = $this->hasFleetFields();
 
         $eagerLoads = [
             'fleetState',
-            'trackers',
             'geofences',
             'workOrders' => fn ($q) => $q->latest()->limit(10),
             'bookings' => fn ($q) => $q->latest()->limit(10),
@@ -348,13 +357,6 @@ class VehicleController extends Controller
                     'name' => $asset->primaryDriver->name,
                     'email' => $asset->primaryDriver->email,
                 ] : null,
-                'trackers' => $asset->trackers->map(fn ($t) => [
-                    'id' => $t->id,
-                    'vendor' => $t->vendor,
-                    'device_uid' => $t->device_uid,
-                    'status' => $t->status,
-                    'last_seen_at' => optional($t->last_seen_at)->toISOString(),
-                ])->values(),
                 'has_wheelchair_ramp' => (bool) $asset->has_wheelchair_ramp,
                 'has_hoist' => (bool) $asset->has_hoist,
                 'has_child_seat_anchors' => (bool) $asset->has_child_seat_anchors,
@@ -406,18 +408,21 @@ class VehicleController extends Controller
             'can' => [
                 'manage' => $this->canManageFleet($user),
                 'inspect' => $this->canManageMaintenance($user),
+                'view_vehicle_technology' => $this->vehicleTechnology->canView($user, $asset),
             ],
-            'timeline' => \Inertia\Inertia::optional(fn () =>
-                app(\App\Services\Fleet\FleetTimelineService::class)
-                    ->forVehicle($asset->id, now()->subDays(14), 40)
-                    ->toArray()
+            'vehicle_technology' => Inertia::optional(
+                fn () => $this->vehicleTechnology->present($user, $asset),
+            ),
+            'timeline' => Inertia::optional(fn () => app(FleetTimelineService::class)
+                ->forVehicle($asset->id, now()->subDays(14), 40)
+                ->toArray()
             ),
         ]);
     }
 
     private function buildServicePrediction(Asset $asset): ?array
     {
-        if (!Schema::hasTable('fleet_service_schedules') || !Schema::hasTable('fleet_trips')) {
+        if (! Schema::hasTable('fleet_service_schedules') || ! Schema::hasTable('fleet_trips')) {
             return null;
         }
 
@@ -426,7 +431,9 @@ class VehicleController extends Controller
             ->whereNotNull('next_due_km')
             ->first();
 
-        if (!$schedule) return null;
+        if (! $schedule) {
+            return null;
+        }
 
         $currentOdometer = (float) ($asset->odometer_km ?? 0);
         $nextDueKm = (float) $schedule->next_due_km;
@@ -504,7 +511,7 @@ class VehicleController extends Controller
     public function markPersonal(Request $request, FleetTrip $trip)
     {
         $trip->update([
-            'is_personal' => !$trip->is_personal,
+            'is_personal' => ! $trip->is_personal,
             'marked_personal_by' => $request->user()->id,
             'marked_personal_at' => now(),
         ]);
@@ -528,7 +535,7 @@ class VehicleController extends Controller
         }
 
         // Legacy support
-        if ($request->filled('asset_id') && !$request->filled('vehicle_id')) {
+        if ($request->filled('asset_id') && ! $request->filled('vehicle_id')) {
             $query->where('asset_id', (int) $request->input('asset_id'));
         }
 
@@ -556,6 +563,7 @@ class VehicleController extends Controller
         // CSV export
         if ($request->input('export') === 'csv') {
             $exportQuery = clone $query;
+
             return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Vehicle', 'Driver', 'Start Time', 'End Time', 'Distance (km)', 'Duration (min)', 'Max Speed (km/h)', 'Start Address', 'End Address', 'Status']);
@@ -686,8 +694,12 @@ class VehicleController extends Controller
         $allowedSorts = ['started_at', 'distance_km', 'duration_s', 'status'];
         $sort = $request->input('sort', 'started_at');
         $direction = $request->input('direction', 'desc');
-        if (!in_array($sort, $allowedSorts)) $sort = 'started_at';
-        if (!in_array($direction, ['asc', 'desc'])) $direction = 'desc';
+        if (! in_array($sort, $allowedSorts)) {
+            $sort = 'started_at';
+        }
+        if (! in_array($direction, ['asc', 'desc'])) {
+            $direction = 'desc';
+        }
         $query->reorder()->orderBy($sort, $direction);
 
         $trips = $query->paginate(25)->withQueryString();
@@ -774,6 +786,7 @@ class VehicleController extends Controller
         // CSV export
         if ($request->input('export') === 'csv') {
             $exportQuery = clone $query;
+
             return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Date', 'Vehicle', 'Odometer (km)', 'Litres', 'Cost ($)', 'Cost/Litre', 'Fuel Type', 'Station', 'Notes', 'Logged By']);
@@ -827,6 +840,7 @@ class VehicleController extends Controller
             ->map(function ($row) use ($distanceByAsset) {
                 $totalDistance = (float) ($distanceByAsset[$row->asset_id] ?? 0);
                 $kmPerLitre = $row->total_litres > 0 ? round($totalDistance / (float) $row->total_litres, 2) : 0;
+
                 return [
                     'vehicle' => $row->asset?->name ?? 'Unknown',
                     'asset_id' => $row->asset_id,
@@ -845,8 +859,12 @@ class VehicleController extends Controller
         $allowedFuelSorts = ['logged_at', 'quantity_litres', 'total_cost'];
         $fuelSort = $request->input('sort', 'logged_at');
         $fuelDirection = $request->input('direction', 'desc');
-        if (!in_array($fuelSort, $allowedFuelSorts)) $fuelSort = 'logged_at';
-        if (!in_array($fuelDirection, ['asc', 'desc'])) $fuelDirection = 'desc';
+        if (! in_array($fuelSort, $allowedFuelSorts)) {
+            $fuelSort = 'logged_at';
+        }
+        if (! in_array($fuelDirection, ['asc', 'desc'])) {
+            $fuelDirection = 'desc';
+        }
         $query->reorder()->orderBy($fuelSort, $fuelDirection);
 
         $fuelLogs = $query->paginate(25)->withQueryString();
@@ -944,9 +962,9 @@ class VehicleController extends Controller
 
         switch ($data['action']) {
             case 'assign_site':
-                if (!empty($data['site_id']) && $this->hasFleetFields()) {
+                if (! empty($data['site_id']) && $this->hasFleetFields()) {
                     Asset::whereIn('id', $data['ids'])->update(['home_site_id' => $data['site_id']]);
-                } elseif (!empty($data['site_id'])) {
+                } elseif (! empty($data['site_id'])) {
                     Asset::whereIn('id', $data['ids'])->update(['site_id' => $data['site_id']]);
                 }
                 break;
@@ -960,7 +978,7 @@ class VehicleController extends Controller
             'count' => count($data['ids']),
         ]);
 
-        return back()->with('success', 'Bulk action applied to ' . count($data['ids']) . ' vehicle(s).');
+        return back()->with('success', 'Bulk action applied to '.count($data['ids']).' vehicle(s).');
     }
 
     public function alertsConfig(Request $request, Asset $asset)

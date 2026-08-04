@@ -76,7 +76,7 @@ class DashboardController extends Controller
             $client->load(['supportWorkers:id,name,email']);
             $todayShifts = Shift::query()
                 ->where('client_id', $client->id)
-                ->visibleToFrontline($user->organization_id)
+                ->visibleToFrontline()
                 ->whereBetween('starts_at', [$today, $tomorrow])
                 ->orderBy('starts_at')
                 ->with('staff:id,name,email')
@@ -84,7 +84,7 @@ class DashboardController extends Controller
 
             $upcomingShifts = Shift::query()
                 ->where('client_id', $client->id)
-                ->visibleToFrontline($user->organization_id)
+                ->visibleToFrontline()
                 ->whereBetween('starts_at', [$today, $weekEnd])
                 ->orderBy('starts_at')
                 ->with('staff:id,name,email')
@@ -113,7 +113,7 @@ class DashboardController extends Controller
         $todayShifts = Shift::query()
             ->when(!$user->canDo('shifts.manageAny'), fn($q) => $q
                 ->where('user_id', $user->id)
-                ->visibleToFrontline($user->organization_id))
+                ->visibleToFrontline())
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
             ->when($status && $status !== 'all', fn ($q) => $q->where('status', $status))
             ->whereBetween('starts_at', [$today, $tomorrow])
@@ -126,7 +126,7 @@ class DashboardController extends Controller
             $upcomingShifts = Shift::query()
                 ->when(!$user->canDo('shifts.manageAny'), fn($q) => $q
                     ->where('user_id', $user->id)
-                    ->visibleToFrontline($user->organization_id))
+                    ->visibleToFrontline())
                 ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
                 ->when($status && $status !== 'all', fn ($q) => $q->where('status', $status))
                 ->whereBetween('starts_at', [$today, $weekEnd])
@@ -173,7 +173,7 @@ class DashboardController extends Controller
         $shiftScope = Shift::query()
             ->when(!$user->canDo('shifts.manageAny'), fn ($q) => $q
                 ->where('user_id', $user->id)
-                ->visibleToFrontline($user->organization_id));
+                ->visibleToFrontline());
 
         $shiftSeries = (clone $shiftScope)
             ->whereBetween('starts_at', [$range7Start, $range7End])
@@ -447,7 +447,7 @@ class DashboardController extends Controller
         $staffKpis = null;
         if ($mode === 'staff') {
             $myShiftsToday = Shift::where('user_id', $user->id)
-                ->visibleToFrontline($user->organization_id)
+                ->visibleToFrontline()
                 ->whereBetween('starts_at', [$today, $tomorrow])
                 ->count();
 

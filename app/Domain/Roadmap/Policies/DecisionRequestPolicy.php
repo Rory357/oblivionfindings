@@ -14,8 +14,7 @@ class DecisionRequestPolicy
 
     public function view(User $user, DecisionRequest $decisionRequest): bool
     {
-        return ($user->canDo('roadmap.decisions.view') || $user->canDo('governance.resolutions.view'))
-            && $this->sameTenant($user, $decisionRequest->tenant_id);
+        return $user->canDo('roadmap.decisions.view') || $user->canDo('governance.resolutions.view');
     }
 
     public function create(User $user): bool
@@ -25,22 +24,11 @@ class DecisionRequestPolicy
 
     public function update(User $user, DecisionRequest $decisionRequest): bool
     {
-        return ($user->canDo('roadmap.decisions.manage') || $user->canDo('governance.resolutions.manage'))
-            && $this->sameTenant($user, $decisionRequest->tenant_id);
+        return $user->canDo('roadmap.decisions.manage') || $user->canDo('governance.resolutions.manage');
     }
 
     public function resolve(User $user, DecisionRequest $decisionRequest): bool
     {
-        return ($user->canDo('roadmap.decisions.manage') || $user->canDo('governance.resolutions.manage'))
-            && $this->sameTenant($user, $decisionRequest->tenant_id);
-    }
-
-    protected function sameTenant(User $user, ?int $tenantId): bool
-    {
-        if ($tenantId === null || $user->organization_id === null) {
-            return false;
-        }
-
-        return (int) $user->organization_id === (int) $tenantId;
+        return $user->canDo('roadmap.decisions.manage') || $user->canDo('governance.resolutions.manage');
     }
 }

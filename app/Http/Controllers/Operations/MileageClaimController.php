@@ -4,10 +4,15 @@ namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
 use App\Models\MileageClaim;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class MileageClaimController extends Controller
 {
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     public function index(Request $request)
     {
         $auth = $request->user();
@@ -19,10 +24,10 @@ class MileageClaimController extends Controller
         ]);
         $search = trim((string) ($data['q'] ?? ''));
 
-        $claims = MileageClaim::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $baseQuery = $this->visibleClaimsQuery($auth);
+        $claims = (clone $baseQuery)
             ->with(['user:id,name'])
-            ->when(!empty($data['status']), fn ($q) => $q->where('status', $data['status']))
+            ->when(! empty($data['status']), fn ($q) => $q->where('status', $data['status']))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($nested) use ($search) {
                     $nested
@@ -54,19 +59,12 @@ class MileageClaimController extends Controller
             'claims' => $claims,
             'filters' => $request->only(['status', 'q']),
             'stats' => [
-                'total' => MileageClaim::query()
-                    ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-                    ->count(),
-                'pending_approval' => MileageClaim::query()
-                    ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+                'total' => (clone $baseQuery)->count(),
+                'pending_approval' => (clone $baseQuery)
                     ->where('status', 'submitted')
                     ->count(),
-                'total_km' => (float) MileageClaim::query()
-                    ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-                    ->sum('distance_km'),
-                'total_amount' => (float) MileageClaim::query()
-                    ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-                    ->sum('amount'),
+                'total_km' => (float) (clone $baseQuery)->sum('distance_km'),
+                'total_amount' => (float) (clone $baseQuery)->sum('amount'),
             ],
         ]);
     }
@@ -95,7 +93,6 @@ class MileageClaimController extends Controller
         ]);
 
         MileageClaim::create([
-            'organization_id' => $auth->organization_id,
             'user_id' => $auth->id,
             'claim_date' => $data['date'],
             'origin' => $data['from_location'],
@@ -116,7 +113,7 @@ class MileageClaimController extends Controller
         abort_unless($auth && $this->canCreateClaims($auth), 403);
 
         $claim = MileageClaim::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->where('user_id', $auth->id)
             ->where('status', 'draft')
             ->findOrFail($claim);
 
@@ -133,8 +130,7 @@ class MileageClaimController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canApproveClaims($auth), 403);
 
-        $claim = MileageClaim::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $claim = $this->visibleClaimsQuery($auth, forceManagedScope: true)
             ->where('status', 'submitted')
             ->findOrFail($claim);
 
@@ -145,6 +141,48 @@ class MileageClaimController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Mileage claim approved.');
+    }
+
+    private function visibleClaimsQuery(User $viewer, bool $forceManagedScope = false): Builder
+    {
+        $canViewManagedClaims = $forceManagedScope
+            || $viewer->canDo('mileage_claims.viewAny')
+            || $viewer->canDo('mileage.viewAny')
+            || $viewer->canDo('mileage_claims.approve')
+            || $viewer->canDo('mileage.approve');
+
+        $query = MileageClaim::query();
+        if ($canViewManagedClaims) {
+            $visibleStaff = $this->siteAccess->applyHistoricalStaffSiteScope(
+                User::query()->select('users.id'),
+                $viewer,
+                ['shifts.manageAny'],
+            );
+            $query->whereIn('user_id', $visibleStaff);
+        } else {
+            $query->where('user_id', $viewer->id);
+        }
+
+        return $query->where(function (Builder $provenance) use ($viewer): void {
+            $provenance
+                ->where(function (Builder $personalClaim): void {
+                    $personalClaim->whereNull('shift_id')->whereNull('client_id');
+                })
+                ->orWhere(function (Builder $visitClaim) use ($viewer): void {
+                    $visitClaim
+                        ->whereNotNull('shift_id')
+                        ->whereNotNull('client_id')
+                        ->whereHas('shift', function (Builder $shiftQuery) use ($viewer): void {
+                            $this->siteAccess->applyShiftScope($shiftQuery, $viewer, ['shifts.manageAny']);
+                            $shiftQuery->whereColumn('shifts.client_id', 'mileage_claims.client_id');
+                        })
+                        ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+                            $clientQuery,
+                            $viewer,
+                            ['shifts.manageAny'],
+                        ));
+                });
+        });
     }
 
     private function canViewClaims($auth): bool

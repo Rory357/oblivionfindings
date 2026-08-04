@@ -21,35 +21,35 @@ class HrDocumentMergeService
      */
     public const MERGE_FIELDS = [
         // Employee profile fields
-        '{{employee_name}}'        => 'HrEmployeeProfile -> user.name',
-        '{{employee_number}}'      => 'HrEmployeeProfile -> employee_number',
-        '{{position_title}}'       => 'HrEmployeeProfile -> position_title',
-        '{{position_role}}'        => 'HrEmployeeProfile -> position_role',
-        '{{employment_type}}'      => 'HrEmployeeProfile -> employment_type',
-        '{{hours_per_week}}'       => 'HrEmployeeProfile -> hours_per_week',
-        '{{hourly_rate}}'          => 'HrEmployeeProfile -> hourly_rate',
-        '{{annual_salary}}'        => 'HrEmployeeProfile -> annual_salary',
-        '{{start_date}}'           => 'HrEmployeeProfile -> start_date (formatted)',
-        '{{end_date}}'             => 'HrEmployeeProfile -> end_date (formatted)',
-        '{{probation_end_date}}'   => 'HrEmployeeProfile -> probation_end_date (formatted)',
-        '{{personal_email}}'       => 'HrEmployeeProfile -> personal_email',
-        '{{work_email}}'           => 'HrEmployeeProfile -> work_email',
-        '{{home_address}}'         => 'HrEmployeeProfile -> home_address',
+        '{{employee_name}}' => 'HrEmployeeProfile -> user.name',
+        '{{employee_number}}' => 'HrEmployeeProfile -> employee_number',
+        '{{position_title}}' => 'HrEmployeeProfile -> position_title',
+        '{{position_role}}' => 'HrEmployeeProfile -> position_role',
+        '{{employment_type}}' => 'HrEmployeeProfile -> employment_type',
+        '{{hours_per_week}}' => 'HrEmployeeProfile -> hours_per_week',
+        '{{hourly_rate}}' => 'HrEmployeeProfile -> hourly_rate',
+        '{{annual_salary}}' => 'HrEmployeeProfile -> annual_salary',
+        '{{start_date}}' => 'HrEmployeeProfile -> start_date (formatted)',
+        '{{end_date}}' => 'HrEmployeeProfile -> end_date (formatted)',
+        '{{probation_end_date}}' => 'HrEmployeeProfile -> probation_end_date (formatted)',
+        '{{personal_email}}' => 'HrEmployeeProfile -> personal_email',
+        '{{work_email}}' => 'HrEmployeeProfile -> work_email',
+        '{{home_address}}' => 'HrEmployeeProfile -> home_address',
 
         // Site fields
-        '{{site_name}}'            => 'HrEmployeeProfile -> primarySite.name',
-        '{{site_address}}'         => 'HrEmployeeProfile -> primarySite.address',
+        '{{site_name}}' => 'HrEmployeeProfile -> primarySite.name',
+        '{{site_address}}' => 'HrEmployeeProfile -> primarySite.address',
 
         // Offer fields (for offer letters)
-        '{{proposed_start_date}}'  => 'HrOffer -> proposed_start_date (formatted)',
+        '{{proposed_start_date}}' => 'HrOffer -> proposed_start_date (formatted)',
         '{{offer_hours_per_week}}' => 'HrOffer -> hours_per_week',
-        '{{offer_hourly_rate}}'    => 'HrOffer -> hourly_rate',
-        '{{offer_annual_salary}}'  => 'HrOffer -> annual_salary',
+        '{{offer_hourly_rate}}' => 'HrOffer -> hourly_rate',
+        '{{offer_annual_salary}}' => 'HrOffer -> annual_salary',
 
         // Organisation fields
-        '{{company_name}}'         => 'Tenant -> name (from config or tenant model)',
-        '{{current_date}}'         => 'now() formatted',
-        '{{current_year}}'         => 'now()->year',
+        '{{company_name}}' => 'Application company name from configuration',
+        '{{current_date}}' => 'now() formatted',
+        '{{current_year}}' => 'now()->year',
     ];
 
     /**
@@ -59,11 +59,9 @@ class HrDocumentMergeService
      * replaces them with actual values from the employee profile and
      * optional offer record.
      *
-     * @param  HrDocumentTemplate  $template
-     * @param  HrEmployeeProfile   $profile
-     * @param  HrOffer|null        $offer    Optional offer record for offer-specific fields
-     * @param  array               $extra    Additional key-value pairs for custom merge fields
-     * @return string  The merged content with all placeholders replaced
+     * @param  HrOffer|null  $offer  Optional offer record for offer-specific fields
+     * @param  array  $extra  Additional key-value pairs for custom merge fields
+     * @return string The merged content with all placeholders replaced
      */
     public function mergeTemplate(HrDocumentTemplate $template, HrEmployeeProfile $profile, ?HrOffer $offer = null, array $extra = []): string
     {
@@ -96,12 +94,8 @@ class HrDocumentMergeService
      * Merges the template, stores the resulting content as a file, and
      * creates an HrDocument record linked to the employee profile.
      *
-     * @param  HrDocumentTemplate  $template
-     * @param  HrEmployeeProfile   $profile
-     * @param  int                 $generatedBy  User ID
-     * @param  HrOffer|null        $offer
-     * @param  array               $extra        Additional merge field values
-     * @return HrDocument
+     * @param  int  $generatedBy  User ID
+     * @param  array  $extra  Additional merge field values
      */
     public function generateDocument(HrDocumentTemplate $template, HrEmployeeProfile $profile, int $generatedBy, ?HrOffer $offer = null, array $extra = []): HrDocument
     {
@@ -109,30 +103,35 @@ class HrDocumentMergeService
         $slug = Str::slug((string) ($template->name ?: 'template'));
         $stamp = now()->format('Ymd_His');
 
-        $title = $template->name . ' - ' . now()->format('d M Y');
+        $title = $template->name.' - '.now()->format('d M Y');
         $pdf = $this->renderPdf($this->wrapHtml($title, $mergedContent));
 
-        $filename = "hr-documents/{$profile->tenant_id}/{$profile->id}/generated_{$slug}_{$stamp}.pdf";
+        $filename = "hr-documents/profiles/{$profile->id}/generated_{$slug}_{$stamp}.pdf";
 
         Storage::disk('private')->put($filename, $pdf);
         $sizeBytes = (int) (Storage::disk('private')->size($filename) ?: strlen($pdf));
 
-        return HrDocument::create([
-            'tenant_id' => $profile->tenant_id,
-            'employee_profile_id' => $profile->id,
-            'template_id' => $template->id,
-            'title' => $title,
-            'category' => $template->category,
-            'storage_disk' => 'private',
-            'storage_path' => $filename,
-            'original_name' => $slug . '.pdf',
-            'mime_type' => 'application/pdf',
-            'size_bytes' => $sizeBytes,
-            'is_restricted' => false,
-            'generated_from_template' => true,
-            'created_by' => $generatedBy,
-            'uploaded_by' => $generatedBy,
-        ]);
+        try {
+            return HrDocument::create([
+                'employee_profile_id' => $profile->id,
+                'template_id' => $template->id,
+                'title' => $title,
+                'category' => $template->category,
+                'storage_disk' => 'private',
+                'storage_path' => $filename,
+                'original_name' => $slug.'.pdf',
+                'mime_type' => 'application/pdf',
+                'size_bytes' => $sizeBytes,
+                'is_restricted' => false,
+                'generated_from_template' => true,
+                'created_by' => $generatedBy,
+                'uploaded_by' => $generatedBy,
+            ]);
+        } catch (\Throwable $exception) {
+            Storage::disk('private')->delete($filename);
+
+            throw $exception;
+        }
     }
 
     /**
@@ -166,11 +165,7 @@ class HrDocumentMergeService
     /**
      * Preview a merged template without storing it.
      *
-     * @param  HrDocumentTemplate  $template
-     * @param  HrEmployeeProfile   $profile
-     * @param  HrOffer|null        $offer
-     * @param  array               $extra
-     * @return string  The merged content
+     * @return string The merged content
      */
     public function preview(HrDocumentTemplate $template, HrEmployeeProfile $profile, ?HrOffer $offer = null, array $extra = []): string
     {
@@ -220,7 +215,6 @@ class HrDocumentMergeService
      * Returns the subset of MERGE_FIELDS relevant to the given category
      * (e.g. offer letters include offer fields, general documents do not).
      *
-     * @param  string  $category
      * @return array<string, string>
      */
     public function getAvailableFields(string $category): array
@@ -285,7 +279,7 @@ class HrDocumentMergeService
                 continue;
             }
 
-            $placeholder = str_starts_with($normalizedKey, '{{') ? $normalizedKey : '{{' . $normalizedKey . '}}';
+            $placeholder = str_starts_with($normalizedKey, '{{') ? $normalizedKey : '{{'.$normalizedKey.'}}';
             $data[$placeholder] = $this->normalizeValue($value);
         }
 

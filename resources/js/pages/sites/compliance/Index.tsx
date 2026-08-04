@@ -1,4 +1,5 @@
 import { OpsStatCard } from '@/components/ops-stat-card';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -84,41 +84,41 @@ type Props = {
     certifications: Certification[];
     compliance_checks: ComplianceCheck[];
     stats: Stats;
-    filters: any;
+    can?: { manage_compliance: boolean };
 };
 
 // ── Constants ──────────────────────────────────────────────────────────
 
 const CERT_TYPES = [
-    'Whaikaha',
-    'HSWA',
-    'Fire Safety',
-    'Building WoF',
-    'Food Safety',
-    'First Aid',
-    'Civil Defence',
-    'Infection Control',
-    'Medication Management',
-    'Restraint Minimisation',
-    'Cultural Safety',
-    'Other',
+    { value: 'healthcert_certification', label: 'HealthCERT certification' },
+    { value: 'hswa_compliance', label: 'HSWA compliance' },
+    { value: 'fire_safety', label: 'Fire safety' },
+    { value: 'building_wof', label: 'Building WoF' },
+    { value: 'food_safety', label: 'Food safety' },
+    { value: 'first_aid', label: 'First aid' },
+    { value: 'civil_defence', label: 'Civil defence' },
+    { value: 'infection_control', label: 'Infection control' },
+    { value: 'medication_management', label: 'Medication management' },
+    { value: 'restraint_minimisation', label: 'Restraint minimisation' },
+    { value: 'cultural_safety', label: 'Cultural safety' },
+    { value: 'other', label: 'Other' },
 ];
 
 const CHECK_TYPES = [
-    'Fire Drill',
-    'Evacuation Drill',
-    'H&S Walkthrough',
-    'Medication Audit',
-    'Infection Control',
-    'Restraint Review',
-    'Cultural Review',
-    'Environmental Check',
-    'Food Safety',
-    'Vehicle Check',
-    'Other',
+    { value: 'fire_drill', label: 'Fire drill' },
+    { value: 'evacuation_drill', label: 'Evacuation drill' },
+    { value: 'health_safety_walkthrough', label: 'H&S walkthrough' },
+    { value: 'medication_audit', label: 'Medication audit' },
+    { value: 'infection_control_audit', label: 'Infection control audit' },
+    { value: 'restraint_review', label: 'Restraint review' },
+    { value: 'cultural_review', label: 'Cultural review' },
+    { value: 'environmental_check', label: 'Environmental check' },
+    { value: 'food_safety_check', label: 'Food safety check' },
+    { value: 'vehicle_check', label: 'Vehicle check' },
+    { value: 'other', label: 'Other' },
 ];
 
-const RISK_RATINGS = ['Low', 'Medium', 'High', 'Critical'];
+const RISK_RATINGS = ['low', 'medium', 'high', 'critical'];
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -206,7 +206,7 @@ export default function SiteComplianceIndex({
     certifications = [],
     compliance_checks = [],
     stats: rawStats,
-    filters = {},
+    can = { manage_compliance: false },
 }: Props) {
     const stats: Stats = rawStats ?? {
         total_certs: 0,
@@ -222,6 +222,8 @@ export default function SiteComplianceIndex({
 
     // Dialog state
     const [showAddCert, setShowAddCert] = useState(false);
+    const [editingCertification, setEditingCertification] =
+        useState<Certification | null>(null);
     const [showScheduleCheck, setShowScheduleCheck] = useState(false);
     const [showCompleteCheck, setShowCompleteCheck] = useState(false);
     const [completingCheckId, setCompletingCheckId] = useState<number | null>(
@@ -237,6 +239,7 @@ export default function SiteComplianceIndex({
     const [certForm, setCertForm] = useState({
         certification_type: '',
         name: '',
+        status: 'current',
         issuing_body: '',
         reference_number: '',
         issued_date: '',
@@ -273,13 +276,18 @@ export default function SiteComplianceIndex({
     // ── Handlers ───────────────────────────────────────────────────────
 
     function handleSaveCert() {
-        router.post(`/sites/${site.id}/compliance/certifications`, certForm, {
+        const route = editingCertification
+            ? `/sites/${site.id}/certifications/${editingCertification.id}`
+            : `/sites/${site.id}/certifications`;
+        const options = {
             preserveScroll: true,
             onSuccess: () => {
                 setShowAddCert(false);
+                setEditingCertification(null);
                 setCertForm({
                     certification_type: '',
                     name: '',
+                    status: 'current',
                     issuing_body: '',
                     reference_number: '',
                     issued_date: '',
@@ -288,11 +296,17 @@ export default function SiteComplianceIndex({
                     notes: '',
                 });
             },
-        });
+        };
+
+        if (editingCertification) {
+            router.put(route, certForm, options);
+        } else {
+            router.post(route, certForm, options);
+        }
     }
 
     function handleScheduleCheck() {
-        router.post(`/sites/${site.id}/compliance/checks`, checkForm, {
+        router.post(`/sites/${site.id}/compliance-checks`, checkForm, {
             preserveScroll: true,
             onSuccess: () => {
                 setShowScheduleCheck(false);
@@ -303,8 +317,8 @@ export default function SiteComplianceIndex({
 
     function handleCompleteCheck() {
         if (!completingCheckId) return;
-        router.put(
-            `/sites/${site.id}/compliance/checks/${completingCheckId}/complete`,
+        router.patch(
+            `/sites/${site.id}/compliance-checks/${completingCheckId}/complete`,
             completeForm,
             {
                 preserveScroll: true,
@@ -324,9 +338,42 @@ export default function SiteComplianceIndex({
     }
 
     function handleDeleteCert(id: number) {
-        router.delete(`/sites/${site.id}/compliance/certifications/${id}`, {
+        router.delete(`/sites/${site.id}/certifications/${id}`, {
             preserveScroll: true,
         });
+    }
+
+    function openCertificationDialog(certification?: Certification) {
+        setEditingCertification(certification ?? null);
+        setCertForm(
+            certification
+                ? {
+                      certification_type: certification.certification_type,
+                      name: certification.name,
+                      status: certification.status,
+                      issuing_body: certification.issuing_body ?? '',
+                      reference_number: certification.reference_number ?? '',
+                      issued_date:
+                          certification.issued_date?.slice(0, 10) ?? '',
+                      expiry_date:
+                          certification.expiry_date?.slice(0, 10) ?? '',
+                      next_review_date:
+                          certification.next_review_date?.slice(0, 10) ?? '',
+                      notes: certification.notes ?? '',
+                  }
+                : {
+                      certification_type: '',
+                      name: '',
+                      status: 'current',
+                      issuing_body: '',
+                      reference_number: '',
+                      issued_date: '',
+                      expiry_date: '',
+                      next_review_date: '',
+                      notes: '',
+                  },
+        );
+        setShowAddCert(true);
     }
 
     function toggleExpanded(id: number) {
@@ -373,10 +420,16 @@ export default function SiteComplianceIndex({
                     backHref={`/sites/${site.id}`}
                     backLabel="Back to site"
                     stats={[
-                        { label: 'Certifications', value: stats.total_certs ?? 0 },
+                        {
+                            label: 'Certifications',
+                            value: stats.total_certs ?? 0,
+                        },
                         { label: 'Current', value: stats.current ?? 0 },
                         { label: 'Expiring', value: stats.expiring ?? 0 },
-                        { label: 'Overdue checks', value: stats.checks_overdue ?? 0 },
+                        {
+                            label: 'Overdue checks',
+                            value: stats.checks_overdue ?? 0,
+                        },
                     ]}
                 />
 
@@ -468,14 +521,18 @@ export default function SiteComplianceIndex({
                                         <Shield className="h-5 w-5 text-primary" />
                                         Certifications & Accreditations
                                     </CardTitle>
-                                    <Button
-                                        size="sm"
-                                        className="bg-primary hover:bg-primary"
-                                        onClick={() => setShowAddCert(true)}
-                                    >
-                                        <Plus className="mr-1 h-4 w-4" />
-                                        Add Certification
-                                    </Button>
+                                    {can.manage_compliance && (
+                                        <Button
+                                            size="sm"
+                                            className="bg-primary hover:bg-primary"
+                                            onClick={() =>
+                                                openCertificationDialog()
+                                            }
+                                        >
+                                            <Plus className="mr-1 h-4 w-4" />
+                                            Add Certification
+                                        </Button>
+                                    )}
                                 </div>
                                 {/* Status filter */}
                                 <div className="mt-3">
@@ -640,37 +697,41 @@ export default function SiteComplianceIndex({
                                                         </div>
                                                     </div>
 
-                                                    <div className="flex shrink-0 gap-1">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                router.get(
-                                                                    `/sites/${site.id}/compliance/certifications/${cert.id}/edit`,
-                                                                )
-                                                            }
-                                                        >
-                                                            <Pencil className="h-4 w-4" />
-                                                        </Button>
-                                                        <ConfirmAction
-                                                            title="Delete certification?"
-                                                            description={`Delete "${cert.name || certTypeLabel(cert.certification_type)}" from this site?`}
-                                                            confirmLabel="Delete"
-                                                            onConfirm={() =>
-                                                                handleDeleteCert(
-                                                                    cert.id,
-                                                                )
-                                                            }
-                                                        >
+                                                    {can.manage_compliance && (
+                                                        <div className="flex shrink-0 gap-1">
                                                             <Button
                                                                 variant="ghost"
                                                                 size="sm"
-                                                                className="text-status-critical hover:text-status-critical"
+                                                                onClick={() =>
+                                                                    openCertificationDialog(
+                                                                        cert,
+                                                                    )
+                                                                }
+                                                                aria-label={`Edit ${cert.name}`}
                                                             >
-                                                                <Trash2 className="h-4 w-4" />
+                                                                <Pencil className="h-4 w-4" />
                                                             </Button>
-                                                        </ConfirmAction>
-                                                    </div>
+                                                            <ConfirmAction
+                                                                title="Delete certification?"
+                                                                description={`Delete "${cert.name || certTypeLabel(cert.certification_type)}" from this site?`}
+                                                                confirmLabel="Delete"
+                                                                onConfirm={() =>
+                                                                    handleDeleteCert(
+                                                                        cert.id,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="text-status-critical hover:text-status-critical"
+                                                                    aria-label={`Delete ${cert.name}`}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </ConfirmAction>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -689,16 +750,18 @@ export default function SiteComplianceIndex({
                                         <FileCheck className="h-5 w-5 text-primary" />
                                         Compliance Checks
                                     </CardTitle>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() =>
-                                            setShowScheduleCheck(true)
-                                        }
-                                    >
-                                        <Plus className="mr-1 h-4 w-4" />
-                                        Schedule Check
-                                    </Button>
+                                    {can.manage_compliance && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() =>
+                                                setShowScheduleCheck(true)
+                                            }
+                                        >
+                                            <Plus className="mr-1 h-4 w-4" />
+                                            Schedule Check
+                                        </Button>
+                                    )}
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-3">
@@ -714,6 +777,13 @@ export default function SiteComplianceIndex({
                                         const isCompleted =
                                             check.status?.toLowerCase() ===
                                             'completed';
+                                        const canComplete = [
+                                            'scheduled',
+                                            'overdue',
+                                            'missed',
+                                        ].includes(
+                                            check.status?.toLowerCase() ?? '',
+                                        );
                                         return (
                                             <Card
                                                 key={check.id}
@@ -843,23 +913,25 @@ export default function SiteComplianceIndex({
                                                 )}
 
                                                 {/* Mark Complete button for non-completed */}
-                                                {!isCompleted && (
-                                                    <div className="mt-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="border-status-success/30 text-status-success hover:bg-status-success"
-                                                            onClick={() =>
-                                                                openCompleteDialog(
-                                                                    check.id,
-                                                                )
-                                                            }
-                                                        >
-                                                            <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
-                                                            Mark Complete
-                                                        </Button>
-                                                    </div>
-                                                )}
+                                                {can.manage_compliance &&
+                                                    !isCompleted &&
+                                                    canComplete && (
+                                                        <div className="mt-2">
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="border-status-success/30 text-status-success hover:bg-status-success"
+                                                                onClick={() =>
+                                                                    openCompleteDialog(
+                                                                        check.id,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                                                                Mark Complete
+                                                            </Button>
+                                                        </div>
+                                                    )}
                                             </Card>
                                         );
                                     })
@@ -870,10 +942,20 @@ export default function SiteComplianceIndex({
                 </div>
 
                 {/* ── Add Certification Dialog ──────────────────────────────── */}
-                <Dialog open={showAddCert} onOpenChange={setShowAddCert}>
+                <Dialog
+                    open={showAddCert}
+                    onOpenChange={(open) => {
+                        setShowAddCert(open);
+                        if (!open) setEditingCertification(null);
+                    }}
+                >
                     <DialogContent className="max-w-lg">
                         <DialogHeader>
-                            <DialogTitle>Add Certification</DialogTitle>
+                            <DialogTitle>
+                                {editingCertification
+                                    ? 'Edit Certification'
+                                    : 'Add Certification'}
+                            </DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4">
                             <div>
@@ -891,9 +973,12 @@ export default function SiteComplianceIndex({
                                         <SelectValue placeholder="Select type..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {CERT_TYPES.map((t) => (
-                                            <SelectItem key={t} value={t}>
-                                                {t}
+                                        {CERT_TYPES.map((type) => (
+                                            <SelectItem
+                                                key={type.value}
+                                                value={type.value}
+                                            >
+                                                {type.label}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -911,6 +996,39 @@ export default function SiteComplianceIndex({
                                     }
                                     placeholder="Certification name"
                                 />
+                            </div>
+                            <div>
+                                <Label>Status</Label>
+                                <Select
+                                    value={certForm.status}
+                                    onValueChange={(value) =>
+                                        setCertForm((form) => ({
+                                            ...form,
+                                            status: value,
+                                        }))
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="current">
+                                            Current
+                                        </SelectItem>
+                                        <SelectItem value="expiring">
+                                            Expiring
+                                        </SelectItem>
+                                        <SelectItem value="expired">
+                                            Expired
+                                        </SelectItem>
+                                        <SelectItem value="pending">
+                                            Pending
+                                        </SelectItem>
+                                        <SelectItem value="not_applicable">
+                                            Not applicable
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div>
                                 <Label>Issuing Body</Label>
@@ -998,7 +1116,10 @@ export default function SiteComplianceIndex({
                         <DialogFooter>
                             <Button
                                 variant="ghost"
-                                onClick={() => setShowAddCert(false)}
+                                onClick={() => {
+                                    setShowAddCert(false);
+                                    setEditingCertification(null);
+                                }}
                             >
                                 Cancel
                             </Button>
@@ -1006,7 +1127,9 @@ export default function SiteComplianceIndex({
                                 className="bg-primary hover:bg-primary"
                                 onClick={handleSaveCert}
                             >
-                                Save Certification
+                                {editingCertification
+                                    ? 'Save Changes'
+                                    : 'Add Certification'}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -1037,9 +1160,12 @@ export default function SiteComplianceIndex({
                                         <SelectValue placeholder="Select check type..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {CHECK_TYPES.map((t) => (
-                                            <SelectItem key={t} value={t}>
-                                                {t}
+                                        {CHECK_TYPES.map((type) => (
+                                            <SelectItem
+                                                key={type.value}
+                                                value={type.value}
+                                            >
+                                                {type.label}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -1145,7 +1271,7 @@ export default function SiteComplianceIndex({
                                     <SelectContent>
                                         {RISK_RATINGS.map((r) => (
                                             <SelectItem key={r} value={r}>
-                                                {r}
+                                                {certTypeLabel(r)}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

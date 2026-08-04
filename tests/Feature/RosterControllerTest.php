@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\Shift;
 use App\Models\AppSetting;
+use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
@@ -110,19 +110,18 @@ it('hides unpublished shifts from my roster when publish workflow is enabled', f
         ->assertJsonPath('today_shifts.0.id', $published->id);
 });
 
-it('allows per-organization rollback of the frontline publish filter', function () {
-    config(['features.rostering.publish' => true]);
+it('uses the global application setting for the frontline publish filter', function () {
+    config(['features.rostering.publish' => false]);
 
     AppSetting::create([
-        'key' => 'features.rostering.publish.organization.42',
-        'value' => false,
+        'key' => 'features.rostering.publish',
+        'value' => true,
     ]);
 
-    $worker = User::factory()->create(['organization_id' => 42]);
+    $worker = User::factory()->create();
     $todayStart = Carbon::parse('2026-04-28 09:00:00', 'Pacific/Auckland');
 
-    $draft = Shift::factory()->create([
-        'organization_id' => 42,
+    Shift::factory()->create([
         'user_id' => $worker->id,
         'starts_at' => $todayStart->copy()->utc(),
         'ends_at' => $todayStart->copy()->addHours(4)->utc(),
@@ -133,8 +132,7 @@ it('allows per-organization rollback of the frontline publish filter', function 
     $this->actingAs($worker)
         ->getJson('/my-roster/data')
         ->assertOk()
-        ->assertJsonCount(1, 'today_shifts')
-        ->assertJsonPath('today_shifts.0.id', $draft->id);
+        ->assertJsonCount(0, 'today_shifts');
 });
 
 it('hides unpublished shifts from my calendar events when publish workflow is enabled', function () {

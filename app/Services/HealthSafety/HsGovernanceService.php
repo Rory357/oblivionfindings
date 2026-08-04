@@ -2,13 +2,16 @@
 
 namespace App\Services\HealthSafety;
 
+use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRiskAssessment;
 use App\Models\HsTrainingRequirement;
-use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -25,15 +28,22 @@ use Illuminate\Support\Facades\DB;
  */
 class HsGovernanceService
 {
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     /* ------------------------------------------------------------------ */
-    /*  Board-level summary (for board packs / dashboard snapshots)        */
+    /*  Board-level summary (for board packs / dashboard snapshots) */
     /* ------------------------------------------------------------------ */
 
     /**
      * Comprehensive H&S posture summary for board consumption.
      */
-    public function getBoardSummary(?Carbon $periodStart = null, ?Carbon $periodEnd = null): array
-    {
+    public function getBoardSummary(
+        ?Carbon $periodStart = null,
+        ?Carbon $periodEnd = null,
+        ?User $viewer = null,
+    ): array {
         $start = $periodStart ?? now()->subMonth()->startOfMonth();
         $end = $periodEnd ?? now();
 
@@ -45,15 +55,15 @@ class HsGovernanceService
             'event_summary' => $this->getEventSummary($start, $end),
             'investigation_summary' => $this->getInvestigationSummary(),
             'corrective_action_summary' => $this->getCorrectiveActionSummary(),
-            'risk_posture' => $this->getRiskPosture(),
+            'risk_posture' => $this->getRiskPosture($viewer),
             'worksafe_status' => $this->getWorksafeStatus($start, $end),
             'training_compliance' => $this->getTrainingComplianceSummary(),
-            'overall_status' => $this->calculateOverallStatus(),
+            'overall_status' => $this->calculateOverallStatus($viewer),
         ];
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Individual summary sections                                        */
+    /*  Individual summary sections */
     /* ------------------------------------------------------------------ */
 
     public function getEventSummary(Carbon $start, Carbon $end): array
@@ -111,9 +121,9 @@ class HsGovernanceService
         ];
     }
 
-    public function getRiskPosture(): array
+    public function getRiskPosture(?User $viewer = null): array
     {
-        $active = HsRiskAssessment::active();
+        $active = $this->riskAssessmentQuery($viewer)->active();
 
         return [
             'total_active' => (clone $active)->count(),
@@ -125,7 +135,7 @@ class HsGovernanceService
             'extreme_risks' => (clone $active)->where('risk_level', 'extreme')->count(),
             'high_risks' => (clone $active)->where('risk_level', 'high')->count(),
             'unacceptable_risks' => (clone $active)->where('risk_acceptable', false)->count(),
-            'due_for_review' => HsRiskAssessment::dueForReview()->count(),
+            'due_for_review' => $this->riskAssessmentQuery($viewer)->dueForReview()->count(),
         ];
     }
 
@@ -186,14 +196,14 @@ class HsGovernanceService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Board pack widget data (for DashboardAggregatorService)           */
+    /*  Board pack widget data (for DashboardAggregatorService) */
     /* ------------------------------------------------------------------ */
 
     /**
      * Compact widget data for governance dashboard snapshot.
      * This is the format consumed by DashboardAggregatorService.
      */
-    public function getWidgetData(array $range): array
+    public function getWidgetData(array $range, ?User $viewer = null): array
     {
         $start = Carbon::parse($range['start']);
         $end = Carbon::parse($range['end']);
@@ -201,7 +211,7 @@ class HsGovernanceService
         $eventSummary = $this->getEventSummary($start, $end);
         $investigations = $this->getInvestigationSummary();
         $actions = $this->getCorrectiveActionSummary();
-        $riskPosture = $this->getRiskPosture();
+        $riskPosture = $this->getRiskPosture($viewer);
         $worksafe = $this->getWorksafeStatus($start, $end);
 
         return [
@@ -219,12 +229,12 @@ class HsGovernanceService
             'risk_reviews_due' => $riskPosture['due_for_review'],
             'worksafe_pending' => $worksafe['pending_notification'],
             'days_since_notifiable' => $worksafe['days_since_last_notifiable'],
-            'status' => $this->calculateOverallStatus(),
+            'status' => $this->calculateOverallStatus($viewer),
         ];
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Internal helpers                                                    */
+    /*  Internal helpers */
     /* ------------------------------------------------------------------ */
 
     private function calculateEffectivenessRate(): int
@@ -250,14 +260,17 @@ class HsGovernanceService
         return $last ? (int) Carbon::parse($last)->diffInDays(now()) : null;
     }
 
-    private function calculateOverallStatus(): string
+    private function calculateOverallStatus(?User $viewer = null): string
     {
         $overdueActions = HsCorrectiveAction::overdue()->count();
         $overdueInvestigations = HsInvestigation::overdue()->count();
         $pendingWorksafe = HsEvent::where('worksafe_notifiable', true)
             ->where('worksafe_status', HsEvent::WORKSAFE_PENDING)
             ->count();
-        $extremeRisks = HsRiskAssessment::active()->where('risk_level', 'extreme')->count();
+        $extremeRisks = $this->riskAssessmentQuery($viewer)
+            ->active()
+            ->where('risk_level', 'extreme')
+            ->count();
 
         if ($pendingWorksafe > 0 || $extremeRisks > 0) {
             return 'critical';
@@ -268,5 +281,18 @@ class HsGovernanceService
         }
 
         return 'good';
+    }
+
+    private function riskAssessmentQuery(?User $viewer): Builder
+    {
+        $query = HsRiskAssessment::query();
+
+        return $viewer
+            ? $this->siteAccess->applyHsRiskAssessmentScope(
+                $query,
+                $viewer,
+                ['healthSafety.viewAllSites'],
+            )
+            : $this->siteAccess->applyHsRiskAssessmentApplicationScope($query);
     }
 }

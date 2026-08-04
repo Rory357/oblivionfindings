@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -10,6 +11,119 @@ function singleApplicationGlobalIdentityMigration(): Migration
     return require database_path(
         'migrations/2026_07_21_160000_enforce_single_application_global_identities.php',
     );
+}
+
+function calendarSyncSingleApplicationIdentityMigration(): Migration
+{
+    return require database_path(
+        'migrations/2026_07_22_122000_enforce_calendar_sync_single_application_identity.php',
+    );
+}
+
+function calendarSyncLegacyIndexCleanupMigration(): Migration
+{
+    return require database_path(
+        'migrations/2026_07_22_123000_remove_calendar_sync_legacy_leading_indexes.php',
+    );
+}
+
+function onboardingSingleApplicationIdentityMigration(): Migration
+{
+    return require database_path(
+        'migrations/2026_07_23_000005_enforce_onboarding_single_application_identity.php',
+    );
+}
+
+function recruitmentSingleApplicationIdentityMigration(): Migration
+{
+    return require database_path(
+        'migrations/2026_07_23_000006_enforce_recruitment_single_application_identity.php',
+    );
+}
+
+function peopleConfigurationSingleApplicationIdentityMigration(): Migration
+{
+    return require database_path(
+        'migrations/2026_07_27_000001_enforce_people_configuration_single_application_identity.php',
+    );
+}
+
+function createPeopleConfigurationIdentitySchema(): void
+{
+    Schema::create('hr_departments', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('tenant_id')->nullable()->index();
+        $table->string('name');
+        $table->boolean('is_active')->default(true);
+        $table->unsignedInteger('sort_order')->default(0);
+        $table->unique(['tenant_id', 'name']);
+    });
+    Schema::create('hr_positions', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('tenant_id')->index();
+        $table->string('code');
+        $table->string('department')->nullable();
+        $table->boolean('is_active')->default(true);
+        $table->unique(['tenant_id', 'code']);
+        $table->index(['tenant_id', 'is_active']);
+        $table->index(['tenant_id', 'department']);
+    });
+}
+
+function createRecruitmentIdentitySchema(): void
+{
+    Schema::create('hr_candidates', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('tenant_id')->index();
+        $table->string('status');
+        $table->timestamp('current_stage_entered_at')->nullable();
+        $table->index(['tenant_id', 'status']);
+    });
+    Schema::create('hr_applications', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('tenant_id')->index();
+        $table->string('position_role')->nullable();
+        $table->unsignedBigInteger('target_site_id')->nullable();
+        $table->string('status');
+        $table->index(['tenant_id', 'position_role']);
+    });
+    Schema::create('hr_interview_kits', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('tenant_id')->index();
+        $table->string('name');
+        $table->string('role')->nullable();
+        $table->boolean('is_active')->default(true);
+        $table->index(['tenant_id', 'is_active']);
+        $table->index(['tenant_id', 'role', 'is_active'], 'hr_int_kits_tenant_role_active_idx');
+    });
+    Schema::create('hr_job_requisitions', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('tenant_id')->index();
+        $table->string('slug');
+        $table->string('status');
+        $table->timestamp('published_at')->nullable();
+        $table->unsignedBigInteger('site_id')->nullable();
+        $table->unique(['tenant_id', 'slug']);
+        $table->index(['tenant_id', 'status', 'published_at'], 'hr_job_req_tenant_status_pub_idx');
+    });
+    Schema::create('hr_candidate_email_templates', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('tenant_id')->index();
+        $table->string('name');
+        $table->index(['tenant_id', 'name']);
+    });
+    Schema::create('hr_candidate_documents', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('tenant_id')->index();
+    });
+    Schema::create('hr_talent_pool', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('tenant_id')->index();
+    });
+    Schema::create('hr_offers', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('application_id')->index();
+    });
 }
 
 function withSingleApplicationIdentityDatabase(Closure $callback): void
@@ -57,6 +171,23 @@ it('enforces the remaining application global identities', function (string $tab
     'integration registry provider' => ['integrations', 'integrations_provider_uq'],
     'integration provider event' => ['integration_events', 'integration_events_provider_source_event_uq'],
     'Queclink preset slug' => ['queclink_presets', 'queclink_presets_slug_uq'],
+    'calendar provider connection' => ['calendar_sync_connections', 'calendar_sync_connections_provider_uq'],
+    'onboarding template role and Site type' => ['hr_onboarding_templates', 'hr_onboarding_templates_role_site_uq'],
+    'requisition slug' => ['hr_job_requisitions', 'hr_job_req_slug_uq'],
+    'offer application' => ['hr_offers', 'hr_offers_application_uq'],
+    'interview kit name' => ['hr_interview_kits', 'hr_interview_kits_name_uq'],
+    'candidate email template name' => ['hr_candidate_email_templates', 'hr_candidate_email_templates_name_uq'],
+    'department name' => ['hr_departments', 'hr_departments_name_uq'],
+    'position code' => ['hr_positions', 'hr_positions_code_uq'],
+    'custom field key' => ['hr_custom_field_definitions', 'hr_custom_fields_field_key_uq'],
+    'policy slug' => ['hr_policies', 'hr_policies_slug_uq'],
+    'competency name' => ['hr_competencies', 'hr_competencies_name_uq'],
+    'feedback template name' => ['hr_feedback_templates', 'hr_feedback_templates_name_uq'],
+    'benefit plan name' => ['hr_benefit_plans', 'hr_benefit_plans_name_uq'],
+    'employee benefit plan' => ['hr_benefit_enrollments', 'hr_benefit_enrollments_profile_plan_uq'],
+    'salary band role name and effective date' => ['hr_salary_bands', 'hr_salary_bands_role_name_effective_uq'],
+    'compensation review employee' => ['hr_compensation_review_items', 'hr_compensation_review_items_review_profile_uq'],
+    'expense claim number' => ['hr_expense_claims', 'hr_expense_claims_claim_number_uq'],
 ]);
 
 it('has no legacy boundary leading index in active IT or Security tables', function (): void {
@@ -104,6 +235,10 @@ it('has no legacy boundary leading index in active IT or Security tables', funct
         'queclink_raw_frames',
         'queclink_audit_events',
         'queclink_presets',
+        'calendar_sync_connections',
+        'calendar_sync_mappings',
+        'calendar_sync_event_links',
+        'calendar_sync_busy_blocks',
     ];
 
     $violations = [];
@@ -248,3 +383,430 @@ it('fails before schema mutation when a global application identity collides', f
     ],
     'Queclink preset slug' => ['Queclink preset slug', 'queclink_presets', ['slug' => 'safe-tracking'], 'queclink_presets_tenant_id_slug_unique', 'queclink_presets_slug_uq'],
 ]);
+
+it('fails before calendar schema mutation when the application provider identity collides', function (): void {
+    withSingleApplicationIdentityDatabase(function (): void {
+        Schema::create('calendar_sync_connections', function (Blueprint $blueprint): void {
+            $blueprint->id();
+            $blueprint->unsignedBigInteger('tenant_id')->index();
+            $blueprint->string('provider');
+            $blueprint->unique(['tenant_id', 'provider']);
+        });
+        Schema::create('calendar_sync_mappings', function (Blueprint $blueprint): void {
+            $blueprint->id();
+            $blueprint->unsignedBigInteger('site_id');
+            $blueprint->boolean('is_active')->default(true);
+        });
+
+        DB::table('calendar_sync_connections')->insert([
+            ['tenant_id' => 11, 'provider' => 'google'],
+            ['tenant_id' => 22, 'provider' => 'google'],
+        ]);
+
+        $before = collect(Schema::getIndexes('calendar_sync_connections'))
+            ->mapWithKeys(fn (array $index): array => [$index['name'] => $index['columns']])
+            ->all();
+
+        expect(fn () => calendarSyncSingleApplicationIdentityMigration()->up())
+            ->toThrow(RuntimeException::class, 'calendar provider connection');
+
+        $after = collect(Schema::getIndexes('calendar_sync_connections'))
+            ->mapWithKeys(fn (array $index): array => [$index['name'] => $index['columns']])
+            ->all();
+
+        expect($after)->toBe($before)
+            ->and(Schema::hasIndex('calendar_sync_connections', 'calendar_sync_connections_provider_uq'))
+            ->toBeFalse();
+    });
+});
+
+it('fails before onboarding template schema mutation when application identity collides', function (): void {
+    withSingleApplicationIdentityDatabase(function (): void {
+        Schema::create('hr_onboarding_templates', function (Blueprint $blueprint): void {
+            $blueprint->id();
+            $blueprint->unsignedBigInteger('tenant_id')->index();
+            $blueprint->string('role');
+            $blueprint->string('site_type');
+            $blueprint->boolean('is_active')->default(true);
+            $blueprint->unique(
+                ['tenant_id', 'role', 'site_type'],
+                'hr_onboarding_templates_tenant_id_role_site_type_unique',
+            );
+        });
+
+        DB::table('hr_onboarding_templates')->insert([
+            ['tenant_id' => 11, 'role' => 'support_worker', 'site_type' => 'house'],
+            ['tenant_id' => 22, 'role' => 'support_worker', 'site_type' => 'house'],
+        ]);
+
+        $before = collect(Schema::getIndexes('hr_onboarding_templates'))
+            ->mapWithKeys(fn (array $index): array => [$index['name'] => $index['columns']])
+            ->all();
+
+        expect(fn () => onboardingSingleApplicationIdentityMigration()->up())
+            ->toThrow(RuntimeException::class, 'onboarding-template identity');
+
+        $after = collect(Schema::getIndexes('hr_onboarding_templates'))
+            ->mapWithKeys(fn (array $index): array => [$index['name'] => $index['columns']])
+            ->all();
+
+        expect($after)->toBe($before)
+            ->and(Schema::hasIndex('hr_onboarding_templates', 'hr_onboarding_templates_role_site_uq'))
+            ->toBeFalse();
+    });
+});
+
+it('enforces and rolls back onboarding template application identity', function (): void {
+    withSingleApplicationIdentityDatabase(function (): void {
+        Schema::create('hr_onboarding_templates', function (Blueprint $blueprint): void {
+            $blueprint->id();
+            $blueprint->unsignedBigInteger('tenant_id')->index();
+            $blueprint->string('role');
+            $blueprint->string('site_type');
+            $blueprint->boolean('is_active')->default(true);
+            $blueprint->unique(
+                ['tenant_id', 'role', 'site_type'],
+                'hr_onboarding_templates_tenant_id_role_site_type_unique',
+            );
+        });
+
+        DB::table('hr_onboarding_templates')->insert([
+            'tenant_id' => 11,
+            'role' => 'support_worker',
+            'site_type' => 'house',
+        ]);
+
+        $migration = onboardingSingleApplicationIdentityMigration();
+        $migration->up();
+
+        $global = collect(Schema::getIndexes('hr_onboarding_templates'))
+            ->firstWhere('name', 'hr_onboarding_templates_role_site_uq');
+        expect($global['columns'] ?? null)->toBe(['role', 'site_type'])
+            ->and($global['unique'] ?? null)->toBeTrue()
+            ->and(Schema::hasIndex(
+                'hr_onboarding_templates',
+                'hr_onboarding_templates_tenant_id_role_site_type_unique',
+            ))->toBeFalse();
+
+        expect(fn () => DB::table('hr_onboarding_templates')->insert([
+            'tenant_id' => 22,
+            'role' => 'support_worker',
+            'site_type' => 'house',
+        ]))->toThrow(QueryException::class);
+
+        $migration->down();
+
+        $legacy = collect(Schema::getIndexes('hr_onboarding_templates'))
+            ->firstWhere('name', 'hr_onboarding_templates_tenant_id_role_site_type_unique');
+        expect($legacy['columns'] ?? null)->toBe(['tenant_id', 'role', 'site_type'])
+            ->and($legacy['unique'] ?? null)->toBeTrue()
+            ->and(Schema::hasIndex('hr_onboarding_templates', 'hr_onboarding_templates_role_site_uq'))
+            ->toBeFalse();
+    });
+});
+
+it('fails before recruitment schema mutation when an application identity collides', function (): void {
+    withSingleApplicationIdentityDatabase(function (): void {
+        createRecruitmentIdentitySchema();
+        DB::table('hr_job_requisitions')->insert([
+            ['tenant_id' => 11, 'slug' => 'support-worker', 'status' => 'draft'],
+            ['tenant_id' => 22, 'slug' => 'support-worker', 'status' => 'draft'],
+        ]);
+
+        $before = collect(Schema::getIndexes('hr_job_requisitions'))
+            ->mapWithKeys(fn (array $index): array => [$index['name'] => $index['columns']])
+            ->all();
+
+        expect(fn () => recruitmentSingleApplicationIdentityMigration()->up())
+            ->toThrow(RuntimeException::class, 'job requisition slug');
+
+        $after = collect(Schema::getIndexes('hr_job_requisitions'))
+            ->mapWithKeys(fn (array $index): array => [$index['name'] => $index['columns']])
+            ->all();
+        expect($after)->toBe($before)
+            ->and(Schema::hasIndex('hr_job_requisitions', 'hr_job_req_slug_uq'))->toBeFalse()
+            ->and(Schema::hasIndex('hr_offers', 'hr_offers_application_uq'))->toBeFalse();
+    });
+});
+
+it('enforces and rolls back recruitment application identities and indexes', function (): void {
+    withSingleApplicationIdentityDatabase(function (): void {
+        createRecruitmentIdentitySchema();
+        DB::table('hr_job_requisitions')->insert([
+            'tenant_id' => 11,
+            'slug' => 'support-worker',
+            'status' => 'draft',
+        ]);
+        DB::table('hr_offers')->insert(['application_id' => 91]);
+        DB::table('hr_interview_kits')->insert([
+            'tenant_id' => 11,
+            'name' => 'Support interview',
+            'role' => 'support_worker',
+            'is_active' => true,
+        ]);
+        DB::table('hr_candidate_email_templates')->insert([
+            'tenant_id' => 11,
+            'name' => 'Application received',
+        ]);
+
+        $migration = recruitmentSingleApplicationIdentityMigration();
+        $migration->up();
+
+        expect(Schema::hasIndex('hr_job_requisitions', 'hr_job_req_slug_uq'))->toBeTrue()
+            ->and(Schema::hasIndex('hr_offers', 'hr_offers_application_uq'))->toBeTrue()
+            ->and(Schema::hasIndex('hr_interview_kits', 'hr_interview_kits_name_uq'))->toBeTrue()
+            ->and(Schema::hasIndex('hr_candidate_email_templates', 'hr_candidate_email_templates_name_uq'))->toBeTrue()
+            ->and(Schema::hasIndex('hr_job_requisitions', 'hr_job_requisitions_tenant_id_slug_unique'))->toBeFalse()
+            ->and(Schema::hasIndex('hr_interview_kits', 'hr_int_kits_tenant_role_active_idx'))->toBeFalse()
+            ->and(Schema::hasIndex('hr_candidate_documents', 'hr_candidate_documents_tenant_id_index'))->toBeFalse();
+
+        expect(fn () => DB::table('hr_offers')->insert(['application_id' => 91]))
+            ->toThrow(QueryException::class)
+            ->and(fn () => DB::table('hr_candidate_email_templates')->insert([
+                'tenant_id' => 22,
+                'name' => 'Application received',
+            ]))->toThrow(QueryException::class);
+
+        $migration->down();
+
+        expect(Schema::hasIndex('hr_job_requisitions', 'hr_job_req_slug_uq'))->toBeFalse()
+            ->and(Schema::hasIndex('hr_offers', 'hr_offers_application_uq'))->toBeFalse()
+            ->and(Schema::hasIndex('hr_job_requisitions', 'hr_job_requisitions_tenant_id_slug_unique'))->toBeTrue()
+            ->and(Schema::hasIndex('hr_interview_kits', 'hr_int_kits_tenant_role_active_idx'))->toBeTrue()
+            ->and(Schema::hasIndex('hr_candidate_documents', 'hr_candidate_documents_tenant_id_index'))->toBeTrue();
+    });
+});
+
+it('fails before people configuration schema mutation when :identity collides', function (
+    string $identity,
+    string $table,
+    array $rows,
+): void {
+    withSingleApplicationIdentityDatabase(function () use ($identity, $table, $rows): void {
+        createPeopleConfigurationIdentitySchema();
+        DB::table($table)->insert($rows);
+
+        $before = [
+            'hr_departments' => collect(Schema::getIndexes('hr_departments'))
+                ->mapWithKeys(fn (array $index): array => [$index['name'] => $index['columns']])
+                ->all(),
+            'hr_positions' => collect(Schema::getIndexes('hr_positions'))
+                ->mapWithKeys(fn (array $index): array => [$index['name'] => $index['columns']])
+                ->all(),
+        ];
+
+        expect(fn () => peopleConfigurationSingleApplicationIdentityMigration()->up())
+            ->toThrow(RuntimeException::class, $identity);
+
+        $after = [
+            'hr_departments' => collect(Schema::getIndexes('hr_departments'))
+                ->mapWithKeys(fn (array $index): array => [$index['name'] => $index['columns']])
+                ->all(),
+            'hr_positions' => collect(Schema::getIndexes('hr_positions'))
+                ->mapWithKeys(fn (array $index): array => [$index['name'] => $index['columns']])
+                ->all(),
+        ];
+
+        expect($after)->toBe($before)
+            ->and(Schema::hasIndex('hr_departments', 'hr_departments_name_uq'))->toBeFalse()
+            ->and(Schema::hasIndex('hr_positions', 'hr_positions_code_uq'))->toBeFalse();
+    });
+})->with([
+    'department name' => [
+        'department name',
+        'hr_departments',
+        [
+            ['tenant_id' => 11, 'name' => 'Operations'],
+            ['tenant_id' => 22, 'name' => 'Operations'],
+        ],
+    ],
+    'position code' => [
+        'position code',
+        'hr_positions',
+        [
+            ['tenant_id' => 11, 'code' => 'SW', 'department' => 'Operations'],
+            ['tenant_id' => 22, 'code' => 'SW', 'department' => 'Operations'],
+        ],
+    ],
+]);
+
+it('enforces and rolls back people configuration application identities and indexes', function (): void {
+    withSingleApplicationIdentityDatabase(function (): void {
+        createPeopleConfigurationIdentitySchema();
+        DB::table('hr_departments')->insert([
+            'tenant_id' => 11,
+            'name' => 'Operations',
+        ]);
+        DB::table('hr_positions')->insert([
+            'tenant_id' => 11,
+            'code' => 'SW',
+            'department' => 'Operations',
+        ]);
+
+        $migration = peopleConfigurationSingleApplicationIdentityMigration();
+        $migration->up();
+
+        expect(Schema::hasIndex('hr_departments', 'hr_departments_name_uq'))->toBeTrue()
+            ->and(Schema::hasIndex('hr_departments', 'hr_departments_active_sort_idx'))->toBeTrue()
+            ->and(Schema::hasIndex('hr_positions', 'hr_positions_code_uq'))->toBeTrue()
+            ->and(Schema::hasIndex('hr_positions', 'hr_positions_active_department_idx'))->toBeTrue()
+            ->and(Schema::hasIndex('hr_departments', 'hr_departments_tenant_id_name_unique'))->toBeFalse()
+            ->and(Schema::hasIndex('hr_departments', 'hr_departments_tenant_id_index'))->toBeFalse()
+            ->and(Schema::hasIndex('hr_positions', 'hr_positions_tenant_id_code_unique'))->toBeFalse()
+            ->and(Schema::hasIndex('hr_positions', 'hr_positions_tenant_id_index'))->toBeFalse()
+            ->and(Schema::hasIndex('hr_positions', 'hr_positions_tenant_id_is_active_index'))->toBeFalse()
+            ->and(Schema::hasIndex('hr_positions', 'hr_positions_tenant_id_department_index'))->toBeFalse();
+
+        expect(fn () => DB::table('hr_departments')->insert([
+            'tenant_id' => 22,
+            'name' => 'Operations',
+        ]))->toThrow(QueryException::class)
+            ->and(fn () => DB::table('hr_positions')->insert([
+                'tenant_id' => 22,
+                'code' => 'SW',
+                'department' => 'Operations',
+            ]))->toThrow(QueryException::class);
+
+        $migration->down();
+
+        expect(Schema::hasIndex('hr_departments', 'hr_departments_name_uq'))->toBeFalse()
+            ->and(Schema::hasIndex('hr_departments', 'hr_departments_active_sort_idx'))->toBeFalse()
+            ->and(Schema::hasIndex('hr_positions', 'hr_positions_code_uq'))->toBeFalse()
+            ->and(Schema::hasIndex('hr_positions', 'hr_positions_active_department_idx'))->toBeFalse()
+            ->and(Schema::hasIndex('hr_departments', 'hr_departments_tenant_id_name_unique'))->toBeTrue()
+            ->and(Schema::hasIndex('hr_departments', 'hr_departments_tenant_id_index'))->toBeTrue()
+            ->and(Schema::hasIndex('hr_positions', 'hr_positions_tenant_id_code_unique'))->toBeTrue()
+            ->and(Schema::hasIndex('hr_positions', 'hr_positions_tenant_id_index'))->toBeTrue()
+            ->and(Schema::hasIndex('hr_positions', 'hr_positions_tenant_id_is_active_index'))->toBeTrue()
+            ->and(Schema::hasIndex('hr_positions', 'hr_positions_tenant_id_department_index'))->toBeTrue();
+    });
+});
+
+it('fails before calendar schema mutation when one site has several active mappings', function (): void {
+    withSingleApplicationIdentityDatabase(function (): void {
+        Schema::create('calendar_sync_connections', function (Blueprint $blueprint): void {
+            $blueprint->id();
+            $blueprint->unsignedBigInteger('tenant_id')->index();
+            $blueprint->string('provider');
+            $blueprint->unique(['tenant_id', 'provider']);
+        });
+        Schema::create('calendar_sync_mappings', function (Blueprint $blueprint): void {
+            $blueprint->id();
+            $blueprint->unsignedBigInteger('site_id');
+            $blueprint->string('provider');
+            $blueprint->boolean('is_active')->default(true);
+        });
+        DB::table('calendar_sync_mappings')->insert([
+            ['site_id' => 7, 'provider' => 'google', 'is_active' => true],
+            ['site_id' => 7, 'provider' => 'microsoft', 'is_active' => true],
+        ]);
+
+        $before = collect(Schema::getIndexes('calendar_sync_connections'))
+            ->mapWithKeys(fn (array $index): array => [$index['name'] => $index['columns']])
+            ->all();
+
+        expect(fn () => calendarSyncSingleApplicationIdentityMigration()->up())
+            ->toThrow(RuntimeException::class, 'active calendar mappings');
+
+        $after = collect(Schema::getIndexes('calendar_sync_connections'))
+            ->mapWithKeys(fn (array $index): array => [$index['name'] => $index['columns']])
+            ->all();
+        expect($after)->toBe($before)
+            ->and(Schema::hasIndex('calendar_sync_connections', 'calendar_sync_connections_provider_uq'))
+            ->toBeFalse();
+    });
+});
+
+it('recovers safely when the stronger calendar identity was installed before cleanup failed', function (): void {
+    withSingleApplicationIdentityDatabase(function (): void {
+        Schema::create('calendar_sync_connections', function (Blueprint $blueprint): void {
+            $blueprint->id();
+            $blueprint->unsignedBigInteger('tenant_id')->index();
+            $blueprint->string('provider');
+            $blueprint->unique(['tenant_id', 'provider']);
+            $blueprint->unique('provider', 'calendar_sync_connections_provider_uq');
+        });
+        Schema::create('calendar_sync_mappings', function (Blueprint $blueprint): void {
+            $blueprint->id();
+            $blueprint->unsignedBigInteger('site_id');
+            $blueprint->boolean('is_active')->default(true);
+        });
+        DB::table('calendar_sync_connections')->insert([
+            'tenant_id' => 11,
+            'provider' => 'google',
+        ]);
+
+        calendarSyncSingleApplicationIdentityMigration()->up();
+
+        $indexes = collect(Schema::getIndexes('calendar_sync_connections'))->keyBy('name');
+        expect($indexes)->toHaveKey('calendar_sync_connections_provider_uq')
+            ->and($indexes)->not->toHaveKey('calendar_sync_connections_tenant_id_provider_unique')
+            ->and($indexes)->not->toHaveKey('calendar_sync_connections_tenant_id_index')
+            ->and(DB::table('calendar_sync_connections')->count())->toBe(1);
+    });
+});
+
+it('replaces and restores the exact calendar compatibility indexes without rewriting data', function (): void {
+    withSingleApplicationIdentityDatabase(function (): void {
+        Schema::create('calendar_sync_connections', function (Blueprint $blueprint): void {
+            $blueprint->id();
+            $blueprint->unsignedBigInteger('tenant_id')->index();
+            $blueprint->string('provider');
+            $blueprint->unique(['tenant_id', 'provider']);
+        });
+        foreach (['calendar_sync_mappings', 'calendar_sync_event_links', 'calendar_sync_busy_blocks'] as $table) {
+            Schema::create($table, function (Blueprint $blueprint) use ($table): void {
+                $blueprint->id();
+                $blueprint->unsignedBigInteger('tenant_id')->index();
+                if ($table === 'calendar_sync_mappings') {
+                    $blueprint->unsignedBigInteger('site_id');
+                    $blueprint->boolean('is_active')->default(true);
+                }
+            });
+        }
+        DB::table('calendar_sync_connections')->insert([
+            'tenant_id' => 11,
+            'provider' => 'google',
+        ]);
+
+        $migration = calendarSyncSingleApplicationIdentityMigration();
+        $migration->up();
+        $cleanup = calendarSyncLegacyIndexCleanupMigration();
+        $cleanup->up();
+
+        expect(Schema::hasIndex('calendar_sync_connections', 'calendar_sync_connections_provider_uq'))
+            ->toBeTrue();
+        expect(fn () => DB::table('calendar_sync_connections')->insert([
+            'tenant_id' => 22,
+            'provider' => 'google',
+        ]))->toThrow(QueryException::class);
+        foreach ([
+            'calendar_sync_connections',
+            'calendar_sync_mappings',
+            'calendar_sync_event_links',
+            'calendar_sync_busy_blocks',
+        ] as $table) {
+            $leadingColumns = collect(Schema::getIndexes($table))
+                ->map(fn (array $index) => $index['columns'][0] ?? null)
+                ->filter()
+                ->values()
+                ->all();
+            expect($leadingColumns)->not->toContain('tenant_id');
+        }
+
+        $cleanup->down();
+        $migration->down();
+
+        $connectionIndexes = collect(Schema::getIndexes('calendar_sync_connections'))->keyBy('name');
+        expect($connectionIndexes)->not->toHaveKey('calendar_sync_connections_provider_uq')
+            ->and($connectionIndexes['calendar_sync_connections_tenant_id_provider_unique']['columns'] ?? null)
+            ->toBe(['tenant_id', 'provider'])
+            ->and($connectionIndexes['calendar_sync_connections_tenant_id_index']['columns'] ?? null)
+            ->toBe(['tenant_id'])
+            ->and(DB::table('calendar_sync_connections')->count())->toBe(1);
+
+        foreach (['calendar_sync_mappings', 'calendar_sync_event_links', 'calendar_sync_busy_blocks'] as $table) {
+            expect(Schema::hasIndex($table, $table.'_tenant_id_index'))->toBeTrue();
+        }
+    });
+});

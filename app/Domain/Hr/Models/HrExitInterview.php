@@ -3,9 +3,9 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Database\Factories\Hr\HrExitInterviewFactory;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class HrExitInterview extends Model
 {
-    use AuditableChanges, HasFactory;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
@@ -21,7 +21,6 @@ class HrExitInterview extends Model
     }
 
     protected $fillable = [
-        'tenant_id',
         'employee_profile_id',
         'interviewer_user_id',
         'interview_date',
@@ -66,14 +65,5 @@ class HrExitInterview extends Model
     public function offboardingTask(): HasOne
     {
         return $this->hasOne(HrOffboardingTask::class, 'exit_interview_id');
-    }
-
-    /* ------------------------------------------------------------------ */
-    /*  Scopes */
-    /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 }

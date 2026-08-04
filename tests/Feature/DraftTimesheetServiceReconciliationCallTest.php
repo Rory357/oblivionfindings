@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftTask;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\Operations\TimesheetReconciliationService;
 
@@ -25,9 +26,11 @@ beforeEach(function () {
 });
 
 test('normal attendance clock out reconciles the draft timesheet exactly once', function () {
-    $client = Client::factory()->create();
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $serviceContext = ServiceContext::factory()->create();
     $shift = Shift::query()->create([
+        'site_id' => $site->id,
         'client_id' => $client->id,
         'service_context_id' => $serviceContext->id,
         'user_id' => $this->worker->id,
@@ -49,9 +52,9 @@ test('normal attendance clock out reconciles the draft timesheet exactly once', 
     ]);
 
     $session = HrAttendanceSession::query()->create([
-        'tenant_id' => null,
         'user_id' => $this->worker->id,
         'shift_id' => $shift->id,
+        'site_id' => $site->id,
         'clock_in_at' => now()->subHours(2),
         'status' => 'open',
         'source' => 'manual',

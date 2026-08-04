@@ -217,20 +217,28 @@ class IncidentControllerTest extends TestCase
         ]);
     }
 
-    public function test_task5_integration_health_safety_incident_action_does_not_disclose_or_accept_a_foreign_organization_client(): void
+    public function test_health_safety_incident_action_scopes_clients_to_accessible_sites_and_rejects_a_remote_site_client(): void
     {
-        $this->client->update(['organization_id' => 1]);
-        $foreignClient = Client::factory()->create([
-            'organization_id' => 2,
-            'site_id' => $this->site->id,
+        $remoteSite = Site::factory()->create();
+        $remoteClient = Client::factory()->create([
+            'site_id' => $remoteSite->id,
         ]);
         $officer = User::factory()->create([
             'role' => 'health_safety_officer',
-            'organization_id' => 1,
             'approved_at' => now(),
             'email_verified_at' => now(),
         ]);
-        $officer->roles()->attach(Role::where('name', 'health_safety_officer')->firstOrFail());
+        $officerRole = Role::where('name', 'health_safety_officer')->firstOrFail();
+        $officer->roles()->attach($officerRole);
+        $officerRole->permissions()->detach(
+            $officerRole->permissions()->where('key', 'healthSafety.viewAllSites')->firstOrFail(),
+        );
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $officer->id,
+            'primary_site_id' => $this->site->id,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
 
         $this->actingAs($officer)
             ->get(route('health-safety.dashboard'))
@@ -240,7 +248,7 @@ class IncidentControllerTest extends TestCase
                 ->where('clients.0.id', $this->client->id));
 
         $this->actingAs($officer)
-            ->post('/incidents', $this->reportPayload(['client_id' => $foreignClient->id]))
+            ->post('/incidents', $this->reportPayload(['client_id' => $remoteClient->id]))
             ->assertForbidden();
 
         $this->assertSame(0, ClientIncident::query()->count());
@@ -275,13 +283,11 @@ class IncidentControllerTest extends TestCase
         $this->actingAs($officer)->get("/incidents/{$foreignIncident->id}")->assertForbidden();
     }
 
-    public function test_task5_hardening_report_picker_scopes_view_any_coordinator_by_site_and_organization(): void
+    public function test_report_picker_and_client_filter_scope_a_view_any_coordinator_by_site(): void
     {
         $this->client->update([
             'first_name' => 'Aroha',
-            'organization_id' => 1,
         ]);
-        $this->coordinator->update(['organization_id' => 1]);
         HrEmployeeProfile::factory()->create([
             'user_id' => $this->coordinator->id,
             'primary_site_id' => $this->site->id,
@@ -291,13 +297,7 @@ class IncidentControllerTest extends TestCase
         $otherSite = Site::factory()->create(['is_active' => true]);
         Client::factory()->create([
             'first_name' => 'Bella',
-            'organization_id' => 1,
             'site_id' => $otherSite->id,
-        ]);
-        Client::factory()->create([
-            'first_name' => 'Charlie',
-            'organization_id' => 2,
-            'site_id' => $this->site->id,
         ]);
 
         $this->actingAs($this->coordinator)
@@ -306,6 +306,8 @@ class IncidentControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->has('reportClients', 1)
                 ->where('reportClients.0.id', $this->client->id)
+                ->has('clients', 1)
+                ->where('clients.0.id', $this->client->id)
                 ->has('sites', 1)
                 ->where('sites.0.id', $this->site->id));
     }
@@ -794,35 +796,37 @@ class IncidentControllerTest extends TestCase
             ->assertRedirect(route('incidents.index', ['report' => 'incident']));
     }
 
-    public function test_task5_review_fix_create_shift_prefill_allows_same_organization_health_safety_reporting_bypass(): void
+    public function test_create_shift_prefill_does_not_expose_remote_site_context_to_a_site_scoped_health_safety_officer(): void
     {
-        $this->client->update(['organization_id' => 1]);
-        $foreignSite = Site::factory()->create();
-        $sameOrganizationClient = Client::factory()->create([
-            'organization_id' => 1,
-            'site_id' => $foreignSite->id,
+        $remoteSite = Site::factory()->create();
+        $remoteClient = Client::factory()->create([
+            'site_id' => $remoteSite->id,
         ]);
         $shift = Shift::factory()->create([
-            'organization_id' => 1,
-            'client_id' => $sameOrganizationClient->id,
-            'site_id' => $foreignSite->id,
+            'client_id' => $remoteClient->id,
+            'site_id' => $remoteSite->id,
             'user_id' => $this->staff->id,
         ]);
         $officer = User::factory()->create([
             'role' => 'health_safety_officer',
-            'organization_id' => 1,
             'approved_at' => now(),
             'email_verified_at' => now(),
         ]);
-        $officer->roles()->attach(Role::where('name', 'health_safety_officer')->firstOrFail());
+        $officerRole = Role::where('name', 'health_safety_officer')->firstOrFail();
+        $officer->roles()->attach($officerRole);
+        $officerRole->permissions()->detach(
+            $officerRole->permissions()->where('key', 'healthSafety.viewAllSites')->firstOrFail(),
+        );
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $officer->id,
+            'primary_site_id' => $this->site->id,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
 
         $this->actingAs($officer)
             ->get('/incidents/create?shift_id='.$shift->id)
-            ->assertRedirect(route('incidents.index', [
-                'report' => 'incident',
-                'report_shift_id' => $shift->id,
-                'report_client_id' => $sameOrganizationClient->id,
-            ]));
+            ->assertRedirect(route('incidents.index', ['report' => 'incident']));
     }
 
     public function test_task5_review_fix_create_shift_prefill_is_nondisclosing_for_missing_and_foreign_organization_shifts(): void
@@ -1380,8 +1384,8 @@ class IncidentControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->staff)
-            ->post('/incidents', $this->reportPayload(['shift_id' => $shift->id]))
-            ->assertSessionHasErrors(['shift_id']);
+            ->postJson('/incidents', $this->reportPayload(['shift_id' => $shift->id]))
+            ->assertForbidden();
 
         $this->assertSame(0, ClientIncident::query()->count());
     }

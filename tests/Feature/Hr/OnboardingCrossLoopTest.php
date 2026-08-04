@@ -8,11 +8,15 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Domain\Hr\Services\OnboardingService;
 use App\Models\Asset;
 use App\Models\AssetAssignment;
+use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -22,13 +26,14 @@ function crossLoopProfile(): HrEmployeeProfile
     $user = User::factory()->create();
 
     return HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'employee_number' => 'EMP-CL-'.$user->id,
         'work_email' => $user->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
+        'primary_site_id' => test()->site->id,
+        'secondary_site_ids' => [],
         'start_date' => now()->addDays(10)->toDateString(),
         'is_active' => true,
     ]);
@@ -37,7 +42,6 @@ function crossLoopProfile(): HrEmployeeProfile
 function crossLoopChecklist(HrEmployeeProfile $profile): HrOnboardingChecklist
 {
     return HrOnboardingChecklist::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'template_key' => 'support_worker:all',
         'status' => 'in_progress',
@@ -49,16 +53,28 @@ function crossLoopChecklist(HrEmployeeProfile $profile): HrOnboardingChecklist
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
+    ]);
+    $this->hr->roles()->firstWhere('name', 'hr')->permissions()->syncWithoutDetaching([
+        Permission::query()->where('key', 'assets.viewAny')->firstOrFail()->id,
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'position_role' => 'hr',
+        'is_active' => true,
+        'start_date' => today()->subYear(),
+        'end_date' => null,
     ]);
     $this->svc = app(OnboardingService::class);
 });
 
 test('generating a checklist auto-enrols the hire in mandatory training from induction tasks', function () {
     HrCourse::query()->create([
-        'tenant_id' => 1,
         'title' => 'Health & Safety Induction',
         'code' => 'HS-IND',
         'delivery_method' => 'online',
@@ -67,7 +83,6 @@ test('generating a checklist auto-enrols the hire in mandatory training from ind
     ]);
 
     HrOnboardingTemplate::query()->create([
-        'tenant_id' => 1,
         'role' => 'support_worker',
         'site_type' => 'all',
         'is_active' => true,
@@ -78,7 +93,7 @@ test('generating a checklist auto-enrols the hire in mandatory training from ind
 
     $profile = crossLoopProfile();
 
-    $this->svc->generateChecklist($profile, $this->hr->id);
+    $checklist = $this->svc->generateChecklist($profile, $this->hr->id);
 
     $enrollments = HrCourseEnrollment::query()
         ->where('user_id', $profile->user_id)
@@ -86,7 +101,9 @@ test('generating a checklist auto-enrols the hire in mandatory training from ind
         ->count();
     expect($enrollments)->toBe(1);
 
-    // Re-generating must not double-enrol.
+    // A later onboarding cycle must not double-enrol, while duplicate active
+    // checklists remain prohibited by the lifecycle service.
+    $this->svc->setChecklistStatus($checklist, 'archived');
     $this->svc->generateChecklist($profile, $this->hr->id);
     expect(HrCourseEnrollment::query()->where('user_id', $profile->user_id)->count())->toBe(1);
 });
@@ -204,7 +221,12 @@ test('the provision endpoint auto-picks when no asset_id is given', function () 
     $task = HrOnboardingTask::query()->create([
         'checklist_id' => $checklist->id, 'category' => 'it', 'title' => 'Issue laptop', 'is_required' => false, 'sort_order' => 2, 'status' => 'pending',
     ]);
-    $free = Asset::query()->create(['name' => 'Auto Laptop', 'asset_tag' => 'IT-AUTO', 'status' => 'active']);
+    $free = Asset::query()->create([
+        'site_id' => $this->site->id,
+        'name' => 'Auto Laptop',
+        'asset_tag' => 'IT-AUTO',
+        'status' => 'active',
+    ]);
 
     $this->actingAs($this->hr)
         ->post("/hr/onboarding/tasks/{$task->id}/provision-asset", [])
@@ -212,4 +234,35 @@ test('the provision endpoint auto-picks when no asset_id is given', function () 
 
     expect($task->fresh()->status)->toBe('completed');
     expect(AssetAssignment::query()->where('asset_id', $free->id)->whereNull('released_at')->count())->toBe(1);
+});
+
+test('evidence storage is cleaned up when task completion rolls back', function () {
+    Storage::fake('private');
+
+    $profile = crossLoopProfile();
+    $checklist = crossLoopChecklist($profile);
+    $task = HrOnboardingTask::query()->create([
+        'checklist_id' => $checklist->id,
+        'category' => 'induction',
+        'title' => 'Upload evidence before rollback',
+        'is_required' => true,
+        'sort_order' => 1,
+        'status' => 'pending',
+    ]);
+    $service = new class(app(HrCurrentStaffService::class), app(UserSiteAccessService::class)) extends OnboardingService
+    {
+        protected function checkChecklistCompletion(HrOnboardingChecklist $checklist): void
+        {
+            throw new RuntimeException('Force transaction rollback after evidence storage.');
+        }
+    };
+
+    expect(fn () => $service->completeTask($task, $this->hr->id, [
+        'evidence_file' => UploadedFile::fake()->create('induction.pdf', 32, 'application/pdf'),
+    ]))->toThrow(RuntimeException::class, 'Force transaction rollback after evidence storage.');
+
+    expect($task->fresh()->status)->toBe('pending')
+        ->and($task->fresh()->hr_document_id)->toBeNull()
+        ->and(HrDocument::query()->where('employee_profile_id', $profile->id)->exists())->toBeFalse()
+        ->and(Storage::disk('private')->allFiles())->toBe([]);
 });

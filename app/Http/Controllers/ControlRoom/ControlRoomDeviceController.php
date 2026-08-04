@@ -3,16 +3,23 @@
 namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
-use App\Models\Asset;
-use App\Models\Client;
 use App\Models\ControlRoom\Device;
 use App\Models\ControlRoomAlert;
-use App\Models\Site;
+use App\Services\ControlRoom\ControlRoomDevicePresenter;
+use App\Services\ControlRoom\ControlRoomDeviceVisibilityService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class ControlRoomDeviceController extends Controller
 {
+    public function __construct(
+        private readonly ControlRoomDeviceVisibilityService $visibility,
+        private readonly ControlRoomDevicePresenter $presenter,
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     /**
      * List all devices with filtering and stats.
      * Enriches each device with canonical Security & Devices data where linked.
@@ -22,59 +29,118 @@ class ControlRoomDeviceController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
 
-        $query = Device::query()
+        $filters = $request->validate([
+            'type' => ['nullable', 'string', Rule::in(array_keys(Device::types()))],
+            'activity' => ['nullable', 'string', Rule::in(['recent', 'quiet', 'never'])],
+            'site_id' => ['nullable', 'integer', 'min:1'],
+            'linkage' => ['nullable', 'string', Rule::in(['linked', 'unlinked'])],
+        ]);
+        $selectedSiteId = isset($filters['site_id'])
+            ? (int) $filters['site_id']
+            : null;
+        if ($selectedSiteId) {
+            $this->visibility->assertCanFilterSite($user, $selectedSiteId);
+        }
+        $canViewCanonicalDevices = $this->visibility->canViewCanonicalDevices($user);
+        if (isset($filters['linkage']) && ! $canViewCanonicalDevices) {
+            abort(403, UserSiteAccessService::DEFAULT_MESSAGE);
+        }
+        $recentSince = now()->subDay();
+
+        $baseQuery = Device::query();
+        $this->visibility->applyScope(
+            $baseQuery,
+            $user,
+            $selectedSiteId ? [$selectedSiteId] : null,
+        );
+
+        $query = (clone $baseQuery)
             ->with([
                 'signalSource:id,name,status',
-                'canonicalDevice:id,device_uid,name,domain,category,subcategory,status,health_status,provider,manufacturer,model,serial_number,mac_address,battery_level,last_seen_at',
+                'canonicalDevice' => fn ($canonical) => $this->visibility
+                    ->applyCanonicalDeviceScope($canonical, $user)
+                    ->select([
+                        'id',
+                        'device_uid',
+                        'name',
+                        'domain',
+                        'category',
+                        'subcategory',
+                        'status',
+                        'health_status',
+                        'manufacturer',
+                        'model',
+                        'battery_level',
+                        'last_seen_at',
+                    ]),
             ]);
 
         // Join site for site name.
         $query->leftJoin('sites', 'control_room_devices.site_id', '=', 'sites.id')
             ->select('control_room_devices.*', 'sites.name as site_name');
 
-        if ($request->filled('type')) {
-            $query->where('control_room_devices.type', $request->input('type'));
+        if (isset($filters['type'])) {
+            $query->where('control_room_devices.type', $filters['type']);
         }
-        if ($request->filled('status')) {
-            $query->where('control_room_devices.status', $request->input('status'));
+        if (($filters['activity'] ?? null) === 'recent') {
+            $query->where('control_room_devices.last_signal_at', '>=', $recentSince);
         }
-        if ($request->filled('site_id')) {
-            $query->where('control_room_devices.site_id', $request->input('site_id'));
+        if (($filters['activity'] ?? null) === 'quiet') {
+            $query->whereNotNull('control_room_devices.last_signal_at')
+                ->where('control_room_devices.last_signal_at', '<', $recentSince);
         }
-        if ($request->boolean('low_battery')) {
-            $query->lowBattery(20);
+        if (($filters['activity'] ?? null) === 'never') {
+            $query->whereNull('control_room_devices.last_signal_at');
+        }
+        if (($filters['linkage'] ?? null) === 'linked') {
+            $query->whereNotNull('control_room_devices.canonical_device_id');
+        }
+        if (($filters['linkage'] ?? null) === 'unlinked') {
+            $query->whereNull('control_room_devices.canonical_device_id');
         }
 
-        $query->orderByDesc('control_room_devices.last_seen_at');
+        $query->orderByDesc('control_room_devices.last_signal_at')
+            ->orderBy('control_room_devices.id');
 
-        $devices = $query->paginate(48)->through(fn (Device $device) => $this->mapDeviceForList($device));
+        $devices = $query->paginate(48)->through(fn (Device $device): array => $this->presenter->list($device));
 
-        // Stats.
-        $total = Device::count();
-        $online = Device::where('status', 'online')->count();
-        $offline = Device::where('status', 'offline')->count();
-        $lowBattery = Device::lowBattery(20)->count();
+        // Statistics follow the same visible Site and selected-Site boundary.
+        $totalSources = (clone $baseQuery)->count();
+        $active24h = (clone $baseQuery)
+            ->where('last_signal_at', '>=', $recentSince)
+            ->count();
+        $canonicalLinked = $canViewCanonicalDevices
+            ? (clone $baseQuery)->whereNotNull('canonical_device_id')->count()
+            : null;
+        $reconciliationNeeded = $canViewCanonicalDevices
+            ? (clone $baseQuery)->whereNull('canonical_device_id')->count()
+            : null;
 
-        $sites = Site::orderBy('name')
+        $sites = $this->visibility->visibleSites($user)
+            ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name]);
 
         return Inertia::render('control-room/devices/index', [
             'devices' => $devices,
             'stats' => [
-                'total' => $total,
-                'online' => $online,
-                'offline' => $offline,
-                'low_battery' => $lowBattery,
+                'signal_sources' => $totalSources,
+                'active_24h' => $active24h,
+                'canonical_linked' => $canonicalLinked,
+                'reconciliation_needed' => $reconciliationNeeded,
             ],
             'filters' => [
-                'type' => $request->input('type', ''),
-                'status' => $request->input('status', ''),
-                'site_id' => $request->input('site_id', ''),
-                'low_battery' => $request->boolean('low_battery'),
+                'type' => $filters['type'] ?? '',
+                'activity' => $filters['activity'] ?? '',
+                'site_id' => isset($filters['site_id']) ? (string) $filters['site_id'] : '',
+                'linkage' => $filters['linkage'] ?? '',
             ],
             'sites' => $sites,
             'device_types' => Device::types(),
+            'can' => [
+                'view_canonical_devices' => $canViewCanonicalDevices,
+            ],
+            'canonicalIndexUrl' => $canViewCanonicalDevices ? '/security-devices/devices' : null,
         ]);
     }
 
@@ -86,40 +152,53 @@ class ControlRoomDeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
+        $this->visibility->assertCanView($user, $device);
 
         $device->load([
             'signalSource:id,name,status,vendor',
-            'canonicalDevice:id,device_uid,name,domain,category,subcategory,status,health_status,provider,manufacturer,model,serial_number,mac_address,imei,ip_address,firmware_version,battery_level,last_seen_at,notes',
+            'canonicalDevice' => fn ($canonical) => $this->visibility
+                ->applyCanonicalDeviceScope($canonical, $user)
+                ->select([
+                    'id',
+                    'device_uid',
+                    'name',
+                    'domain',
+                    'category',
+                    'subcategory',
+                    'status',
+                    'health_status',
+                    'manufacturer',
+                    'model',
+                    'battery_level',
+                    'last_seen_at',
+                ]),
         ]);
 
-        $site = $device->site_id ? Site::find($device->site_id, ['id', 'name']) : null;
-
-        $client = null;
-        if ($device->client_id) {
-            $client = Client::find($device->client_id, ['id', 'first_name', 'last_name']);
-        }
-
-        $asset = null;
-        if ($device->asset_id) {
-            $asset = Asset::find($device->asset_id, ['id', 'name', 'asset_tag']);
-        }
+        $site = $device->site_id
+            ? $this->visibility->visibleSites($user)->whereKey($device->site_id)->first(['id', 'name'])
+            : null;
+        $client = $this->visibility->visibleClient($user, $device->client_id ? (int) $device->client_id : null);
+        $asset = $this->visibility->visibleAsset($user, $device->asset_id ? (int) $device->asset_id : null);
+        $visibleSiteIds = $this->visibility->accessibleSiteIds($user);
 
         // Recent signals (last 50).
         $signals = $device->signals()
+            ->with(['alert:id,reference_number', 'correlatedAlert:id,reference_number'])
+            ->where(function ($query) use ($visibleSiteIds): void {
+                $query->whereNull('site_id');
+                if ($visibleSiteIds !== []) {
+                    $query->orWhereIn('site_id', $visibleSiteIds);
+                }
+            })
             ->orderByDesc('occurred_at')
             ->limit(50)
             ->get()
-            ->map(fn ($s) => [
-                'id' => $s->id,
-                'signal_type_code' => $s->signal_type_code,
-                'severity_hint' => $s->severity_hint,
-                'occurred_at' => $s->occurred_at?->toISOString(),
-                'status' => $s->status,
-                'payload' => $s->payload ? array_slice($s->payload, 0, 5) : null,
-            ]);
+            ->map(fn ($signal): array => $this->presenter->signal($signal));
 
         // Linked alerts (last 20).
-        $alerts = ControlRoomAlert::where('device_id', $device->id)
+        $alertQuery = ControlRoomAlert::query()->where('device_id', $device->id);
+        $this->siteAccess->applyAlertScope($alertQuery, $user, ['reports.viewAny']);
+        $alerts = $alertQuery
             ->orderByDesc('triggered_at')
             ->limit(20)
             ->get()
@@ -132,27 +211,9 @@ class ControlRoomDeviceController extends Controller
                 'triggered_at' => $a->triggered_at?->toISOString(),
             ]);
 
-        // Build canonical device context (additive — safe fallback if not linked).
-        $canonical = $device->canonicalDevice;
-
         return Inertia::render('control-room/devices/show', [
             'device' => [
-                'id' => $device->id,
-                'name' => $device->name,
-                'device_uid' => $device->device_uid,
-                'type' => $device->type,
-                'type_label' => Device::types()[$device->type] ?? ucfirst(str_replace('_', ' ', $device->type)),
-                'vendor' => $device->vendor,
-                'model' => $device->model,
-                'status' => $device->status,
-                'battery_level' => $device->battery_level,
-                'last_seen_at' => $device->last_seen_at?->toISOString(),
-                'last_signal_at' => $device->last_signal_at?->toISOString(),
-                'is_stale' => $device->isOnline() && $device->isStale(10),
-                'latitude' => $device->latitude ? (float) $device->latitude : null,
-                'longitude' => $device->longitude ? (float) $device->longitude : null,
-                'location_description' => $device->location_description,
-                'config' => $device->config,
+                ...$this->presenter->detail($device),
                 'signal_source' => $device->signalSource ? [
                     'id' => $device->signalSource->id,
                     'name' => $device->signalSource->name,
@@ -169,62 +230,9 @@ class ControlRoomDeviceController extends Controller
                     'name' => $asset->name,
                     'asset_tag' => $asset->asset_tag,
                 ] : null,
-                // Canonical device data (additive — null if not linked).
-                'canonical' => $canonical ? [
-                    'id' => $canonical->id,
-                    'device_uid' => $canonical->device_uid,
-                    'name' => $canonical->name,
-                    'domain' => $canonical->domain,
-                    'category' => $canonical->category,
-                    'subcategory' => $canonical->subcategory,
-                    'status' => $canonical->status?->value,
-                    'health_status' => $canonical->health_status?->value,
-                    'provider' => $canonical->provider,
-                    'manufacturer' => $canonical->manufacturer,
-                    'model' => $canonical->model,
-                    'serial_number' => $canonical->serial_number,
-                    'mac_address' => $canonical->mac_address,
-                    'imei' => $canonical->imei,
-                    'ip_address' => $canonical->ip_address,
-                    'firmware_version' => $canonical->firmware_version,
-                    'battery_level' => $canonical->battery_level,
-                    'last_seen_at' => $canonical->last_seen_at?->toISOString(),
-                    'detail_url' => "/security-devices/devices/{$canonical->id}",
-                ] : null,
             ],
             'signals' => $signals,
             'alerts' => $alerts,
         ]);
-    }
-
-    private function mapDeviceForList(Device $device): array
-    {
-        $canonical = $device->canonicalDevice;
-
-        return [
-            'id' => $device->id,
-            'name' => $device->name,
-            'device_uid' => $device->device_uid,
-            'type' => $device->type,
-            'type_label' => Device::types()[$device->type] ?? ucfirst(str_replace('_', ' ', $device->type)),
-            'vendor' => $device->vendor,
-            'model' => $device->model,
-            'status' => $device->status,
-            'battery_level' => $device->battery_level,
-            'last_seen_at' => $device->last_seen_at?->toISOString(),
-            'last_signal_at' => $device->last_signal_at?->toISOString(),
-            'is_stale' => $device->isOnline() && $device->isStale(10),
-            'location_description' => $device->location_description,
-            'site_id' => $device->site_id,
-            'site_name' => $device->site_name,
-            'signal_source_name' => $device->signalSource?->name,
-            // Canonical enrichment (safe fallback to null).
-            'canonical_id' => $canonical?->id,
-            'canonical_device_uid' => $canonical?->device_uid,
-            'canonical_domain' => $canonical?->domain,
-            'canonical_category' => $canonical?->category,
-            'canonical_health_status' => $canonical?->health_status?->value,
-            'canonical_detail_url' => $canonical ? "/security-devices/devices/{$canonical->id}" : null,
-        ];
     }
 }

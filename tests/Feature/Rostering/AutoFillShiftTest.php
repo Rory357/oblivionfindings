@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
@@ -10,10 +11,9 @@ use App\Models\User;
 
 // Pest.php applies Tests\TestCase + RefreshDatabase to the whole Feature folder.
 
-function autoFillManager(): User
+function autoFillManager(Site $site): User
 {
     $manager = User::factory()->create([
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
 
@@ -27,8 +27,6 @@ function autoFillManager(): User
     $permissions = collect([
         'rostering.viewAny',
         'shifts.manageAny',
-        // Bypass site-access scoping in tests.
-        'reports.viewAny',
     ])->map(
         fn (string $key) => Permission::query()->firstOrCreate(
             ['key' => $key],
@@ -42,26 +40,39 @@ function autoFillManager(): User
 
     $role->permissions()->sync($permissions->pluck('id'));
     $manager->roles()->attach($role);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $manager->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 
     return $manager;
 }
 
 it('rejects auto-fill on already-assigned shifts', function () {
-    $manager = autoFillManager();
-
     $site = Site::factory()->create();
+    $manager = autoFillManager($site);
     $context = ServiceContext::factory()->create();
     $client = Client::factory()->create([
         'site_id' => $site->id,
         'service_context_id' => $context->id,
     ]);
     $assigned = User::factory()->create([
-        'organization_id' => 1,
         'approved_at' => now(),
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $assigned->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
     ]);
 
     $shift = Shift::factory()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'site_id' => $site->id,
         'service_context_id' => $context->id,

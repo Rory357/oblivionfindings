@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,12 +11,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SiteDamage extends Model
 {
-    use HasFactory;
-    use SoftDeletes;
+    use HasFactory, SoftDeletes, WritesLegacyStorageContext;
 
     protected $fillable = [
-        'tenant_id',
-        'site_id',
         'reported_by',
         'assigned_to',
         'title',
@@ -44,26 +42,6 @@ class SiteDamage extends Model
         'repaired_at' => 'datetime',
         'photos' => 'array',
     ];
-
-    /**
-     * Multi-tenant safety hook.
-     *
-     * Damage reports are reachable from site-scoped routes and controllers
-     * sometimes create them with only `site_id` populated. Without this hook,
-     * such rows would land with `tenant_id = null` and bypass tenant scopes,
-     * leaking across tenants. We backfill `tenant_id` from the parent site
-     * when callers omit it.
-     */
-    protected static function booted(): void
-    {
-        static::creating(function (self $damage): void {
-            if ($damage->tenant_id === null && $damage->site_id !== null) {
-                $damage->tenant_id = Site::query()
-                    ->whereKey($damage->site_id)
-                    ->value('tenant_id');
-            }
-        });
-    }
 
     // Relationships
 

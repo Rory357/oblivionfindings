@@ -1,126 +1,90 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
+import { Card, CardContent } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
+import { ArrowRight, MapPin } from 'lucide-react';
+
+type SiteOption = { id: number; name: string };
 
 type Props = {
-    clients: Array<{ id: number; first_name: string; last_name: string }>;
+    sites: SiteOption[];
+    selectedSiteId: number | null;
 };
 
-export default function GeofenceCreate({ clients }: Props) {
-    const { data, setData, post, processing, errors } = useForm({
-        name: '',
-        latitude: '',
-        longitude: '',
-        radius: '100',
-        description: '',
-        is_active: true,
-    });
+export default function GeofenceCreate({ sites = [], selectedSiteId }: Props) {
+    const orderedSites = [...sites].sort((left, right) => {
+        if (left.id === selectedSiteId) return -1;
+        if (right.id === selectedSiteId) return 1;
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post('/operations/geofences');
-    };
+        return left.name.localeCompare(right.name);
+    });
 
     return (
         <AppLayout>
-            <Head title="Create Geofence" />
-            <PageHero variant="compact" title="Create Geofence" description="Define a new geofence zone for electronic visit verification." backHref="/operations/geofences" />
+            <Head title="Manage a Site Geofence" />
+            <PageHero
+                variant="compact"
+                icon={MapPin}
+                title="Manage a Site Geofence"
+                description="Choose the Site that owns the geofence. The Site Profile is the single place to draw, edit, activate, or remove it."
+                backHref="/operations/geofences"
+            />
             <PageShell>
-                <form onSubmit={handleSubmit}>
+                <div className="mb-4 rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+                    Operations geofences no longer create a separate zone. Open
+                    the Site Profile, then choose{' '}
+                    <strong className="text-foreground">
+                        Map &amp; Site Geofence
+                    </strong>
+                    .
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {orderedSites.map((site) => (
+                        <Card
+                            key={site.id}
+                            className={
+                                site.id === selectedSiteId
+                                    ? 'border-primary/60 shadow-sm'
+                                    : ''
+                            }
+                        >
+                            <CardContent className="flex items-center gap-3 p-4">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                    <MapPin className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-semibold">
+                                        {site.name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Canonical Site-owned geofence
+                                    </p>
+                                </div>
+                                <Button asChild size="sm" variant="outline">
+                                    <Link href={`/sites/${site.id}`}>
+                                        Open
+                                        <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                                    </Link>
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+
+                {orderedSites.length === 0 && (
                     <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Zone Details</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-1.5">
-                                <Label htmlFor="name">Zone Name *</Label>
-                                <Input
-                                    id="name"
-                                    value={data.name}
-                                    onChange={(e) => setData('name', e.target.value)}
-                                    placeholder="e.g. Client Home - 123 Main St"
-                                />
-                                {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-3">
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="latitude">Latitude *</Label>
-                                    <Input
-                                        id="latitude"
-                                        type="number"
-                                        step="any"
-                                        value={data.latitude}
-                                        onChange={(e) => setData('latitude', e.target.value)}
-                                        placeholder="-36.8485"
-                                    />
-                                    {errors.latitude && <p className="text-xs text-destructive">{errors.latitude}</p>}
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="longitude">Longitude *</Label>
-                                    <Input
-                                        id="longitude"
-                                        type="number"
-                                        step="any"
-                                        value={data.longitude}
-                                        onChange={(e) => setData('longitude', e.target.value)}
-                                        placeholder="174.7633"
-                                    />
-                                    {errors.longitude && <p className="text-xs text-destructive">{errors.longitude}</p>}
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="radius">Radius (metres) *</Label>
-                                    <Input
-                                        id="radius"
-                                        type="number"
-                                        min="1"
-                                        value={data.radius}
-                                        onChange={(e) => setData('radius', e.target.value)}
-                                        placeholder="100"
-                                    />
-                                    {errors.radius && <p className="text-xs text-destructive">{errors.radius}</p>}
-                                </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <Label htmlFor="description">Description</Label>
-                                <Textarea
-                                    id="description"
-                                    value={data.description}
-                                    onChange={(e) => setData('description', e.target.value)}
-                                    placeholder="Optional description for this geofence zone..."
-                                    rows={3}
-                                />
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <input
-                                    id="is_active"
-                                    type="checkbox"
-                                    checked={data.is_active}
-                                    onChange={(e) => setData('is_active', e.target.checked)}
-                                    className="h-4 w-4 rounded border-border"
-                                />
-                                <Label htmlFor="is_active" className="cursor-pointer">Active</Label>
-                            </div>
+                        <CardContent className="py-12 text-center">
+                            <p className="font-medium">No accessible Sites</p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Ask an administrator to assign the correct Site
+                                before managing a geofence.
+                            </p>
                         </CardContent>
                     </Card>
-
-                    <div className="mt-4 flex items-center justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => router.get('/operations/geofences')}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={processing}>
-                            Create Geofence
-                        </Button>
-                    </div>
-                </form>
+                )}
             </PageShell>
         </AppLayout>
     );

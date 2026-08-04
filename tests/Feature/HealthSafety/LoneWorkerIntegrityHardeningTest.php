@@ -103,7 +103,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         $this->assertDatabaseCount('lone_worker_sessions', 0);
     }
 
-    public function test_start_session_rejects_a_shift_from_another_tenant_even_when_it_claims_a_local_site(): void
+    public function test_start_session_rejects_a_shift_with_contradictory_storage_provenance_even_when_it_claims_a_local_site(): void
     {
         $site = Site::factory()->create(['tenant_id' => 421]);
         $coordinator = $this->tenantHsLead(421);
@@ -134,7 +134,7 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
     {
         $site = Site::factory()->create(['tenant_id' => 423]);
         $coordinator = $this->tenantHsLead(423);
-        $worker = User::factory()->create(['organization_id' => 423]);
+        $worker = $this->siteScopedUser(423, $site);
         $client = Client::factory()->create([
             'organization_id' => 423,
             'site_id' => $site->id,
@@ -626,14 +626,17 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         $this->assertSame(ControlRoomAlert::STATUS_OPEN, $canonicalDecimal->fresh()->status);
     }
 
-    public function test_session_update_reloads_actor_provenance_and_rejects_a_stale_tenant_identity(): void
+    public function test_session_update_reloads_actor_provenance_and_rejects_a_stale_site_assignment(): void
     {
         $site = Site::factory()->create(['tenant_id' => 485]);
-        $actor = $this->tenantHsLead(485);
+        $otherSite = Site::factory()->create(['tenant_id' => 485]);
+        $actor = $this->siteScopedUser(485, $site, ['hazards.manage']);
         $worker = User::factory()->create(['organization_id' => 485]);
         $session = $this->makeSession($worker, $site);
         $originalEnd = $session->expected_end_at->copy();
-        User::query()->whereKey($actor->id)->update(['organization_id' => 999485]);
+        $actor->hrEmployeeProfile()->update([
+            'primary_site_id' => $otherSite->id,
+        ]);
         $request = Request::create(
             "/health-safety/lone-workers/sessions/{$session->id}",
             'PATCH',
@@ -676,14 +679,17 @@ class LoneWorkerIntegrityHardeningTest extends TestCase
         $this->assertSame('active', $session->fresh()->status);
     }
 
-    public function test_locate_now_reauthorizes_the_locked_actor_instead_of_trusting_stale_identity(): void
+    public function test_locate_now_reauthorizes_the_locked_actor_after_a_site_assignment_change(): void
     {
         $site = Site::factory()->create(['tenant_id' => 4861]);
-        $actor = $this->tenantHsLead(4861);
+        $otherSite = Site::factory()->create(['tenant_id' => 4861]);
+        $actor = $this->siteScopedUser(4861, $site, ['hazards.manage']);
         $worker = User::factory()->create(['organization_id' => 4861]);
         $session = $this->makeSession($worker, $site);
         $this->pairWorkerTracker($worker, 4861, '861106048610001');
-        User::query()->whereKey($actor->id)->update(['organization_id' => 9861]);
+        $actor->hrEmployeeProfile()->update([
+            'primary_site_id' => $otherSite->id,
+        ]);
         $request = Request::create(
             "/health-safety/lone-workers/sessions/{$session->id}/locate",
             'POST',

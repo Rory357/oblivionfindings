@@ -3,18 +3,16 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CarePlan extends Model
 {
-    use AuditableChanges;
-    use HasFactory;
-    use SoftDeletes;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'client_id',
         'title',
         'status',
@@ -103,7 +101,6 @@ class CarePlan extends Model
         $version = (int) ($this->version ?? 1);
 
         return ! self::query()
-            ->where('organization_id', $this->organization_id)
             ->where('client_id', $this->client_id)
             ->whereKeyNot($this->getKey())
             ->whereIn('status', ['active', 'review'])

@@ -3,25 +3,23 @@
 namespace App\Services\Tasks\Providers;
 
 use App\Domain\Hr\Models\HrCase;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Domain\Hr\Services\HrCaseAccessService;
 use App\Models\User;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use App\Services\UserSiteAccessService;
 use Illuminate\Validation\ValidationException;
 
 /**
- * HR cases are confidential by default: the query replicates
- * HrCaseController::applyCaseVisibilityScope() (manage-perm bypass, otherwise
- * non-confidential OR creator/reporter/assignee/access-list membership) plus
- * the controller's tenant scoping, and the title/description never expose the
- * case title or narrative — only the humanised case type.
+ * HR cases are confidential by default. HrCaseAccessService supplies retained
+ * historical Site provenance and the confidential-case predicate. Assignment
+ * eligibility remains current staff at an approved Site, and task text never
+ * exposes the case title or narrative.
  */
-class HrCaseProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
+class HrCaseProvider implements AssignableTaskProvider, HasModelClass, TaskProvider
 {
-    use ResolvesHrTenant;
-
     public function sourceKey(): string
     {
         return 'hr_case';
@@ -45,17 +43,21 @@ class HrCaseProvider implements TaskProvider, HasModelClass, AssignableTaskProvi
 
     public function assign(User $actor, int $id, ?int $assigneeId): void
     {
-        // Re-fetch under the same tenant + confidentiality scoping tasks()
+        // Re-fetch with the same confidentiality scoping used by tasks()
         // applies, so an out-of-scope case reads as "not found".
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-
-        $case = HrCase::forTenant($tenantId)
-            ->tap(fn ($q) => $this->applyCaseVisibilityScope($q, $actor))
+        $case = app(HrCaseAccessService::class)
+            ->applyVisibleCaseScope(HrCase::query(), $actor)
             ->find($id);
 
         if (! $case) {
             throw ValidationException::withMessages([
                 'assignee_id' => 'HR case not found or outside your visibility.',
+            ]);
+        }
+
+        if ($assigneeId !== null && ! $this->visibleStaffUserIds($actor)->whereKey($assigneeId)->exists()) {
+            throw ValidationException::withMessages([
+                'assignee_id' => 'The assignee must be current staff at an approved Site.',
             ]);
         }
 
@@ -72,11 +74,9 @@ class HrCaseProvider implements TaskProvider, HasModelClass, AssignableTaskProvi
 
     public function tasks(User $user, array $filters = []): array
     {
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $query = HrCase::forTenant($tenantId)
+        $query = app(HrCaseAccessService::class)
+            ->applyVisibleCaseScope(HrCase::query(), $user)
             ->with('assignedTo:id,name')
-            ->tap(fn ($q) => $this->applyCaseVisibilityScope($q, $user))
             ->orderByDesc('opened_at')
             ->limit(300);
 
@@ -109,24 +109,10 @@ class HrCaseProvider implements TaskProvider, HasModelClass, AssignableTaskProvi
         })->all();
     }
 
-    /**
-     * Mirror of HrCaseController::applyCaseVisibilityScope() — keep in sync.
-     */
-    protected function applyCaseVisibilityScope($query, User $viewer)
+    protected function visibleStaffUserIds(User $viewer)
     {
-        if ($viewer->canDo('hr.cases.manage')) {
-            return $query;
-        }
+        $staff = User::query()->select('users.id');
 
-        return $query->where(function ($inner) use ($viewer) {
-            $inner->where('is_confidential', false)
-                ->orWhereNull('is_confidential')
-                ->orWhere('created_by', $viewer->id)
-                ->orWhere('reported_by', $viewer->id)
-                ->orWhere('assigned_to', $viewer->id)
-                // access_list entries may be stored as ints or strings.
-                ->orWhereJsonContains('access_list', $viewer->id)
-                ->orWhereJsonContains('access_list', (string) $viewer->id);
-        });
+        return app(UserSiteAccessService::class)->applyStaffScope($staff, $viewer);
     }
 }

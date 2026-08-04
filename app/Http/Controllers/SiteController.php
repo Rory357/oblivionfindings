@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\SecurityDevices\Services\DeviceRegistryService;
+use App\Domain\SecurityDevices\Presenters\SiteProfileTechnologyProjectionPresenter;
 use App\Http\Requests\StoreSiteRequest;
 use App\Http\Requests\UpdateSiteRequest;
 use App\Models\Asset;
@@ -16,7 +16,6 @@ use App\Models\FleetOuting;
 use App\Models\FleetTrip;
 use App\Models\FleetVehicleBooking;
 use App\Models\HsRiskAssessment;
-use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\PpeInventory;
 use App\Models\SafeWorkProcedure;
 use App\Models\ServiceContext;
@@ -44,6 +43,7 @@ use App\Services\NotificationService;
 use App\Services\ShiftCoverageService;
 use App\Services\Sites\HouseLedgerPresenter;
 use App\Services\Sites\HouseLedgerService;
+use App\Services\Sites\SiteContactService;
 use App\Services\Sites\SiteReadinessService;
 use App\Services\Sites\SiteTypePlanService;
 use App\Services\UserSiteAccessService;
@@ -57,10 +57,16 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class SiteController extends Controller
 {
+    private const SITE_BYPASS_PERMISSIONS = ['sites.viewAll'];
+
+    public function __construct(private readonly SiteContactService $siteContacts) {}
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', Site::class);
@@ -83,7 +89,8 @@ class SiteController extends Controller
         // The Archived tab is only reachable when the "Show archived" toggle is on.
         $archivedView = $showArchived && $request->boolean('archived');
         $allowedTypes = $this->allowedSiteTypes($request);
-        $accessibleSiteIds = $this->siteAccess()->accessibleSiteIds($user);
+        $canViewAllSites = $this->siteAccess()->canBypass($user, self::SITE_BYPASS_PERMISSIONS);
+        $accessibleSiteIds = $canViewAllSites ? [] : $this->siteAccess()->accessibleSiteIds($user);
         $readinessService = app(SiteReadinessService::class);
 
         if ($type && ! in_array($type, $allowedTypes, true)) {
@@ -92,7 +99,9 @@ class SiteController extends Controller
 
         $visibleSitesQuery = Site::query()
             ->whereIn('type', $allowedTypes)
-            ->when($accessibleSiteIds !== [], fn ($q) => $q->whereIn('id', $accessibleSiteIds));
+            ->when(! $canViewAllSites, fn ($q) => $accessibleSiteIds === []
+                ? $q->whereRaw('1 = 0')
+                : $q->whereIn('id', $accessibleSiteIds));
 
         $sites = (clone $visibleSitesQuery)
             ->when($search !== '', function ($q) use ($search) {
@@ -203,10 +212,9 @@ class SiteController extends Controller
             ->filter()
             ->unique()
             ->values();
-        $managers = User::whereIn('id', $managerIds)
-            ->select(['id', 'name'])
-            ->orderBy('name')
-            ->get();
+        $managerQuery = User::query()->whereIn('id', $managerIds);
+        $this->siteAccess()->applyStaffScope($managerQuery, $user, self::SITE_BYPASS_PERMISSIONS);
+        $managers = $managerQuery->select(['id', 'name'])->orderBy('name')->get();
         $savedViewCounts = $this->savedViewCounts($liveSites, $readinessService);
         $savedViewCounts['archived'] = $archivedCount;
 
@@ -231,7 +239,7 @@ class SiteController extends Controller
         // Reference data for the Add Site modal (mounted on this index). Only
         // computed for users who can create sites; everyone else gets empties.
         $addSite = ($user?->canDo('sites.create') ?? false)
-            ? $this->addSiteReferenceData($allowedTypes, $accessibleSiteIds)
+            ? $this->addSiteReferenceData($allowedTypes, $user)
             : $this->emptyAddSiteReferenceData();
 
         return inertia('sites/index', [
@@ -271,8 +279,11 @@ class SiteController extends Controller
         ]);
     }
 
-    public function show(Request $request, Site $site)
-    {
+    public function show(
+        Request $request,
+        Site $site,
+        SiteProfileTechnologyProjectionPresenter $technologyPresenter,
+    ) {
         $this->authorize('view', $site);
 
         $site->load([
@@ -319,7 +330,12 @@ class SiteController extends Controller
         }
 
         $user = $request->user();
-        $siteDevices = app(DeviceRegistryService::class)->visibleForSite($user, $site->id);
+        $canEditSite = (bool) ($user && $user->canDo('sites.update') && $user->can('update', $site));
+        $canLinkClient = $canEditSite
+            && $user->canDo('clients.assignments.update')
+            && $user->canDo('clients.viewAny');
+        $canCreateClient = $canEditSite && $user->canDo('clients.create');
+        $canViewTechnology = $technologyPresenter->canView($user, $site);
         $houseLedger = $this->buildHouseLedgerData($site, $user);
 
         // Assets linked to this site (includes both site-owned assets and client-owned assets stored at the site)
@@ -492,22 +508,23 @@ class SiteController extends Controller
                         'room' => $clientRoomMap[(int) $c->id] ?? null,
                     ];
                 }),
-            'availableClients' => Client::query()
-                ->whereNull('site_id')
-                ->when($user?->organization_id, fn ($q) => $q->where('organization_id', $user->organization_id))
-                ->orderBy('first_name')
-                ->orderBy('last_name')
-                ->limit(200)
-                ->get(['id', 'first_name', 'last_name', 'status', 'preferred_name'])
-                ->map(fn ($c) => [
-                    'id' => $c->id,
-                    'first_name' => $c->first_name,
-                    'last_name' => $c->last_name,
-                    'preferred_name' => $c->preferred_name,
-                    'full_name' => trim(($c->first_name ?? '').' '.($c->last_name ?? '')),
-                    'status' => $c->status,
-                ])
-                ->values(),
+            'availableClients' => $canLinkClient
+                ? Client::query()
+                    ->whereNull('site_id')
+                    ->orderBy('first_name')
+                    ->orderBy('last_name')
+                    ->limit(200)
+                    ->get(['id', 'first_name', 'last_name', 'status', 'preferred_name'])
+                    ->map(fn ($c) => [
+                        'id' => $c->id,
+                        'first_name' => $c->first_name,
+                        'last_name' => $c->last_name,
+                        'preferred_name' => $c->preferred_name,
+                        'full_name' => trim(($c->first_name ?? '').' '.($c->last_name ?? '')),
+                        'status' => $c->status,
+                    ])
+                    ->values()
+                : collect(),
             'clientsSummary' => [
                 'total' => $site->clients->count(),
                 'active' => $site->clients->where('status', 'active')->count(),
@@ -646,19 +663,12 @@ class SiteController extends Controller
                 ? SiteCredential::where('site_id', $site->id)->count()
                 : 0,
             'credentialTypeOptions' => ($user?->canDo('credentials.view') ?? false)
-                ? CredentialType::pickerOptionsForTenant($site->tenant_id)
+                ? CredentialType::pickerOptions()
                 : collect(),
-            'hardwareCount' => (clone $siteDevices)->count(),
-            'integrationStatus' => IntegrationSiteConfig::where('site_id', $site->id)
-                ->where('is_active', true)
-                ->get()
-                ->map(fn ($c) => [
-                    'provider' => $c->provider,
-                    'status' => $c->status,
-                ])
-                ->values()
-                ->all(),
-            'can_edit' => (bool) ($user && $user->canDo('sites.update') && $user->can('update', $site)),
+            'technology' => Inertia::optional(
+                fn () => $technologyPresenter->present($user, $site),
+            ),
+            'can_edit' => $canEditSite,
             'staffRequirements' => SiteStaffRequirement::where('site_id', $site->id)
                 ->where('is_active', true)
                 ->orderByRaw("FIELD(category, 'mandatory', 'recommended', 'specialist')")
@@ -785,6 +795,10 @@ class SiteController extends Controller
             'ppeSummary' => ($user && $user->canDo('hazards.view')) ? $this->buildPpeSummary($site) : null,
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),
+                'linkClient' => $canLinkClient,
+                'createClient' => $canCreateClient,
+                'viewTechnology' => $canViewTechnology,
+                'viewHardwarePlacement' => $canViewTechnology && $user->canDo('siteHardware.view'),
                 'view_hs_risk_assessments' => (bool) ($user && $user->canDo('hazards.view')),
                 'manage_hs_risk_assessments' => (bool) ($user && $user->canDo('hazards.manage')),
                 'view_hs_first_aid' => (bool) ($user && $user->canDo('hazards.view')),
@@ -1081,11 +1095,6 @@ class SiteController extends Controller
             return null;
         }
 
-        $tenantId = $user->organization_id;
-        if ($site->tenant_id && $tenantId && (int) $site->tenant_id !== (int) $tenantId) {
-            return null;
-        }
-
         $ledger = app(HouseLedgerService::class)->getOrCreateLedger($site);
         $entries = $ledger->entries()
             ->with(['recordedBy:id,name', 'approvedBy:id,name'])
@@ -1237,11 +1246,11 @@ class SiteController extends Controller
         ];
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $this->authorize('create', Site::class);
 
-        $users = User::select(['id', 'name'])->orderBy('name')->get();
+        $users = $this->staffPicker($request->user());
 
         return inertia('sites/create', [
             'users' => $users,
@@ -1295,9 +1304,10 @@ class SiteController extends Controller
         }
 
         $site = DB::transaction(function () use ($validated, $contacts, $rooms, $resources, $zones, $assets, $checklists, $coverage, $credentials, $geofence, $request, $user) {
+            $this->assertResponsibleStaff($validated['primary_contact_user_id'] ?? null, $user);
             $site = Site::create($validated);
 
-            $this->syncContacts($site, $contacts);
+            $this->siteContacts->sync($site, $contacts);
             $this->syncRooms($site, $rooms);
             $this->syncResources($site, $resources);
             $this->syncZones($site, $zones);
@@ -1305,8 +1315,8 @@ class SiteController extends Controller
             $this->syncChecklists($site, $checklists);
 
             // Rostering + geofence fan-out (all reuse existing models).
-            $this->persistCoverageRequirements($site, $coverage, $user);
-            $this->persistStaffRequirements($site, $credentials, $user);
+            $this->persistCoverageRequirements($site, $coverage);
+            $this->persistStaffRequirements($site, $credentials);
             $this->persistSiteGeofence($site, $geofence);
 
             // Documents last so disk writes only happen once every DB op succeeds.
@@ -1356,14 +1366,13 @@ class SiteController extends Controller
      *
      * @param  array<int, array<string, mixed>>  $coverage
      */
-    private function persistCoverageRequirements(Site $site, array $coverage, ?User $user): void
+    private function persistCoverageRequirements(Site $site, array $coverage): void
     {
         foreach ($coverage as $rule) {
             $roleRequirements = $this->rolesMapToArray($rule['roles'] ?? []);
 
             foreach ($rule['days'] ?? [] as $day) {
                 SiteCoverageRequirement::create([
-                    'organization_id' => $user?->organization_id,
                     'site_id' => $site->id,
                     'service_context_id' => $rule['service_context_id'] ?? null,
                     'name' => $rule['name'],
@@ -1406,7 +1415,7 @@ class SiteController extends Controller
      *
      * @param  array<int, array<string, mixed>>  $credentials
      */
-    private function persistStaffRequirements(Site $site, array $credentials, ?User $user): void
+    private function persistStaffRequirements(Site $site, array $credentials): void
     {
         foreach ($credentials as $cred) {
             $expiry = $cred['expiry_period_months'] ?? null;
@@ -1415,7 +1424,6 @@ class SiteController extends Controller
             SiteStaffRequirement::updateOrCreate(
                 ['site_id' => $site->id, 'requirement_name' => $cred['name']],
                 [
-                    'organization_id' => $user?->organization_id,
                     'category' => $cred['category'],
                     'certification_required' => ($cred['category'] ?? null) === 'mandatory',
                     'expiry_period_months' => $expiry,
@@ -1497,7 +1505,6 @@ class SiteController extends Controller
             $folder = $this->ensureDocumentFolder($site, $entry['folder'] ?? null);
 
             SiteDocument::create([
-                'tenant_id' => $site->tenant_id,
                 'site_id' => $site->id,
                 'uploaded_by_user_id' => $userId,
                 'title' => $entry['title'] ?? null,
@@ -1531,11 +1538,11 @@ class SiteController extends Controller
         return $folder;
     }
 
-    public function edit(Site $site)
+    public function edit(Request $request, Site $site)
     {
         $this->authorize('update', $site);
 
-        $users = User::select(['id', 'name'])->orderBy('name')->get();
+        $users = $this->staffPicker($request->user());
 
         $site->load('contacts');
 
@@ -1619,12 +1626,12 @@ class SiteController extends Controller
 
         $validated = $request->validated();
 
-        $contacts = $validated['contacts'] ?? [];
-        $rooms = $validated['rooms'] ?? [];
-        $resources = $validated['resources'] ?? [];
-        $zones = $validated['zones'] ?? [];
-        $assets = $validated['assets'] ?? [];
-        $checklists = $validated['checklists'] ?? [];
+        $contacts = array_key_exists('contacts', $validated) ? $validated['contacts'] : null;
+        $rooms = array_key_exists('rooms', $validated) ? $validated['rooms'] : null;
+        $resources = array_key_exists('resources', $validated) ? $validated['resources'] : null;
+        $zones = array_key_exists('zones', $validated) ? $validated['zones'] : null;
+        $assets = array_key_exists('assets', $validated) ? $validated['assets'] : null;
+        $checklists = array_key_exists('checklists', $validated) ? $validated['checklists'] : null;
 
         // Finance: keep the dollars→cents conversion symmetric with store() so an
         // edited weekly food budget actually persists.
@@ -1650,14 +1657,33 @@ class SiteController extends Controller
             $validated['weekly_food_budget'],
         );
 
-        $site->update($validated);
+        $actor = $request->user();
+        $site = DB::transaction(function () use ($site, $validated, $contacts, $rooms, $resources, $zones, $assets, $checklists, $actor): Site {
+            $lockedSite = Site::query()->whereKey($site->id)->lockForUpdate()->firstOrFail();
+            $this->assertResponsibleStaff($validated['primary_contact_user_id'] ?? null, $actor);
+            $lockedSite->update($validated);
 
-        $this->syncContacts($site, $contacts);
-        $this->syncRooms($site, $rooms);
-        $this->syncResources($site, $resources);
-        $this->syncZones($site, $zones);
-        $this->assignAssets($site, $assets, $request->user()?->id);
-        $this->syncChecklists($site, $checklists);
+            if ($contacts !== null) {
+                $this->siteContacts->sync($lockedSite, $contacts);
+            }
+            if ($rooms !== null) {
+                $this->syncRooms($lockedSite, $rooms);
+            }
+            if ($resources !== null) {
+                $this->syncResources($lockedSite, $resources);
+            }
+            if ($zones !== null) {
+                $this->syncZones($lockedSite, $zones);
+            }
+            if ($assets !== null) {
+                $this->assignAssets($lockedSite, $assets, $actor?->id);
+            }
+            if ($checklists !== null) {
+                $this->syncChecklists($lockedSite, $checklists);
+            }
+
+            return $lockedSite;
+        });
 
         app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'site', $site, null, [
             'title' => "Site updated: {$site->name}",
@@ -1677,7 +1703,7 @@ class SiteController extends Controller
             'step' => ['required', 'string', 'in:contacts,assets'],
             'data' => ['nullable', 'array'],
             'data.contacts' => ['nullable', 'array'],
-            'data.contacts.*.type' => ['nullable', 'string', 'max:60'],
+            'data.contacts.*.type' => ['required_with:data.contacts.*', 'string', Rule::in(SiteContact::TYPES)],
             'data.contacts.*.name' => ['required_with:data.contacts', 'string', 'max:160'],
             'data.contacts.*.role' => ['nullable', 'string', 'max:120'],
             'data.contacts.*.phone' => ['nullable', 'string', 'max:60'],
@@ -1693,7 +1719,7 @@ class SiteController extends Controller
         $payload = $validated['data'] ?? [];
 
         if ($validated['step'] === 'contacts') {
-            $this->storeOnboardingContacts($site, $payload['contacts'] ?? []);
+            $this->siteContacts->upsertBatch($site, $payload['contacts'] ?? []);
         }
 
         if ($validated['step'] === 'assets') {
@@ -1718,14 +1744,17 @@ class SiteController extends Controller
      * staff-credential catalogue and the coverage role keys.
      *
      * @param  array<int, string>  $allowedTypes
-     * @param  array<int, int>  $accessibleSiteIds
      * @return array<string, mixed>
      */
-    private function addSiteReferenceData(array $allowedTypes, array $accessibleSiteIds): array
+    private function addSiteReferenceData(array $allowedTypes, ?User $user): array
     {
+        $canViewAllSites = $this->siteAccess()->canBypass($user, self::SITE_BYPASS_PERMISSIONS);
+        $accessibleSiteIds = $canViewAllSites ? [] : $this->siteAccess()->accessibleSiteIds($user);
         $copyableSites = Site::query()
             ->whereIn('type', $allowedTypes)
-            ->when($accessibleSiteIds !== [], fn ($q) => $q->whereIn('id', $accessibleSiteIds))
+            ->when(! $canViewAllSites, fn ($q) => $accessibleSiteIds === []
+                ? $q->whereRaw('1 = 0')
+                : $q->whereIn('id', $accessibleSiteIds))
             ->where('archived', false)
             ->with([
                 'coverageRequirements' => fn ($q) => $q->where('is_active', true)
@@ -1761,7 +1790,9 @@ class SiteController extends Controller
 
         $serviceContexts = ServiceContext::query()
             ->where('is_active', true)
-            ->when($accessibleSiteIds !== [], fn ($q) => $q->whereIn('site_id', $accessibleSiteIds))
+            ->when(! $canViewAllSites, fn ($q) => $accessibleSiteIds === []
+                ? $q->whereRaw('1 = 0')
+                : $q->whereIn('site_id', $accessibleSiteIds))
             ->orderBy('name')
             ->limit(200)
             ->get(['id', 'name', 'type', 'site_id'])
@@ -1773,7 +1804,7 @@ class SiteController extends Controller
             ->values();
 
         return [
-            'users' => User::select(['id', 'name'])->orderBy('name')->get(),
+            'users' => $this->staffPicker($user),
             'regionOptions' => NzRegions::REGIONS,
             'serviceContexts' => $serviceContexts,
             'copyableSites' => $copyableSites,
@@ -1795,32 +1826,6 @@ class SiteController extends Controller
             'credentialCatalogue' => [],
             'coverageRoleKeys' => [],
         ];
-    }
-
-    private function storeOnboardingContacts(Site $site, array $contacts): void
-    {
-        foreach ($contacts as $contact) {
-            $name = trim((string) ($contact['name'] ?? ''));
-            if ($name === '') {
-                continue;
-            }
-
-            SiteContact::updateOrCreate(
-                [
-                    'site_id' => $site->id,
-                    'type' => $contact['type'] ?? 'other',
-                    'name' => $name,
-                ],
-                [
-                    'tenant_id' => $site->tenant_id,
-                    'role' => $contact['role'] ?? null,
-                    'phone' => $contact['phone'] ?? null,
-                    'email' => $contact['email'] ?? null,
-                    'is_primary' => (bool) ($contact['is_primary'] ?? false),
-                    'notes' => $contact['notes'] ?? null,
-                ],
-            );
-        }
     }
 
     private function storeOnboardingAssets(Site $site, array $assets, ?int $userId): void
@@ -1848,49 +1853,6 @@ class SiteController extends Controller
         }
     }
 
-    private function syncContacts(Site $site, array $contacts): void
-    {
-        $keepIds = [];
-
-        foreach ($contacts as $contact) {
-            $name = trim((string) ($contact['name'] ?? ''));
-            if ($name === '') {
-                continue;
-            }
-
-            $payload = [
-                'site_id' => $site->id,
-                'tenant_id' => $site->tenant_id,
-                'type' => $contact['type'] ?? 'general',
-                'name' => $name,
-                'role' => $contact['role'] ?? null,
-                'phone' => $contact['phone'] ?? null,
-                'email' => $contact['email'] ?? null,
-                'is_primary' => (bool) ($contact['is_primary'] ?? false),
-                'notes' => $contact['notes'] ?? null,
-            ];
-
-            if (! empty($contact['id'])) {
-                $existing = SiteContact::where('id', $contact['id'])
-                    ->where('site_id', $site->id)
-                    ->first();
-                if ($existing) {
-                    $existing->update($payload);
-                    $keepIds[] = $existing->id;
-
-                    continue;
-                }
-            }
-
-            $created = SiteContact::create($payload);
-            $keepIds[] = $created->id;
-        }
-
-        SiteContact::where('site_id', $site->id)
-            ->whereNotIn('id', $keepIds)
-            ->delete();
-    }
-
     private function syncRooms(Site $site, array $rooms): void
     {
         if ($site->type !== 'house') {
@@ -1905,7 +1867,6 @@ class SiteController extends Controller
             }
 
             $payload = [
-                'tenant_id' => $site->tenant_id,
                 'notes' => $room['notes'] ?? null,
                 'is_active' => true,
             ];
@@ -1957,7 +1918,6 @@ class SiteController extends Controller
             }
 
             $payload = [
-                'tenant_id' => $site->tenant_id,
                 'resource_type' => $resource['resource_type'] ?? 'meeting_room',
                 'capacity' => isset($resource['capacity']) ? (int) $resource['capacity'] : null,
                 'is_active' => true,
@@ -2003,7 +1963,6 @@ class SiteController extends Controller
             }
 
             $payload = [
-                'tenant_id' => $site->tenant_id,
                 'zone_type' => $zone['zone_type'] ?? null,
                 'is_active' => true,
             ];
@@ -2110,7 +2069,6 @@ class SiteController extends Controller
                     'template_id' => $templateId,
                 ],
                 [
-                    'tenant_id' => $site->tenant_id,
                     'frequency' => $assignment['frequency'] ?? 'monthly',
                     'start_date' => now()->toDateString(),
                     'assigned_to_user_id' => $assignment['assigned_to_user_id'] ?? null,
@@ -2352,6 +2310,30 @@ class SiteController extends Controller
             ->all();
 
         return $allowed !== [] ? $allowed : array_keys($map);
+    }
+
+    private function staffPicker(?User $viewer)
+    {
+        $query = User::query();
+        $this->siteAccess()->applyStaffScope($query, $viewer, self::SITE_BYPASS_PERMISSIONS);
+
+        return $query->select(['id', 'name'])->orderBy('name')->get();
+    }
+
+    private function assertResponsibleStaff(mixed $userId, ?User $actor): void
+    {
+        if (! filled($userId)) {
+            return;
+        }
+
+        $query = User::query()->whereKey((int) $userId);
+        $this->siteAccess()->applyStaffScope($query, $actor, self::SITE_BYPASS_PERMISSIONS);
+
+        if (! $query->exists()) {
+            throw ValidationException::withMessages([
+                'primary_contact_user_id' => 'Choose a current approved staff member visible from your approved Sites.',
+            ]);
+        }
     }
 
     private function siteAccess(): UserSiteAccessService

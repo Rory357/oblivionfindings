@@ -9,11 +9,17 @@ use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientIncident;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 class EmergencyAccessController extends Controller
 {
+    private const SITE_BYPASS_PERMISSIONS = ['medications.audit.view'];
+
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     private function canRevoke($user, ClientBreakGlassAccess $access): bool
     {
         $isManager = $user->hasRole('admin', 'provider_manager') || $user->canDo('medications.audit.view');
@@ -33,7 +39,21 @@ class EmergencyAccessController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('medications.breakglass'), 403);
 
-        $policy = BreakGlassPolicy::forOrganization($user->organization_id);
+        $policy = BreakGlassPolicy::current();
+
+        $visibleSiteIds = $this->siteAccess->accessibleSiteIds(
+            $user,
+            self::SITE_BYPASS_PERMISSIONS,
+        );
+        $siteId = $request->integer('site_id') ?: null;
+        if ($siteId !== null) {
+            abort_unless(in_array($siteId, $visibleSiteIds, true), 403);
+        }
+        $scopedSiteIds = $siteId === null ? $visibleSiteIds : [$siteId];
+        $accessScope = fn (Builder $query): Builder => $query->whereHas(
+            'client',
+            fn (Builder $clients): Builder => $clients->whereIn('site_id', $scopedSiteIds),
+        );
 
         $q = trim((string) $request->get('q', ''));
 
@@ -41,6 +61,7 @@ class EmergencyAccessController extends Controller
         if (mb_strlen($q) >= 2) {
             $results = Client::query()
                 ->with('site:id,name')
+                ->whereIn('site_id', $scopedSiteIds)
                 ->where(function ($query) use ($q) {
                     $searchTerm = '%'.$q.'%';
                     $query
@@ -61,15 +82,11 @@ class EmergencyAccessController extends Controller
                 ]);
         }
 
-        $siteId = $request->integer('site_id') ?: null;
-        $orgScope = fn ($query) => $query->when($user->organization_id, fn ($x) => $x->whereHas('user', fn ($u) => $u->where('organization_id', $user->organization_id)));
-        $bySite = fn ($query) => $query->when($siteId, fn ($x) => $x->whereHas('client', fn ($c) => $c->where('site_id', $siteId)));
         $clientName = fn ($a) => $a->client ? trim(($a->client->first_name ?? '').' '.($a->client->last_name ?? '')) : 'Unknown';
 
-        // Live grants (org-wide oversight) — not revoked, not expired.
+        // Live grants visible through canonical Site access — not revoked, not expired.
         $activeAccesses = ClientBreakGlassAccess::query()
-            ->tap($orgScope)
-            ->tap($bySite)
+            ->tap($accessScope)
             ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'user:id,name', 'coSignedBy:id,name'])
             ->where(fn ($w) => $w->whereNull('expires_at')->orWhere('expires_at', '>', now()))
             ->orderByDesc('created_at')
@@ -92,8 +109,7 @@ class EmergencyAccessController extends Controller
 
         // Audit log — every activation, including revoked (soft-deleted) ones.
         $auditLog = ClientBreakGlassAccess::withTrashed()
-            ->tap($orgScope)
-            ->tap($bySite)
+            ->tap($accessScope)
             ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'user:id,name', 'revokedBy:id,name', 'reviewedBy:id,name', 'accessEvents'])
             ->orderByDesc('created_at')
             ->limit(150)
@@ -124,7 +140,6 @@ class EmergencyAccessController extends Controller
 
         // Acknowledged signals are suppressed until newer activity appears (re-surface).
         $dismissals = BreakGlassFlagDismissal::query()
-            ->where('organization_id', $user->organization_id)
             ->get()
             ->keyBy(fn ($d) => $d->signal_type.':'.$d->signal_key);
         $isDismissed = function (string $type, string $key, ?Carbon $freshAt) use ($dismissals): bool {
@@ -135,7 +150,11 @@ class EmergencyAccessController extends Controller
 
         // Flagged: repeat break-glass — one user activating ≥ the policy threshold within its window.
         $windowStart = now()->subDays($policy->repeat_window_days);
-        $recent = ClientBreakGlassAccess::withTrashed()->tap($orgScope)->where('created_at', '>=', $windowStart)->with('user:id,name')->get();
+        $recent = ClientBreakGlassAccess::withTrashed()
+            ->tap($accessScope)
+            ->where('created_at', '>=', $windowStart)
+            ->with('user:id,name')
+            ->get();
         $flaggedSignals = $recent->groupBy('user_id')
             ->filter(fn ($g) => $g->count() >= $policy->repeat_threshold_count)
             ->reject(fn ($g) => $isDismissed('repeat', (string) $g->first()->user_id, $g->max('created_at')))
@@ -150,8 +169,7 @@ class EmergencyAccessController extends Controller
 
         // Oversight gap: activations that have ended (expired) without a post-event review.
         $awaitingBase = ClientBreakGlassAccess::query()
-            ->tap($orgScope)
-            ->tap($bySite)
+            ->tap($accessScope)
             ->whereNotNull('expires_at')->where('expires_at', '<', now())
             ->whereNull('review_outcome');
         $awaitingReview = (clone $awaitingBase)->count();
@@ -167,24 +185,39 @@ class EmergencyAccessController extends Controller
             ]);
         }
 
-        // Co-sign approver pool: approved staff in the same org (a different person from the requester).
+        // Co-sign approver pool: approved staff who can access at least one
+        // currently visible Site and hold break-glass or audit permission.
         $approvers = User::query()
-            ->when($user->organization_id, fn ($q) => $q->where('organization_id', $user->organization_id))
             ->where('id', '!=', $user->id)
             ->whereNotNull('approved_at')
             ->orderBy('name')
             ->limit(100)
             ->get(['id', 'name', 'role'])
+            ->filter(function (User $candidate) use ($scopedSiteIds): bool {
+                if (! $candidate->canDo('medications.breakglass') && ! $candidate->canDo('medications.audit.view')) {
+                    return false;
+                }
+
+                return array_intersect(
+                    $scopedSiteIds,
+                    // Co-signing is a care authorisation action, so audit
+                    // visibility cannot replace a current HR Site assignment.
+                    $this->siteAccess->accessibleSiteIds($candidate),
+                ) !== [];
+            })
             ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'role' => $u->role])
             ->values();
 
-        $activeSite = $siteId ? Site::find($siteId) : null;
+        $activeSite = $siteId ? Site::query()->whereIn('id', $visibleSiteIds)->find($siteId) : null;
 
         // Deep-link from the MAR interstitial: pre-open the request wizard for this client.
         $requestClientId = $request->integer('request_client') ?: null;
         $requestClient = null;
         if ($requestClientId) {
-            $rc = Client::query()->with('site:id,name')->find($requestClientId);
+            $rc = Client::query()
+                ->whereIn('site_id', $scopedSiteIds)
+                ->with('site:id,name')
+                ->find($requestClientId);
             if ($rc) {
                 $requestClient = [
                     'id' => $rc->id,
@@ -233,7 +266,11 @@ class EmergencyAccessController extends Controller
                 'awaiting_review' => $awaitingReview,
                 'flagged' => $flaggedSignals->count(),
             ],
-            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'sites' => Site::query()
+                ->whereIn('id', $visibleSiteIds)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name']),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
             'request_client' => $requestClient,

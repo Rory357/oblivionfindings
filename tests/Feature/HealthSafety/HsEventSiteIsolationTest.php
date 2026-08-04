@@ -413,8 +413,14 @@ class HsEventSiteIsolationTest extends TestCase
 
         HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,
+            'position_role' => in_array('hazards.manage', $permissionKeys, true)
+                ? 'coordinator'
+                : 'support_worker',
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+            'is_active' => true,
         ]);
 
         return $user;

@@ -216,14 +216,12 @@ $role = \\App\\Models\\Role::query()->where('name', 'support_worker')->firstOrFa
 $employee = \\App\\Models\\User::query()->create([
     'name' => $marker.' Worker',
     'email' => strtolower($marker).'.worker@example.test',
-    'organization_id' => 1,
     'role' => 'support_worker',
     'password' => \\Illuminate\\Support\\Facades\\Hash::make('password'),
     'approved_at' => now(),
 ]);
 $employee->roles()->syncWithoutDetaching([$role->id]);
 $profile = \\App\\Domain\\Hr\\Models\\HrEmployeeProfile::query()->create([
-    'tenant_id' => 1,
     'user_id' => $employee->id,
     'employee_number' => $marker.'-EMP',
     'work_email' => $employee->email,
@@ -243,14 +241,12 @@ $profile = \\App\\Domain\\Hr\\Models\\HrEmployeeProfile::query()->create([
 $payrollEmployee = \\App\\Models\\User::query()->create([
     'name' => $marker.' Payroll Worker',
     'email' => strtolower($marker).'.payroll@example.test',
-    'organization_id' => 1,
     'role' => 'support_worker',
     'password' => \\Illuminate\\Support\\Facades\\Hash::make('password'),
     'approved_at' => now(),
 ]);
 $payrollEmployee->roles()->syncWithoutDetaching([$role->id]);
 $payrollProfile = \\App\\Domain\\Hr\\Models\\HrEmployeeProfile::query()->create([
-    'tenant_id' => 1,
     'user_id' => $payrollEmployee->id,
     'employee_number' => $marker.'-PAY',
     'work_email' => $payrollEmployee->email,
@@ -268,7 +264,6 @@ $payrollProfile = \\App\\Domain\\Hr\\Models\\HrEmployeeProfile::query()->create(
 ]);
 
 $band = \\App\\Domain\\Hr\\Models\\HrSalaryBand::query()->create([
-    'tenant_id' => 1,
     'position_role' => $profile->position_role,
     'band_name' => $marker.' Band',
     'min_salary' => 50000,
@@ -285,7 +280,6 @@ $band = \\App\\Domain\\Hr\\Models\\HrSalaryBand::query()->create([
 $attachmentPath = 'hr/calendar/1/'.$marker.'.txt';
 
 $checklist = \\App\\Domain\\Hr\\Models\\HrOffboardingChecklist::query()->create([
-    'tenant_id' => 1,
     'employee_profile_id' => $profile->id,
     'template_key' => 'standard',
     'status' => 'in_progress',
@@ -306,7 +300,6 @@ $exitTask = $checklist->tasks()->create([
 ]);
 
 $candidate = \\App\\Domain\\Hr\\Models\\HrCandidate::query()->create([
-    'tenant_id' => 1,
     'first_name' => 'Codex',
     'last_name' => $marker,
     'personal_email' => strtolower($marker).'.candidate@example.test',
@@ -317,7 +310,6 @@ $candidate = \\App\\Domain\\Hr\\Models\\HrCandidate::query()->create([
     'updated_by' => $admin->id,
 ]);
 $application = \\App\\Domain\\Hr\\Models\\HrApplication::query()->create([
-    'tenant_id' => 1,
     'candidate_id' => $candidate->id,
     'position_title' => 'Smoke Support Worker',
     'position_role' => 'support_worker',
@@ -342,7 +334,6 @@ $offer = \\App\\Domain\\Hr\\Models\\HrOffer::query()->create([
 ]);
 
 $overrideCandidate = \\App\\Domain\\Hr\\Models\\HrCandidate::query()->create([
-    'tenant_id' => 1,
     'first_name' => 'Codex',
     'last_name' => $marker.' Override',
     'personal_email' => strtolower($marker).'.override@example.test',
@@ -353,7 +344,6 @@ $overrideCandidate = \\App\\Domain\\Hr\\Models\\HrCandidate::query()->create([
     'updated_by' => $admin->id,
 ]);
 $overrideApplication = \\App\\Domain\\Hr\\Models\\HrApplication::query()->create([
-    'tenant_id' => 1,
     'candidate_id' => $overrideCandidate->id,
     'position_title' => 'Smoke Support Worker',
     'position_role' => 'support_worker',
@@ -377,7 +367,6 @@ $overrideApplication = \\App\\Domain\\Hr\\Models\\HrApplication::query()->create
 ]);
 
 $chain = \\App\\Domain\\Hr\\Models\\HrApprovalChain::query()->create([
-    'tenant_id' => 1,
     'name' => $marker.' Generic approvals',
     'process_type' => 'expense',
     'is_active' => true,
@@ -386,18 +375,17 @@ $chain = \\App\\Domain\\Hr\\Models\\HrApprovalChain::query()->create([
 $chain->steps()->create(['step_order' => 1, 'approver_type' => 'manager', 'created_at' => now()]);
 $chain->steps()->create(['step_order' => 2, 'approver_type' => 'user', 'approver_user_id' => $admin->id, 'created_at' => now()]);
 $leaveOne = \\App\\Domain\\Hr\\Models\\HrLeaveApprovalChain::query()->create([
-    'tenant_id' => 1, 'user_id' => $employee->id, 'approver_user_id' => $admin->id,
+    'user_id' => $employee->id, 'approver_user_id' => $admin->id,
     'approval_level' => 1, 'escalation_after_hours' => 24, 'is_active' => true,
     'created_by' => $admin->id, 'updated_by' => $admin->id,
 ]);
 $leaveTwo = \\App\\Domain\\Hr\\Models\\HrLeaveApprovalChain::query()->create([
-    'tenant_id' => 1, 'user_id' => $employee->id, 'approver_user_id' => $admin->id,
+    'user_id' => $employee->id, 'approver_user_id' => $admin->id,
     'approval_level' => 2, 'escalation_after_hours' => 48, 'is_active' => true,
     'created_by' => $admin->id, 'updated_by' => $admin->id,
 ]);
 
 $run = \\App\\Domain\\Hr\\Models\\HrPayrollRun::query()->create([
-    'tenant_id' => 1,
     'period_start' => now()->subWeeks(2)->startOfWeek()->toDateString(),
     'period_end' => now()->subWeek()->endOfWeek()->toDateString(),
     'status' => 'locked',
@@ -410,7 +398,6 @@ $run = \\App\\Domain\\Hr\\Models\\HrPayrollRun::query()->create([
     'created_by' => $admin->id,
 ]);
 $payslip = \\App\\Domain\\Hr\\Models\\HrPayslip::query()->create([
-    'tenant_id' => 1,
     'payroll_run_id' => $run->id,
     'employee_profile_id' => $payrollProfile->id,
     'user_id' => $payrollEmployee->id,
@@ -439,7 +426,6 @@ $payslip = \\App\\Domain\\Hr\\Models\\HrPayslip::query()->create([
 ]);
 
 \\App\\Models\\AuditLog::query()->create([
-    'organization_id' => 1,
     'user_id' => null,
     'action' => 'codex.live_hr_gaps',
     'auditable_type' => null,
@@ -493,7 +479,6 @@ test.describe.serial('HR live gap closeout', () => {
         runLaravelPhp(`
 foreach ([${JSON.stringify(probeMarker)}, ${JSON.stringify(sentinelMarker)}] as $probe) {
     \\App\\Domain\\Hr\\Models\\HrCalendarEvent::query()->create([
-        'tenant_id' => 1,
         'title' => $probe.' Team event',
         'event_type' => 'team',
         'starts_at' => now()->addDay(),
@@ -502,7 +487,6 @@ foreach ([${JSON.stringify(probeMarker)}, ${JSON.stringify(sentinelMarker)}] as 
         'created_by' => ${fixture.adminId},
     ]);
     \\App\\Models\\AuditLog::query()->create([
-        'organization_id' => 1,
         'user_id' => null,
         'action' => 'codex.cleanup_scope',
         'auditable_type' => null,
@@ -544,7 +528,6 @@ echo \\App\\Models\\AuditLog::query()
         const deletedRouteId = Number(
             runLaravelPhp(`
 $route = \\App\\Domain\\Hr\\Models\\HrLeaveApprovalChain::query()->create([
-    'tenant_id' => 1,
     'user_id' => ${fixture.payrollUserId},
     'approver_user_id' => ${fixture.adminId},
     'approval_level' => 99,
@@ -665,7 +648,6 @@ $event->reminders()->create(['offset_minutes' => 60, 'channel' => 'notification'
 $path = ${JSON.stringify(fixture.attachmentPath)};
 \\Illuminate\\Support\\Facades\\Storage::disk('private')->put($path, ${JSON.stringify(fixture.marker)});
 $event->attachments()->create([
-    'tenant_id' => 1,
     'uploaded_by' => ${fixture.adminId},
     'disk' => 'private',
     'original_name' => ${JSON.stringify(`${fixture.marker}.txt`)},

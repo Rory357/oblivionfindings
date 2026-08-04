@@ -19,12 +19,8 @@ class RoadmapDashboardController extends Controller
 
     public function index(Request $request)
     {
-        $tenantId = $this->tenantId($request);
-        $user = $request->user();
-
-        $summary = $this->dashboardService->governanceWidget($tenantId);
+        $summary = $this->dashboardService->governanceWidget();
         $triageOverload = InitiativeSuggestion::query()
-            ->forTenant($tenantId)
             ->where('status', InitiativeSuggestion::STATUS_TRIAGE_PENDING)
             ->count();
 
@@ -48,16 +44,5 @@ class RoadmapDashboardController extends Controller
             'managers' => $this->roadmapManagerOptions($request),
             'can' => $this->roadmapCan($request),
         ]);
-    }
-
-    protected function tenantId(Request $request): ?int
-    {
-        $user = $request->user();
-
-        if ($request->filled('tenant_id')) {
-            return (int) $request->integer('tenant_id');
-        }
-
-        return $user?->tenant_id ?? null;
     }
 }

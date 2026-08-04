@@ -343,13 +343,14 @@ test('fleet resident tracking page loads', function () {
     });
 });
 
-test('fleet mobile dashboard page loads', function () {
+test('legacy fleet mobile dashboard redirects to the desktop web workspace', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/fleet-assets/mobile/dashboard')
-            ->waitFor('@fleet-mobile-dashboard-heading', 10)
-            ->assertSeeIn('@fleet-mobile-dashboard-heading', 'Mobile Dashboard');
+            ->waitForText('Fleet & Assets', 10)
+            ->assertPathIs('/fleet-assets')
+            ->assertDontSee('Mobile Dashboard');
     });
 });
 

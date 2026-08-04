@@ -1,15 +1,20 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementActionPlan;
 use App\Domain\Hr\Models\HrEngagementSurvey;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Carbon\Carbon;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     Carbon::setTestNow(Carbon::parse('2026-02-18 07:30:00'));
+
+    $this->site = Site::factory()->create(['name' => 'Wellbeing dashboard site']);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -30,6 +35,17 @@ beforeEach(function () {
     if ($hrRole) {
         $this->hr->roles()->syncWithoutDetaching([$hrRole->id]);
     }
+
+    foreach ([$this->hr, $this->ownerA, $this->ownerB] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+    }
 });
 
 afterEach(function () {
@@ -38,7 +54,6 @@ afterEach(function () {
 
 test('wellbeing dashboard returns action-plan sla metrics and applies action-plan filters', function () {
     $survey = HrEngagementSurvey::query()->create([
-        'tenant_id' => 1,
         'title' => 'Workload Wellbeing Survey',
         'survey_type' => 'engagement',
         'status' => 'published',
@@ -49,7 +64,6 @@ test('wellbeing dashboard returns action-plan sla metrics and applies action-pla
 
     $openPlan = HrEngagementActionPlan::query()->create([
         'survey_id' => $survey->id,
-        'tenant_id' => 1,
         'owner_user_id' => $this->ownerA->id,
         'title' => 'Open plan owner A',
         'priority' => 'medium',
@@ -62,7 +76,6 @@ test('wellbeing dashboard returns action-plan sla metrics and applies action-pla
 
     HrEngagementActionPlan::query()->create([
         'survey_id' => $survey->id,
-        'tenant_id' => 1,
         'owner_user_id' => $this->ownerA->id,
         'title' => 'In progress overdue owner A',
         'priority' => 'high',
@@ -75,7 +88,6 @@ test('wellbeing dashboard returns action-plan sla metrics and applies action-pla
 
     HrEngagementActionPlan::query()->create([
         'survey_id' => $survey->id,
-        'tenant_id' => 1,
         'owner_user_id' => $this->ownerB->id,
         'title' => 'Completed plan owner B',
         'priority' => 'low',

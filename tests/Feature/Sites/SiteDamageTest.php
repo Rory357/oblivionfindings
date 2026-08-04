@@ -2,10 +2,11 @@
 
 namespace Tests\Feature\Sites;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
 use App\Models\Site;
-use App\Models\SiteDamage;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -14,14 +15,16 @@ class SiteDamageTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $supportWorker;
+
     protected Site $site;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -30,6 +33,14 @@ class SiteDamageTest extends TestCase
         $this->supportWorker->roles()->attach(Role::where('name', 'support_worker')->first());
 
         $this->site = Site::factory()->create(['type' => 'house']);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->supportWorker->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
     }
 
     public function test_damages_index_requires_authentication(): void
@@ -71,12 +82,11 @@ class SiteDamageTest extends TestCase
         ]);
     }
 
-    public function test_creating_damage_report_inherits_tenant_id_from_site_when_omitted(): void
+    public function test_creating_damage_report_preserves_canonical_site_ownership(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 99]);
+        $site = Site::factory()->create();
 
-        $damage = SiteDamage::create([
-            'site_id' => $site->id,
+        $damage = $site->damages()->create([
             'reported_by' => $this->admin->id,
             'title' => 'Cracked window',
             'description' => 'Window in bedroom 2 was cracked during storm.',
@@ -86,13 +96,13 @@ class SiteDamageTest extends TestCase
             'discovered_date' => '2026-02-18',
         ]);
 
-        $this->assertSame(99, $damage->tenant_id);
+        $this->assertSame($site->id, $damage->site_id);
+        $this->assertTrue($damage->site->is($site));
     }
 
     public function test_admin_can_update_damage_report(): void
     {
-        $damage = SiteDamage::create([
-            'site_id' => $this->site->id,
+        $damage = $this->site->damages()->create([
             'reported_by' => $this->admin->id,
             'title' => 'Cracked wall',
             'description' => 'Crack in lounge wall.',
@@ -116,8 +126,7 @@ class SiteDamageTest extends TestCase
 
     public function test_marking_repaired_sets_repaired_at(): void
     {
-        $damage = SiteDamage::create([
-            'site_id' => $this->site->id,
+        $damage = $this->site->damages()->create([
             'reported_by' => $this->admin->id,
             'title' => 'Leaking tap',
             'description' => 'Kitchen tap leaking.',
@@ -141,8 +150,7 @@ class SiteDamageTest extends TestCase
 
     public function test_admin_can_soft_delete_damage(): void
     {
-        $damage = SiteDamage::create([
-            'site_id' => $this->site->id,
+        $damage = $this->site->damages()->create([
             'reported_by' => $this->admin->id,
             'title' => 'Test damage',
             'description' => 'To be deleted.',
@@ -157,6 +165,32 @@ class SiteDamageTest extends TestCase
             ->assertRedirect();
 
         $this->assertSoftDeleted('site_damages', ['id' => $damage->id]);
+    }
+
+    public function test_damage_routes_reject_records_owned_by_a_different_site(): void
+    {
+        $otherSite = Site::factory()->create(['type' => 'house']);
+        $damage = $otherSite->damages()->create([
+            'reported_by' => $this->admin->id,
+            'title' => 'Other Site damage',
+            'description' => 'This record belongs to another Site.',
+            'severity' => 'minor',
+            'status' => 'reported',
+            'damage_date' => '2026-02-18',
+            'discovered_date' => '2026-02-18',
+        ]);
+
+        $url = "/sites/{$this->site->id}/damages/{$damage->id}";
+
+        $this->actingAs($this->admin)
+            ->put($url, ['status' => 'assessed'])
+            ->assertNotFound();
+
+        $this->actingAs($this->admin)
+            ->delete($url)
+            ->assertNotFound();
+
+        $this->assertNotSoftDeleted('site_damages', ['id' => $damage->id]);
     }
 
     public function test_support_worker_can_report_site_damage(): void
@@ -185,6 +219,30 @@ class SiteDamageTest extends TestCase
             'severity' => 'minor',
             'status' => 'reported',
             'reported_by' => $this->supportWorker->id,
+        ]);
+    }
+
+    public function test_site_scoped_user_cannot_view_or_report_damage_for_another_site(): void
+    {
+        $otherSite = Site::factory()->create(['type' => 'house']);
+
+        $this->actingAs($this->supportWorker)
+            ->get("/sites/{$otherSite->id}/damages")
+            ->assertForbidden();
+
+        $this->actingAs($this->supportWorker)
+            ->post("/sites/{$otherSite->id}/damages", [
+                'title' => 'Outside assignment',
+                'description' => 'This must not be recorded.',
+                'severity' => 'minor',
+                'damage_date' => '2026-02-19',
+                'discovered_date' => '2026-02-19',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('site_damages', [
+            'site_id' => $otherSite->id,
+            'title' => 'Outside assignment',
         ]);
     }
 

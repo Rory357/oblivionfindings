@@ -4,9 +4,11 @@ namespace App\Models;
 
 use App\Contracts\Timeline\EmitsToTimeline;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 /**
  * Person-centred PATH (Planning Alternative Tomorrows with Hope) plan
@@ -15,11 +17,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class ClientPathPlan extends Model implements EmitsToTimeline
 {
-    use AuditableChanges, SoftDeletes;
+    use AuditableChanges, SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
         'client_id',
-        'organization_id',
         'dream',
         'north_star',
         'strengths',
@@ -76,7 +77,7 @@ class ClientPathPlan extends Model implements EmitsToTimeline
             'client_id' => $this->client_id,
             'site_id' => $this->client?->site_id,
             'subject' => 'PATH plan updated'
-                .($this->dream ? ': '.\Illuminate\Support\Str::limit($this->dream, 60) : ''),
+                .($this->dream ? ': '.Str::limit($this->dream, 60) : ''),
             'body' => $this->meaningful_outcomes ?? $this->dream,
             'meta' => array_filter([
                 'plan_date' => $this->plan_date?->toDateString(),

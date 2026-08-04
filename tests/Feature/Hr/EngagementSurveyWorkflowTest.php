@@ -1,13 +1,16 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementSurvey;
 use App\Domain\Hr\Models\HrEngagementSurveyResponse;
 use App\Domain\Hr\Services\EngagementService;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -27,6 +30,21 @@ beforeEach(function () {
     $supportRole = Role::where('name', 'support_worker')->first();
     if ($supportRole) {
         $this->staff->roles()->syncWithoutDetaching([$supportRole->id]);
+    }
+
+    $this->site = Site::factory()->create([
+        'name' => 'Engagement Survey Site',
+    ]);
+
+    foreach ([$this->hr, $this->staff] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
     }
 });
 

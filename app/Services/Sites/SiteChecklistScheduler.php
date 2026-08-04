@@ -42,7 +42,6 @@ class SiteChecklistScheduler
                     ],
                     [
                         'site_id' => $assignment->site_id,
-                        'tenant_id' => $assignment->tenant_id,
                         'template_id' => $assignment->template_id,
                         'assigned_to_user_id' => $shift->user_id ?: $assignment->assigned_to_user_id,
                         'status' => 'scheduled',
@@ -108,7 +107,6 @@ class SiteChecklistScheduler
                 SiteChecklistRun::create([
                     'assignment_id' => $assignment->id,
                     'site_id' => $assignment->site_id,
-                    'tenant_id' => $assignment->tenant_id,
                     'template_id' => $assignment->template_id,
                     'scheduled_date' => $currentDate->copy(),
                     'status' => 'scheduled',

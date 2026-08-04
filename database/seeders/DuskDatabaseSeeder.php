@@ -2,13 +2,74 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Finance\Models\FinAccount;
+use App\Domain\Finance\Models\FinBankAccount;
+use App\Domain\Finance\Models\FinBill;
+use App\Domain\Finance\Models\FinCashFlowForecast;
+use App\Domain\Finance\Models\FinCreditNote;
+use App\Domain\Finance\Models\FinDonorFund;
+use App\Domain\Finance\Models\FinFixedAsset;
+use App\Domain\Finance\Models\FinGstReturn;
+use App\Domain\Finance\Models\FinInvoice;
+use App\Domain\Finance\Models\FinJournal;
+use App\Domain\Finance\Models\FinPaymentRun;
+use App\Domain\Finance\Models\FinPettyCashFund;
+use App\Domain\Finance\Models\FinPurchaseOrder;
+use App\Domain\Finance\Models\FinVendor;
+use App\Domain\Governance\Models\BoardMember;
+use App\Domain\Governance\Models\GovernanceMeeting;
+use App\Domain\Governance\Models\GovernancePolicy;
+use App\Domain\Hr\Models\HrAnnouncement;
+use App\Domain\Hr\Models\HrCase;
+use App\Domain\Hr\Models\HrCompensationReview;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrExpenseClaim;
+use App\Domain\Hr\Models\HrGoal;
+use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrPerformanceReview;
+use App\Domain\Hr\Models\HrPolicy;
+use App\Domain\Hr\Models\HrPosition;
+use App\Domain\Hr\Models\HrSuccessionPlan;
 use App\Models\Asset;
 use App\Models\Client;
+use App\Models\ClientIncident;
+use App\Models\ClientMedicalProfile;
+use App\Models\ClientMedication;
+use App\Models\CompetencyFramework;
+use App\Models\ControlRoom\Playbook;
+use App\Models\ControlRoomAlert;
+use App\Models\DataBreachLog;
+use App\Models\DataRetentionPolicy;
+use App\Models\DataSubjectRequest;
+use App\Models\EmergencyDrill;
+use App\Models\FleetTrip;
+use App\Models\FleetVehicleBooking;
+use App\Models\FleetWorkOrder;
+use App\Models\GeofenceZone;
+use App\Models\HazardousSubstance;
+use App\Models\IncidentFollowup;
+use App\Models\LegalHold;
+use App\Models\Permission;
+use App\Models\PriceBook;
+use App\Models\PrivacyImpactAssessment;
+use App\Models\ProcedureTemplate;
+use App\Models\Quote;
+use App\Models\RespiteBooking;
+use App\Models\RespiteStay;
+use App\Models\RespiteTask;
 use App\Models\Role;
+use App\Models\SafeguardingConcern;
+use App\Models\SafeWorkProcedure;
+use App\Models\ServiceAgreement;
 use App\Models\ServiceContext;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\Staff;
+use App\Models\TimelineEvent;
+use App\Models\Timesheet;
+use App\Models\TrainingCourse;
 use App\Models\User;
+use App\Models\WorkplaceInjury;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -42,7 +103,7 @@ class DuskDatabaseSeeder extends Seeder
         $permissionKeys = collect([
             'assets.alerts.manage', 'assets.alerts.view', 'assets.assignments.manage', 'assets.create', 'assets.delete',
             'assets.documents.manage', 'assets.geofences.manage', 'assets.inspections.record', 'assets.maintenance.record',
-            'assets.ownership.manage', 'assets.scan.record', 'assets.telemetry.ingest', 'assets.trackers.manage',
+            'assets.ownership.manage', 'assets.scan.record', 'assets.telemetry.export', 'assets.telemetry.ingest', 'assets.trackers.manage',
             'assets.update', 'assets.viewAny', 'assets.viewAssigned', 'audit.viewAny', 'billing.viewAny',
             'calendar.create', 'calendar.manage_recurring', 'calendar.view', 'calendar.viewAny',
             'care_note_templates.viewAny', 'care_plans.create', 'care_plans.delete', 'care_plans.update', 'care_plans.viewAny',
@@ -115,8 +176,9 @@ class DuskDatabaseSeeder extends Seeder
             'incidents.followups.complete', 'incidents.followups.manage',
             'incidents.portal.manage', 'incidents.reopen', 'incidents.submit',
             'incidents.templates.manage', 'incidents.update', 'incidents.viewAny', 'incidents.viewAssigned',
-            'integrations.manage_site_secrets', 'integrations.manage_tenant_secrets', 'integrations.view',
+            'integrations.manage_site_secrets', 'integrations.manage_secrets', 'integrations.view',
             'invoices.create', 'invoices.send', 'invoices.update', 'invoices.viewAny', 'invoices.void',
+            'it.manage', 'it.organisationWide', 'it.request', 'it.view', 'it.viewSensitive',
             'medications.administer.correct', 'medications.administer.record', 'medications.audit.view',
             'medications.breakglass', 'medications.controlled.record',
             'medications.orders.manage', 'medications.reports.export', 'medications.stock.update', 'medications.view',
@@ -147,7 +209,7 @@ class DuskDatabaseSeeder extends Seeder
             'settings.access.manage', 'settings.branding.manage', 'settings.service_contexts.manage',
             'settings.templates.manage', 'settings.terminology.manage',
             'shifts.create', 'shifts.manageAny', 'shifts.tasks.updateSelf', 'shifts.update', 'shifts.viewAny', 'shifts.viewAssigned',
-            'siteHardware.manage', 'siteHardware.view', 'sites.create', 'sites.update', 'sites.viewAny',
+            'siteHardware.manage', 'siteHardware.view', 'sites.create', 'sites.update', 'sites.viewAll', 'sites.viewAny',
             'staff.assignments.update', 'staff.availability.updateAny', 'staff.availability.updateSelf',
             'staff.credentials.updateAny', 'staff.credentials.updateSelf', 'staff.credentials.viewAny',
             'staff.update', 'staff.viewAny',
@@ -160,14 +222,17 @@ class DuskDatabaseSeeder extends Seeder
             'securityDevices.groups.manage', 'securityDevices.events.view', 'securityDevices.cctv.media.view',
             'securityDevices.maintenance.view', 'securityDevices.maintenance.manage',
             'securityDevices.integrations.view', 'securityDevices.integrations.manage',
-            'securityDevices.reports.view',
+            'securityDevices.reports.view', 'securityDevices.commands.observe',
+            'securityDevices.commands.operate', 'securityDevices.commands.manage',
+            'securityDevices.commands.control', 'securityDevices.commands.approve',
+            'securityDevices.commands.admin',
             'unifi.manage', 'vendors.manage', 'vendors.view',
             'workers.viewAny',
         ]);
 
         $permIds = [];
         foreach ($permissionKeys as $key) {
-            $perm = \App\Models\Permission::firstOrCreate(
+            $perm = Permission::firstOrCreate(
                 ['key' => $key],
                 $this->existingColumns('permissions', [
                     'description' => str_replace('.', ' ', $key),
@@ -179,7 +244,7 @@ class DuskDatabaseSeeder extends Seeder
         }
         $adminRole->permissions()->syncWithoutDetaching($permIds);
 
-        $permissionIdByKey = \App\Models\Permission::query()
+        $permissionIdByKey = Permission::query()
             ->whereIn('key', $permissionKeys)
             ->pluck('id', 'key');
 
@@ -331,7 +396,6 @@ class DuskDatabaseSeeder extends Seeder
         $site = Site::query()->withoutGlobalScopes()->updateOrCreate(
             ['name' => 'QA Main Site'],
             $this->existingColumns('sites', [
-                'tenant_id' => 1,
                 'type' => 'house',
                 'city' => 'Auckland',
                 'region' => 'Auckland',
@@ -378,10 +442,9 @@ class DuskDatabaseSeeder extends Seeder
                 'manager_user_id' => $managerUser->id,
             ],
         ] as $profileData) {
-            \App\Domain\Hr\Models\HrEmployeeProfile::firstOrCreate(
+            HrEmployeeProfile::firstOrCreate(
                 ['user_id' => $profileData['user']->id],
                 $this->existingColumns('hr_employee_profiles', [
-                    'tenant_id' => 1,
                     'employee_number' => $profileData['employee_number'],
                     'work_email' => $profileData['work_email'],
                     'position_title' => $profileData['position_title'],
@@ -401,7 +464,7 @@ class DuskDatabaseSeeder extends Seeder
             );
         }
 
-        \App\Domain\Governance\Models\BoardMember::firstOrCreate(
+        BoardMember::firstOrCreate(
             ['user_id' => $admin->id],
             [
                 'board_role' => 'chair',
@@ -433,8 +496,8 @@ class DuskDatabaseSeeder extends Seeder
             ])
         );
 
-        $this->seed(fn () => \App\Models\ClientMedicalProfile::factory()->create(['client_id' => $client->id]));
-        $this->seed(fn () => \App\Models\ClientMedication::factory()->create(['client_id' => $client->id]));
+        $this->seed(fn () => ClientMedicalProfile::factory()->create(['client_id' => $client->id]));
+        $this->seed(fn () => ClientMedication::factory()->create(['client_id' => $client->id]));
 
         // ──────────────────────────────────────────────
         // Assets
@@ -448,49 +511,49 @@ class DuskDatabaseSeeder extends Seeder
         // ──────────────────────────────────────────────
         // Incidents & Safeguarding
         // ──────────────────────────────────────────────
-        $incident = $this->seed(fn () => \App\Models\ClientIncident::factory()->create([
+        $incident = $this->seed(fn () => ClientIncident::factory()->create([
             'client_id' => $client->id,
             'reported_by' => $admin->id,
         ]));
 
         if ($incident) {
-            $this->seed(fn () => \App\Models\IncidentFollowup::factory()->create([
+            $this->seed(fn () => IncidentFollowup::factory()->create([
                 'client_incident_id' => $incident->id,
                 'assigned_to_user_id' => $staffUser->id,
                 'created_by' => $admin->id,
             ]));
         }
 
-        $this->seed(fn () => \App\Models\SafeguardingConcern::factory()->create([
+        $this->seed(fn () => SafeguardingConcern::factory()->create([
             'reported_by_user_id' => $admin->id,
         ]));
 
         // ──────────────────────────────────────────────
         // Rostering & Timesheets
         // ──────────────────────────────────────────────
-        $this->seed(fn () => \App\Models\Shift::factory()->create([
+        $this->seed(fn () => Shift::factory()->create([
             'client_id' => $client->id,
             'user_id' => $staffUser->id,
             'created_by' => $admin->id,
         ]));
 
-        $this->seed(fn () => \App\Models\Timesheet::factory()->create([
+        $this->seed(fn () => Timesheet::factory()->create([
             'user_id' => $staffUser->id,
             'client_id' => $client->id,
             'created_by' => $admin->id,
         ]));
 
-        $this->seed(fn () => \App\Models\TimelineEvent::factory()->create([
+        $this->seed(fn () => TimelineEvent::factory()->create([
             'actor_user_id' => $admin->id,
         ]));
 
         // ──────────────────────────────────────────────
         // Respite
         // ──────────────────────────────────────────────
-        $booking = $this->seed(fn () => \App\Models\RespiteBooking::factory()->create([
+        $booking = $this->seed(fn () => RespiteBooking::factory()->create([
             'client_id' => $client->id,
         ]));
-        $this->seed(fn () => \App\Models\RespiteStay::firstOrCreate(
+        $this->seed(fn () => RespiteStay::firstOrCreate(
             ['booking_id' => $booking->id],
             [
                 'client_id' => $client->id,
@@ -503,7 +566,7 @@ class DuskDatabaseSeeder extends Seeder
                 'updated_by' => $admin->id,
             ]
         ));
-        $this->seed(fn () => \App\Models\ProcedureTemplate::firstOrCreate(
+        $this->seed(fn () => ProcedureTemplate::firstOrCreate(
             ['name' => 'QA Medication Handover', 'domain' => 'respite'],
             [
                 'version' => '1.0',
@@ -527,88 +590,88 @@ class DuskDatabaseSeeder extends Seeder
                 'updated_by' => $admin->id,
             ]
         ));
-        $this->seed(fn () => \App\Models\RespiteTask::factory()->create());
+        $this->seed(fn () => RespiteTask::factory()->create());
 
         // ──────────────────────────────────────────────
         // Fleet
         // ──────────────────────────────────────────────
         if ($vehicleAsset) {
-            $this->seed(fn () => \App\Models\FleetVehicleBooking::factory()->create([
+            $this->seed(fn () => FleetVehicleBooking::factory()->create([
                 'asset_id' => $vehicleAsset->id,
                 'user_id' => $staffUser->id,
             ]));
-            $this->seed(fn () => \App\Models\FleetWorkOrder::factory()->create([
+            $this->seed(fn () => FleetWorkOrder::factory()->create([
                 'asset_id' => $vehicleAsset->id,
                 'reported_by_user_id' => $staffUser->id,
             ]));
-            $this->seed(fn () => \App\Models\FleetTrip::factory()->create([
+            $this->seed(fn () => FleetTrip::factory()->create([
                 'asset_id' => $vehicleAsset->id,
             ]));
         }
-        $this->seed(fn () => \App\Models\GeofenceZone::factory()->create());
+        $this->seed(fn () => GeofenceZone::factory()->create());
 
         // ──────────────────────────────────────────────
         // Health & Safety
         // ──────────────────────────────────────────────
-        $this->seed(fn () => \App\Models\EmergencyDrill::factory()->create(['site_id' => $site->id]));
-        $this->seed(fn () => \App\Models\WorkplaceInjury::factory()->create(['user_id' => $staffUser->id]));
-        $this->seed(fn () => \App\Models\SafeWorkProcedure::factory()->create());
-        $this->seed(fn () => \App\Models\HazardousSubstance::factory()->create());
+        $this->seed(fn () => EmergencyDrill::factory()->create(['site_id' => $site->id]));
+        $this->seed(fn () => WorkplaceInjury::factory()->create(['user_id' => $staffUser->id]));
+        $this->seed(fn () => SafeWorkProcedure::factory()->create());
+        $this->seed(fn () => HazardousSubstance::factory()->create());
 
         // ──────────────────────────────────────────────
         // Privacy & Legal
         // ──────────────────────────────────────────────
         $this->call(StandardConsentTypesSeeder::class);
-        $this->seed(fn () => \App\Models\DataBreachLog::factory()->create());
-        $this->seed(fn () => \App\Models\DataSubjectRequest::factory()->create());
-        $this->seed(fn () => \App\Models\DataRetentionPolicy::factory()->create());
-        $this->seed(fn () => \App\Models\PrivacyImpactAssessment::factory()->create());
-        $this->seed(fn () => \App\Models\LegalHold::factory()->create());
+        $this->seed(fn () => DataBreachLog::factory()->create());
+        $this->seed(fn () => DataSubjectRequest::factory()->create());
+        $this->seed(fn () => DataRetentionPolicy::factory()->create());
+        $this->seed(fn () => PrivacyImpactAssessment::factory()->create());
+        $this->seed(fn () => LegalHold::factory()->create());
 
         // ──────────────────────────────────────────────
         // Training & Competency
         // ──────────────────────────────────────────────
-        $this->seed(fn () => \App\Models\TrainingCourse::factory()->create());
-        $this->seed(fn () => \App\Models\CompetencyFramework::factory()->create());
+        $this->seed(fn () => TrainingCourse::factory()->create());
+        $this->seed(fn () => CompetencyFramework::factory()->create());
 
         // ──────────────────────────────────────────────
         // Service Agreements, Quotes & Price Books
         // ──────────────────────────────────────────────
-        $this->seed(fn () => \App\Models\ServiceAgreement::factory()->create([
+        $this->seed(fn () => ServiceAgreement::factory()->create([
             'client_id' => $client->id,
         ]));
-        $this->seed(fn () => \App\Models\Quote::factory()->create());
-        $this->seed(fn () => \App\Models\PriceBook::factory()->create());
+        $this->seed(fn () => Quote::factory()->create());
+        $this->seed(fn () => PriceBook::factory()->create());
 
         // ──────────────────────────────────────────────
         // Control Room
         // ──────────────────────────────────────────────
-        $this->seed(fn () => \App\Models\ControlRoomAlert::factory()->create());
-        $this->seed(fn () => \App\Models\ControlRoom\Playbook::factory()->create());
+        $this->seed(fn () => ControlRoomAlert::factory()->create());
+        $this->seed(fn () => Playbook::factory()->create());
 
         // ──────────────────────────────────────────────
         // HR
         // ──────────────────────────────────────────────
-        $this->seed(fn () => \App\Domain\Hr\Models\HrPosition::factory()->create());
-        $this->seed(fn () => \App\Domain\Hr\Models\HrPolicy::factory()->create());
-        $this->seed(fn () => \App\Domain\Hr\Models\HrLeaveRequest::factory()->create([
+        $this->seed(fn () => HrPosition::factory()->create());
+        $this->seed(fn () => HrPolicy::factory()->create());
+        $this->seed(fn () => HrLeaveRequest::factory()->create([
             'user_id' => $staffUser->id,
         ]));
-        $this->seed(fn () => \App\Domain\Hr\Models\HrExpenseClaim::factory()->create([
+        $this->seed(fn () => HrExpenseClaim::factory()->create([
             'user_id' => $staffUser->id,
         ]));
-        $this->seed(fn () => \App\Domain\Hr\Models\HrGoal::factory()->create([
+        $this->seed(fn () => HrGoal::factory()->create([
             'user_id' => $staffUser->id,
             'created_by' => $admin->id,
         ]));
-        $this->seed(fn () => \App\Domain\Hr\Models\HrPerformanceReview::factory()->create([
+        $this->seed(fn () => HrPerformanceReview::factory()->create([
             'employee_user_id' => $staffUser->id,
             'reviewer_user_id' => $managerUser->id,
         ]));
-        $this->seed(fn () => \App\Domain\Hr\Models\HrCase::factory()->create([
+        $this->seed(fn () => HrCase::factory()->create([
             'user_id' => $staffUser->id,
         ]));
-        $this->seed(fn () => \App\Domain\Hr\Models\HrAnnouncement::factory()->create([
+        $this->seed(fn () => HrAnnouncement::factory()->create([
             'created_by' => $admin->id,
         ]));
         // Skipped: HrExitInterview requires employee_profile_id FK
@@ -618,42 +681,46 @@ class DuskDatabaseSeeder extends Seeder
         // ]));
         // Skipped: HrOnboardingChecklist requires employee_profile_id FK
         // $this->seed(fn () => \App\Domain\Hr\Models\HrOnboardingChecklist::factory()->create());
-        $this->seed(fn () => \App\Domain\Hr\Models\HrCompensationReview::factory()->create());
-        $this->seed(fn () => \App\Domain\Hr\Models\HrSuccessionPlan::factory()->create());
+        $this->seed(fn () => HrCompensationReview::factory()->create());
+        $this->seed(fn () => HrSuccessionPlan::factory()->create([
+            'site_id' => $site->id,
+            'current_holder_user_id' => $staffUser->id,
+            'created_by' => $admin->id,
+        ]));
 
         // ──────────────────────────────────────────────
         // Finance
         // ──────────────────────────────────────────────
-        $vendor = $this->seed(fn () => \App\Domain\Finance\Models\FinVendor::factory()->create());
-        $this->seed(fn () => \App\Domain\Finance\Models\FinAccount::factory()->create());
-        $this->seed(fn () => \App\Domain\Finance\Models\FinInvoice::factory()->create());
-        $this->seed(fn () => \App\Domain\Finance\Models\FinCreditNote::factory()->create());
+        $vendor = $this->seed(fn () => FinVendor::factory()->create());
+        $this->seed(fn () => FinAccount::factory()->create());
+        $this->seed(fn () => FinInvoice::factory()->create());
+        $this->seed(fn () => FinCreditNote::factory()->create());
 
         if ($vendor) {
-            $this->seed(fn () => \App\Domain\Finance\Models\FinBill::factory()->create([
+            $this->seed(fn () => FinBill::factory()->create([
                 'vendor_id' => $vendor->id,
             ]));
-            $this->seed(fn () => \App\Domain\Finance\Models\FinPurchaseOrder::factory()->create([
+            $this->seed(fn () => FinPurchaseOrder::factory()->create([
                 'vendor_id' => $vendor->id,
             ]));
         }
 
-        $this->seed(fn () => \App\Domain\Finance\Models\FinBankAccount::factory()->create());
-        $this->seed(fn () => \App\Domain\Finance\Models\FinJournal::factory()->create());
-        $this->seed(fn () => \App\Domain\Finance\Models\FinPaymentRun::factory()->create());
-        $this->seed(fn () => \App\Domain\Finance\Models\FinPettyCashFund::factory()->create());
-        $this->seed(fn () => \App\Domain\Finance\Models\FinFixedAsset::factory()->create());
-        $this->seed(fn () => \App\Domain\Finance\Models\FinGstReturn::factory()->create());
-        $this->seed(fn () => \App\Domain\Finance\Models\FinCashFlowForecast::factory()->create());
-        $this->seed(fn () => \App\Domain\Finance\Models\FinDonorFund::factory()->create());
+        $this->seed(fn () => FinBankAccount::factory()->create());
+        $this->seed(fn () => FinJournal::factory()->create());
+        $this->seed(fn () => FinPaymentRun::factory()->create());
+        $this->seed(fn () => FinPettyCashFund::factory()->create());
+        $this->seed(fn () => FinFixedAsset::factory()->create());
+        $this->seed(fn () => FinGstReturn::factory()->create());
+        $this->seed(fn () => FinCashFlowForecast::factory()->create());
+        $this->seed(fn () => FinDonorFund::factory()->create());
 
         // ──────────────────────────────────────────────
         // Governance
         // ──────────────────────────────────────────────
-        $this->seed(fn () => \App\Domain\Governance\Models\GovernancePolicy::factory()->create([
+        $this->seed(fn () => GovernancePolicy::factory()->create([
             'created_by' => $admin->id,
         ]));
-        $this->seed(fn () => \App\Domain\Governance\Models\GovernanceMeeting::factory()->create([
+        $this->seed(fn () => GovernanceMeeting::factory()->create([
             'created_by' => $admin->id,
         ]));
 
@@ -690,10 +757,6 @@ class DuskDatabaseSeeder extends Seeder
      */
     private function seedUser(array $overrides): User
     {
-        if (Schema::hasColumn('users', 'organization_id') && ! array_key_exists('organization_id', $overrides)) {
-            $overrides['organization_id'] = 1;
-        }
-
         $attributes = User::factory()
             ->withoutTwoFactor()
             ->make($overrides)

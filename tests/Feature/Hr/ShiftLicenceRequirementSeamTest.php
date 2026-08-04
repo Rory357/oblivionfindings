@@ -17,7 +17,6 @@ beforeEach(function () {
 
     $this->manager = User::factory()->create([
         'role' => 'admin',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
     $this->manager->roles()->syncWithoutDetaching([
@@ -26,22 +25,19 @@ beforeEach(function () {
 
     $this->worker = User::factory()->create([
         'role' => 'support_worker',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
     $this->worker->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'support_worker')->firstOrFail()->id,
     ]);
 
-    $this->site = Site::factory()->create(['tenant_id' => 1]);
+    $this->site = Site::factory()->create();
     $this->client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $this->site->id,
     ]);
     $this->context = ServiceContext::factory()->create();
 
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'employee_number' => 'LICENCE-1',
         'is_active' => true,
@@ -54,7 +50,6 @@ beforeEach(function () {
 function licenceRequirementShift(array $overrides = []): Shift
 {
     return Shift::factory()->create([
-        'organization_id' => 1,
         'client_id' => test()->client->id,
         'site_id' => test()->site->id,
         'service_context_id' => test()->context->id,
@@ -73,7 +68,6 @@ function licenceRequirementShift(array $overrides = []): Shift
 function licenceRequirementDriver(array $overrides = []): HrDriverEligibility
 {
     return HrDriverEligibility::query()->create([
-        'tenant_id' => 1,
         'user_id' => test()->worker->id,
         'licence_number' => 'DL-REQUIREMENT',
         'licence_class' => '2',
@@ -146,8 +140,9 @@ test('a licence that expires before the shift blocks eligibility', function () {
         ->and($result['message'])->toContain('expires before this shift');
 });
 
-test('driver data from another organisation never satisfies the requirement', function () {
-    licenceRequirementDriver(['tenant_id' => 2]);
+test('driver data for another worker never satisfies the requirement', function () {
+    $otherWorker = User::factory()->create(['approved_at' => now()]);
+    licenceRequirementDriver(['user_id' => $otherWorker->id]);
 
     $result = app(RequiredDriverLicenceRule::class)->evaluate(
         licenceRequirementShift(['required_licence_class' => '2']),
@@ -155,7 +150,7 @@ test('driver data from another organisation never satisfies the requirement', fu
     );
 
     expect($result['passed'])->toBeFalse()
-        ->and($result['message'])->toContain('this organisation');
+        ->and($result['message'])->toContain('No current driver eligibility record');
 });
 
 test('the assignment endpoint hard-blocks a worker who misses the shift licence requirement', function () {

@@ -13,10 +13,9 @@ use App\Models\Timesheet;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class PayrollExportService
 {
@@ -61,17 +60,14 @@ class PayrollExportService
     /**
      * @throws \InvalidArgumentException
      */
-    public function createRun(?int $tenantId, Carbon $periodStart, Carbon $periodEnd, int $createdBy): HrPayrollRun
+    public function createRun(Carbon $periodStart, Carbon $periodEnd, int $createdBy): HrPayrollRun
     {
         if ($periodStart->greaterThanOrEqualTo($periodEnd)) {
             throw new \InvalidArgumentException('Payroll period start must be before period end.');
         }
 
-        $resolvedTenantId = $this->resolveTenantId($tenantId, $createdBy);
-
-        return DB::transaction(function () use ($resolvedTenantId, $periodStart, $periodEnd, $createdBy) {
+        return DB::transaction(function () use ($periodStart, $periodEnd, $createdBy) {
             $overlap = HrPayrollRun::query()
-                ->where('tenant_id', $resolvedTenantId)
                 ->whereIn('status', ['draft', 'locked'])
                 ->whereDate('period_start', '<=', $periodEnd->toDateString())
                 ->whereDate('period_end', '>=', $periodStart->toDateString())
@@ -82,7 +78,6 @@ class PayrollExportService
             }
 
             $run = HrPayrollRun::create([
-                'tenant_id' => $resolvedTenantId,
                 'period_start' => $periodStart->toDateString(),
                 'period_end' => $periodEnd->toDateString(),
                 'status' => 'draft',
@@ -90,7 +85,7 @@ class PayrollExportService
                 'validation_errors' => [],
             ]);
 
-            $items = $this->getRunItems($resolvedTenantId, $periodStart, $periodEnd);
+            $items = $this->getRunItems($periodStart, $periodEnd);
             $totalHours = 0.0;
             $totalStaff = 0;
             $totalGross = 0.0;
@@ -223,16 +218,17 @@ class PayrollExportService
                 if ($timesheet->status !== 'approved') {
                     Log::info('Skipping non-approved timesheet during payroll paid cascade.', [
                         'payroll_run_id' => $run->id,
-                        'timesheet_id'   => $timesheet->id,
-                        'status'         => $timesheet->status,
+                        'timesheet_id' => $timesheet->id,
+                        'status' => $timesheet->status,
                     ]);
+
                     continue; // timesheet_ids array can be stale — never trust it blindly
                 }
 
                 $payload = [
-                    'status'                 => 'paid',
+                    'status' => 'paid',
                     'exported_to_payroll_at' => now(),
-                    'payroll_reference'      => $reference,
+                    'payroll_reference' => $reference,
                 ];
 
                 $alreadyLinked = filled($timesheet->getOriginal('payroll_reference'))
@@ -267,14 +263,9 @@ class PayrollExportService
         $resolvedProfile = $profile;
         if (! $resolvedProfile) {
             $resolvedProfile = HrPayrollExportProfile::query()
-                ->where('tenant_id', $run->tenant_id)
                 ->where('is_default', true)
                 ->orderByDesc('id')
                 ->first();
-        }
-
-        if ($resolvedProfile && (int) $resolvedProfile->tenant_id !== (int) $run->tenant_id) {
-            throw new \LogicException('Selected export profile does not belong to this payroll run tenant.');
         }
 
         $rows = $this->buildCanonicalRows($run, $items->all());
@@ -304,7 +295,7 @@ class PayrollExportService
             );
         }
 
-        $profileSuffix = $resolvedProfile ? '_' . Str::slug($resolvedProfile->name) : '';
+        $profileSuffix = $resolvedProfile ? '_'.Str::slug($resolvedProfile->name) : '';
 
         $filename = sprintf(
             'payroll-exports/run-%d_%s_%s%s.csv',
@@ -331,14 +322,12 @@ class PayrollExportService
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function getRunItems(?int $tenantId, Carbon $periodStart, Carbon $periodEnd): array
+    public function getRunItems(Carbon $periodStart, Carbon $periodEnd): array
     {
         $timesheetQuery = Timesheet::query()
             ->with(['client:id,service_context_id', 'user:id,role'])
             ->where('status', 'approved')
             ->whereBetween('work_date', [$periodStart->toDateString(), $periodEnd->toDateString()]);
-
-        $this->applyTenantScope($timesheetQuery, $tenantId);
 
         $timesheets = $timesheetQuery->get();
         $grouped = $timesheets->groupBy('user_id');
@@ -347,7 +336,7 @@ class PayrollExportService
         // Approved PAID leave overlapping the period, keyed by user — consumed
         // per-user inside the loop; whatever remains afterwards belongs to
         // employees with leave but no timesheets in the period.
-        $leaveByUser = $this->approvedLeaveHoursByUser($tenantId, $periodStart, $periodEnd);
+        $leaveByUser = $this->approvedLeaveHoursByUser($periodStart, $periodEnd);
 
         foreach ($grouped as $userId => $userTimesheets) {
             $profile = HrEmployeeProfile::query()
@@ -384,7 +373,7 @@ class PayrollExportService
                 $mileageKm += $hours['mileage_km'];
                 $timesheetIds[] = $timesheet->id;
 
-                $effectiveRule = $this->resolvePayRateRule($tenantId, $profile, $timesheet);
+                $effectiveRule = $this->resolvePayRateRule($profile, $timesheet);
                 $rates = $this->resolveRateInputs($effectiveRule);
 
                 $timesheetRegularPay = $hours['regular_hours'] * $baseRate * $rates['regular_multiplier'];
@@ -566,7 +555,7 @@ class PayrollExportService
      *
      * @return array<int, array{hours: float, request_ids: array<int, int>}>
      */
-    protected function approvedLeaveHoursByUser(?int $tenantId, Carbon $periodStart, Carbon $periodEnd): array
+    protected function approvedLeaveHoursByUser(Carbon $periodStart, Carbon $periodEnd): array
     {
         $timezone = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
 
@@ -574,7 +563,6 @@ class PayrollExportService
         // precise overlap is recomputed below on worker-timezone calendar days.
         $requests = HrLeaveRequest::query()
             ->approved()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->where('leave_type', '!=', 'unpaid')
             ->whereDate('starts_at', '<=', $periodEnd->toDateString())
             ->whereDate('ends_at', '>=', $periodStart->copy()->subDay()->toDateString())
@@ -641,7 +629,7 @@ class PayrollExportService
         ];
     }
 
-    protected function resolvePayRateRule(?int $tenantId, ?HrEmployeeProfile $profile, Timesheet $timesheet): ?HrPayRateRule
+    protected function resolvePayRateRule(?HrEmployeeProfile $profile, Timesheet $timesheet): ?HrPayRateRule
     {
         $positionRole = $profile?->position_role ?? $timesheet->user?->role;
         $siteId = $profile?->primary_site_id ?? null;
@@ -652,7 +640,6 @@ class PayrollExportService
 
         $query = HrPayRateRule::query()
             ->active()
-            ->when($tenantId !== null, fn ($builder) => $builder->where('tenant_id', $tenantId))
             ->where(function ($builder) use ($positionRole) {
                 $builder->whereNull('position_role')
                     ->orWhere('position_role', $positionRole);
@@ -730,6 +717,7 @@ class PayrollExportService
 
             if ($item->user_id === null) {
                 $errors[] = "Run item #{$item->id} has no employee assigned.";
+
                 continue;
             }
 
@@ -755,6 +743,7 @@ class PayrollExportService
             foreach ($timesheetIds as $timesheetId) {
                 if (isset($timesheetToItem[$timesheetId])) {
                     $errors[] = "Timesheet #{$timesheetId} is duplicated across run items #{$timesheetToItem[$timesheetId]['item_id']} and #{$item->id}.";
+
                     continue;
                 }
 
@@ -780,6 +769,7 @@ class PayrollExportService
                 $timesheet = $timesheets->get($timesheetId);
                 if (! $timesheet) {
                     $errors[] = "Timesheet #{$timesheetId} linked to item #{$meta['item_id']} does not exist.";
+
                     continue;
                 }
 
@@ -805,46 +795,8 @@ class PayrollExportService
         return array_values(array_unique($errors));
     }
 
-    protected function resolveTenantId(?int $tenantId, int $userId): int
-    {
-        if ($tenantId !== null) {
-            return $tenantId;
-        }
-
-        $profileTenantId = HrEmployeeProfile::query()
-            ->where('user_id', $userId)
-            ->value('tenant_id');
-
-        if (is_numeric($profileTenantId)) {
-            return (int) $profileTenantId;
-        }
-
-        $fallbackTenantId = HrPayrollRun::query()
-            ->orderByDesc('id')
-            ->value('tenant_id')
-            ?? HrEmployeeProfile::query()->orderBy('id')->value('tenant_id');
-
-        return (int) ($fallbackTenantId ?? 1);
-    }
-
-    protected function applyTenantScope($query, ?int $tenantId): void
-    {
-        if ($tenantId === null) {
-            return;
-        }
-
-        if (Schema::hasColumn('timesheets', 'tenant_id')) {
-            $query->where('tenant_id', $tenantId);
-            return;
-        }
-
-        if (Schema::hasColumn('users', 'tenant_id')) {
-            $query->whereHas('user', fn ($userQuery) => $userQuery->where('tenant_id', $tenantId));
-        }
-    }
-
     /**
-     * @param array<int, HrPayrollRunItem> $items
+     * @param  array<int, HrPayrollRunItem>  $items
      * @return array<int, array<string, scalar|null>>
      */
     protected function buildCanonicalRows(HrPayrollRun $run, array $items): array
@@ -908,7 +860,7 @@ class PayrollExportService
     }
 
     /**
-     * @param array<int, array<string, mixed>> $mappings
+     * @param  array<int, array<string, mixed>>  $mappings
      * @return array<int, array{header: string, source: string, value?: mixed}>
      */
     protected function normalizeMappings(array $mappings): array
@@ -946,8 +898,8 @@ class PayrollExportService
     }
 
     /**
-     * @param array<int, array<string, scalar|null>> $rows
-     * @param array<int, array{header: string, source: string, value?: mixed}> $mappings
+     * @param  array<int, array<string, scalar|null>>  $rows
+     * @param  array<int, array{header: string, source: string, value?: mixed}>  $mappings
      */
     protected function buildCsvFromRows(
         array $rows,
@@ -972,6 +924,7 @@ class PayrollExportService
             foreach ($mappings as $mapping) {
                 if ($mapping['source'] === 'static') {
                     $values[] = $mapping['value'] ?? '';
+
                     continue;
                 }
 
@@ -981,11 +934,11 @@ class PayrollExportService
             $lines[] = $this->encodeCsvRow($values, $safeDelimiter, $safeEnclosure);
         }
 
-        return implode($safeLineEnding, $lines) . $safeLineEnding;
+        return implode($safeLineEnding, $lines).$safeLineEnding;
     }
 
     /**
-     * @param array<int, mixed> $values
+     * @param  array<int, mixed>  $values
      */
     protected function encodeCsvRow(array $values, string $delimiter, string $enclosure): string
     {
@@ -994,9 +947,9 @@ class PayrollExportService
                 // Employee names, notes and static profile values are user-chosen —
                 // neutralise formula-leading cells (OWASP CSV injection) before enclosing.
                 $stringValue = (string) $this->sanitizeCsvCell((string) ($value ?? ''));
-                $escaped = str_replace($enclosure, $enclosure . $enclosure, $stringValue);
+                $escaped = str_replace($enclosure, $enclosure.$enclosure, $stringValue);
 
-                return $enclosure . $escaped . $enclosure;
+                return $enclosure.$escaped.$enclosure;
             })
             ->implode($delimiter);
     }

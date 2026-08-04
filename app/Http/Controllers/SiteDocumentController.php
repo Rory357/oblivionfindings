@@ -98,7 +98,6 @@ class SiteDocumentController extends Controller
         $stored = $file->store($dir, 'local');
 
         $doc = SiteDocument::create([
-            'tenant_id' => $site->tenant_id,
             'site_id' => $site->id,
             'uploaded_by_user_id' => $request->user()?->id,
             'title' => $data['title'] ?? null,

@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrCompensationReview;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -10,28 +11,32 @@ use Database\Seeders\SeedHrPermissionsSeeder;
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
+    $this->site = Site::factory()->create(['name' => 'Compensation approval Site']);
 
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
     ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+    ]);
 
     $this->employee = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
     $this->profile = HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->employee->id,
         'employee_number' => 'EMP-COMP-'.$this->employee->id,
         'work_email' => 'comp'.$this->employee->id.'@example.test',
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
+        'primary_site_id' => $this->site->id,
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'annual_salary' => 60000,
@@ -43,7 +48,6 @@ beforeEach(function () {
 function makePlanningReview(int $hrId, int $profileId): HrCompensationReview
 {
     $review = HrCompensationReview::query()->create([
-        'tenant_id' => 1,
         'title' => 'FY2026 Annual Review',
         'review_cycle' => 'annual',
         'effective_date' => '2026-07-01',

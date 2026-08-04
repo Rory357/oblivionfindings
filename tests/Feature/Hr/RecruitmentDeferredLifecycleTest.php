@@ -2,6 +2,7 @@
 
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrInterviewScore;
 use App\Domain\Hr\Models\HrOffer;
@@ -17,29 +18,36 @@ use Illuminate\Support\Facades\Notification;
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->firstOrFail()->id,
     ]);
-    $this->site = Site::factory()->create(['tenant_id' => 1]);
+    $this->site = Site::factory()->create();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'position_role' => 'hr',
+        'is_active' => true,
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+    ]);
 });
 
 function deferredRecruitmentApplication(User $actor, string $stage): array
 {
     $candidate = HrCandidate::factory()->create([
-        'tenant_id' => 1,
         'status' => $stage,
         'created_by' => $actor->id,
         'updated_by' => $actor->id,
     ]);
     $application = HrApplication::factory()->create([
-        'tenant_id' => 1,
         'candidate_id' => $candidate->id,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
+        'target_site_id' => test()->site->id,
         'status' => 'active',
     ]);
 
@@ -140,7 +148,6 @@ test('force expiry invalidates the portal immediately and records actor reason a
 
     $audit = AuditLog::query()->where('action', 'recruitment.offer_force_expired')->latest('id')->first();
     expect($audit)->not->toBeNull()
-        ->and($audit->organization_id)->toBe(1)
         ->and($audit->user_id)->toBe($this->hr->id)
         ->and($audit->meta['reason'])->toBe('Candidate requested more time before a revised package.');
 });
@@ -176,7 +183,7 @@ test('resend is the intentional revival path and rotates the portal token', func
 });
 
 test('full interviewer scorecard quorum permits advancement beyond interview', function () {
-    $second = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $second = User::factory()->create(['approved_at' => now()]);
     ['candidate' => $candidate] = deferredCompletedPanel(
         $this->hr,
         [$this->hr->id, $second->id],
@@ -190,7 +197,7 @@ test('full interviewer scorecard quorum permits advancement beyond interview', f
 
 test('zero interviewers and missing scorecards block advancement', function (string $scenario) {
     $second = $scenario === 'missing'
-        ? User::factory()->create(['organization_id' => 1, 'approved_at' => now()])
+        ? User::factory()->create(['approved_at' => now()])
         : null;
     $interviewers = $second ? [$this->hr->id, $second->id] : [];
     $submittedBy = $second ? [$this->hr->id] : [];
@@ -214,7 +221,7 @@ test('zero interviewers and missing scorecards block advancement', function (str
 ]);
 
 test('scorecard override requires a non-empty reason and is canonically audited', function () {
-    $second = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $second = User::factory()->create(['approved_at' => now()]);
     ['application' => $application, 'candidate' => $candidate, 'interview' => $interview] = deferredCompletedPanel(
         $this->hr,
         [$this->hr->id, $second->id],
@@ -239,7 +246,6 @@ test('scorecard override requires a non-empty reason and is canonically audited'
     expect($candidate->fresh()->status)->toBe('reference_check');
     $audit = AuditLog::query()->where('action', 'recruitment.scorecard_quorum_overridden')->latest('id')->first();
     expect($audit)->not->toBeNull()
-        ->and($audit->organization_id)->toBe(1)
         ->and($audit->user_id)->toBe($this->hr->id)
         ->and($audit->meta['interview_id'])->toBe($interview->id)
         ->and($audit->meta['missing_interviewer_ids'])->toBe([$second->id])

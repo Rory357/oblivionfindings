@@ -2,6 +2,7 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
@@ -11,6 +12,18 @@ beforeEach(function () {
     $this->hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
+    ]);
+    $this->site = Site::factory()->create(['name' => 'Directory Test Site']);
+    HrEmployeeProfile::query()->create([
+        'user_id' => $this->hr->id,
+        'employee_number' => 'EMP-DIR-VIEWER',
+        'work_email' => $this->hr->email,
+        'position_title' => 'HR Manager',
+        'position_role' => 'hr',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $this->site->id,
     ]);
 });
 
@@ -34,7 +47,6 @@ test('the people index exposes directory card fields on each row', function () {
         'approved_at' => now(),
     ]);
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $staff->id,
         'employee_number' => 'EMP-DIR-1',
         'preferred_name' => 'Ana',
@@ -45,6 +57,7 @@ test('the people index exposes directory card fields on each row', function () {
         'employment_type' => 'full_time',
         'start_date' => now()->subMonth()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
     ]);
 
     $response = $this->actingAs($this->hr)->get('/hr/people');

@@ -5,9 +5,10 @@ namespace Tests\Feature\Domain\Clinical;
 use App\Domain\Clinical\Models\ClinicalAttachment;
 use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Domain\Clinical\Models\ClinicalObservation;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
-use App\Models\HsEvent;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
@@ -31,12 +32,15 @@ class HealthClinicalModuleRecordingTest extends TestCase
 
     protected Client $client;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
-        $this->client = Client::factory()->create();
+        $this->site = Site::factory()->create(['is_active' => true]);
+        $this->client = Client::factory()->create(['site_id' => $this->site->id]);
     }
 
     protected function createUserWithRole(string $roleName): User
@@ -46,6 +50,14 @@ class HealthClinicalModuleRecordingTest extends TestCase
         if ($role) {
             $user->roles()->attach($role);
         }
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
 
         return $user;
     }

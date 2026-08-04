@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientDocument;
 use App\Models\ClientDocumentFolder;
@@ -12,13 +13,16 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
+use Database\Factories\ClientFactory as BaseClientFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ClientControllerTest extends TestCase
@@ -71,7 +75,26 @@ class ClientControllerTest extends TestCase
         $this->auditor->roles()->attach(Role::where('name', 'auditor')->first());
 
         $this->site = Site::factory()->create();
+        ClientControllerSiteScopedClientFactory::$siteId = $this->site->id;
+        Factory::guessFactoryNamesUsing(function (string $modelName): string {
+            if ($modelName === Client::class) {
+                return ClientControllerSiteScopedClientFactory::class;
+            }
+
+            $relativeName = Str::startsWith($modelName, 'App\\Models\\')
+                ? Str::after($modelName, 'App\\Models\\')
+                : Str::after($modelName, 'App\\');
+
+            return 'Database\\Factories\\'.$relativeName.'Factory';
+        });
         $this->serviceContext = ServiceContext::factory()->create();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->supportWorker->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'end_date' => null,
+        ]);
     }
 
     /**
@@ -83,6 +106,15 @@ class ClientControllerTest extends TestCase
         $role = Role::where('name', $roleName)->first();
         if ($role) {
             $user->roles()->attach($role);
+        }
+        if (! in_array($roleName, ['client', 'next_of_kin'], true)) {
+            HrEmployeeProfile::factory()->create([
+                'user_id' => $user->id,
+                'primary_site_id' => $this->site->id,
+                'secondary_site_ids' => [],
+                'is_active' => true,
+                'end_date' => null,
+            ]);
         }
 
         return $user;
@@ -336,7 +368,7 @@ class ClientControllerTest extends TestCase
         );
     }
 
-    public function test_index_returns_null_site_for_client_without_site(): void
+    public function test_index_excludes_client_without_a_canonical_site(): void
     {
         Client::factory()->create(['site_id' => null]);
 
@@ -344,7 +376,7 @@ class ClientControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->where('clients.0.site', null)
+            ->has('clients', 0)
         );
     }
 
@@ -1849,7 +1881,7 @@ class ClientControllerTest extends TestCase
         $response->assertJsonPath('client.service_context_id', $this->serviceContext->id);
     }
 
-    public function test_edit_form_includes_inactive_site_if_client_assigned_to_it(): void
+    public function test_edit_form_denies_client_assigned_to_an_inactive_site(): void
     {
         $inactiveSite = Site::factory()->create(['is_active' => false, 'name' => 'Old Site']);
         $client = Client::factory()->create(['site_id' => $inactiveSite->id]);
@@ -1857,10 +1889,7 @@ class ClientControllerTest extends TestCase
         $response = $this->actingAs($this->admin)
             ->getJson("/clients/{$client->id}/edit");
 
-        $response->assertOk();
-        // The sites list must contain the inactive site because the client is assigned to it.
-        $siteIds = collect($response->json('sites'))->pluck('id')->all();
-        $this->assertContains($inactiveSite->id, $siteIds);
+        $response->assertForbidden();
     }
 
     // =========================================================================
@@ -2553,16 +2582,13 @@ class ClientControllerTest extends TestCase
         );
     }
 
-    public function test_show_returns_client_with_no_site(): void
+    public function test_show_denies_client_without_a_canonical_site(): void
     {
         $client = Client::factory()->create(['site_id' => null]);
 
         $response = $this->actingAs($this->admin)->get("/operations/clients/{$client->id}");
 
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->where('client.site', null)
-        );
+        $response->assertForbidden();
     }
 
     public function test_show_returns_client_with_no_service_context(): void
@@ -2664,15 +2690,14 @@ class ClientControllerTest extends TestCase
         $this->assertNotNull($client->profile_photo_path);
     }
 
-    public function test_show_json_returns_null_site_for_client_without_site(): void
+    public function test_show_json_denies_client_without_a_canonical_site(): void
     {
         $client = Client::factory()->create(['site_id' => null]);
 
         $response = $this->actingAs($this->admin)
             ->getJson("/operations/clients/{$client->id}");
 
-        $response->assertOk();
-        $response->assertJsonPath('client.site', null);
+        $response->assertForbidden();
     }
 
     public function test_index_returns_empty_list_when_no_clients_exist(): void
@@ -2932,5 +2957,22 @@ class ClientControllerTest extends TestCase
     {
         $response = $this->actingAs($this->admin)->get('/clients/99999/edit');
         $response->assertNotFound();
+    }
+}
+
+/**
+ * Keep legacy controller coverage focused on its intended Site while allowing
+ * individual tests to opt out explicitly with ['site_id' => null].
+ */
+final class ClientControllerSiteScopedClientFactory extends BaseClientFactory
+{
+    public static int $siteId;
+
+    public function definition(): array
+    {
+        return [
+            ...parent::definition(),
+            'site_id' => self::$siteId,
+        ];
     }
 }

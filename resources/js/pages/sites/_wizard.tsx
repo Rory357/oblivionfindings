@@ -1,6 +1,6 @@
+import { FieldLabel } from '@/components/field-label';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FieldLabel } from '@/components/field-label';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -12,8 +12,6 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { WizardStep } from '@/components/wizard-stepper';
-import { CONTACT_TYPES } from './contacts/_helpers';
-export { CONTACT_TYPES };
 import {
     AlertTriangle,
     BedDouble,
@@ -45,6 +43,8 @@ import {
     type ComponentType,
     type ReactElement,
 } from 'react';
+import { CONTACT_TYPES } from './contacts/_helpers';
+export { CONTACT_TYPES };
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -321,7 +321,6 @@ export const emptyResource = (): Resource => ({
 
 export const emptyZone = (): Zone => ({ name: '', zone_type: 'workshop' });
 
-
 // ── Step props ────────────────────────────────────────────────────────────
 
 export type StepProps = {
@@ -329,7 +328,10 @@ export type StepProps = {
     setData: SetData;
     errors: Record<string, string | undefined>;
     fieldRefs?: Partial<
-        Record<keyof WizardData, React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>>
+        Record<
+            keyof WizardData,
+            React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>
+        >
     >;
     regionOptions?: string[];
 };
@@ -364,7 +366,8 @@ export function StepBasics({
                         const Icon = type.icon;
                         const isSelected = data.type === type.value;
                         return (
-                            <Button unstyled
+                            <Button
+                                unstyled
                                 key={type.value}
                                 type="button"
                                 onClick={() => setData('type', type.value)}
@@ -415,7 +418,10 @@ export function StepBasics({
                     className={`mt-1 ${errors.name ? 'border-status-critical ring-1 ring-status-critical/40' : ''}`}
                 />
                 {errors.name && (
-                    <p id="name-error" className="mt-1 text-sm text-status-critical">
+                    <p
+                        id="name-error"
+                        className="mt-1 text-sm text-status-critical"
+                    >
                         {errors.name}
                     </p>
                 )}
@@ -428,13 +434,17 @@ export function StepBasics({
                         type="color"
                         aria-label="Brand colour picker"
                         value={data.brand_colour || '#7c3aed'}
-                        onChange={(e) => setData('brand_colour', e.target.value)}
+                        onChange={(e) =>
+                            setData('brand_colour', e.target.value)
+                        }
                         className="h-9 w-12 shrink-0 cursor-pointer rounded-md border bg-transparent p-1"
                     />
                     <Input
                         id="brand_colour"
                         value={data.brand_colour}
-                        onChange={(e) => setData('brand_colour', e.target.value)}
+                        onChange={(e) =>
+                            setData('brand_colour', e.target.value)
+                        }
                         placeholder="#RRGGBB — leave blank for theme default"
                         aria-invalid={!!errors.brand_colour}
                         className={`flex-1 ${errors.brand_colour ? 'border-status-critical ring-1 ring-status-critical/40' : ''}`}
@@ -451,7 +461,8 @@ export function StepBasics({
                     ) : null}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                    Tints this site&apos;s medication (eMAR) page hero. Leave blank to inherit the default theme colour.
+                    Tints this site&apos;s medication (eMAR) page hero. Leave
+                    blank to inherit the default theme colour.
                 </p>
                 {errors.brand_colour && (
                     <p className="mt-1 text-sm text-status-critical">
@@ -462,16 +473,14 @@ export function StepBasics({
 
             <div>
                 <FieldLabel htmlFor="primary_contact_user_id" recommended>
-                    Site Lead / Manager
+                    Responsible staff member
                 </FieldLabel>
                 <Select
                     value={data.primary_contact_user_id || undefined}
-                    onValueChange={(v) =>
-                        setData('primary_contact_user_id', v)
-                    }
+                    onValueChange={(v) => setData('primary_contact_user_id', v)}
                 >
                     <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select manager…" />
+                        <SelectValue placeholder="Select current staff…" />
                     </SelectTrigger>
                     <SelectContent>
                         {users.map((u) => (
@@ -575,9 +584,7 @@ export function StepAddress({
                     <Field label="Country" error={errors.country}>
                         <Input
                             value={data.country}
-                            onChange={(e) =>
-                                setData('country', e.target.value)
-                            }
+                            onChange={(e) => setData('country', e.target.value)}
                         />
                     </Field>
                     <Field label="Region" recommended error={errors.region}>
@@ -684,7 +691,9 @@ export function StepRoomsOrResources({ data, setData }: StepProps) {
                                                 )
                                             }
                                             placeholder="Room name"
-                                            aria-invalid={!!roomNameWarning(room.name)}
+                                            aria-invalid={
+                                                !!roomNameWarning(room.name)
+                                            }
                                         />
                                         {roomNameWarning(room.name) && (
                                             <p className="text-xs text-status-warning">
@@ -835,16 +844,14 @@ export function StepRoomsOrResources({ data, setData }: StepProps) {
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {RESOURCE_TYPES.map(
-                                                        (t) => (
-                                                            <SelectItem
-                                                                key={t.value}
-                                                                value={t.value}
-                                                            >
-                                                                {t.label}
-                                                            </SelectItem>
-                                                        ),
-                                                    )}
+                                                    {RESOURCE_TYPES.map((t) => (
+                                                        <SelectItem
+                                                            key={t.value}
+                                                            value={t.value}
+                                                        >
+                                                            {t.label}
+                                                        </SelectItem>
+                                                    ))}
                                                 </SelectContent>
                                             </Select>
                                         </Field>
@@ -918,8 +925,7 @@ export function StepRoomsOrResources({ data, setData }: StepProps) {
                                 >
                                     <div className="flex items-start justify-between gap-2">
                                         <span className="text-sm font-semibold">
-                                            {z.name.trim() ||
-                                                `Zone ${i + 1}`}
+                                            {z.name.trim() || `Zone ${i + 1}`}
                                         </span>
                                         <Button
                                             type="button"
@@ -1050,7 +1056,11 @@ export function StepContacts({
 
             <Section icon={Phone} title="Site contact details">
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Primary phone" recommended error={errors.phone}>
+                    <Field
+                        label="Primary phone"
+                        recommended
+                        error={errors.phone}
+                    >
                         <Input
                             value={data.phone}
                             onChange={(e) => setData('phone', e.target.value)}
@@ -1224,9 +1234,7 @@ function ContactCard({
             <Field label="Notes">
                 <Textarea
                     value={contact.notes}
-                    onChange={(e) =>
-                        onUpdate(index, { notes: e.target.value })
-                    }
+                    onChange={(e) => onUpdate(index, { notes: e.target.value })}
                     rows={2}
                     placeholder="Best time to call, preferred channel, etc."
                 />
@@ -1274,7 +1282,10 @@ export function StepAssets({
                 subtitle="Pick from the assets pool. Only unassigned assets (and ones already on this site) are listed. To create a new asset, use the Assets module."
             />
 
-            <Section icon={Package} title={`Available assets (${availableAssets.length})`}>
+            <Section
+                icon={Package}
+                title={`Available assets (${availableAssets.length})`}
+            >
                 {availableAssets.length === 0 ? (
                     <EmptyState
                         icon={Package}
@@ -1349,7 +1360,9 @@ export function StepAssets({
                                                     {asset.serial_number && (
                                                         <span>
                                                             S/N{' '}
-                                                            {asset.serial_number}
+                                                            {
+                                                                asset.serial_number
+                                                            }
                                                         </span>
                                                     )}
                                                 </div>
@@ -1405,7 +1418,7 @@ export function StepDocuments({
                                 key={`pending-${i}`}
                                 className="flex items-center justify-between rounded-lg border bg-muted/20 p-3 text-sm"
                             >
-                                <div className="flex items-center gap-3 min-w-0">
+                                <div className="flex min-w-0 items-center gap-3">
                                     <FileText className="h-4 w-4 shrink-0 text-primary" />
                                     <div className="min-w-0">
                                         <p className="truncate font-medium">
@@ -1446,7 +1459,7 @@ export function StepDocuments({
                                 key={doc.id}
                                 className="flex items-center justify-between rounded-lg border p-3 text-sm"
                             >
-                                <div className="flex items-center gap-3 min-w-0">
+                                <div className="flex min-w-0 items-center gap-3">
                                     <FileText className="h-4 w-4 shrink-0 text-primary" />
                                     <div className="min-w-0">
                                         <p className="truncate font-medium">
@@ -1469,9 +1482,7 @@ export function StepDocuments({
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() =>
-                                            onDeleteExisting(doc.id)
-                                        }
+                                        onClick={() => onDeleteExisting(doc.id)}
                                         className="text-status-critical hover:text-status-critical"
                                     >
                                         <Trash2 className="h-3.5 w-3.5" />
@@ -1560,10 +1571,7 @@ function DocumentUploader({
                 />
             </Field>
 
-            <Field
-                label="File *"
-                hint="PDF, Word, Excel, or images. Max 20MB."
-            >
+            <Field label="File *" hint="PDF, Word, Excel, or images. Max 20MB.">
                 <Input
                     ref={fileInputRef}
                     type="file"
@@ -1824,10 +1832,7 @@ export function StepSafety({ data, setData, errors }: StepProps) {
                     <Input
                         value={data.emergency_plan_location}
                         onChange={(e) =>
-                            setData(
-                                'emergency_plan_location',
-                                e.target.value,
-                            )
+                            setData('emergency_plan_location', e.target.value)
                         }
                         placeholder="e.g. Kitchen drawer, Office filing cabinet"
                     />
@@ -1850,7 +1855,11 @@ export function StepSafety({ data, setData, errors }: StepProps) {
                 </Field>
             </Section>
 
-            <Section icon={AlertTriangle} title="Risk assessment" tone="warning">
+            <Section
+                icon={AlertTriangle}
+                title="Risk assessment"
+                tone="warning"
+            >
                 <div className="grid gap-3 sm:grid-cols-2">
                     <FlagOption
                         id="is_high_risk"
@@ -1890,10 +1899,7 @@ export function StepSafety({ data, setData, errors }: StepProps) {
                                 type="date"
                                 value={data.risk_review_date}
                                 onChange={(e) =>
-                                    setData(
-                                        'risk_review_date',
-                                        e.target.value,
-                                    )
+                                    setData('risk_review_date', e.target.value)
                                 }
                             />
                         </Field>
@@ -2020,7 +2026,9 @@ export function Field({
                 <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
             )}
             {error && (
-                <p id={errorId} className="mt-1 text-sm text-status-critical">{error}</p>
+                <p id={errorId} className="mt-1 text-sm text-status-critical">
+                    {error}
+                </p>
             )}
         </div>
     );
@@ -2094,7 +2102,8 @@ function roomNameWarning(name: string): string | null {
     const value = name.trim();
     if (!value) return null;
     if (value.length < 2) return 'Use a clear room name.';
-    const whitelisted = /^(bedroom|kitchen|lounge|bathroom|laundry|hallway|garage|garden|office|dining|living|ensuite)/i;
+    const whitelisted =
+        /^(bedroom|kitchen|lounge|bathroom|laundry|hallway|garage|garden|office|dining|living|ensuite)/i;
     if (whitelisted.test(value)) return null;
     if (/^[a-z]{4,8}$/i.test(value)) {
         return "This doesn't look like a real room name. Examples: Bedroom 1, Master bedroom, Lounge, Ensuite.";

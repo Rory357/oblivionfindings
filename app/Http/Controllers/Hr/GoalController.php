@@ -11,9 +11,12 @@ use App\Domain\Hr\Models\HrKeyResult;
 use App\Domain\Hr\Notifications\GoalAssignedNotification;
 use App\Domain\Hr\Services\CycleService;
 use App\Domain\Hr\Services\GoalService;
+use App\Domain\Hr\Services\HrGoalAccessService;
 use App\Domain\Hr\Services\HrNotificationService;
+use App\Domain\Hr\Services\HrPerformanceAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -26,6 +29,8 @@ class GoalController extends Controller
         protected GoalService $goalService,
         protected CycleService $cycleService,
         protected HrNotificationService $notificationService,
+        private readonly HrPerformanceAccessService $performanceAccess,
+        private readonly HrGoalAccessService $goalAccess,
     ) {}
 
     /* ------------------------------------------------------------------ */
@@ -34,15 +39,12 @@ class GoalController extends Controller
 
     public function index(Request $request)
     {
-        $user = $request->user();
-        abort_unless($this->canView($user), 403);
-
-        $tenantId = $user->tenant_id ?? 1;
+        $user = $this->viewer($request);
 
         // Resolve cycle lens. ?cycle=all shows every cycle; a numeric id scopes
         // to that cycle; default is the current cycle (or all if it's empty).
-        $cycles = $this->cycleService->cyclesForTenant($tenantId);
-        $current = $this->cycleService->currentCycle($tenantId);
+        $cycles = $this->cycleService->cycles();
+        $current = $this->cycleService->currentCycle();
         $cycleParam = $request->query('cycle');
 
         $selectedCycleId = null; // null === "all"
@@ -51,14 +53,33 @@ class GoalController extends Controller
         } elseif (is_numeric($cycleParam) && $cycles->contains('id', (int) $cycleParam)) {
             $selectedCycleId = (int) $cycleParam;
         } elseif ($current) {
-            $hasGoals = HrGoal::forTenant($tenantId)->where('cycle_id', $current->id)->exists();
+            $hasGoals = $this->goalAccess
+                ->applyHistoricalGoalScope(HrGoal::query(), $user)
+                ->where('cycle_id', $current->id)
+                ->exists();
             $selectedCycleId = $hasGoals ? $current->id : null;
         }
 
-        $objectives = HrGoal::query()
-            ->forTenant($tenantId)
-            ->with(['user:id,name', 'parentGoal:id,title', 'cycle:id,name', 'keyResults.owner:id,name'])
-            ->withCount('developmentGoals')
+        $objectives = $this->goalAccess
+            ->applyHistoricalGoalScope(HrGoal::query(), $user)
+            ->with([
+                'user:id,name',
+                'parentGoal' => fn ($parentQuery) => $this->goalAccess
+                    ->applyHistoricalGoalScope($parentQuery, $user)
+                    ->select(['id', 'title', 'user_id']),
+                'cycle:id,name',
+                'keyResults' => fn ($keyResultQuery) => $keyResultQuery->with([
+                    'owner' => fn ($ownerQuery) => $ownerQuery
+                        ->whereIn('users.id', $this->goalAccess->historicalStaffQuery($user))
+                        ->select(['users.id', 'users.name']),
+                ]),
+            ])
+            ->withCount([
+                'developmentGoals' => fn ($developmentQuery) => $developmentQuery->whereIn(
+                    $developmentQuery->qualifyColumn('employee_user_id'),
+                    $this->performanceAccess->historicalUserIds($user),
+                ),
+            ])
             ->forCycle($selectedCycleId)
             ->orderByDesc('priority')
             ->orderByDesc('created_at')
@@ -66,10 +87,13 @@ class GoalController extends Controller
             ->map(fn (HrGoal $g) => $this->mapObjective($g))
             ->values();
 
-        $users = User::orderBy('name')->get(['id', 'name']);
+        $users = $this->goalAccess->currentStaffQuery($user)
+            ->orderBy('name')
+            ->limit(500)
+            ->get(['id', 'name']);
 
-        $developmentPlans = HrDevelopmentGoal::query()
-            ->forTenant($tenantId)
+        $developmentPlans = $this->performanceAccess
+            ->applyHistoricalSubjectScope(HrDevelopmentGoal::query(), $user)
             ->with(['employee:id,name', 'manager:id,name', 'goal:id,title', 'competency:id,name'])
             ->orderByRaw("CASE WHEN status = 'blocked' THEN 0 WHEN status = 'in_progress' THEN 1 WHEN status = 'not_started' THEN 2 ELSE 3 END")
             ->orderBy('due_date')
@@ -77,8 +101,8 @@ class GoalController extends Controller
             ->map(fn (HrDevelopmentGoal $d) => $this->mapDevelopmentPlan($d))
             ->values();
 
-        $analytics = $this->goalService->getGoalAnalytics($tenantId, $selectedCycleId);
-        $cascadeTree = $this->goalService->getCompanyGoalTree($tenantId, $selectedCycleId);
+        $analytics = $this->goalService->getGoalAnalytics($user, $selectedCycleId);
+        $cascadeTree = $this->goalService->getCompanyGoalTree($user, $selectedCycleId);
 
         return Inertia::render('hr/goals/index', [
             'objectives' => $objectives,
@@ -86,7 +110,7 @@ class GoalController extends Controller
             'users' => $users,
             'goalTypes' => $this->goalTypeOptions(),
             'priorities' => $this->priorityOptions(),
-            'parentGoals' => $this->parentGoalOptions($tenantId),
+            'parentGoals' => $this->parentGoalOptions($user),
             'cycles' => $cycles->sortBy('starts_at')->values()->map(fn (HrGoalCycle $c) => [
                 'id' => $c->id,
                 'name' => $c->name,
@@ -101,7 +125,7 @@ class GoalController extends Controller
             'analytics' => $analytics,
             'cascadeTree' => $cascadeTree,
             'devCategories' => $this->devCategoryOptions(),
-            'templates' => HrGoalTemplate::forTenant($tenantId)->active()->orderBy('name')->get()
+            'templates' => HrGoalTemplate::query()->active()->orderBy('name')->get()
                 ->map(fn (HrGoalTemplate $t) => [
                     'id' => $t->id,
                     'name' => $t->name,
@@ -112,10 +136,12 @@ class GoalController extends Controller
                     'priority' => $t->priority,
                     'key_results' => $t->key_results ?? [],
                 ]),
-            'allTags' => HrGoal::forTenant($tenantId)->whereNotNull('tags')->pluck('tags')
+            'allTags' => $this->goalAccess
+                ->applyHistoricalGoalScope(HrGoal::query(), $user)
+                ->whereNotNull('tags')
+                ->pluck('tags')
                 ->flatMap(fn ($t) => is_array($t) ? $t : [])->unique()->sort()->values(),
             'competencies' => HrCompetency::query()
-                ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId))
                 ->orderBy('name')->get(['id', 'name'])
                 ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]),
             'can' => [
@@ -223,8 +249,7 @@ class GoalController extends Controller
      */
     public function create(Request $request)
     {
-        $user = $request->user();
-        abort_unless($this->canManage($user), 403);
+        $this->manager($request);
 
         return redirect()->route('hr.goals.index');
     }
@@ -250,9 +275,15 @@ class GoalController extends Controller
     }
 
     /** Active/draft goals selectable as a parent in the dialog. */
-    private function parentGoalOptions(int $tenantId)
+    private function parentGoalOptions(User $viewer, ?int $excludeGoalId = null)
     {
-        return HrGoal::forTenant($tenantId)
+        return $this->goalAccess
+            ->applyCurrentGoalScope(HrGoal::query(), $viewer)
+            ->when($excludeGoalId, fn (Builder $query) => $query->where(
+                $query->qualifyColumn('id'),
+                '!=',
+                $excludeGoalId,
+            ))
             ->where(fn ($q) => $q->where('status', 'active')->orWhere('status', 'draft'))
             ->orderBy('title')
             ->get(['id', 'title'])
@@ -266,21 +297,18 @@ class GoalController extends Controller
 
     public function store(Request $request)
     {
-        $user = $request->user();
-        abort_unless($this->canManage($user), 403);
-
-        $tenantId = $user->tenant_id ?? 1;
+        $user = $this->manager($request);
 
         $data = $request->validate([
-            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'user_id' => ['required', 'integer'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'goal_type' => ['required', 'string', 'in:individual,team,company'],
             'category' => ['nullable', 'string', 'max:255'],
             'tags' => ['sometimes', 'array'],
             'tags.*' => ['string', 'max:40'],
-            'parent_goal_id' => ['nullable', 'integer', Rule::exists('hr_goals', 'id')->where('tenant_id', $tenantId)],
-            'cycle_id' => ['nullable', 'integer', Rule::exists('hr_goal_cycles', 'id')->where('tenant_id', $tenantId)],
+            'parent_goal_id' => ['nullable', 'integer'],
+            'cycle_id' => ['nullable', 'integer'],
             'target_value' => ['nullable', 'numeric', 'min:0'],
             'unit' => ['nullable', 'string', 'max:50'],
             'priority' => ['required', 'string', 'in:low,medium,high'],
@@ -300,12 +328,21 @@ class GoalController extends Controller
 
         $keyResults = $data['key_results'] ?? [];
         unset($data['key_results']);
+        $owner = $this->goalAccess->currentStaff($user, (int) $data['user_id']);
+        $parent = isset($data['parent_goal_id'])
+            ? $this->goalAccess->currentGoal($user, (int) $data['parent_goal_id'])
+            : null;
+        $cycle = isset($data['cycle_id'])
+            ? $this->cycle((int) $data['cycle_id'])
+            : null;
 
-        $goal = DB::transaction(function () use ($data, $keyResults, $tenantId, $user) {
+        $goal = DB::transaction(function () use ($data, $keyResults, $owner, $parent, $cycle, $user) {
             $goal = $this->goalService->createGoal([
-                'tenant_id' => $tenantId,
-                'created_by' => $user->id,
                 ...$data,
+                'user_id' => $owner->id,
+                'parent_goal_id' => $parent?->id,
+                'cycle_id' => $cycle?->id,
+                'created_by' => $user->id,
             ]);
 
             foreach ($keyResults as $kr) {
@@ -314,7 +351,6 @@ class GoalController extends Controller
                 }
 
                 $created = HrKeyResult::create([
-                    'tenant_id' => $tenantId,
                     'goal_id' => $goal->id,
                     'title' => $kr['title'],
                     'kr_type' => $kr['kr_type'] ?? 'number',
@@ -340,7 +376,7 @@ class GoalController extends Controller
         });
 
         // Notify the owner the objective was assigned to them.
-        if ($goal->user_id !== $user->id && ($owner = User::find($goal->user_id))) {
+        if ($goal->user_id !== $user->id) {
             $owner->notify(new GoalAssignedNotification($goal));
         }
 
@@ -357,21 +393,43 @@ class GoalController extends Controller
 
     public function show(Request $request, HrGoal $goal)
     {
-        $user = $request->user();
-        abort_unless($this->canView($user), 403);
+        $user = $this->viewer($request);
+        $goal = $this->goalAccess->historicalGoal($user, $goal);
 
         $goal->load([
             'user:id,name',
             'creator:id,name',
             'cycle:id,name',
-            'parentGoal:id,title,goal_type',
-            'childGoals' => fn ($q) => $q->with('user:id,name', 'keyResults')->orderBy('priority', 'desc'),
-            'keyResults.owner:id,name',
+            'parentGoal' => fn ($parentQuery) => $this->goalAccess
+                ->applyHistoricalGoalScope($parentQuery, $user)
+                ->select(['id', 'title', 'goal_type', 'user_id']),
+            'childGoals' => fn ($childQuery) => $this->goalAccess
+                ->applyHistoricalGoalScope($childQuery, $user)
+                ->with('user:id,name', 'keyResults')
+                ->orderBy('priority', 'desc'),
+            'keyResults' => fn ($keyResultQuery) => $keyResultQuery->with([
+                'owner' => fn ($ownerQuery) => $ownerQuery
+                    ->whereIn('users.id', $this->goalAccess->historicalStaffQuery($user))
+                    ->select(['users.id', 'users.name']),
+            ]),
             'updates' => fn ($q) => $q->with('user:id,name')->orderByDesc('created_at')->limit(20),
-            'developmentGoals' => fn ($q) => $q->with('employee:id,name')->orderByDesc('updated_at'),
+            'developmentGoals' => fn ($developmentQuery) => $developmentQuery
+                ->whereIn(
+                    $developmentQuery->qualifyColumn('employee_user_id'),
+                    $this->performanceAccess->historicalUserIds($user),
+                )
+                ->with('employee:id,name')
+                ->orderByDesc('updated_at'),
         ]);
 
-        $users = User::orderBy('name')->get(['id', 'name']);
+        $users = $this->goalAccess->currentStaffQuery($user)
+            ->orderBy('name')
+            ->limit(500)
+            ->get(['id', 'name']);
+        $isCurrentGoal = $this->goalAccess
+            ->applyCurrentGoalScope(HrGoal::query(), $user)
+            ->whereKey($goal->id)
+            ->exists();
 
         return Inertia::render('hr/goals/show', [
             'goal' => [
@@ -448,8 +506,8 @@ class GoalController extends Controller
             'users' => $users,
             'goalTypes' => $this->goalTypeOptions(),
             'priorities' => $this->priorityOptions(),
-            'parentGoals' => $this->parentGoalOptions($user->tenant_id ?? 1),
-            'cycles' => $this->cycleService->cyclesForTenant($user->tenant_id ?? 1)
+            'parentGoals' => $this->parentGoalOptions($user, $goal->id),
+            'cycles' => $this->cycleService->cycles()
                 ->sortBy('starts_at')
                 ->values()
                 ->map(fn (HrGoalCycle $c) => [
@@ -461,8 +519,9 @@ class GoalController extends Controller
                     'ends_at' => $c->ends_at?->toDateString(),
                 ]),
             'can' => [
-                'manage' => $this->canManage($user),
-                'updateProgress' => $this->canManage($user) || $goal->user_id === $user->id,
+                'manage' => $this->canManage($user) && $isCurrentGoal,
+                'updateProgress' => $isCurrentGoal
+                    && ($this->canManage($user) || $goal->user_id === $user->id),
             ],
         ]);
     }
@@ -473,10 +532,8 @@ class GoalController extends Controller
 
     public function update(Request $request, HrGoal $goal)
     {
-        $user = $request->user();
-        abort_unless($this->canManage($user), 403);
-
-        $tenantId = $goal->tenant_id;
+        $user = $this->manager($request);
+        $goal = $this->goalAccess->currentGoal($user, $goal);
 
         $data = $request->validate([
             'title' => ['sometimes', 'string', 'max:255'],
@@ -485,8 +542,8 @@ class GoalController extends Controller
             'category' => ['nullable', 'string', 'max:255'],
             'tags' => ['sometimes', 'nullable', 'array'],
             'tags.*' => ['string', 'max:40'],
-            'parent_goal_id' => ['nullable', 'integer', Rule::exists('hr_goals', 'id')->where('tenant_id', $tenantId)],
-            'cycle_id' => ['nullable', 'integer', Rule::exists('hr_goal_cycles', 'id')->where('tenant_id', $tenantId)],
+            'parent_goal_id' => ['nullable', 'integer'],
+            'cycle_id' => ['nullable', 'integer'],
             'target_value' => ['nullable', 'numeric', 'min:0'],
             'unit' => ['nullable', 'string', 'max:50'],
             'priority' => ['sometimes', 'string', 'in:low,medium,high'],
@@ -497,18 +554,49 @@ class GoalController extends Controller
             'status' => ['sometimes', 'string', 'in:draft,active,on_hold,blocked,completed,cancelled'],
         ]);
 
-        // A goal can't be its own parent (cycle guard).
-        if (($data['parent_goal_id'] ?? null) === $goal->id) {
-            unset($data['parent_goal_id']);
+        $newParent = null;
+        if (array_key_exists('parent_goal_id', $data) && $data['parent_goal_id'] !== null) {
+            $newParent = $this->goalAccess->currentGoal($user, (int) $data['parent_goal_id']);
+            abort_if($newParent->id === $goal->id, 422, 'An objective cannot be its own parent.');
+            abort_if($this->isDescendant($user, $goal, $newParent->id), 422, 'Cannot move an objective under one of its own descendants.');
+            $data['parent_goal_id'] = $newParent->id;
+        }
+
+        if (array_key_exists('cycle_id', $data) && $data['cycle_id'] !== null) {
+            $data['cycle_id'] = $this->cycle((int) $data['cycle_id'])->id;
         }
 
         if (($data['status'] ?? null) === 'completed' && $goal->status !== 'completed') {
             $data['completed_at'] = now();
             $data['confidence'] = 'on_track';
+        } elseif (isset($data['status']) && $data['status'] !== 'completed' && $goal->status === 'completed') {
+            $data['completed_at'] = null;
         }
 
-        $wasCompleted = $goal->status === 'completed';
-        $goal->update($data);
+        $oldParentId = $goal->parent_goal_id;
+        [$goal, $wasCompleted] = DB::transaction(function () use ($goal, $user, $data): array {
+            $locked = $this->goalAccess
+                ->applyCurrentGoalScope(HrGoal::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($goal->id);
+            $wasCompleted = $locked->status === 'completed';
+            $locked->update($data);
+
+            return [$locked->fresh(), $wasCompleted];
+        }, attempts: 1);
+
+        if (array_key_exists('parent_goal_id', $data) && $oldParentId !== $goal->parent_goal_id) {
+            $oldParent = $oldParentId
+                ? $this->goalAccess->applyCurrentGoalScope(HrGoal::query(), $user)->find($oldParentId)
+                : null;
+            if ($oldParent) {
+                $this->goalService->recalculateGoalProgress($oldParent);
+            }
+            if ($newParent) {
+                $this->goalService->recalculateGoalProgress($newParent->fresh());
+            }
+        }
+
         $this->notifyCompletionTransition($goal, $wasCompleted);
 
         return redirect()->back()->with('success', 'Objective updated.');
@@ -520,10 +608,16 @@ class GoalController extends Controller
 
     public function destroy(Request $request, HrGoal $goal)
     {
-        $user = $request->user();
-        abort_unless($this->canManage($user), 403);
+        $user = $this->manager($request);
+        $goal = $this->goalAccess->currentGoal($user, $goal);
 
-        $goal->delete();
+        DB::transaction(function () use ($goal, $user): void {
+            $this->goalAccess
+                ->applyCurrentGoalScope(HrGoal::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($goal->id)
+                ->delete();
+        }, attempts: 1);
 
         return redirect()->route('hr.goals.index')->with('success', 'Objective deleted.');
     }
@@ -534,11 +628,8 @@ class GoalController extends Controller
 
     public function updateProgress(Request $request, HrGoal $goal)
     {
-        $user = $request->user();
-        abort_unless(
-            ($user && $this->canManage($user)) || $goal->user_id === $user?->id,
-            403
-        );
+        $user = $this->goalActor($request);
+        $goal = $this->goalForCheckin($user, $goal);
 
         $data = $request->validate([
             'current_value' => ['nullable', 'numeric', 'min:0'],
@@ -547,15 +638,21 @@ class GoalController extends Controller
             'comment' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        // Progress-source rule: an objective with KRs derives its % from them —
-        // a manual slider must never clobber the weighted roll-up.
-        abort_if($goal->hasKeyResults(), 422, 'This objective derives progress from its key results. Check in on the key results instead.');
+        [$goal, $wasCompleted] = DB::transaction(function () use ($goal, $user, $data): array {
+            $locked = $this->lockGoalForCheckin($user, $goal);
 
-        $wasCompleted = $goal->status === 'completed';
-        $this->goalService->updateProgress($goal, [
-            'user_id' => $user->id,
-            ...$data,
-        ]);
+            // An objective with KRs derives its percentage from them. A manual
+            // slider must never clobber the weighted roll-up.
+            abort_if($locked->hasKeyResults(), 422, 'This objective derives progress from its key results. Check in on the key results instead.');
+
+            $wasCompleted = $locked->status === 'completed';
+            $this->goalService->updateProgress($locked, [
+                'user_id' => $user->id,
+                ...$data,
+            ]);
+
+            return [$locked->fresh(), $wasCompleted];
+        }, attempts: 1);
         $this->notifyCompletionTransition($goal, $wasCompleted);
 
         return redirect()->back()->with('success', 'Progress updated.');
@@ -572,34 +669,38 @@ class GoalController extends Controller
      */
     public function checkin(Request $request, HrGoal $goal)
     {
-        $user = $request->user();
-        abort_unless(
-            ($user && $this->canManage($user)) || $goal->user_id === $user?->id,
-            403
-        );
+        $user = $this->goalActor($request);
+        $goal = $this->goalForCheckin($user, $goal);
 
         $data = $request->validate([
             'confidence' => ['required', 'string', 'in:on_track,at_risk,off_track'],
             'comment' => ['nullable', 'string', 'max:2000'],
             'manual_progress' => ['nullable', 'integer', 'min:0', 'max:100'],
             'key_results' => ['sometimes', 'array'],
-            'key_results.*.id' => ['required_with:key_results', 'integer'],
+            'key_results.*.id' => ['required_with:key_results', 'integer', 'distinct'],
             'key_results.*.current_value' => ['required_with:key_results', 'numeric'],
             'key_results.*.confidence' => ['nullable', 'string', 'in:on_track,at_risk,off_track'],
         ]);
 
-        $goal->loadMissing('keyResults');
+        [$goal, $wasCompleted] = DB::transaction(function () use ($goal, $data, $user): array {
+            $locked = $this->lockGoalForCheckin($user, $goal);
+            $keyResults = $locked->keyResults()->lockForUpdate()->get();
+            $hasKeyResults = $keyResults->isNotEmpty();
+            $submittedKeyResults = $data['key_results'] ?? [];
 
-        $wasCompleted = $goal->status === 'completed';
+            abort_if(! $hasKeyResults && $submittedKeyResults !== [], 422, 'This objective does not have key results.');
 
-        DB::transaction(function () use ($goal, $data, $user) {
-            if ($goal->hasKeyResults() && ! empty($data['key_results'])) {
-                $byId = $goal->keyResults->keyBy('id');
-                foreach ($data['key_results'] as $row) {
-                    $kr = $byId->get($row['id']);
-                    if (! $kr) {
-                        continue;
-                    }
+            $wasCompleted = $locked->status === 'completed';
+            if ($hasKeyResults && $submittedKeyResults !== []) {
+                $byId = $keyResults->keyBy('id');
+                abort_unless(
+                    collect($submittedKeyResults)->every(fn (array $row) => $byId->has((int) $row['id'])),
+                    422,
+                    'One or more key results do not belong to this objective.',
+                );
+
+                foreach ($submittedKeyResults as $row) {
+                    $kr = $byId->get((int) $row['id']);
                     $this->goalService->updateKeyResultProgress($kr, [
                         'current_value' => $row['current_value'],
                         'confidence' => $row['confidence'] ?? $data['confidence'],
@@ -607,22 +708,26 @@ class GoalController extends Controller
                     ], $user->id);
                 }
                 // Recalc gives the weighted roll-up; log a goal-level note with confidence.
-                $goal->refresh();
-                $this->goalService->updateProgress($goal, [
+                $locked->refresh();
+                $this->goalService->updateProgress($locked, [
                     'user_id' => $user->id,
-                    'progress_percentage' => $goal->progress_percentage,
+                    'progress_percentage' => $locked->progress_percentage,
                     'confidence' => $data['confidence'],
                     'comment' => $data['comment'] ?? null,
                 ]);
             } else {
-                $this->goalService->updateProgress($goal, [
+                $this->goalService->updateProgress($locked, [
                     'user_id' => $user->id,
-                    'progress_percentage' => $data['manual_progress'] ?? $goal->progress_percentage,
+                    'progress_percentage' => $hasKeyResults
+                        ? $locked->progress_percentage
+                        : ($data['manual_progress'] ?? $locked->progress_percentage),
                     'confidence' => $data['confidence'],
                     'comment' => $data['comment'] ?? null,
                 ]);
             }
-        });
+
+            return [$locked->fresh(), $wasCompleted];
+        }, attempts: 1);
         $this->notifyCompletionTransition($goal, $wasCompleted);
 
         return redirect()->back()->with('success', 'Check-in logged.');
@@ -634,8 +739,8 @@ class GoalController extends Controller
 
     public function storeKeyResult(Request $request, HrGoal $goal)
     {
-        $user = $request->user();
-        abort_unless($this->canManage($user), 403);
+        $user = $this->manager($request);
+        $goal = $this->goalAccess->currentGoal($user, $goal);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:500'],
@@ -645,37 +750,45 @@ class GoalController extends Controller
             'unit' => ['nullable', 'string', 'max:50'],
             'weight' => ['nullable', 'integer', 'min:1', 'max:10'],
             'due_date' => ['nullable', 'date'],
-            'owner_id' => ['nullable', 'integer', 'exists:users,id'],
+            'owner_id' => ['nullable', 'integer'],
         ]);
+        $owner = isset($data['owner_id'])
+            ? $this->goalAccess->currentStaff($user, (int) $data['owner_id'])
+            : $this->goalAccess->currentStaff($user, (int) $goal->user_id);
 
-        $kr = HrKeyResult::create([
-            'tenant_id' => $goal->tenant_id,
-            'goal_id' => $goal->id,
-            'title' => $data['title'],
-            'kr_type' => $data['kr_type'] ?? 'number',
-            'start_value' => $data['start_value'] ?? 0,
-            'current_value' => $data['start_value'] ?? 0,
-            'target_value' => $data['target_value'],
-            'unit' => $data['unit'] ?? null,
-            'weight' => $data['weight'] ?? 1,
-            'due_date' => $data['due_date'] ?? $goal->due_date,
-            'owner_id' => $data['owner_id'] ?? $goal->user_id,
-            'status' => 'not_started',
-            'confidence' => $goal->confidence ?? 'on_track',
-        ]);
-        $kr->recalculateProgress();
-        $kr->save();
+        DB::transaction(function () use ($goal, $user, $data, $owner): void {
+            $lockedGoal = $this->goalAccess
+                ->applyCurrentGoalScope(HrGoal::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($goal->id);
+            $keyResult = HrKeyResult::query()->create([
+                'goal_id' => $lockedGoal->id,
+                'title' => $data['title'],
+                'kr_type' => $data['kr_type'] ?? 'number',
+                'start_value' => $data['start_value'] ?? 0,
+                'current_value' => $data['start_value'] ?? 0,
+                'target_value' => $data['target_value'],
+                'unit' => $data['unit'] ?? null,
+                'weight' => $data['weight'] ?? 1,
+                'due_date' => $data['due_date'] ?? $lockedGoal->due_date,
+                'owner_id' => $owner->id,
+                'status' => 'not_started',
+                'confidence' => $lockedGoal->confidence ?? 'on_track',
+            ]);
+            $keyResult->recalculateProgress();
+            $keyResult->save();
 
-        // First KR flips the objective from manual to derived — recalc now.
-        $this->goalService->recalculateGoalProgress($goal->fresh());
+            // The first KR flips the objective from manual to derived.
+            $this->goalService->recalculateGoalProgress($lockedGoal->fresh());
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Key result added.');
     }
 
     public function updateKeyResult(Request $request, HrKeyResult $keyResult)
     {
-        $user = $request->user();
-        abort_unless($this->canManage($user), 403);
+        $user = $this->manager($request);
+        $keyResult = $this->goalAccess->currentKeyResult($user, $keyResult);
 
         $data = $request->validate([
             'current_value' => ['sometimes', 'numeric'],
@@ -690,18 +803,26 @@ class GoalController extends Controller
             'comment' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        // Static attributes (title/type/weight/baseline) update directly;
-        // value/confidence flow through the service so progress recalculates
-        // and a KR-level check-in is logged.
-        $static = array_intersect_key($data, array_flip(['title', 'kr_type', 'start_value', 'target_value', 'unit', 'weight']));
-        if ($static !== []) {
-            $keyResult->fill($static);
-            $keyResult->save();
-        }
+        [$goal, $wasCompleted] = DB::transaction(function () use ($keyResult, $user, $data): array {
+            $locked = $this->goalAccess
+                ->applyCurrentKeyResultScope(HrKeyResult::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($keyResult->id);
 
-        $goal = $keyResult->goal;
-        $wasCompleted = $goal->status === 'completed';
-        $this->goalService->updateKeyResultProgress($keyResult, $data, $user->id);
+            // Static attributes update directly. Value and confidence flow
+            // through the service so progress and first-class history agree.
+            $static = array_intersect_key($data, array_flip(['title', 'kr_type', 'start_value', 'target_value', 'unit', 'weight']));
+            if ($static !== []) {
+                $locked->fill($static);
+                $locked->save();
+            }
+
+            $goal = $locked->goal()->lockForUpdate()->firstOrFail();
+            $wasCompleted = $goal->status === 'completed';
+            $this->goalService->updateKeyResultProgress($locked, $data, $user->id);
+
+            return [$goal->fresh(), $wasCompleted];
+        }, attempts: 1);
         $this->notifyCompletionTransition($goal, $wasCompleted);
 
         return redirect()->back()->with('success', 'Key result updated.');
@@ -718,14 +839,18 @@ class GoalController extends Controller
 
     public function destroyKeyResult(Request $request, HrKeyResult $keyResult)
     {
-        $user = $request->user();
-        abort_unless($this->canManage($user), 403);
+        $user = $this->manager($request);
+        $keyResult = $this->goalAccess->currentKeyResult($user, $keyResult);
 
-        $goal = $keyResult->goal;
-        $keyResult->delete();
-
-        // Recalculate parent after deletion
-        $this->goalService->recalculateGoalProgress($goal);
+        DB::transaction(function () use ($keyResult, $user): void {
+            $locked = $this->goalAccess
+                ->applyCurrentKeyResultScope(HrKeyResult::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($keyResult->id);
+            $goal = $locked->goal()->lockForUpdate()->firstOrFail();
+            $locked->delete();
+            $this->goalService->recalculateGoalProgress($goal);
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Key result removed.');
     }
@@ -737,53 +862,66 @@ class GoalController extends Controller
     /** Back the multi-select bar on the objectives table. */
     public function bulk(Request $request)
     {
-        $user = $request->user();
-        abort_unless($this->canManage($user), 403);
-
-        $tenantId = $user->tenant_id ?? 1;
+        $user = $this->manager($request);
 
         $data = $request->validate([
             'action' => ['required', 'string', 'in:archive,request_checkin,reassign_owner,recycle'],
             'ids' => ['required', 'array', 'min:1'],
-            'ids.*' => ['integer'],
-            'owner_id' => ['nullable', 'integer', 'exists:users,id'],
-            'cycle_id' => ['nullable', 'integer', Rule::exists('hr_goal_cycles', 'id')->where('tenant_id', $tenantId)],
+            'ids.*' => ['integer', 'distinct'],
+            'owner_id' => ['required_if:action,reassign_owner', 'nullable', 'integer'],
+            'cycle_id' => ['nullable', 'integer'],
         ]);
 
-        $goals = HrGoal::forTenant($tenantId)->whereIn('id', $data['ids'])->get();
-        $count = 0;
+        $goalIds = collect($data['ids'])->map(fn ($id) => (int) $id)->values();
+        $goals = $this->goalAccess
+            ->applyCurrentGoalScope(HrGoal::query(), $user)
+            ->whereKey($goalIds->all())
+            ->get();
+        abort_unless($goals->count() === $goalIds->count(), 404);
 
-        foreach ($goals as $goal) {
-            switch ($data['action']) {
-                case 'archive':
-                    $goal->update(['status' => 'cancelled']);
-                    $count++;
-                    break;
-                case 'reassign_owner':
-                    if (! empty($data['owner_id'])) {
-                        $goal->update(['user_id' => $data['owner_id']]);
-                        $count++;
-                    }
-                    break;
-                case 'request_checkin':
-                    if ($owner = User::find($goal->user_id)) {
-                        $owner->notify(new GoalAssignedNotification($goal, checkinReminder: true));
-                        $count++;
-                    }
-                    break;
-                case 'recycle':
-                    // handled below in one shot
-                    break;
+        if ($data['action'] === 'request_checkin') {
+            foreach ($goals as $goal) {
+                $this->goalAccess
+                    ->currentStaff($user, (int) $goal->user_id)
+                    ->notify(new GoalAssignedNotification($goal, checkinReminder: true));
             }
-        }
 
-        if ($data['action'] === 'recycle') {
-            $target = ($data['cycle_id'] ?? null)
-                ? HrGoalCycle::find($data['cycle_id'])
-                : $this->cycleService->currentCycle($tenantId);
-            if ($target) {
-                $count = $this->cycleService->rollover($target, $data['ids'], true);
-            }
+            $count = $goals->count();
+        } elseif ($data['action'] === 'recycle') {
+            $target = isset($data['cycle_id'])
+                ? $this->cycle((int) $data['cycle_id'])
+                : $this->cycleService->currentCycle();
+            abort_unless($target, 422, 'No target cycle is available.');
+            $count = $this->cycleService->rollover($user, $target, $goals, true);
+        } else {
+            $newOwner = $data['action'] === 'reassign_owner'
+                ? $this->goalAccess->currentStaff($user, (int) $data['owner_id'])
+                : null;
+
+            $count = DB::transaction(function () use ($goalIds, $user, $data, $newOwner): int {
+                $lockedGoals = $this->goalAccess
+                    ->applyCurrentGoalScope(HrGoal::query(), $user)
+                    ->whereKey($goalIds->all())
+                    ->lockForUpdate()
+                    ->get();
+                abort_unless($lockedGoals->count() === $goalIds->count(), 404);
+
+                foreach ($lockedGoals as $goal) {
+                    if ($data['action'] === 'archive') {
+                        $goal->update(['status' => 'cancelled']);
+
+                        continue;
+                    }
+
+                    $previousOwnerId = $goal->user_id;
+                    $goal->update(['user_id' => $newOwner->id]);
+                    $goal->keyResults()
+                        ->where('owner_id', $previousOwnerId)
+                        ->update(['owner_id' => $newOwner->id]);
+                }
+
+                return $lockedGoals->count();
+            }, attempts: 1);
         }
 
         return redirect()->back()->with('success', "{$count} objective(s) updated.");
@@ -792,49 +930,67 @@ class GoalController extends Controller
     /** Duplicate an objective (optionally with KRs) into a chosen cycle. */
     public function duplicate(Request $request, HrGoal $goal)
     {
-        $user = $request->user();
-        abort_unless($this->canManage($user), 403);
-
-        $tenantId = $goal->tenant_id;
+        $user = $this->manager($request);
+        $goal = $this->goalAccess->currentGoal($user, $goal);
 
         $data = $request->validate([
-            'cycle_id' => ['nullable', 'integer', Rule::exists('hr_goal_cycles', 'id')->where('tenant_id', $tenantId)],
+            'cycle_id' => ['nullable', 'integer'],
             'with_key_results' => ['sometimes', 'boolean'],
         ]);
 
-        $target = ($data['cycle_id'] ?? null)
-            ? HrGoalCycle::find($data['cycle_id'])
-            : ($goal->cycle ?? $this->cycleService->currentCycle($tenantId));
+        $target = isset($data['cycle_id'])
+            ? $this->cycle((int) $data['cycle_id'])
+            : ($goal->cycle ?? $this->cycleService->currentCycle());
+        if ($goal->parent_goal_id) {
+            $this->goalAccess->currentGoal($user, (int) $goal->parent_goal_id);
+        }
 
         $withKrs = $data['with_key_results'] ?? true;
 
-        DB::transaction(function () use ($goal, $target, $withKrs) {
-            $clone = $goal->replicate(['progress_percentage', 'completed_at', 'last_checkin_at']);
-            $clone->title = $goal->title.' (copy)';
+        DB::transaction(function () use ($goal, $target, $withKrs, $user): void {
+            $lockedGoal = $this->goalAccess
+                ->applyCurrentGoalScope(HrGoal::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($goal->id);
+            $keyResults = $withKrs
+                ? $lockedGoal->keyResults()->lockForUpdate()->get()
+                : collect();
+            $lockedTarget = $target
+                ? HrGoalCycle::query()->lockForUpdate()->findOrFail($target->id)
+                : null;
+
+            $clone = $lockedGoal->replicateForApplication([
+                'progress_percentage',
+                'completed_at',
+                'last_checkin_at',
+            ]);
+            $clone->title = $lockedGoal->title.' (copy)';
             $clone->status = 'draft';
             $clone->confidence = 'on_track';
             $clone->progress_percentage = 0;
             $clone->completed_at = null;
             $clone->last_checkin_at = null;
-            if ($target) {
-                $clone->cycle_id = $target->id;
-                $clone->start_date = $target->starts_at;
-                $clone->due_date = $target->ends_at;
+            if ($lockedTarget) {
+                $clone->cycle_id = $lockedTarget->id;
+                $clone->start_date = $lockedTarget->starts_at;
+                $clone->due_date = $lockedTarget->ends_at;
             }
             $clone->save();
 
-            if ($withKrs) {
-                foreach ($goal->keyResults as $kr) {
-                    $krClone = $kr->replicate(['current_value', 'progress_percentage', 'status']);
-                    $krClone->goal_id = $clone->id;
-                    $krClone->current_value = $kr->start_value;
-                    $krClone->progress_percentage = 0;
-                    $krClone->status = 'not_started';
-                    $krClone->confidence = 'on_track';
-                    $krClone->save();
-                }
+            foreach ($keyResults as $keyResult) {
+                $keyResultClone = $keyResult->replicateForApplication([
+                    'current_value',
+                    'progress_percentage',
+                    'status',
+                ]);
+                $keyResultClone->goal_id = $clone->id;
+                $keyResultClone->current_value = $keyResult->start_value;
+                $keyResultClone->progress_percentage = 0;
+                $keyResultClone->status = 'not_started';
+                $keyResultClone->confidence = 'on_track';
+                $keyResultClone->save();
             }
-        });
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Objective duplicated.');
     }
@@ -842,62 +998,86 @@ class GoalController extends Controller
     /** Re-parent an objective (alignment drag / "Move under…"). */
     public function reparent(Request $request, HrGoal $goal)
     {
-        $user = $request->user();
-        abort_unless($this->canManage($user), 403);
-
-        $tenantId = $goal->tenant_id;
+        $user = $this->manager($request);
+        $goal = $this->goalAccess->currentGoal($user, $goal);
 
         $data = $request->validate([
-            'parent_goal_id' => ['nullable', 'integer', Rule::exists('hr_goals', 'id')->where('tenant_id', $tenantId)],
+            'parent_goal_id' => ['nullable', 'integer'],
         ]);
 
         $parentId = $data['parent_goal_id'] ?? null;
+        $newParent = $parentId !== null
+            ? $this->goalAccess->currentGoal($user, (int) $parentId)
+            : null;
 
         // Guard against cycles: can't parent to self or to a descendant.
         if ($parentId !== null) {
             abort_if($parentId === $goal->id, 422, 'An objective cannot be its own parent.');
-            abort_if($this->isDescendant($goal, $parentId), 422, 'Cannot move an objective under one of its own descendants.');
+            abort_if($this->isDescendant($user, $goal, (int) $parentId), 422, 'Cannot move an objective under one of its own descendants.');
         }
 
-        $oldParent = $goal->parentGoal;
-        $goal->update(['parent_goal_id' => $parentId]);
+        $oldParentId = $goal->parent_goal_id;
+        DB::transaction(function () use ($goal, $user, $parentId): void {
+            $this->goalAccess
+                ->applyCurrentGoalScope(HrGoal::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($goal->id)
+                ->update(['parent_goal_id' => $parentId]);
+        }, attempts: 1);
 
         // Recompute roll-ups on both old and new branches.
+        $oldParent = $oldParentId
+            ? $this->goalAccess->applyCurrentGoalScope(HrGoal::query(), $user)->find($oldParentId)
+            : null;
         if ($oldParent) {
             $this->goalService->recalculateGoalProgress($oldParent->fresh());
         }
-        if ($parentId && ($newParent = HrGoal::find($parentId))) {
-            $this->goalService->recalculateGoalProgress($newParent);
+        if ($newParent) {
+            $this->goalService->recalculateGoalProgress($newParent->fresh());
         }
 
         return redirect()->back()->with('success', 'Objective moved.');
     }
 
-    private function isDescendant(HrGoal $goal, int $candidateParentId): bool
+    private function isDescendant(User $viewer, HrGoal $goal, int $candidateParentId): bool
     {
-        $node = HrGoal::find($candidateParentId);
+        $node = $this->goalAccess
+            ->applyCurrentGoalScope(HrGoal::query(), $viewer)
+            ->find($candidateParentId);
         $guard = 0;
         while ($node && $guard++ < 50) {
-            if ($node->parent_goal_id === $goal->id) {
+            if ($node->id === $goal->id) {
                 return true;
             }
-            $node = $node->parent_goal_id ? HrGoal::find($node->parent_goal_id) : null;
+            if (! $node->parent_goal_id) {
+                return false;
+            }
+
+            $node = $this->goalAccess
+                ->applyCurrentGoalScope(HrGoal::query(), $viewer)
+                ->find($node->parent_goal_id);
+
+            // A broken or inaccessible branch is never a valid new parent.
+            if (! $node) {
+                return true;
+            }
         }
 
-        return false;
+        return $guard >= 50;
     }
 
     /** Export objectives + KRs for the current cycle lens as CSV. */
     public function export(Request $request): StreamedResponse
     {
-        $user = $request->user();
-        abort_unless($this->canView($user), 403);
+        $user = $this->viewer($request);
 
-        $tenantId = $user->tenant_id ?? 1;
         $cycleParam = $request->query('cycle');
-        $cycleId = is_numeric($cycleParam) ? (int) $cycleParam : null;
+        $cycleId = is_numeric($cycleParam)
+            ? $this->cycle((int) $cycleParam)->id
+            : null;
 
-        $goals = HrGoal::forTenant($tenantId)
+        $goals = $this->goalAccess
+            ->applyHistoricalGoalScope(HrGoal::query(), $user)
             ->with(['user:id,name', 'cycle:id,name', 'keyResults'])
             ->forCycle($cycleId)
             ->orderBy('goal_type')
@@ -969,5 +1149,51 @@ class GoalController extends Controller
             $user->canDo('hr.goals.manage')
             || $user->canDo('hr.performance.manage')
         );
+    }
+
+    private function viewer(Request $request): User
+    {
+        $user = $this->goalAccess->currentViewer($request->user());
+        abort_unless($this->canView($user), 403);
+
+        return $user;
+    }
+
+    private function manager(Request $request): User
+    {
+        $user = $this->goalAccess->currentViewer($request->user());
+        abort_unless($this->canManage($user), 403);
+
+        return $user;
+    }
+
+    private function goalActor(Request $request): User
+    {
+        return $this->goalAccess->currentViewer($request->user());
+    }
+
+    private function goalForCheckin(User $viewer, HrGoal $goal): HrGoal
+    {
+        if ($this->canManage($viewer)) {
+            return $this->goalAccess->currentGoal($viewer, $goal);
+        }
+
+        return HrGoal::query()
+            ->where('user_id', $viewer->id)
+            ->findOrFail($goal->getKey());
+    }
+
+    private function lockGoalForCheckin(User $viewer, HrGoal $goal): HrGoal
+    {
+        $query = $this->canManage($viewer)
+            ? $this->goalAccess->applyCurrentGoalScope(HrGoal::query(), $viewer)
+            : HrGoal::query()->where('user_id', $viewer->id);
+
+        return $query->lockForUpdate()->findOrFail($goal->getKey());
+    }
+
+    private function cycle(int $cycleId): HrGoalCycle
+    {
+        return HrGoalCycle::query()->findOrFail($cycleId);
     }
 }

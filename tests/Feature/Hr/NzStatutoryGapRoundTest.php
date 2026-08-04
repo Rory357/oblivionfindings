@@ -8,12 +8,15 @@ use App\Domain\Hr\Models\HrLeaveBalanceLedger;
 use App\Domain\Hr\Models\HrPublicHoliday;
 use App\Domain\Hr\Models\HrSalaryBand;
 use App\Domain\Hr\Notifications\VisaExpiryNotification;
+use App\Domain\Hr\Services\AlternativeHolidayService;
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Hr\Services\PublicHolidayCalendar;
 use App\Domain\Hr\Services\TimeTrackingService;
 use App\Domain\Shifts\Timesheets\TimesheetApprovalService;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
 use Database\Seeders\HrPayEquityBandsSeeder;
@@ -26,13 +29,11 @@ beforeEach(function () {
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
 
     $this->staff = User::factory()->create([
         'role' => 'support_worker',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
 
@@ -44,8 +45,15 @@ beforeEach(function () {
         $this->staff->roles()->syncWithoutDetaching([$supportRole->id]);
     }
 
+    $this->site = Site::factory()->create(['name' => 'NZ Statutory Allowed Site']);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+        'start_date' => now()->subYear()->toDateString(),
+    ]);
+
     $this->profile = HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'employee_number' => 'EMP-NZGAP-001',
         'work_email' => "nz-gap-worker-{$this->staff->id}@example.test",
@@ -55,6 +63,7 @@ beforeEach(function () {
         'hourly_rate' => '30.00',
         'created_by' => $this->hr->id,
         'updated_by' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
     ]);
 });
 
@@ -73,7 +82,7 @@ test('family violence leave is a valid statutory type with accrual support', fun
     expect($request->leave_type)->toBe('family_violence')
         ->and($request->status)->toBe('pending');
 
-    (new ProcessLeaveBalanceAccrualJob(1))->handle();
+    (new ProcessLeaveBalanceAccrualJob)->handle(app(HrCurrentStaffService::class));
 
     $ledger = HrLeaveBalanceLedger::query()
         ->where('user_id', $this->staff->id)
@@ -96,9 +105,9 @@ test('public holiday calendar matches national days and region-scoped anniversar
     $calendar = app(PublicHolidayCalendar::class);
 
     expect($calendar->isPublicHoliday('2026-02-06'))->toBeTrue()
-        ->and($calendar->isPublicHoliday('2026-02-06', null, 'wellington'))->toBeTrue()
-        ->and($calendar->isPublicHoliday('2026-01-26', null, 'Auckland'))->toBeTrue()
-        ->and($calendar->isPublicHoliday('2026-01-26', null, 'wellington'))->toBeFalse()
+        ->and($calendar->isPublicHoliday('2026-02-06', 'wellington'))->toBeTrue()
+        ->and($calendar->isPublicHoliday('2026-01-26', 'Auckland'))->toBeTrue()
+        ->and($calendar->isPublicHoliday('2026-01-26', 'wellington'))->toBeFalse()
         ->and($calendar->isPublicHoliday('2026-01-26'))->toBeFalse()
         ->and($calendar->isPublicHoliday('2026-02-05'))->toBeFalse();
 });
@@ -136,7 +145,7 @@ test('working a public holiday flags the timesheet and approval accrues an alter
         ->and((float) $balance->accrued_hours)->toBe(8.0);
 
     // Re-running the accrual (e.g. re-approval cycles) never double-credits.
-    app(\App\Domain\Hr\Services\AlternativeHolidayService::class)
+    app(AlternativeHolidayService::class)
         ->accrueForTimesheet($timesheet->fresh());
 
     expect(HrLeaveBalanceLedger::query()
@@ -182,7 +191,7 @@ test('visa expiry reminders notify the worker and their manager without duplicat
         'manager_user_id' => $this->hr->id,
     ]);
 
-    (new SendExpiryRemindersJob(1))->handle();
+    (new SendExpiryRemindersJob)->handle();
 
     $staffNotifications = $this->staff->notifications()
         ->where('type', VisaExpiryNotification::class)->get();
@@ -193,7 +202,7 @@ test('visa expiry reminders notify the worker and their manager without duplicat
         ->and($managerNotifications)->toHaveCount(1)
         ->and($staffNotifications->first()->data['reminder_days'])->toBe(30);
 
-    (new SendExpiryRemindersJob(1))->handle();
+    (new SendExpiryRemindersJob)->handle();
 
     expect($this->staff->notifications()->where('type', VisaExpiryNotification::class)->count())->toBe(1);
 });

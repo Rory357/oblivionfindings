@@ -24,8 +24,7 @@ class AlertController extends Controller
         ControlRoomAlert $alert,
         CanonicalAlertController $canonical,
         ControlRoomAlertLifecycleService $lifecycle,
-    )
-    {
+    ) {
         $this->assertFleetAlert($alert);
         $this->siteAccess()->assertCanAccessAlert(
             $request->user(),
@@ -45,8 +44,7 @@ class AlertController extends Controller
         ControlRoomAlert $alert,
         CanonicalAlertController $canonical,
         ControlRoomAlertLifecycleService $lifecycle,
-    )
-    {
+    ) {
         $this->assertFleetAlert($alert);
         $this->siteAccess()->assertCanAccessAlert(
             $request->user(),
@@ -66,8 +64,7 @@ class AlertController extends Controller
         ControlRoomAlert $alert,
         CanonicalAlertController $canonical,
         ControlRoomAlertLifecycleService $lifecycle,
-    )
-    {
+    ) {
         $this->assertFleetAlert($alert);
         $this->siteAccess()->assertCanAccessAlert(
             $request->user(),
@@ -94,10 +91,10 @@ class AlertController extends Controller
         $crQuery = ControlRoomAlert::query()
             ->with([
                 'asset:id,name,asset_tag,site_id,home_site_id,client_id',
-                'asset.client:id,site_id,organization_id',
+                'asset.client:id,site_id',
                 'fleetSignal:id,asset_id',
                 'fleetSignal.asset:id,site_id,home_site_id,client_id',
-                'fleetSignal.asset.client:id,site_id,organization_id',
+                'fleetSignal.asset.client:id,site_id',
                 'assignedTo:id,name',
             ])
             ->whereIn('source', ['fleet', 'asset', 'tracker', 'geofence']);
@@ -122,8 +119,12 @@ class AlertController extends Controller
         $allowedSorts = ['triggered_at', 'severity', 'status'];
         $sort = $request->input('sort', 'triggered_at');
         $direction = $request->input('direction', 'desc');
-        if (!in_array($sort, $allowedSorts)) $sort = 'triggered_at';
-        if (!in_array($direction, ['asc', 'desc'])) $direction = 'desc';
+        if (! in_array($sort, $allowedSorts)) {
+            $sort = 'triggered_at';
+        }
+        if (! in_array($direction, ['asc', 'desc'])) {
+            $direction = 'desc';
+        }
 
         $controlRoomAlerts = $crQuery->orderBy($sort, $direction)
             ->paginate(25, ['*'], 'cr_page')
@@ -338,24 +339,20 @@ class AlertController extends Controller
 
     protected function assertCanAccessAssetId($user, int $assetId): void
     {
-        if ($this->hasInstallationWideAssetAccess($user)) {
+        if ($this->hasApplicationWideAssetAccess($user)) {
             return;
         }
 
         $siteIds = $this->siteAccess()->accessibleSiteIds($user, $this->alertBypassPermissions());
         $query = Asset::query()->whereKey($assetId);
-        $this->applyAssetSiteScope(
-            $query,
-            $siteIds,
-            $user?->organization_id === null ? null : (int) $user->organization_id,
-        );
+        $this->applyAssetSiteScope($query, $siteIds);
 
         abort_unless($query->exists(), 403, 'You are not authorized to access fleet alerts for that asset.');
     }
 
     protected function applyArchivedAssetAlertScope($query, $user): void
     {
-        if ($this->hasInstallationWideAssetAccess($user)) {
+        if ($this->hasApplicationWideAssetAccess($user)) {
             return;
         }
 
@@ -366,11 +363,9 @@ class AlertController extends Controller
             return;
         }
 
-        $organizationId = $user?->organization_id;
         $query->whereHas('asset', fn ($assetQuery) => $this->applyAssetSiteScope(
             $assetQuery,
             $siteIds,
-            $organizationId === null ? null : (int) $organizationId,
         ));
     }
 
@@ -380,9 +375,7 @@ class AlertController extends Controller
     protected function applyAssetSiteScope(
         $query,
         array $siteIds,
-        ?int $organizationId,
-    ): void
-    {
+    ): void {
         if ($siteIds === []) {
             $query->whereRaw('1 = 0');
 
@@ -395,28 +388,24 @@ class AlertController extends Controller
 
         $query->where(function ($provenance) use (
             $siteIds,
-            $organizationId,
             $assetSiteColumn,
             $assetHomeSiteColumn,
             $assetClientColumn,
         ) {
             $provenance->where(function ($directSite) use (
                 $siteIds,
-                $organizationId,
                 $assetSiteColumn,
                 $assetClientColumn,
             ) {
                 $directSite
                     ->whereIn($assetSiteColumn, $siteIds)
                     ->where(function ($clientAgreement) use (
-                        $organizationId,
                         $assetSiteColumn,
                         $assetClientColumn,
                     ) {
                         $clientAgreement
                             ->whereNull($assetClientColumn)
                             ->orWhereHas('client', fn ($clientQuery) => $clientQuery
-                                ->where('organization_id', $organizationId)
                                 ->whereColumn(
                                     $clientQuery->qualifyColumn('site_id'),
                                     $assetSiteColumn,
@@ -424,7 +413,6 @@ class AlertController extends Controller
                     });
             })->orWhere(function ($homeSite) use (
                 $siteIds,
-                $organizationId,
                 $assetSiteColumn,
                 $assetHomeSiteColumn,
                 $assetClientColumn,
@@ -433,14 +421,12 @@ class AlertController extends Controller
                     ->whereNull($assetSiteColumn)
                     ->whereIn($assetHomeSiteColumn, $siteIds)
                     ->where(function ($clientAgreement) use (
-                        $organizationId,
                         $assetHomeSiteColumn,
                         $assetClientColumn,
                     ) {
                         $clientAgreement
                             ->whereNull($assetClientColumn)
                             ->orWhereHas('client', fn ($clientQuery) => $clientQuery
-                                ->where('organization_id', $organizationId)
                                 ->whereColumn(
                                     $clientQuery->qualifyColumn('site_id'),
                                     $assetHomeSiteColumn,
@@ -448,7 +434,6 @@ class AlertController extends Controller
                     });
             })->orWhere(function ($clientFallback) use (
                 $siteIds,
-                $organizationId,
                 $assetSiteColumn,
                 $assetHomeSiteColumn,
                 $assetClientColumn,
@@ -458,16 +443,14 @@ class AlertController extends Controller
                     ->whereNull($assetHomeSiteColumn)
                     ->whereNotNull($assetClientColumn)
                     ->whereHas('client', fn ($clientQuery) => $clientQuery
-                        ->where('organization_id', $organizationId)
                         ->whereIn('site_id', $siteIds));
             });
         });
     }
 
-    protected function hasInstallationWideAssetAccess($user): bool
+    protected function hasApplicationWideAssetAccess($user): bool
     {
-        return $this->siteAccess()->canBypass($user, $this->alertBypassPermissions())
-            && $this->siteAccess()->isUnrestrictedPlatformUser($user);
+        return $this->siteAccess()->canBypass($user, $this->alertBypassPermissions());
     }
 
     /**

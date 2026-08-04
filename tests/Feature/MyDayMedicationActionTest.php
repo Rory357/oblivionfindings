@@ -1,11 +1,13 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\Permission;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\EnhancedMarService;
 use Illuminate\Support\Carbon;
@@ -68,6 +70,7 @@ it('stores scheduled doses in UTC while resolving the local slot on My Day and M
 
     Shift::factory()->assignedToday($worker)->published()->create([
         'client_id' => $medication->client_id,
+        'site_id' => $medication->client->site_id,
     ]);
 
     $scheduledLocal = Carbon::parse('2026-05-21 09:00:00', 'Pacific/Auckland');
@@ -131,7 +134,7 @@ it('records a witnessed controlled drug My Day give through the MAR service', fu
         'controlled_drug' => true,
         'witness_required' => true,
     ]);
-    $witness = makeMedicationWitness();
+    $witness = makeMedicationWitness($medication->client);
     ClientMedicationStock::query()->create([
         'client_medication_id' => $medication->id,
         'on_hand' => 10,
@@ -202,7 +205,8 @@ it('stores a snooze flag in the cache for /my-day/medications/{med}/snooze', fun
 });
 
 it('rejects unauthenticated medication administration', function () {
-    $client = Client::factory()->create();
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $medication = ClientMedication::factory()->create(['client_id' => $client->id]);
 
     $this->post("/my-day/medications/{$medication->id}/administer")
@@ -213,7 +217,9 @@ it('rejects unauthenticated medication administration', function () {
 
 it('rejects workers without medications.administer.record permission', function () {
     $worker = User::factory()->frontlineWorker()->create();
-    $client = Client::factory()->create();
+    $site = Site::factory()->create();
+    assignMedicationWorkerToSite($worker, $site);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $client->supportWorkers()->attach($worker->id);
     $medication = ClientMedication::factory()->create(['client_id' => $client->id]);
 
@@ -232,6 +238,8 @@ it('rejects workers without medications.administer.record permission', function 
 function makeWorkerAndMedication(array $medicationOverrides = []): array
 {
     $worker = User::factory()->frontlineWorker()->create();
+    $site = Site::factory()->create();
+    assignMedicationWorkerToSite($worker, $site);
 
     // Two permissions are needed:
     //   - clients.viewAssigned so ClientPolicy::view passes (worker is assigned
@@ -247,7 +255,7 @@ function makeWorkerAndMedication(array $medicationOverrides = []): array
     }
     $worker->permissionOverrides()->syncWithoutDetaching($overrides);
 
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $client->supportWorkers()->attach($worker->id);
 
     $medication = ClientMedication::factory()->create(array_merge([
@@ -264,9 +272,11 @@ function makeWorkerAndMedication(array $medicationOverrides = []): array
     return [$worker, $medication];
 }
 
-function makeMedicationWitness(): User
+function makeMedicationWitness(Client $client): User
 {
     $witness = User::factory()->frontlineWorker()->create();
+    assignMedicationWorkerToSite($witness, $client->site()->firstOrFail());
+    $client->supportWorkers()->syncWithoutDetaching([$witness->id]);
     $permission = Permission::query()->firstOrCreate(
         ['key' => 'medications.controlled.witness'],
         ['description' => 'medications.controlled.witness'],
@@ -276,4 +286,16 @@ function makeMedicationWitness(): User
     ]);
 
     return $witness;
+}
+
+function assignMedicationWorkerToSite(User $worker, Site $site): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $worker->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subMonth(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 }

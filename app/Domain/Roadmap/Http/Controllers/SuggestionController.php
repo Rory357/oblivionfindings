@@ -26,13 +26,11 @@ class SuggestionController extends Controller
 
     public function index(Request $request): JsonResponse|Response
     {
-        $tenantId = $this->tenantId($request);
         $status = $request->filled('status')
             ? $request->string('status')->value()
             : ($this->shouldReturnJson($request) ? null : InitiativeSuggestion::STATUS_TRIAGE_PENDING);
 
         $query = InitiativeSuggestion::query()
-            ->forTenant($tenantId)
             ->with(['triageOwner:id,name,email']);
 
         if ($status) {
@@ -65,9 +63,7 @@ class SuggestionController extends Controller
 
     public function ingest(Request $request)
     {
-        $tenantId = $this->tenantId($request);
-
-        $result = $this->suggestionService->ingestAll($tenantId);
+        $result = $this->suggestionService->ingestAll();
 
         return response()->json([
             'ingested' => $result,
@@ -77,8 +73,6 @@ class SuggestionController extends Controller
 
     public function triage(Request $request, InitiativeSuggestion $suggestion)
     {
-        $this->assertTenant($request, $suggestion->tenant_id);
-
         $data = $request->validate([
             'status' => ['required', 'in:triage_pending,accepted,rejected,snoozed'],
             'snoozed_until' => ['nullable', 'date'],
@@ -108,7 +102,6 @@ class SuggestionController extends Controller
         );
 
         $this->changeLogService->log(
-            $updated->tenant_id,
             InitiativeSuggestion::class,
             $updated->id,
             'suggestion.triaged',
@@ -126,15 +119,12 @@ class SuggestionController extends Controller
 
     public function convert(StoreSuggestionRequest $request, InitiativeSuggestion $suggestion)
     {
-        $this->assertTenant($request, $suggestion->tenant_id);
-
         $data = $request->validated();
 
         $initiative = $this->suggestionService->convertToInitiative($suggestion, $data, $request->user()?->id);
         $score = $this->scoringService->score($initiative, 'board_ceo', true);
 
         $this->changeLogService->log(
-            $initiative->tenant_id,
             InitiativeSuggestion::class,
             $suggestion->id,
             'suggestion.converted',
@@ -147,24 +137,6 @@ class SuggestionController extends Controller
             'suggestion' => $suggestion->fresh(),
             'initiative' => $initiative->fresh(),
         ], 201);
-    }
-
-    protected function tenantId(Request $request): ?int
-    {
-        if ($request->filled('tenant_id')) {
-            return (int) $request->integer('tenant_id');
-        }
-
-        return $request->user()?->tenant_id ?? null;
-    }
-
-    protected function assertTenant(Request $request, ?int $resourceTenantId): void
-    {
-        $tenantId = $this->tenantId($request);
-
-        if ($tenantId !== null && $resourceTenantId !== null && $tenantId !== $resourceTenantId) {
-            abort(403, 'Tenant scope mismatch.');
-        }
     }
 
     protected function shouldReturnJson(Request $request): bool

@@ -10,12 +10,12 @@ use App\Models\ControlRoomAlert;
 use App\Models\LoneWorkerAlert;
 use App\Models\LoneWorkerSession;
 use App\Models\Shift;
-use App\Models\ShiftGpsLog;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\HealthSafety\LoneWorkerSignalService;
+use App\Services\HealthSafety\ShiftGpsAccessService;
 use App\Services\Queclink\LocateNowService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -53,7 +53,10 @@ class LoneWorkerController extends Controller
     /** Explicit H&S-wide access; hazards.view/manage remain site-scoped. */
     private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
 
-    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly ShiftGpsAccessService $shiftGpsAccess,
+    ) {}
 
     /**
      * The coordinator watch-tower: live register, alerts, hero KPIs, detail.
@@ -322,7 +325,11 @@ class LoneWorkerController extends Controller
             $site = $siteQuery->lockForUpdate()->first();
             abort_unless(
                 $site
-                    && (int) $site->tenant_id === (int) $worker->organization_id,
+                    && in_array(
+                        (int) $site->id,
+                        $this->siteAccess->accessibleSiteIds($worker),
+                        true,
+                    ),
                 403,
                 'You are not authorized to start monitoring at that site.',
             );
@@ -333,18 +340,6 @@ class LoneWorkerController extends Controller
             $sessionData['client_id'] = $client?->id;
             $sessionData['site_id'] = $siteId;
 
-            // Reuse the roster's last GPS ping rather than re-keying coordinates.
-            if ($shift && empty($sessionData['location_lat']) && empty($sessionData['location_lng'])) {
-                $ping = ShiftGpsLog::query()
-                    ->where('shift_id', $shift->id)
-                    ->latest('captured_at')
-                    ->first();
-                if ($ping) {
-                    $sessionData['location_lat'] = $ping->latitude;
-                    $sessionData['location_lng'] = $ping->longitude;
-                }
-            }
-
             $session = LoneWorkerSession::query()->create(array_merge($sessionData, [
                 'started_at' => now(),
                 'last_check_in_at' => now(),
@@ -354,9 +349,24 @@ class LoneWorkerController extends Controller
                 'updated_by' => $actor->id,
             ]));
 
+            // A Shift GPS ping is staff location evidence. It may be reused only
+            // after the authorised lone-worker safety session is live, and only
+            // through the canonical Shift Site and worker assignment boundary.
+            if ($shift
+                && $actor->canDo('assets.telemetry.view')
+                && blank($sessionData['location_lat'] ?? null)
+                && blank($sessionData['location_lng'] ?? null)) {
+                $ping = $this->shiftGpsAccess->latestForLiveSession($actor, $shift, $session);
+                if ($ping) {
+                    $session->update([
+                        'location_lat' => $ping->latitude,
+                        'location_lng' => $ping->longitude,
+                    ]);
+                }
+            }
+
             AuditLogger::logOrFail('healthSafety.loneWorker.session.start', $session, [
                 'actor_id' => $actor->id,
-                'organization_id' => (int) $worker->organization_id,
                 'worker_user_id' => $worker->id,
                 'site_id' => $site->id,
                 'shift_id' => $shift?->id,
@@ -748,40 +758,41 @@ class LoneWorkerController extends Controller
     }
 
     /**
-     * Queue a "Locate now" request to the worker's paired GPS tracker. Async — the
-     * tracker reports its fix on its next connection (reuses LocateNowService).
+     * Hand the worker's paired GPS tracker to the governed Device command plane.
      */
     public function locateNow(Request $request, LoneWorkerSession $session, LocateNowService $locateNow): RedirectResponse
     {
-        $queued = DB::transaction(function () use ($request, $session, $locateNow): bool {
+        $managementUrl = DB::transaction(function () use ($request, $session, $locateNow): ?string {
             $actor = $this->lockedActor($request);
             abort_unless($actor->canDo('hazards.manage'), 403);
             [$lockedSession, $device] = $this->lockedTrackerSessionContext((int) $session->id);
             $this->assertCanAccessSession($actor, $lockedSession);
 
             if (! $device) {
-                return false;
+                return null;
             }
 
-            // LocateNowService only creates a queued command row. Keeping that
-            // insert after the strict audit and inside this transaction means no
-            // command can survive a failed authorization or audit write.
             $this->auditSessionMutation(
-                'healthSafety.loneWorker.location.request',
+                'healthSafety.loneWorker.location.management_opened',
                 $lockedSession,
                 $actor,
-                ['device_id' => $device->id],
+                [
+                    'device_id' => $device->id,
+                    'capability' => 'tracking.location_refresh',
+                ],
             );
-            $locateNow->queueForDevice($device, $actor);
 
-            return true;
+            return $locateNow->managementUrlForDevice($device);
         }, 3);
 
-        if (! $queued) {
+        if ($managementUrl === null) {
             return back()->with('error', 'This worker does not have a paired GPS tracker.');
         }
 
-        return back()->with('success', 'Locate now queued — the tracker will report on its next connection.');
+        return redirect()->to($managementUrl)->with(
+            'success',
+            'Review the governed location refresh, confirm your identity, and record the operational reason before dispatch.',
+        );
     }
 
     /**
@@ -937,19 +948,11 @@ class LoneWorkerController extends Controller
 
         $siteCounts = $shifts->whereNotNull('site_id')->groupBy('site_id')->map->count();
 
-        $gpsByShift = $shifts->isEmpty()
-            ? collect()
-            : ShiftGpsLog::whereIn('shift_id', $shifts->pluck('id'))
-                ->orderByDesc('captured_at')
-                ->get()
-                ->groupBy('shift_id');
-
-        $list = $shifts->map(function (Shift $shift) use ($siteCounts, $gpsByShift) {
+        $list = $shifts->map(function (Shift $shift) use ($siteCounts) {
             $isSolo = $shift->site_id && ($siteCounts[$shift->site_id] ?? 0) === 1;
             // Explicit roster flag is authoritative; fall back to the heuristic
             // (on-call, or solo cover at the site) for shifts not yet flagged.
             $isLone = (bool) $shift->is_lone_worker || (bool) $shift->is_on_call || $isSolo;
-            $ping = $gpsByShift->get($shift->id)?->first();
 
             return [
                 'id' => $shift->id,
@@ -961,8 +964,11 @@ class LoneWorkerController extends Controller
                 'starts_at' => $shift->starts_at,
                 'ends_at' => $shift->ends_at,
                 'location' => $shift->location,
-                'location_lat' => $ping?->latitude,
-                'location_lng' => $ping?->longitude,
+                // Staff GPS remains redacted until an authorised lone-worker
+                // safety session is active. The Site's fixed coordinates remain
+                // available separately to the wizard for its location field.
+                'location_lat' => null,
+                'location_lng' => null,
                 'is_on_call' => (bool) $shift->is_on_call,
                 'is_lone' => $isLone,
             ];
@@ -1257,83 +1263,14 @@ class LoneWorkerController extends Controller
     {
         $this->applySessionIntrinsicIntegrity($query);
 
-        if ($this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS)
-            && $this->siteAccess->isUnrestrictedPlatformUser($user)) {
+        if ($this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS)) {
             return $query;
         }
 
         $siteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);
-        $organizationId = $user?->organization_id;
-        if ($siteIds === [] || $organizationId === null) {
+        if ($siteIds === []) {
             return $query->whereRaw('1 = 0');
         }
-
-        $organizationId = (int) $organizationId;
-        $siteColumn = $query->qualifyColumn('site_id');
-        $clientColumn = $query->qualifyColumn('client_id');
-        $shiftColumn = $query->qualifyColumn('shift_id');
-        $userColumn = $query->qualifyColumn('user_id');
-
-        // The monitored worker is identifiable data and must belong to the
-        // viewer's organization before this session can appear anywhere.
-        $query->whereHas('user', fn (Builder $userQuery) => $userQuery
-            ->where($userQuery->qualifyColumn('organization_id'), $organizationId));
-
-        // Optional client/shift relations still carry identifiable data. When
-        // present, they must agree with the tenant, worker, and with each
-        // other's site provenance before the session can appear anywhere.
-        $query->where(function (Builder $clientIntegrity) use ($clientColumn, $organizationId) {
-            $clientIntegrity->whereNull($clientColumn)
-                ->orWhereHas('client', fn (Builder $clientQuery) => $clientQuery
-                    ->where('organization_id', $organizationId)
-                    ->whereNotNull('site_id'));
-        });
-        $query->where(function (Builder $shiftIntegrity) use (
-            $clientColumn,
-            $shiftColumn,
-            $userColumn,
-            $organizationId,
-        ) {
-            $shiftIntegrity->whereNull($shiftColumn)
-                ->orWhereHas('shift', function (Builder $shiftQuery) use (
-                    $clientColumn,
-                    $userColumn,
-                    $organizationId,
-                ) {
-                    $shiftQuery
-                        ->where('shifts.organization_id', $organizationId)
-                        ->where(function (Builder $workerAgreement) use ($userColumn) {
-                            $workerAgreement->whereNull('shifts.user_id')
-                                ->orWhereColumn('shifts.user_id', $userColumn);
-                        })
-                        ->where(function (Builder $resolvedShiftSite) use ($organizationId) {
-                            $resolvedShiftSite->whereNotNull('shifts.site_id')
-                                ->orWhere(function (Builder $shiftClientFallback) use ($organizationId) {
-                                    $shiftClientFallback->whereNull('shifts.site_id')
-                                        ->whereHas('client', fn (Builder $clientQuery) => $clientQuery
-                                            ->where('organization_id', $organizationId)
-                                            ->whereNotNull('site_id'));
-                                });
-                        })
-                        ->where(function (Builder $shiftClientIntegrity) use ($organizationId) {
-                            $shiftClientIntegrity->whereNull('shifts.client_id')
-                                ->orWhereHas('client', function (Builder $clientQuery) use ($organizationId) {
-                                    $clientQuery
-                                        ->where('organization_id', $organizationId)
-                                        ->whereNotNull('site_id')
-                                        ->where(function (Builder $siteAgreement) {
-                                            $siteAgreement->whereNull('shifts.site_id')
-                                                ->orWhereColumn('clients.site_id', 'shifts.site_id');
-                                        });
-                                });
-                        })
-                        ->where(function (Builder $sessionClientAgreement) use ($clientColumn) {
-                            $sessionClientAgreement->whereNull($clientColumn)
-                                ->orWhereNull('shifts.client_id')
-                                ->orWhereColumn('shifts.client_id', $clientColumn);
-                        });
-                });
-        });
 
         return $query->where(function (Builder $sessionScope) use ($siteIds) {
             $siteColumn = $sessionScope->qualifyColumn('site_id');
@@ -1414,17 +1351,17 @@ class LoneWorkerController extends Controller
     {
         $table = $query->getModel()->getTable();
         $row = "`{$table}`";
-        $workerOrganization = "(SELECT `organization_id` FROM `users` WHERE `users`.`id` = {$row}.`user_id` LIMIT 1)";
         $clientSite = "(SELECT `site_id` FROM `clients` WHERE `clients`.`id` = {$row}.`client_id` LIMIT 1)";
         $shiftSite = "(SELECT COALESCE(`lw_shift`.`site_id`, `lw_shift_client`.`site_id`) FROM `shifts` AS `lw_shift` LEFT JOIN `clients` AS `lw_shift_client` ON `lw_shift_client`.`id` = `lw_shift`.`client_id` WHERE `lw_shift`.`id` = {$row}.`shift_id` LIMIT 1)";
         $authoritativeSite = "COALESCE({$row}.`site_id`, {$clientSite}, {$shiftSite})";
+        $today = now()->toDateString();
 
         return $query
-            ->whereRaw("{$workerOrganization} IS NOT NULL")
             ->whereRaw("{$authoritativeSite} IS NOT NULL")
-            ->whereRaw("EXISTS (SELECT 1 FROM `sites` AS `lw_site` WHERE `lw_site`.`id` = {$authoritativeSite} AND `lw_site`.`tenant_id` = {$workerOrganization})")
-            ->whereRaw("({$row}.`client_id` IS NULL OR EXISTS (SELECT 1 FROM `clients` AS `lw_client` WHERE `lw_client`.`id` = {$row}.`client_id` AND `lw_client`.`organization_id` = {$workerOrganization} AND `lw_client`.`site_id` = {$authoritativeSite}))")
-            ->whereRaw("({$row}.`shift_id` IS NULL OR EXISTS (SELECT 1 FROM `shifts` AS `lw_linked_shift` LEFT JOIN `clients` AS `lw_linked_client` ON `lw_linked_client`.`id` = `lw_linked_shift`.`client_id` WHERE `lw_linked_shift`.`id` = {$row}.`shift_id` AND `lw_linked_shift`.`organization_id` = {$workerOrganization} AND `lw_linked_shift`.`user_id` = {$row}.`user_id` AND (`lw_linked_shift`.`client_id` <=> {$row}.`client_id`) AND (`lw_linked_shift`.`client_id` IS NULL OR (`lw_linked_client`.`organization_id` = `lw_linked_shift`.`organization_id` AND `lw_linked_client`.`site_id` IS NOT NULL AND (`lw_linked_shift`.`site_id` IS NULL OR `lw_linked_shift`.`site_id` = `lw_linked_client`.`site_id`))) AND COALESCE(`lw_linked_shift`.`site_id`, `lw_linked_client`.`site_id`) = {$authoritativeSite}))");
+            ->whereRaw("EXISTS (SELECT 1 FROM `sites` AS `lw_site` WHERE `lw_site`.`id` = {$authoritativeSite} AND `lw_site`.`is_active` = 1 AND `lw_site`.`archived` = 0 AND `lw_site`.`archived_at` IS NULL)")
+            ->whereRaw("EXISTS (SELECT 1 FROM `users` AS `lw_worker` JOIN `hr_employee_profiles` AS `lw_profile` ON `lw_profile`.`user_id` = `lw_worker`.`id` AND `lw_profile`.`deleted_at` IS NULL WHERE `lw_worker`.`id` = {$row}.`user_id` AND `lw_worker`.`approved_at` IS NOT NULL AND `lw_profile`.`is_active` = 1 AND (`lw_profile`.`start_date` IS NULL OR DATE(`lw_profile`.`start_date`) <= ?) AND (`lw_profile`.`end_date` IS NULL OR DATE(`lw_profile`.`end_date`) >= ?) AND (`lw_profile`.`primary_site_id` = {$authoritativeSite} OR JSON_CONTAINS(COALESCE(`lw_profile`.`secondary_site_ids`, JSON_ARRAY()), JSON_ARRAY({$authoritativeSite}))))", [$today, $today])
+            ->whereRaw("({$row}.`client_id` IS NULL OR EXISTS (SELECT 1 FROM `clients` AS `lw_client` WHERE `lw_client`.`id` = {$row}.`client_id` AND `lw_client`.`site_id` = {$authoritativeSite}))")
+            ->whereRaw("({$row}.`shift_id` IS NULL OR EXISTS (SELECT 1 FROM `shifts` AS `lw_linked_shift` LEFT JOIN `clients` AS `lw_linked_client` ON `lw_linked_client`.`id` = `lw_linked_shift`.`client_id` WHERE `lw_linked_shift`.`id` = {$row}.`shift_id` AND `lw_linked_shift`.`user_id` = {$row}.`user_id` AND (`lw_linked_shift`.`client_id` <=> {$row}.`client_id`) AND (`lw_linked_shift`.`client_id` IS NULL OR (`lw_linked_client`.`site_id` IS NOT NULL AND (`lw_linked_shift`.`site_id` IS NULL OR `lw_linked_shift`.`site_id` = `lw_linked_client`.`site_id`))) AND COALESCE(`lw_linked_shift`.`site_id`, `lw_linked_client`.`site_id`) = {$authoritativeSite}))");
     }
 
     private function lockedActor(Request $request): User
@@ -1527,16 +1464,15 @@ class LoneWorkerController extends Controller
         bool $allowOwnerWithoutSiteAssignment = false,
     ): void {
         $session->loadMissing([
-            'user:id,organization_id',
-            'site:id,tenant_id',
-            'client:id,organization_id,site_id',
-            'shift:id,organization_id,site_id,client_id,user_id',
-            'shift.client:id,organization_id,site_id',
+            'user:id,approved_at',
+            'site:id,is_active,archived,archived_at',
+            'client:id,site_id',
+            'shift:id,site_id,client_id,user_id',
+            'shift.client:id,site_id',
         ]);
 
-        $sessionOrganizationId = $this->nullablePositiveId($session->user?->organization_id);
         abort_unless(
-            $session->user && $sessionOrganizationId !== null,
+            $session->user,
             403,
             UserSiteAccessService::DEFAULT_MESSAGE,
         );
@@ -1545,7 +1481,6 @@ class LoneWorkerController extends Controller
         if ($session->client_id !== null) {
             abort_unless(
                 $session->client
-                    && $this->nullablePositiveId($session->client->organization_id) === $sessionOrganizationId
                     && $session->client->site_id !== null,
                 403,
                 UserSiteAccessService::DEFAULT_MESSAGE,
@@ -1558,7 +1493,6 @@ class LoneWorkerController extends Controller
         if ($session->shift_id !== null) {
             abort_unless(
                 $session->shift
-                    && $this->nullablePositiveId($session->shift->organization_id) === $sessionOrganizationId
                     && $this->nullablePositiveId($session->shift->user_id) === $this->nullablePositiveId($session->user_id)
                     && $this->nullablePositiveId($session->shift->client_id) === $this->nullablePositiveId($session->client_id),
                 403,
@@ -1568,7 +1502,6 @@ class LoneWorkerController extends Controller
             if ($session->shift->client_id !== null) {
                 abort_unless(
                     $session->shift->client
-                        && $this->nullablePositiveId($session->shift->client->organization_id) === $sessionOrganizationId
                         && $session->shift->client->site_id !== null,
                     403,
                     UserSiteAccessService::DEFAULT_MESSAGE,
@@ -1605,27 +1538,26 @@ class LoneWorkerController extends Controller
         abort_unless(
             Site::query()
                 ->whereKey($siteId)
-                ->where('tenant_id', $sessionOrganizationId)
+                ->active()
+                ->notArchived()
+                ->whereNull('archived_at')
                 ->exists(),
             403,
             UserSiteAccessService::DEFAULT_MESSAGE,
         );
-
-        if ($this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS)
-            && $this->siteAccess->isUnrestrictedPlatformUser($user)) {
-            return;
-        }
-
         abort_unless(
-            $this->nullablePositiveId($user->organization_id) === $sessionOrganizationId,
+            in_array($siteId, $this->siteAccess->accessibleSiteIds($session->user), true),
             403,
             UserSiteAccessService::DEFAULT_MESSAGE,
         );
 
+        if ($this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS)) {
+            return;
+        }
+
         if ($allowOwnerWithoutSiteAssignment) {
             abort_unless(
-                (int) $session->user_id === (int) $user->id
-                    && $this->nullablePositiveId($user->organization_id) === $sessionOrganizationId,
+                (int) $session->user_id === (int) $user->id,
                 403,
                 UserSiteAccessService::DEFAULT_MESSAGE,
             );

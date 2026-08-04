@@ -2,6 +2,7 @@
 
 namespace App\Domain\Roadmap\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +13,7 @@ class InitiativeSuggestion extends Model
 {
     use HasFactory;
     use SoftDeletes;
+    use WritesLegacyStorageContext;
 
     protected $table = 'roadmap_suggestions';
 
@@ -26,7 +28,6 @@ class InitiativeSuggestion extends Model
     public const STATUS_CONVERTED = 'converted';
 
     protected $fillable = [
-        'tenant_id',
         'source',
         'source_key',
         'title',
@@ -62,15 +63,6 @@ class InitiativeSuggestion extends Model
     public function convertedInitiative(): BelongsTo
     {
         return $this->belongsTo(Initiative::class, 'converted_initiative_id');
-    }
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        if ($tenantId === null) {
-            return $query;
-        }
-
-        return $query->where('tenant_id', $tenantId);
     }
 
     public function isRateLimited(): bool

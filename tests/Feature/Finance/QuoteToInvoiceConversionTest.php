@@ -1,32 +1,47 @@
 <?php
 
 use App\Domain\Finance\Models\FinInvoice;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Quote;
 use App\Models\QuoteLineItem;
+use App\Models\Site;
 use App\Models\User;
 
-function arManager(): User
+function arManager(Site $site): User
 {
-    $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $user = User::factory()->create(['approved_at' => now()]);
     foreach (['finance.ar.view', 'finance.ar.manage'] as $key) {
         $permission = Permission::firstOrCreate(['key' => $key], ['description' => $key]);
         $user->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
     }
 
+    HrEmployeeProfile::query()->create([
+        'user_id' => $user->id,
+        'employee_number' => 'EMP-QUOTE-'.$user->id,
+        'work_email' => $user->email,
+        'position_title' => 'Accounts Receivable Manager',
+        'position_role' => 'manager',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subMonth()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+    ]);
+
     return $user;
 }
 
 beforeEach(function () {
+    $this->site = Site::factory()->create();
     $this->client = Client::factory()->create([
-        'organization_id' => 1,
+        'site_id' => $this->site->id,
         'first_name' => 'Ana',
         'last_name' => 'Smith',
     ]);
 
     $this->quote = Quote::create([
-        'organization_id' => 1,
         'client_id' => $this->client->id,
         'quote_number' => 'Q-0001',
         'title' => 'Support quote',
@@ -40,7 +55,6 @@ beforeEach(function () {
 
     foreach ([['Line A', '100.00'], ['Line B', '50.00']] as [$desc, $amount]) {
         QuoteLineItem::create([
-            'organization_id' => 1,
             'quote_id' => $this->quote->id,
             'description' => $desc,
             'quantity' => 1,
@@ -51,12 +65,11 @@ beforeEach(function () {
 });
 
 it('converts an accepted quote into a draft FinInvoice with NZ GST', function () {
-    $this->actingAs(arManager())
+    $this->actingAs(arManager($this->site))
         ->post(route('finance.quotes.convert-to-invoice', $this->quote->id))
         ->assertRedirect();
 
-    $invoice = FinInvoice::where('organization_id', 1)
-        ->where('source_id', $this->quote->id)
+    $invoice = FinInvoice::where('source_id', $this->quote->id)
         ->firstOrFail()
         ->load('lines');
 
@@ -74,7 +87,7 @@ it('converts an accepted quote into a draft FinInvoice with NZ GST', function ()
 });
 
 it('is idempotent — re-converting returns the existing invoice, not a second one', function () {
-    $user = arManager();
+    $user = arManager($this->site);
     $this->actingAs($user)->post(route('finance.quotes.convert-to-invoice', $this->quote->id));
     $this->actingAs($user)->post(route('finance.quotes.convert-to-invoice', $this->quote->id));
 
@@ -82,7 +95,7 @@ it('is idempotent — re-converting returns the existing invoice, not a second o
 });
 
 it('persists line amounts and rolls GST up onto the quote header on create', function () {
-    $this->actingAs(arManager())
+    $this->actingAs(arManager($this->site))
         ->post(route('finance.quotes.store'), [
             'client_id' => $this->client->id,
             'title' => 'New support quote',
@@ -103,4 +116,32 @@ it('persists line amounts and rolls GST up onto the quote header on create', fun
         ->and((float) $quote->subtotal)->toBe(100.0)
         ->and((float) $quote->tax_amount)->toBe(15.0)
         ->and((float) $quote->total_amount)->toBe(115.0);
+});
+
+it('denies quote creation and direct access for an unassigned Client Site', function () {
+    $otherSite = Site::factory()->create();
+    $otherClient = Client::factory()->create(['site_id' => $otherSite->id]);
+    $otherQuote = Quote::create([
+        'client_id' => $otherClient->id,
+        'quote_number' => 'Q-OTHER-SITE',
+        'title' => 'Other Site quote',
+        'status' => 'draft',
+    ]);
+    $actor = arManager($this->site);
+
+    $this->actingAs($actor)
+        ->post(route('finance.quotes.store'), [
+            'client_id' => $otherClient->id,
+            'title' => 'Blocked quote',
+            'line_items' => [
+                ['description' => 'Support', 'quantity' => 1, 'unit_price' => '50.00'],
+            ],
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($actor)
+        ->get(route('finance.quotes.show', $otherQuote->id))
+        ->assertNotFound();
+
+    expect(Quote::query()->where('title', 'Blocked quote')->exists())->toBeFalse();
 });

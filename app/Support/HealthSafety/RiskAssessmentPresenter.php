@@ -7,6 +7,7 @@ use App\Models\HsEvent;
 use App\Models\HsRiskAssessment;
 use App\Models\HsRiskAssessmentAttachment;
 use App\Models\Site;
+use App\Services\UserSiteAccessService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -104,21 +105,54 @@ class RiskAssessmentPresenter
      *
      * @return array{sites:Collection,clients:Collection,events:Collection}
      */
-    public static function pickers(?int $organizationId = null): array
+    public static function pickers(?int $legacyContext = null): array
     {
+        $siteAccess = app(UserSiteAccessService::class);
+
+        return self::siteScopedPickers($siteAccess->accessibleSiteIds(
+            auth()->user(),
+            ['healthSafety.viewAllSites'],
+        ));
+    }
+
+    /**
+     * Picker data for the standalone register, constrained to canonical Site access.
+     *
+     * @param  array<int, int|string>  $siteIds
+     * @return array{sites:Collection,clients:Collection,events:Collection}
+     */
+    public static function siteScopedPickers(array $siteIds): array
+    {
+        $siteIds = collect($siteIds)
+            ->map(fn ($siteId) => (int) $siteId)
+            ->filter(fn (int $siteId) => $siteId > 0)
+            ->unique()
+            ->values()
+            ->all();
+
         return [
             'sites' => Site::query()
-                ->when($organizationId !== null, fn ($query) => $query->where('tenant_id', $organizationId))
-                ->orderBy('name')->get(['id', 'name'])
-                ->map(fn (Site $s) => ['id' => $s->id, 'name' => $s->name])->values(),
+                ->whereIn('id', $siteIds)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (Site $site) => ['id' => $site->id, 'name' => $site->name])
+                ->values(),
             'clients' => Client::query()
-                ->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))
-                ->orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name'])
-                ->map(fn (Client $c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)])->values(),
+                ->whereIn('site_id', $siteIds)
+                ->orderBy('first_name')
+                ->orderBy('last_name')
+                ->get(['id', 'first_name', 'last_name'])
+                ->map(fn (Client $client) => [
+                    'id' => $client->id,
+                    'name' => trim($client->first_name.' '.$client->last_name),
+                ])->values(),
             'events' => HsEvent::query()
-                ->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))
-                ->latest()->limit(50)->get(['id', 'reference_number'])
-                ->map(fn (HsEvent $e) => ['id' => $e->id, 'name' => $e->reference_number])->values(),
+                ->whereIn('site_id', $siteIds)
+                ->latest()
+                ->limit(50)
+                ->get(['id', 'reference_number'])
+                ->map(fn (HsEvent $event) => ['id' => $event->id, 'name' => $event->reference_number])
+                ->values(),
         ];
     }
 

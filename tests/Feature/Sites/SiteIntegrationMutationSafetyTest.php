@@ -9,6 +9,11 @@ use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Integration\Contracts\DeviceSyncCapability;
+use App\Services\Integration\Contracts\EventCollectionCapability;
+use App\Services\Integration\Contracts\InventoryDiscoveryCapability;
+use App\Services\Integration\Data\IntegrationCapabilityManifest;
+use App\Services\Integration\Data\ProviderEventPage;
 use App\Services\Integration\IntegrationAdapterInterface;
 use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Services\Integration\SyncResult;
@@ -37,17 +42,33 @@ class SiteIntegrationMutationSafetyTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
-        $this->site = Site::factory()->create(['tenant_id' => 42]);
-        $this->manager = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
+        $this->site = Site::factory()->create();
+        $this->manager = User::factory()->create(['approved_at' => now()]);
         $this->manager->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
         $this->providerConnection = IntegrationProviderConnection::create([
-            'tenant_id' => 42,
             'provider' => self::PROVIDER,
             'secret_encrypted' => 'encrypted-at-rest',
             'status' => IntegrationProviderConnection::STATUS_CONNECTED,
         ]);
 
-        app(IntegrationAdapterRegistry::class)->register(self::PROVIDER, SentinelFailureAdapter::class);
+        app(IntegrationAdapterRegistry::class)->register(
+            self::PROVIDER,
+            SentinelFailureAdapter::class,
+            new IntegrationCapabilityManifest(
+                provider: self::PROVIDER,
+                version: '1.0',
+                capabilities: [
+                    InventoryDiscoveryCapability::class,
+                    DeviceSyncCapability::class,
+                    EventCollectionCapability::class,
+                ],
+                requiredPermissions: ['securityDevices.integrations.manage'],
+                sensitivityLabels: ['provider_credentials', 'event_metadata'],
+                pageLimit: 100,
+                minimumIntervalSeconds: 60,
+                backfillLimit: 100,
+            ),
+        );
     }
 
     public function test_site_sync_mutations_never_persist_flash_or_log_raw_provider_failures(): void
@@ -68,7 +89,6 @@ class SiteIntegrationMutationSafetyTest extends TestCase
         $this->assertSame(SafeOperationalData::failureSummary(), $this->providerConnection->fresh()->last_error);
 
         IntegrationSiteConfig::create([
-            'tenant_id' => 42,
             'site_id' => $this->site->id,
             'provider' => self::PROVIDER,
             'mapped_external_site_id' => 'mapped-site',
@@ -96,7 +116,6 @@ class SiteIntegrationMutationSafetyTest extends TestCase
             ->assertSessionHas('error', fn (string $message): bool => ! str_contains($message, self::RAW_FAILURE));
 
         IntegrationSiteSecret::create([
-            'tenant_id' => 42,
             'site_id' => $this->site->id,
             'provider' => self::PROVIDER,
             'capability' => 'access_api',
@@ -133,7 +152,7 @@ class SiteIntegrationMutationSafetyTest extends TestCase
     }
 }
 
-final class SentinelFailureAdapter implements IntegrationAdapterInterface
+final class SentinelFailureAdapter implements DeviceSyncCapability, EventCollectionCapability, IntegrationAdapterInterface, InventoryDiscoveryCapability
 {
     public static string $operation = 'discover';
 
@@ -166,9 +185,22 @@ final class SentinelFailureAdapter implements IntegrationAdapterInterface
         throw new \RuntimeException(SiteIntegrationMutationSafetyTest::RAW_FAILURE);
     }
 
+    public function collectEvents(
+        IntegrationSiteConfig $siteConfig,
+        IntegrationProviderConnection $providerConnection,
+        ?string $cursor,
+        int $limit,
+    ): ProviderEventPage {
+        throw new \RuntimeException(SiteIntegrationMutationSafetyTest::RAW_FAILURE);
+    }
+
     public function capabilities(): array
     {
-        return [];
+        return [
+            InventoryDiscoveryCapability::class,
+            DeviceSyncCapability::class,
+            EventCollectionCapability::class,
+        ];
     }
 
     public function provider(): string

@@ -2,15 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class PriceBookItem extends Model
 {
     use HasFactory;
+    use WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'price_book_id',
         'service_code',
         'name',

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Sites\Concerns\ResolvesAllowedSiteTypes;
 use App\Models\Client;
 use App\Models\ClientMealDislike;
 use App\Models\MealDietaryTag;
@@ -16,13 +17,19 @@ use App\Services\AuditLogger;
 use App\Services\Catering\DietaryConflictChecker;
 use App\Services\Catering\InventoryMovementRecorder;
 use App\Services\Catering\MealCostCalculator;
+use App\Services\UserSiteAccessService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
 use Illuminate\Validation\ValidationException;
 
 class SiteMealPlanController extends Controller
 {
+    use ResolvesAllowedSiteTypes;
     use RespondsToInertiaOrJson;
+
+    private const SITE_BYPASS_PERMISSIONS = ['sites.viewAll'];
 
     /** IDDSI food framework levels offered in the resident dietary editor. */
     public const IDDSI_LEVELS = [
@@ -37,10 +44,13 @@ class SiteMealPlanController extends Controller
         private DietaryConflictChecker $conflictChecker,
         private MealCostCalculator $costCalculator,
         private InventoryMovementRecorder $inventory,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
-    public function bootstrap(Site $site)
+    public function bootstrap(Request $request, Site $site)
     {
+        $this->authorize('view', $site);
+
         $user = auth()->user();
 
         $recipes = MealRecipe::active()
@@ -73,16 +83,24 @@ class SiteMealPlanController extends Controller
             ->map(fn (Client $c) => $this->residentPayload($c));
 
         $templates = SiteMealWeekTemplate::query()
-            ->where('site_id', $site->id)
+            ->where(fn ($query) => $query
+                ->where('site_id', $site->id)
+                ->orWhere('is_starter', true))
             ->orderBy('name')
             ->get()
             ->map(fn (SiteMealWeekTemplate $t) => $this->templatePayload($t));
 
         // Slim list of houses & offices for the hero site switcher.
         $sites = Site::query()
-            ->where('tenant_id', $site->tenant_id)
-            ->where('is_active', true)
-            ->orderBy('name')
+            ->active()
+            ->whereIn('type', $this->allowedSiteTypes($request))
+            ->orderBy('name');
+        $this->siteAccess->applySiteScope(
+            $sites,
+            $request->user(),
+            self::SITE_BYPASS_PERMISSIONS,
+        );
+        $sites = $sites
             ->get(['id', 'name', 'type', 'suburb', 'region'])
             ->map(fn (Site $s) => [
                 'id' => $s->id,
@@ -191,6 +209,8 @@ class SiteMealPlanController extends Controller
 
     public function index(Request $request, Site $site)
     {
+        $this->authorize('view', $site);
+
         $start = $this->resolveStart($request->string('week')->toString());
         $end = $start->addDays(6);
 
@@ -220,10 +240,19 @@ class SiteMealPlanController extends Controller
      */
     public function checkConflicts(Request $request, Site $site)
     {
+        $this->authorize('view', $site);
+
         $data = $request->validate([
-            'recipe_id' => 'nullable|integer|exists:meal_recipes,id',
+            'recipe_id' => [
+                'nullable',
+                'integer',
+                $this->visibleRecipeRule($site),
+            ],
             'client_ids' => 'nullable|array',
-            'client_ids.*' => 'integer|exists:clients,id',
+            'client_ids.*' => [
+                'integer',
+                Rule::exists('clients', 'id')->where('site_id', $site->id),
+            ],
         ]);
 
         if (empty($data['recipe_id']) || empty($data['client_ids'])) {
@@ -236,7 +265,11 @@ class SiteMealPlanController extends Controller
             ]);
         }
 
-        $recipe = MealRecipe::with(['tags', 'ingredients.product.tags'])->find($data['recipe_id']);
+        $recipe = MealRecipe::query()
+            ->active()
+            ->visibleToSite($site->id)
+            ->with(['tags', 'ingredients.product.tags'])
+            ->findOrFail($data['recipe_id']);
         $report = $this->conflictChecker->checkRecipeAgainstClients($recipe, $data['client_ids']);
 
         return response()->json($report);
@@ -244,13 +277,13 @@ class SiteMealPlanController extends Controller
 
     public function store(Request $request, Site $site)
     {
+        $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
 
-        $data = $this->validateInput($request);
+        $data = $this->validateInput($request, $site);
         $this->enforceOverrideGate($data);
 
         $entry = SiteMealPlanEntry::create([
-            'tenant_id' => $site->tenant_id ?? auth()->user()?->tenant_id,
             'site_id' => $site->id,
             'plan_date' => $data['plan_date'],
             'meal_slot' => $data['meal_slot'],
@@ -282,10 +315,11 @@ class SiteMealPlanController extends Controller
 
     public function update(Request $request, Site $site, SiteMealPlanEntry $entry)
     {
+        $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         abort_unless($entry->site_id === $site->id, 404);
 
-        $data = $this->validateInput($request);
+        $data = $this->validateInput($request, $site);
         $this->enforceOverrideGate($data);
 
         $payload = [
@@ -326,6 +360,7 @@ class SiteMealPlanController extends Controller
 
     public function destroy(Request $request, Site $site, SiteMealPlanEntry $entry)
     {
+        $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         abort_unless($entry->site_id === $site->id, 404);
         $entry->delete();
@@ -334,6 +369,7 @@ class SiteMealPlanController extends Controller
 
     public function markServed(Request $request, Site $site, SiteMealPlanEntry $entry)
     {
+        $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         abort_unless($entry->site_id === $site->id, 404);
 
@@ -356,6 +392,7 @@ class SiteMealPlanController extends Controller
 
     public function unserve(Request $request, Site $site, SiteMealPlanEntry $entry)
     {
+        $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         abort_unless($entry->site_id === $site->id, 404);
 
@@ -417,6 +454,7 @@ class SiteMealPlanController extends Controller
 
     public function saveSettings(Request $request, Site $site)
     {
+        $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.shopping.manage'), 403);
         $data = $request->validate([
             'weekly_food_budget_cents' => 'nullable|integer|min:0|max:100000000',
@@ -431,6 +469,7 @@ class SiteMealPlanController extends Controller
      */
     public function updateResident(Request $request, Site $site, Client $client)
     {
+        $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         abort_unless($client->site_id === $site->id, 404);
 
@@ -471,6 +510,7 @@ class SiteMealPlanController extends Controller
 
     public function clearWeek(Request $request, Site $site)
     {
+        $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         $start = $this->resolveStart($request->string('week')->toString());
         $end = $start->addDays(6);
@@ -483,6 +523,7 @@ class SiteMealPlanController extends Controller
 
     public function copyWeek(Request $request, Site $site)
     {
+        $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         $data = $request->validate([
             'from_week' => 'required|date',
@@ -509,7 +550,6 @@ class SiteMealPlanController extends Controller
         foreach ($src as $e) {
             $offset = $from->diffInDays(CarbonImmutable::parse($e->plan_date));
             SiteMealPlanEntry::create([
-                'tenant_id' => $e->tenant_id,
                 'site_id' => $site->id,
                 'plan_date' => $to->addDays((int) $offset)->toDateString(),
                 'meal_slot' => $e->meal_slot,
@@ -532,6 +572,8 @@ class SiteMealPlanController extends Controller
 
     public function weekSummary(Request $request, Site $site)
     {
+        $this->authorize('view', $site);
+
         $start = $this->resolveStart($request->string('week')->toString());
         $end = $start->addDays(6);
 
@@ -578,6 +620,8 @@ class SiteMealPlanController extends Controller
      */
     public function takeawayVendors(Site $site)
     {
+        $this->authorize('view', $site);
+
         $vendors = SiteMealPlanEntry::query()
             ->where('site_id', $site->id)
             ->whereNotNull('takeaway_vendor')
@@ -622,13 +666,17 @@ class SiteMealPlanController extends Controller
         }
     }
 
-    private function validateInput(Request $request): array
+    private function validateInput(Request $request, Site $site): array
     {
         $data = $request->validate([
             'plan_date' => 'required|date',
             'meal_slot' => 'required|in:' . implode(',', SiteMealPlanEntry::MEAL_SLOTS),
             'source_type' => 'nullable|in:' . implode(',', SiteMealPlanEntry::SOURCE_TYPES),
-            'recipe_id' => 'nullable|integer|exists:meal_recipes,id',
+            'recipe_id' => [
+                'nullable',
+                'integer',
+                $this->visibleRecipeRule($site),
+            ],
             'ad_hoc_name' => 'nullable|string|max:255',
             'takeaway_vendor' => 'nullable|string|max:255',
             // Accept either dollars (decimal) or cents (integer); normalised below.
@@ -638,7 +686,10 @@ class SiteMealPlanController extends Controller
             'servings' => 'nullable|integer|min:1|max:500',
             'notes' => 'nullable|string|max:2000',
             'client_ids' => 'nullable|array',
-            'client_ids.*' => 'integer|exists:clients,id',
+            'client_ids.*' => [
+                'integer',
+                Rule::exists('clients', 'id')->where('site_id', $site->id),
+            ],
             'allergen_override_reason' => 'nullable|string|min:10|max:500',
         ]);
 
@@ -682,6 +733,19 @@ class SiteMealPlanController extends Controller
         }
 
         return $data;
+    }
+
+    private function visibleRecipeRule(Site $site): Exists
+    {
+        return Rule::exists('meal_recipes', 'id')
+            ->where(fn ($query) => $query
+                ->where('is_active', true)
+                ->whereNull('deleted_at')
+                ->where(fn ($scope) => $scope
+                    ->where('scope', 'shared')
+                    ->orWhere(fn ($local) => $local
+                        ->where('scope', 'house')
+                        ->where('site_id', $site->id))));
     }
 
     private function resolveStart(string $week): CarbonImmutable

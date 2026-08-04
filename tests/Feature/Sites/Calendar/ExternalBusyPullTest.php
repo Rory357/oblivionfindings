@@ -7,7 +7,6 @@ use App\Models\Site;
 use App\Services\Sites\Calendar\CalendarSyncService;
 use App\Services\Sites\Calendar\SiteCalendarAggregator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
@@ -22,7 +21,7 @@ function twoWayFixture(): array
     $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
 
     CalendarSyncConnection::firstOrCreate(
-        ['tenant_id' => 0, 'provider' => 'google'],
+        ['provider' => 'google'],
         [
             'status' => CalendarSyncConnection::STATUS_CONNECTED,
             'access_token' => 'fake-token',
@@ -32,7 +31,6 @@ function twoWayFixture(): array
     );
 
     $mapping = CalendarSyncMapping::create([
-        'tenant_id' => 0,
         'site_id' => $site->id,
         'provider' => 'google',
         'external_calendar_id' => 'house-a@resource.calendar.google.com',
@@ -148,4 +146,60 @@ test('one-way mappings do not pull external busy', function () {
 
     expect($counts['pulled'])->toBe(0);
     expect(CalendarSyncBusyBlock::count())->toBe(0);
+});
+
+test('retired sites skip sync without a provider call or successful timestamp', function (string $state) {
+    [$site, $mapping] = twoWayFixture();
+
+    match ($state) {
+        'inactive' => $site->update(['is_active' => false]),
+        'archived' => $site->update(['archived' => true, 'archived_at' => now()]),
+        'deleted' => $site->delete(),
+    };
+
+    Http::fake(['www.googleapis.com/*' => Http::response(['items' => []], 200)]);
+
+    $result = app(CalendarSyncService::class)->syncMapping($mapping);
+
+    expect($result)->toBeNull()
+        ->and($mapping->fresh()->last_synced_at)->toBeNull()
+        ->and(CalendarSyncBusyBlock::count())->toBe(0);
+    Http::assertNothingSent();
+})->with(['inactive', 'archived', 'deleted']);
+
+test('a stale mapping whose site is missing skips sync', function () {
+    [$site, $mapping] = twoWayFixture();
+    $site->forceDelete();
+
+    Http::fake(['www.googleapis.com/*' => Http::response(['items' => []], 200)]);
+
+    expect(app(CalendarSyncService::class)->syncMapping($mapping))->toBeNull()
+        ->and(CalendarSyncBusyBlock::count())->toBe(0);
+    Http::assertNothingSent();
+});
+
+test('an attempted zero-item sync retains the successful counts result', function () {
+    [, $mapping] = twoWayFixture();
+    fakeGoogle([]);
+
+    $result = app(CalendarSyncService::class)->syncMapping($mapping);
+
+    expect($result)->toBe(['pushed' => 0, 'pulled' => 0, 'failed' => 0])
+        ->and($mapping->fresh()->last_synced_at)->not->toBeNull();
+});
+
+test('busy block storage succeeds without caller compatibility storage', function () {
+    [, $mapping] = twoWayFixture();
+    $start = now()->addDay()->setTime(9, 0);
+
+    fakeGoogle([[
+        'id' => 'global-busy',
+        'summary' => 'Application-wide provider event',
+        'start' => ['dateTime' => $start->toRfc3339String()],
+        'end' => ['dateTime' => $start->copy()->addHour()->toRfc3339String()],
+    ]]);
+
+    app(CalendarSyncService::class)->syncMapping($mapping);
+
+    expect(CalendarSyncBusyBlock::where('external_event_id', 'global-busy')->exists())->toBeTrue();
 });

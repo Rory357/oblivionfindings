@@ -116,7 +116,11 @@ export default function SkillsIndex({
                         stats={[
                             { label: 'Skills', value: skills.data.length },
                             { label: 'Categories', value: categories.length },
-                            { label: 'Gaps', value: skillGaps.length, amber: skillGaps.length > 0 },
+                            {
+                                label: 'Gaps',
+                                value: skillGaps.length,
+                                amber: skillGaps.length > 0,
+                            },
                         ]}
                         actions={
                             <>
@@ -241,7 +245,7 @@ export default function SkillsIndex({
                                                 className={
                                                     skill.is_active
                                                         ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                                        : 'bg-muted-foreground/10 border-border/30 text-muted-foreground'
+                                                        : 'border-border/30 bg-muted-foreground/10 text-muted-foreground'
                                                 }
                                             >
                                                 {skill.is_active
@@ -281,8 +285,10 @@ export default function SkillsIndex({
                     </DialogHeader>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
-                            <Label>Name</Label>
+                            <Label htmlFor="skill-name">Name</Label>
                             <Input
+                                id="skill-name"
+                                name="name"
                                 value={form.name}
                                 onChange={(e) => set('name', e.target.value)}
                                 placeholder="e.g. First Aid"
@@ -290,8 +296,10 @@ export default function SkillsIndex({
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label>Category</Label>
+                            <Label htmlFor="skill-category">Category</Label>
                             <Input
+                                id="skill-category"
+                                name="category"
                                 value={form.category}
                                 onChange={(e) =>
                                     set('category', e.target.value)
@@ -301,8 +309,12 @@ export default function SkillsIndex({
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label>Description</Label>
+                            <Label htmlFor="skill-description">
+                                Description
+                            </Label>
                             <Textarea
+                                id="skill-description"
+                                name="description"
                                 value={form.description}
                                 onChange={(e) =>
                                     set('description', e.target.value)

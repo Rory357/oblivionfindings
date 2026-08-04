@@ -3,10 +3,14 @@
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinJournal;
+use App\Domain\Finance\Services\ExpenseJournalService;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrExpenseItem;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use App\Support\LegacyStorageContext;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
 
@@ -20,7 +24,6 @@ function createExpenseGlAccounts(): void
         '2000' => ['Accounts Payable', 'liability'],
     ] as $code => [$name, $type]) {
         FinAccount::factory()->create([
-            'organization_id' => 1,
             'code' => $code,
             'name' => $name,
             'type' => $type,
@@ -32,8 +35,13 @@ function createExpenseGlAccounts(): void
 
 function createExpenseOpenPeriod(): FinFiscalPeriod
 {
+    $storageColumn = collect((new FinFiscalPeriod)->getFillable())
+        ->filter(fn (string $attribute): bool => str_ends_with($attribute, '_id'))
+        ->sole();
+    $storageValue = collect(LegacyStorageContext::attributes())->sole();
+
     return FinFiscalPeriod::create([
-        'organization_id' => 1,
+        $storageColumn => $storageValue,
         'name' => 'FY2026 Expenses',
         'start_date' => '2026-01-01',
         'end_date' => '2026-12-31',
@@ -45,9 +53,10 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
 
+    $this->site = Site::factory()->create();
+
     // HR role is granted hr.expenses.approve.
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
@@ -55,13 +64,28 @@ beforeEach(function () {
         Role::query()->where('name', 'hr')->first()->id,
     ]);
 
-    $this->worker = User::factory()->create(['organization_id' => 1, 'role' => 'support_worker', 'approved_at' => now()]);
+    $this->worker = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+
+    foreach ([$this->hr, $this->worker] as $staff) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $staff->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $staff->id,
+            'updated_by' => $staff->id,
+        ]);
+    }
 });
 
 function makeSubmittedExpenseClaim(int $ownerId): HrExpenseClaim
 {
     $claim = HrExpenseClaim::query()->create([
-        'tenant_id' => 1,
         'user_id' => $ownerId,
         'claim_number' => 'EXP-TEST-001',
         'title' => 'Conference trip',
@@ -105,7 +129,6 @@ test('approving an expense claim posts a balanced GL journal', function () {
     expect($claim->gl_posted_at)->not->toBeNull();
 
     $journal = FinJournal::query()
-        ->where('organization_id', 1)
         ->where('source_type', 'expense_claim')
         ->where('source_id', $claim->id)
         ->firstOrFail()
@@ -135,7 +158,7 @@ test('the expense GL post guards against double-posting (one journal per claim)'
     expect($claim->journal_id)->not->toBeNull();
 
     // The service refuses to re-post an already-journalled claim (guard).
-    expect(fn () => app(\App\Domain\Finance\Services\ExpenseJournalService::class)
+    expect(fn () => app(ExpenseJournalService::class)
         ->postExpenseClaimJournal($claim))
         ->toThrow(InvalidArgumentException::class);
 

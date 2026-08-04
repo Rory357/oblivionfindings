@@ -3,6 +3,7 @@
 namespace App\Domain\Roadmap\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,11 +13,11 @@ class AssuranceEvidencePlan extends Model
 {
     use AuditableChanges;
     use HasFactory;
+    use WritesLegacyStorageContext;
 
     protected $table = 'roadmap_assurance_evidence_plans';
 
     protected $fillable = [
-        'tenant_id',
         'initiative_id',
         'control_name',
         'evidence_type',

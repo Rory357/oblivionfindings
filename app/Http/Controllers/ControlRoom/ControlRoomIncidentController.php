@@ -606,14 +606,12 @@ class ControlRoomIncidentController extends Controller
         $siteAccess = $this->siteAccess();
         $bypassPermissions = $this->alertBypassPermissions();
 
-        if (! $siteAccess->isUnrestrictedPlatformUser($user)) {
-            $siteIds = $siteAccess->accessibleSiteIds($user, $bypassPermissions);
+        $siteIds = $siteAccess->accessibleSiteIds($user, $bypassPermissions);
 
-            if ($siteIds === []) {
-                $query->whereRaw('1 = 0');
-            } else {
-                $query->whereIn('site_id', $siteIds);
-            }
+        if ($siteIds === []) {
+            $query->whereRaw('1 = 0');
+        } else {
+            $query->whereIn('site_id', $siteIds);
         }
 
         if (! $user->can('viewAny', SafeguardingConcern::class)) {

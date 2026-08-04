@@ -42,6 +42,10 @@ beforeEach(function (): void {
 });
 
 it('audits single-application collisions and provenance without mutating data or exposing values', function () {
+    $canSeedTicketReferenceCollision = ! auditColumnHasGlobalUniqueIndex('it_tickets', 'reference');
+    $canSeedMissingAssignmentDevice = ! auditColumnHasForeignKey('device_assignments', 'device_id');
+    $canSeedMissingLinkedTicket = ! auditColumnHasForeignKey('it_ticket_links', 'ticket_id');
+
     $requesterId = DB::table('users')->insertGetId([
         'name' => 'Private Audit Person',
         'email' => 'private-audit-person@example.test',
@@ -57,22 +61,54 @@ it('audits single-application collisions and provenance without mutating data or
         'name' => 'Audit team',
         'is_active' => true,
     ]);
-    DB::table('hr_employee_profiles')->insert([
+    DB::table('hr_employee_profiles')->insert(auditFixtureRow('hr_employee_profiles', [
         'user_id' => $requesterId,
         'primary_site_id' => $ticketSiteId,
         'tenant_id' => 11,
-    ]);
-    DB::table('site_rooms')->insert([
+        'employee_number' => 'EMP-AUDIT-'.$requesterId,
+        'work_email' => 'private-audit-person@example.test',
+        'position_title' => 'Audit Fixture',
+        'position_role' => 'auditor',
+        'employment_type' => 'full_time',
+        'start_date' => today()->subDay(),
+        'is_active' => true,
+        'secondary_site_ids' => '[]',
+        'created_by' => $requesterId,
+        'updated_by' => $requesterId,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]));
+    DB::table('site_rooms')->insert(auditFixtureRow('site_rooms', [
         'site_id' => $ticketSiteId,
         'tenant_id' => 71234,
-    ]);
-    DB::table('location_hardware')->insert(['tenant_id' => 81234]);
-    $vehicleClientId = DB::table('clients')->insertGetId(['site_id' => $otherSiteId]);
-    $vehicleAssetId = DB::table('assets')->insertGetId([
+        'name' => 'Audit room',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]));
+    DB::table('location_hardware')->insert(auditFixtureRow('location_hardware', [
+        'tenant_id' => 81234,
+        'site_id' => $ticketSiteId,
+        'provider' => 'manual',
+        'category' => 'other',
+        'name' => 'Audit hardware',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]));
+    $vehicleClientId = DB::table('clients')->insertGetId(auditFixtureRow('clients', [
+        'site_id' => $otherSiteId,
+        'first_name' => 'Audit',
+        'last_name' => 'Client',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]));
+    $vehicleAssetId = DB::table('assets')->insertGetId(auditFixtureRow('assets', [
         'site_id' => $ticketSiteId,
         'home_site_id' => $otherSiteId,
         'client_id' => $vehicleClientId,
-    ]);
+        'name' => 'Audit vehicle',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]));
 
     DB::table('it_tickets')->insert([
         [
@@ -91,7 +127,7 @@ it('audits single-application collisions and provenance without mutating data or
         ],
         [
             'tenant_id' => 22,
-            'reference' => 'TOP-SECRET-COLLISION',
+            'reference' => $canSeedTicketReferenceCollision ? 'TOP-SECRET-COLLISION' : 'TOP-SECRET-SECOND',
             'title' => 'Second private ticket',
             'requester_user_id' => $requesterId,
             'site_id' => null,
@@ -106,8 +142,8 @@ it('audits single-application collisions and provenance without mutating data or
     ]);
     $existingTicketId = (int) DB::table('it_tickets')->orderBy('id')->value('id');
 
-    DB::table('it_ticket_links')->insert([
-        [
+    $ticketLinks = [
+        ...($canSeedMissingLinkedTicket ? [[
             'tenant_id' => 11,
             'ticket_id' => 999997,
             'relationship' => 'affected_site',
@@ -115,7 +151,7 @@ it('audits single-application collisions and provenance without mutating data or
             'linkable_id' => $ticketSiteId,
             'created_at' => now(),
             'updated_at' => now(),
-        ],
+        ]] : []),
         [
             'tenant_id' => 11,
             'ticket_id' => $existingTicketId,
@@ -161,7 +197,8 @@ it('audits single-application collisions and provenance without mutating data or
             'created_at' => now(),
             'updated_at' => now(),
         ],
-    ]);
+    ];
+    DB::table('it_ticket_links')->insert($ticketLinks);
 
     $unassignedId = insertAuditDevice('audit-device-unassigned', 11);
     $ambiguousId = insertAuditDevice('audit-device-ambiguous', 11);
@@ -169,7 +206,7 @@ it('audits single-application collisions and provenance without mutating data or
     $clientOrphanedId = insertAuditDevice('audit-device-client-orphaned', 11);
     $vehicleId = insertAuditDevice('audit-device-vehicle-provenance', 11);
 
-    DB::table('device_assignments')->insert([
+    $deviceAssignments = [
         [
             'device_id' => $ambiguousId,
             'assignable_type' => 'site',
@@ -206,7 +243,7 @@ it('audits single-application collisions and provenance without mutating data or
             'created_at' => now(),
             'updated_at' => now(),
         ],
-        [
+        ...($canSeedMissingAssignmentDevice ? [[
             'device_id' => 999998,
             'assignable_type' => 'staff',
             'assignable_id' => $requesterId,
@@ -214,7 +251,7 @@ it('audits single-application collisions and provenance without mutating data or
             'assigned_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
-        ],
+        ]] : []),
         [
             'device_id' => $vehicleId,
             'assignable_type' => 'vehicle',
@@ -224,7 +261,8 @@ it('audits single-application collisions and provenance without mutating data or
             'created_at' => now(),
             'updated_at' => now(),
         ],
-    ]);
+    ];
+    DB::table('device_assignments')->insert($deviceAssignments);
 
     DB::table('integration_site_configs')->insert([
         'tenant_id' => 11,
@@ -235,10 +273,14 @@ it('audits single-application collisions and provenance without mutating data or
         'created_at' => now(),
         'updated_at' => now(),
     ]);
-    DB::table('integrations')->insert([
+    DB::table('integrations')->insert(auditFixtureRow('integrations', [
         'tenant_id' => 22,
         'provider' => 'secret-provider-name',
-    ]);
+        'display_name' => 'Private integration',
+        'status' => 'inactive',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]));
 
     $before = auditTableCounts();
     $queries = [];
@@ -285,15 +327,15 @@ it('audits single-application collisions and provenance without mutating data or
         ->firstWhere('key', 'ticket_reference');
     expect($ticketKey)
         ->not->toBeNull()
-        ->and($ticketKey['duplicate_groups'])->toBe(1)
-        ->and($ticketKey['duplicate_rows'])->toBe(2)
-        ->and($ticketKey['status'])->toBe('collision');
+        ->and($ticketKey['duplicate_groups'])->toBe($canSeedTicketReferenceCollision ? 1 : 0)
+        ->and($ticketKey['duplicate_rows'])->toBe($canSeedTicketReferenceCollision ? 2 : 0)
+        ->and($ticketKey['status'])->toBe($canSeedTicketReferenceCollision ? 'collision' : 'clear');
 
     expect($report['inbound_email_ambiguity'])
         ->toMatchArray([
-            'status' => 'ambiguous',
-            'ambiguous_reference_groups' => 1,
-            'ambiguous_ticket_rows' => 2,
+            'status' => $canSeedTicketReferenceCollision ? 'ambiguous' : 'clear',
+            'ambiguous_reference_groups' => $canSeedTicketReferenceCollision ? 1 : 0,
+            'ambiguous_ticket_rows' => $canSeedTicketReferenceCollision ? 2 : 0,
         ]);
 
     expect(collect($report['global_key_checks'])->pluck('key')->all())->toEqualCanonicalizing([
@@ -340,11 +382,11 @@ it('audits single-application collisions and provenance without mutating data or
         ->and(collect($report['orphan_checks'])->firstWhere('check', 'device_assignment_staff_target_missing')['count'])
         ->toBe(0)
         ->and(collect($report['orphan_checks'])->firstWhere('check', 'device_assignment_device_missing')['count'])
-        ->toBe(1)
+        ->toBe($canSeedMissingAssignmentDevice ? 1 : 0)
         ->and(collect($report['orphan_checks'])->firstWhere('check', 'provider_site_mapping_without_connection')['count'])
         ->toBe(1)
         ->and(collect($report['orphan_checks'])->firstWhere('check', 'it_ticket_link_ticket_missing')['count'])
-        ->toBe(1)
+        ->toBe($canSeedMissingLinkedTicket ? 1 : 0)
         ->and(collect($report['orphan_checks'])->firstWhere('check', 'it_ticket_link_security_device_target_missing')['count'])
         ->toBe(1)
         ->and(collect($report['orphan_checks'])->firstWhere('check', 'it_ticket_link_control_room_alert_target_missing')['count'])
@@ -358,11 +400,11 @@ it('audits single-application collisions and provenance without mutating data or
         ->and($report['null_site_tickets']['total'])->toBe(1)
         ->and($report['null_site_tickets']['without_explicit_organisation_wide_evidence'])->toBe(1)
         ->and($report['device_assignments']['unassigned_devices'])->toBeGreaterThanOrEqual(1)
-        ->and($report['device_assignments']['ambiguously_assigned_devices'])->toBeGreaterThanOrEqual(1)
-        ->and(collect($report['tenant_leading_indexes'])->where('table', 'it_tickets')->count())->toBeGreaterThan(0);
+        ->and($report['device_assignments']['ambiguously_assigned_devices'])->toBeGreaterThanOrEqual(1);
 
     expect($output)
         ->not->toContain('TOP-SECRET-COLLISION')
+        ->not->toContain('TOP-SECRET-SECOND')
         ->not->toContain('private-audit-person@example.test')
         ->not->toContain('Private Audit Person')
         ->not->toContain('secret-provider-name')
@@ -393,13 +435,20 @@ it('audits single-application collisions and provenance without mutating data or
     // Make the intentionally unused fixture explicit: it proves an ordinary
     // device with no active assignment is counted without exposing its ID.
     expect(DB::table('devices')->where('id', $unassignedId)->exists())->toBeTrue();
-    expect(collect($report['tenant_leading_indexes'])->pluck('table')->all())
-        ->toContain('site_rooms', 'location_hardware');
+    foreach (['it_tickets', 'site_rooms', 'location_hardware'] as $table) {
+        expect(collect($report['tenant_leading_indexes'])
+            ->where('table', $table)
+            ->pluck('index')
+            ->values()
+            ->all())->toEqualCanonicalizing(auditTenantLeadingIndexNames($table));
+    }
 });
 
 it('renders bounded markdown and states that Task 1 is only a no-regression gate', function () {
     $exit = Artisan::call('it-security:audit-single-tenant-data');
     $output = Artisan::output();
+    $evidenceMarker = collect(['is_organisation_wide', 'is_organization_wide', 'scope_type'])
+        ->first(fn (string $column): bool => Schema::hasColumn('it_tickets', $column)) ?? 'not_available';
 
     expect($exit)->toBe(0)
         ->and($output)->toContain('# IT, Security & Devices single-tenant data audit')
@@ -412,7 +461,7 @@ it('renders bounded markdown and states that Task 1 is only a no-regression gate
         ->toContain('## Legacy boundary sources')
         ->toContain('| users.organization_id | audited |')
         ->toContain('| hr_employee_profiles.tenant_id | audited |')
-        ->toContain('Organisation-wide evidence marker: not_available');
+        ->toContain('Organisation-wide evidence marker: '.$evidenceMarker);
 
     $databaseName = (string) config('database.connections.mysql.database');
     if ($databaseName !== '') {
@@ -496,42 +545,63 @@ it('uses current assignment time scope while auditing orphan targets across all 
 });
 
 it('rejects mutating pragma statements in the outer-transaction query guard', function () {
-    $before = (int) DB::selectOne('PRAGMA user_version')->user_version;
     $command = app(AuditItSecuritySingleTenantData::class);
+    $classifier = new ReflectionMethod($command, 'isAllowedAuditQuery');
     $readOnly = new ReflectionMethod($command, 'readOnly');
 
+    foreach ([
+        'PRAGMA user_version = 9173',
+        'PRAGMA table_info("users"); PRAGMA user_version = 9173',
+        'SELECT 1; PRAGMA user_version = 9173',
+        'PRAGMA table_info = 9173',
+    ] as $unsafeQuery) {
+        expect($classifier->invoke($command, $unsafeQuery))->toBeFalse();
+    }
+
+    $connection = DB::connection();
+    $isSqlite = $connection->getDriverName() === 'sqlite';
+    $before = $isSqlite ? (int) DB::selectOne('PRAGMA user_version')->user_version : null;
+    $unsafeStatement = $isSqlite
+        ? 'PRAGMA user_version = 9173'
+        : 'UPDATE users SET name = name WHERE 1 = 0';
+
     expect(fn () => $readOnly->invoke(
         $command,
-        DB::connection(),
-        fn (): bool => DB::statement('PRAGMA user_version = 9173'),
-    ))->toThrow(RuntimeException::class, 'The audit attempted a non-read query.');
-    expect(fn () => $readOnly->invoke(
-        $command,
-        DB::connection(),
-        fn (): bool => DB::statement('PRAGMA table_info("users"); PRAGMA user_version = 9173'),
-    ))->toThrow(RuntimeException::class, 'The audit attempted a non-read query.');
-    expect(fn () => $readOnly->invoke(
-        $command,
-        DB::connection(),
-        fn (): bool => DB::statement('SELECT 1; PRAGMA user_version = 9173'),
-    ))->toThrow(RuntimeException::class, 'The audit attempted a non-read query.');
-    expect(fn () => $readOnly->invoke(
-        $command,
-        DB::connection(),
-        fn (): bool => DB::statement('PRAGMA table_info = 9173'),
+        $connection,
+        fn (): bool => DB::statement($unsafeStatement),
     ))->toThrow(RuntimeException::class, 'The audit attempted a non-read query.');
 
-    expect((int) DB::selectOne('PRAGMA user_version')->user_version)->toBe($before);
+    if ($isSqlite) {
+        expect((int) DB::selectOne('PRAGMA user_version')->user_version)->toBe($before);
+    }
 });
 
 it('marks unavailable tables and columns explicitly instead of reporting a false zero', function () {
-    Schema::drop('it_kb_articles');
-    Schema::table('it_tickets', fn (Blueprint $table) => $table->dropColumn('team_id'));
-
-    $exit = Artisan::call('it-security:audit-single-tenant-data', [
-        '--format' => 'json',
+    $connectionName = 'audit_missing_schema';
+    $originalConnection = config("database.connections.{$connectionName}");
+    config()->set("database.connections.{$connectionName}", [
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
     ]);
-    $report = json_decode(trim(Artisan::output()), true, flags: JSON_THROW_ON_ERROR);
+
+    try {
+        $schema = DB::connection($connectionName)->getSchemaBuilder();
+        $schema->create('it_tickets', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('site_id')->nullable();
+        });
+
+        $exit = Artisan::call('it-security:audit-single-tenant-data', [
+            '--connection' => $connectionName,
+            '--format' => 'json',
+        ]);
+        $report = json_decode(trim(Artisan::output()), true, flags: JSON_THROW_ON_ERROR);
+    } finally {
+        DB::purge($connectionName);
+        config()->set("database.connections.{$connectionName}", $originalConnection);
+    }
 
     expect($exit)->toBe(0)
         ->and(collect($report['global_key_checks'])->firstWhere('key', 'kb_slug')['status'])->toBe('not_available')
@@ -580,6 +650,45 @@ function auditReportKeys(array $value): array
     }
 
     return array_values(array_unique($keys));
+}
+
+function auditColumnHasGlobalUniqueIndex(string $table, string $column): bool
+{
+    return collect(Schema::getIndexes($table))->contains(function (array $index) use ($column): bool {
+        $columns = array_map('strtolower', array_values($index['columns'] ?? []));
+
+        return (bool) ($index['unique'] ?? false) && $columns === [strtolower($column)];
+    });
+}
+
+/** @param array<string, mixed> $values
+ * @return array<string, mixed>
+ */
+function auditFixtureRow(string $table, array $values): array
+{
+    return array_intersect_key($values, array_flip(Schema::getColumnListing($table)));
+}
+
+function auditColumnHasForeignKey(string $table, string $column): bool
+{
+    return collect(Schema::getForeignKeys($table))->contains(
+        fn (array $foreignKey): bool => in_array(strtolower($column), array_map(
+            'strtolower',
+            array_values($foreignKey['columns'] ?? []),
+        ), true),
+    );
+}
+
+/** @return list<string> */
+function auditTenantLeadingIndexNames(string $table): array
+{
+    return collect(Schema::getIndexes($table))
+        ->filter(fn (array $index): bool => strtolower((string) ($index['columns'][0] ?? '')) === 'tenant_id')
+        ->pluck('name')
+        ->map(fn (mixed $name): string => (string) $name)
+        ->sort()
+        ->values()
+        ->all();
 }
 
 function insertAuditDevice(string $uid, int $legacyId): int

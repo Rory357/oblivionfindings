@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Contracts\CalendarOAuthToken;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Org-level OAuth connection to Google Workspace / Microsoft 365 used by the admin
+ * Application-level OAuth connection to Google Workspace / Microsoft 365 used by the admin
  * calendar-sync feature to read/write house *resource* calendars.
  *
  * Implements {@see CalendarOAuthToken} so it can drive GoogleCalendarService /
@@ -16,11 +17,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class CalendarSyncConnection extends Model implements CalendarOAuthToken
 {
+    use WritesLegacyStorageContext;
+
     public const STATUS_CONNECTED = 'connected';
+
     public const STATUS_DISCONNECTED = 'disconnected';
+
     public const STATUS_ERROR = 'error';
 
     public const PROVIDER_GOOGLE = 'google';
+
     public const PROVIDER_MICROSOFT = 'microsoft';
 
     protected $fillable = [

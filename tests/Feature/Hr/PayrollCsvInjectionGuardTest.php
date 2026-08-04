@@ -52,22 +52,18 @@ test('C1: the payroll run export CSV neutralises formula-leading cells but leave
 
 test('C1: the net-pay direct-credit CSV neutralises a formula-leading employee name', function () {
     $staff = User::factory()->create([
-        'organization_id' => 1,
         'name' => '=HYPERLINK("http://evil.test","Pay me")',
     ]);
     $profile = HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $staff->id,
         'bank_account' => '12-3456-7890123-00',
     ]);
     $run = HrPayrollRun::factory()->create([
-        'tenant_id' => 1,
         'status' => 'locked',
         'period_start' => '2026-06-01',
         'period_end' => '2026-06-30',
     ]);
     HrPayslip::create([
-        'tenant_id' => 1,
         'payroll_run_id' => $run->id,
         'employee_profile_id' => $profile->id,
         'user_id' => $staff->id,

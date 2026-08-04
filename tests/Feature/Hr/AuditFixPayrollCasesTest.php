@@ -14,14 +14,20 @@ use App\Domain\Shifts\Timesheets\TimesheetApprovalService;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
+
+    $this->site = Site::factory()->create([
+        'name' => 'HR audit case Site',
+    ]);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -43,8 +49,13 @@ beforeEach(function () {
         $this->staff->roles()->syncWithoutDetaching([$supportRole->id]);
     }
 
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+    ]);
+
     $this->staffProfile = HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'employee_number' => 'EMP80001',
         'work_email' => "worker-{$this->staff->id}@example.test",
@@ -53,6 +64,7 @@ beforeEach(function () {
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'hourly_rate' => '30.00',
+        'primary_site_id' => $this->site->id,
         'created_by' => $this->hr->id,
         'updated_by' => $this->hr->id,
     ]);
@@ -79,7 +91,7 @@ function makeApprovedTimesheet(User $staff, User $approver, ?Client $client = nu
 }
 
 /* ---------------------------------------------------------------------- */
-/*  1. Approved leave lands in payroll run items                           */
+/*  1. Approved leave lands in payroll run items */
 /* ---------------------------------------------------------------------- */
 
 test('approved paid leave lands in payroll run items and gross pay, unpaid leave is excluded', function () {
@@ -87,7 +99,6 @@ test('approved paid leave lands in payroll run items and gross pay, unpaid leave
 
     // 8h of PAID annual leave inside the period.
     HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'leave_type' => 'annual',
         'starts_at' => now()->subDays(2)->startOfDay(),
@@ -99,7 +110,6 @@ test('approved paid leave lands in payroll run items and gross pay, unpaid leave
 
     // Unpaid leave in the same period must NOT be counted.
     HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'leave_type' => 'unpaid',
         'starts_at' => now()->subDays(3)->startOfDay(),
@@ -110,7 +120,7 @@ test('approved paid leave lands in payroll run items and gross pay, unpaid leave
     ]);
 
     $service = app(PayrollExportService::class);
-    $items = $service->getRunItems(1, now()->subWeek()->startOfDay(), now()->endOfDay());
+    $items = $service->getRunItems(now()->subWeek()->startOfDay(), now()->endOfDay());
 
     expect($items)->toHaveKey($this->staff->id);
     expect((float) $items[$this->staff->id]['leave_hours'])->toBe(8.0);
@@ -119,7 +129,7 @@ test('approved paid leave lands in payroll run items and gross pay, unpaid leave
     expect((float) $items[$this->staff->id]['gross_pay'])->toBe(480.0);
 
     // Persisted onto the run item row too.
-    $run = $service->createRun(1, now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
+    $run = $service->createRun(now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
     $item = HrPayrollRunItem::query()
         ->where('payroll_run_id', $run->id)
         ->where('user_id', $this->staff->id)
@@ -134,7 +144,6 @@ test('an employee with approved leave but no timesheets still gets a run item', 
     $leaveOnly = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $leaveOnly->id,
         'employee_number' => 'EMP80002',
         'work_email' => "worker-{$leaveOnly->id}@example.test",
@@ -143,12 +152,12 @@ test('an employee with approved leave but no timesheets still gets a run item', 
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'hourly_rate' => '25.00',
+        'primary_site_id' => $this->site->id,
         'created_by' => $this->hr->id,
         'updated_by' => $this->hr->id,
     ]);
 
     HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $leaveOnly->id,
         'leave_type' => 'sick',
         'starts_at' => now()->subDays(2)->startOfDay(),
@@ -159,7 +168,7 @@ test('an employee with approved leave but no timesheets still gets a run item', 
     ]);
 
     $items = app(PayrollExportService::class)
-        ->getRunItems(1, now()->subWeek()->startOfDay(), now()->endOfDay());
+        ->getRunItems(now()->subWeek()->startOfDay(), now()->endOfDay());
 
     expect($items)->toHaveKey($leaveOnly->id);
     expect($items[$leaveOnly->id]['timesheet_ids'])->toBe([]);
@@ -169,7 +178,7 @@ test('an employee with approved leave but no timesheets still gets a run item', 
 });
 
 /* ---------------------------------------------------------------------- */
-/*  2. Payroll lock blocks status downgrades                               */
+/*  2. Payroll lock blocks status downgrades */
 /* ---------------------------------------------------------------------- */
 
 test('a submitted timesheet inside a locked payroll run cannot be returned for changes or approved', function () {
@@ -177,7 +186,7 @@ test('a submitted timesheet inside a locked payroll run cannot be returned for c
     makeApprovedTimesheet($this->staff, $this->hr, $client);
 
     $service = app(PayrollExportService::class);
-    $run = $service->createRun(1, now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
+    $run = $service->createRun(now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
     $service->lockRun($run->fresh(), $this->hr->id);
 
     // A second timesheet, submitted before the lock, with a work_date inside
@@ -214,7 +223,7 @@ test('a submitted timesheet inside a locked payroll run cannot be returned for c
 });
 
 /* ---------------------------------------------------------------------- */
-/*  3. Confidential case access_list enforcement                           */
+/*  3. Confidential case access_list enforcement */
 /* ---------------------------------------------------------------------- */
 
 function grantCaseView(User $user): void
@@ -228,10 +237,16 @@ test('a confidential case is hidden from a viewer not on the access list and vis
     $member = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     grantCaseView($outsider);
     grantCaseView($member);
+    foreach ([$outsider, $member] as $viewer) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $this->site->id,
+            'is_active' => true,
+        ]);
+    }
 
     $case = HrCase::query()->create([
-        'tenant_id' => 1,
-        'case_number' => 'HR-' . Str::padLeft((string) random_int(1, 99999), 5, '0'),
+        'case_number' => 'HR-'.Str::padLeft((string) random_int(1, 99999), 5, '0'),
         'user_id' => $this->staff->id,
         'case_type' => 'grievance',
         'severity' => 'high',
@@ -246,8 +261,9 @@ test('a confidential case is hidden from a viewer not on the access list and vis
         'created_by' => $this->hr->id,
     ]);
 
-    // Outsider: 403 on show, hidden on index.
-    $this->actingAs($outsider)->get("/hr/cases/{$case->id}")->assertForbidden();
+    // Confidential direct objects are concealed as not found, including from
+    // otherwise valid current staff at the same Site.
+    $this->actingAs($outsider)->get("/hr/cases/{$case->id}")->assertNotFound();
     $this->actingAs($outsider)->get('/hr/cases')
         ->assertOk()
         ->assertInertia(fn ($page) => $page
@@ -267,14 +283,13 @@ test('a confidential case is hidden from a viewer not on the access list and vis
 });
 
 /* ---------------------------------------------------------------------- */
-/*  4. Asset assignment notifies the employee                              */
+/*  4. Asset assignment notifies the employee */
 /* ---------------------------------------------------------------------- */
 
 test('assigning an asset notifies the assignee', function () {
     Notification::fake();
 
     $asset = HrAsset::query()->create([
-        'tenant_id' => 1,
         'asset_tag' => 'AST-9001',
         'name' => 'MacBook Air',
         'category' => 'laptop',
@@ -292,12 +307,11 @@ test('assigning an asset notifies the assignee', function () {
 });
 
 /* ---------------------------------------------------------------------- */
-/*  5. Cycle close auto-completes 100% objectives                          */
+/*  5. Cycle close auto-completes 100% objectives */
 /* ---------------------------------------------------------------------- */
 
 test('closing a goal cycle auto-completes objectives at 100 percent and leaves the rest for rollover', function () {
     $cycle = HrGoalCycle::query()->create([
-        'tenant_id' => 1,
         'name' => 'Q3 2026',
         'type' => 'quarter',
         'status' => 'active',
@@ -306,7 +320,6 @@ test('closing a goal cycle auto-completes objectives at 100 percent and leaves t
     ]);
 
     $done = HrGoal::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'title' => 'Finished objective',
         'goal_type' => 'objective',
@@ -319,7 +332,6 @@ test('closing a goal cycle auto-completes objectives at 100 percent and leaves t
     ]);
 
     $open = HrGoal::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'title' => 'Half-done objective',
         'goal_type' => 'objective',

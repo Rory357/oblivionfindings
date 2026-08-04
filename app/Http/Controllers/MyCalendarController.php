@@ -38,7 +38,7 @@ class MyCalendarController extends Controller
 
         // 1. Shifts
         $shifts = Shift::where('user_id', $userId)
-            ->visibleToFrontline($request->user()->organization_id)
+            ->visibleToFrontline()
             ->where('starts_at', '<', $end)
             ->where('ends_at', '>', $start)
             ->with(['client:id,first_name,last_name', 'tasks:id,shift_id,label,scheduled_time,is_completed,sort_order'])

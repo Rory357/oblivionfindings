@@ -1,3 +1,4 @@
+import { MyHrShell, type MyHrShellData } from '@/components/hr';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -19,7 +20,6 @@ import {
 import { Label } from '@/components/ui/label';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { Textarea } from '@/components/ui/textarea';
-import { MyHrShell, type MyHrShellData } from '@/components/hr';
 import { useForm } from '@inertiajs/react';
 import { ChevronDown, Star } from 'lucide-react';
 import { useState } from 'react';
@@ -99,9 +99,14 @@ function ReviewCard({ review }: { review: Review }) {
     });
 
     const canComment =
-        review.status === 'in_progress' || review.status === 'completed';
+        !review.employee_signed_off &&
+        (review.status === 'in_progress' ||
+            review.status === 'completed' ||
+            review.status === 'signed_off');
     const canSignOff =
-        review.status === 'completed' && !review.employee_signed_off;
+        review.status === 'signed_off' &&
+        review.manager_signed_off &&
+        !review.employee_signed_off;
     const sc = statusConfig[review.status] || statusConfig.draft;
 
     const handleSave = () => {
@@ -267,11 +272,11 @@ function ReviewCard({ review }: { review: Review }) {
                                     onClick={() => setShowSignOff(true)}
                                     disabled={form.processing}
                                 >
-                                    Sign Off on Review
+                                    Acknowledge review
                                 </Button>
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                    By signing off, you acknowledge that you
-                                    have read and discussed this review.
+                                    Confirm that you have read and discussed
+                                    this manager-approved review.
                                 </p>
                                 <AlertDialog
                                     open={showSignOff}
@@ -280,10 +285,10 @@ function ReviewCard({ review }: { review: Review }) {
                                     <AlertDialogContent>
                                         <AlertDialogHeader>
                                             <AlertDialogTitle>
-                                                Sign off on this review?
+                                                Acknowledge this review?
                                             </AlertDialogTitle>
                                             <AlertDialogDescription>
-                                                Signing off confirms you have
+                                                Acknowledging confirms you have
                                                 read and discussed this review
                                                 with your reviewer. This cannot
                                                 be undone.
@@ -296,7 +301,7 @@ function ReviewCard({ review }: { review: Review }) {
                                             <AlertDialogAction
                                                 onClick={handleSignOff}
                                             >
-                                                Sign off
+                                                Acknowledge
                                             </AlertDialogAction>
                                         </AlertDialogFooter>
                                     </AlertDialogContent>
@@ -306,7 +311,7 @@ function ReviewCard({ review }: { review: Review }) {
 
                         {review.employee_signed_off_at && (
                             <p className="text-xs text-muted-foreground">
-                                Signed off on{' '}
+                                Acknowledged on{' '}
                                 {new Date(
                                     review.employee_signed_off_at,
                                 ).toLocaleDateString('en-NZ')}
@@ -329,22 +334,22 @@ export default function MyReviews({ myHr, reviews }: Props) {
     return (
         <MyHrShell active="reviews" myHr={myHr} title="Reviews · My HR">
             {reviews.data.length === 0 ? (
-                    <Card>
-                        <CardContent className="py-8 text-center text-muted-foreground">
-                            No performance reviews found.
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <div className="space-y-4">
-                        {reviews.data.map((review) => (
-                            <ReviewCard key={review.id} review={review} />
-                        ))}
-                    </div>
-                )}
+                <Card>
+                    <CardContent className="py-8 text-center text-muted-foreground">
+                        No performance reviews found.
+                    </CardContent>
+                </Card>
+            ) : (
+                <div className="space-y-4">
+                    {reviews.data.map((review) => (
+                        <ReviewCard key={review.id} review={review} />
+                    ))}
+                </div>
+            )}
 
-                {reviews.last_page > 1 && (
-                    <LaravelPagination links={reviews.links} />
-                )}
+            {reviews.last_page > 1 && (
+                <LaravelPagination links={reviews.links} />
+            )}
         </MyHrShell>
     );
 }

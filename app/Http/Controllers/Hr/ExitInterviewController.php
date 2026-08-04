@@ -2,20 +2,18 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExitInterview;
 use App\Domain\Hr\Services\ExitInterviewService;
+use App\Domain\Hr\Services\HrLifecycleAccessService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class ExitInterviewController extends Controller
 {
-    use ResolvesHrTenant;
-
     /**
      * Departure-reason taxonomy, shared with the offboarding wizard.
      */
@@ -35,6 +33,7 @@ class ExitInterviewController extends Controller
 
     public function __construct(
         protected ExitInterviewService $exitInterviewService,
+        protected HrLifecycleAccessService $lifecycleAccess,
     ) {}
 
     /**
@@ -44,10 +43,20 @@ class ExitInterviewController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canView($user), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $interviews = HrExitInterview::forTenant($tenantId)
+        $interviews = $this->lifecycleAccess->visibleInterviews($user)
+            ->select([
+                'id',
+                'employee_profile_id',
+                'interviewer_user_id',
+                'interview_date',
+                'departure_reason',
+                'would_recommend',
+                'overall_satisfaction',
+                'is_confidential',
+            ])
             ->with([
+                'employeeProfile:id,user_id',
                 'employeeProfile.user:id,name',
                 'interviewer:id,name',
             ])
@@ -58,7 +67,7 @@ class ExitInterviewController extends Controller
 
         $canManage = $this->canManage($user);
 
-        $statsBase = HrExitInterview::forTenant($tenantId);
+        $statsBase = $this->lifecycleAccess->visibleInterviews($user);
         $avgSatisfaction = (clone $statsBase)->whereNotNull('overall_satisfaction')->avg('overall_satisfaction');
         $recommendTotal = (clone $statsBase)->whereNotNull('would_recommend')->count();
         $recommendYes = (clone $statsBase)->where('would_recommend', true)->count();
@@ -72,11 +81,11 @@ class ExitInterviewController extends Controller
                 'last_90_days' => (clone $statsBase)->where('interview_date', '>=', now()->subDays(90)->toDateString())->count(),
             ],
             'employees' => $canManage
-                ? HrEmployeeProfile::forTenant($tenantId)
+                ? $this->lifecycleAccess->historicalProfiles($user)
                     ->with('user:id,name')
                     ->get(['id', 'user_id', 'position_title'])
                 : [],
-            'interviewers' => $canManage ? $this->interviewerOptions($tenantId, $user) : [],
+            'interviewers' => $canManage ? $this->interviewerOptions($user) : [],
             'departureReasons' => self::DEPARTURE_REASONS,
             'filters' => [
                 'reason' => $request->query('reason'),
@@ -106,11 +115,10 @@ class ExitInterviewController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
-            'employee_profile_id' => ['required', 'integer', 'exists:hr_employee_profiles,id'],
-            'interviewer_user_id' => ['required', 'integer', 'exists:users,id'],
+            'employee_profile_id' => ['required', 'integer'],
+            'interviewer_user_id' => ['required', 'integer'],
             'interview_date' => ['required', 'date'],
             'departure_reason' => ['required', 'string', 'max:255'],
             'would_recommend' => ['nullable', 'boolean'],
@@ -121,14 +129,36 @@ class ExitInterviewController extends Controller
             'culture_feedback' => ['nullable', 'string', 'max:5000'],
             'additional_comments' => ['nullable', 'string', 'max:5000'],
             'is_confidential' => ['sometimes', 'boolean'],
-            'offboarding_task_id' => ['nullable', 'integer', 'exists:hr_offboarding_tasks,id'],
+            'offboarding_task_id' => ['nullable', 'integer'],
         ]);
 
-        $this->exitInterviewService->createExitInterview([
-            'tenant_id' => $tenantId,
-            'created_by' => $user->id,
-            ...$data,
-        ]);
+        DB::transaction(function () use ($user, $data): void {
+            $profile = $this->lifecycleAccess->historicalProfile(
+                $user,
+                (int) $data['employee_profile_id'],
+                true,
+            );
+            $this->lifecycleAccess->currentUser(
+                $user,
+                (int) $data['interviewer_user_id'],
+                true,
+            );
+
+            if (! empty($data['offboarding_task_id'])) {
+                $task = $this->lifecycleAccess->visibleOffboardingTask(
+                    $user,
+                    (int) $data['offboarding_task_id'],
+                    true,
+                );
+                $checklist = $task->checklist()->firstOrFail();
+                abort_unless($checklist->employee_profile_id === $profile->id, 404);
+            }
+
+            $this->exitInterviewService->createExitInterview([
+                'created_by' => $user->id,
+                ...$data,
+            ]);
+        });
 
         // When recorded from an offboarding checklist, stay on that page.
         if ($request->boolean('from_offboarding')) {
@@ -146,10 +176,7 @@ class ExitInterviewController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
-        $this->assertHrTenantAccess(
-            $this->resolveHrTenantIdForUser($user),
-            $exitInterview->tenant_id,
-        );
+        $exitInterview = $this->lifecycleAccess->visibleInterview($user, $exitInterview);
 
         $answerFields = [
             'would_recommend',
@@ -175,11 +202,29 @@ class ExitInterviewController extends Controller
         }
 
         $data = $request->validate([
-            'interviewer_user_id' => ['required', 'integer', 'exists:users,id'],
+            'interviewer_user_id' => ['required', 'integer'],
             'interview_date' => ['required', 'date'],
         ]);
 
-        $this->exitInterviewService->rescheduleInterview($exitInterview, $data);
+        try {
+            DB::transaction(function () use ($user, $exitInterview, $data, $answerFields, $unexpectedFields): void {
+                $lockedInterview = $this->lifecycleAccess->visibleInterview($user, $exitInterview, true);
+                $hasLockedAnswers = collect($answerFields)
+                    ->contains(fn (string $field) => $lockedInterview->{$field} !== null);
+                if ($hasLockedAnswers || $unexpectedFields) {
+                    throw new \LogicException('Submitted exit interviews are locked. Add an addendum instead.');
+                }
+
+                $this->lifecycleAccess->currentUser(
+                    $user,
+                    (int) $data['interviewer_user_id'],
+                    true,
+                );
+                $this->exitInterviewService->rescheduleInterview($lockedInterview, $data);
+            });
+        } catch (\LogicException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
 
         return redirect()->back()->with('success', 'Exit interview schedule updated.');
     }
@@ -191,16 +236,16 @@ class ExitInterviewController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
-        $this->assertHrTenantAccess(
-            $this->resolveHrTenantIdForUser($user),
-            $exitInterview->tenant_id,
-        );
+        $exitInterview = $this->lifecycleAccess->visibleInterview($user, $exitInterview);
 
         $data = $request->validate([
             'note' => ['required', 'string', 'max:5000'],
         ]);
 
-        $this->exitInterviewService->appendAddendum($exitInterview, $data['note'], $user);
+        DB::transaction(function () use ($user, $exitInterview, $data): void {
+            $lockedInterview = $this->lifecycleAccess->visibleInterview($user, $exitInterview, true);
+            $this->exitInterviewService->appendAddendum($lockedInterview, $data['note'], $user);
+        });
 
         return redirect()->back()->with(
             'success',
@@ -215,8 +260,10 @@ class ExitInterviewController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canView($user), 403);
+        $exitInterview = $this->lifecycleAccess->visibleInterview($user, $exitInterview);
 
         $exitInterview->load([
+            'employeeProfile:id,user_id,position_title',
             'employeeProfile.user:id,name',
             'interviewer:id,name',
             'creator:id,name',
@@ -237,13 +284,12 @@ class ExitInterviewController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canView($user), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $fromDate = $request->query('from', now()->subYear()->toDateString());
         $toDate = $request->query('to', now()->toDateString());
 
         $trends = $this->exitInterviewService->getExitTrends(
-            $tenantId,
+            $this->lifecycleAccess->visibleInterviews($user),
             $fromDate,
             $toDate,
         );
@@ -260,18 +306,9 @@ class ExitInterviewController extends Controller
     /**
      * Users who can be recorded as interviewers for the wizard.
      */
-    private function interviewerOptions(?int $tenantId, User $user): Collection
+    private function interviewerOptions(User $viewer): Collection
     {
-        $ids = HrEmployeeProfile::forTenant($tenantId)
-            ->pluck('user_id')
-            ->push($user->id)
-            ->filter(fn ($id) => is_numeric($id))
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-
-        return User::query()
-            ->whereIn('id', $ids)
+        return $this->lifecycleAccess->currentUsers($viewer)
             ->orderBy('name')
             ->get(['id', 'name']);
     }

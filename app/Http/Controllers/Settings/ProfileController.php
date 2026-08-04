@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
-use App\Models\Staff;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -26,8 +30,8 @@ class ProfileController extends Controller
         $user = $request->user();
         $user->loadMissing([
             'roles:id,name,label,landing_route',
-            'staffProfile:id,user_id,job_title,mobile_phone',
         ]);
+        $employeeProfile = $this->currentEmployeeProfile($user);
 
         $roleLabels = $user->roles
             ->map(fn ($role) => $role->label ?: str($role->name)->replace('_', ' ')->title()->toString())
@@ -53,8 +57,8 @@ class ProfileController extends Controller
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
             'profile' => [
-                'phone' => $user->cellphone ?? $user->staffProfile?->mobile_phone,
-                'jobTitle' => $user->staffProfile?->job_title,
+                'phone' => $user->cellphone ?? $employeeProfile?->work_phone,
+                'jobTitle' => $employeeProfile?->position_title,
                 'timezone' => $user->timezone ?? 'Pacific/Auckland',
                 'locale' => $user->locale ?? 'en',
                 'dateFormat' => $user->date_format ?? 'DD/MM/YYYY',
@@ -120,6 +124,13 @@ class ProfileController extends Controller
     {
         $validated = $request->validated();
         $user = $request->user();
+        $employeeProfile = $this->currentEmployeeProfile($user);
+
+        if ($request->jobTitleWasSubmitted() && filled($validated['job_title']) && ! $employeeProfile) {
+            throw ValidationException::withMessages([
+                'job_title' => 'Employment details must be created or restored in HR People before a job title can be changed.',
+            ]);
+        }
 
         $userAttributes = $this->filterExistingUserColumns([
             'name' => $validated['name'],
@@ -131,33 +142,38 @@ class ProfileController extends Controller
             'time_format' => $validated['time_format'],
         ]);
 
-        $user->fill($userAttributes);
+        DB::transaction(function () use ($employeeProfile, $request, $user, $userAttributes, $validated): void {
+            $user->fill($userAttributes);
 
-        if (
-            array_key_exists('email', $userAttributes)
-            && $user->isDirty('email')
-            && Schema::hasColumn('users', 'email_verified_at')
-        ) {
-            $user->email_verified_at = null;
-        }
+            if (
+                array_key_exists('email', $userAttributes)
+                && $user->isDirty('email')
+                && Schema::hasColumn('users', 'email_verified_at')
+            ) {
+                $user->email_verified_at = null;
+            }
 
-        $user->save();
+            $user->save();
 
-        $staffAttributes = [
-            'job_title' => $validated['job_title'],
-            'mobile_phone' => $validated['phone'],
-        ];
+            if (! $employeeProfile) {
+                return;
+            }
 
-        if (
-            $user->staffProfile()->exists()
-            || filled($staffAttributes['job_title'])
-            || filled($staffAttributes['mobile_phone'])
-        ) {
-            Staff::query()->updateOrCreate(
-                ['user_id' => $user->id],
-                $staffAttributes,
-            );
-        }
+            $profileAttributes = [
+                'work_email' => $user->email,
+                'updated_by' => $user->id,
+            ];
+
+            if ($request->phoneWasSubmitted()) {
+                $profileAttributes['work_phone'] = $validated['phone'];
+            }
+
+            if ($request->jobTitleWasSubmitted()) {
+                $profileAttributes['position_title'] = $validated['job_title'];
+            }
+
+            $employeeProfile->forceFill($profileAttributes)->save();
+        });
 
         return to_route('profile.edit');
     }
@@ -185,6 +201,22 @@ class ProfileController extends Controller
         return collect($attributes)
             ->filter(fn (mixed $value, string $column): bool => Schema::hasColumn('users', $column))
             ->all();
+    }
+
+    private function currentEmployeeProfile(?User $user): ?HrEmployeeProfile
+    {
+        if (! $user) {
+            return null;
+        }
+
+        $query = HrEmployeeProfile::query()->where('user_id', $user->id);
+        app(UserSiteAccessService::class)->applyCurrentStaffProfileScope(
+            $query,
+            $user,
+            ['sites.viewAll'],
+        );
+
+        return $query->first();
     }
 
 
@@ -289,6 +321,12 @@ class ProfileController extends Controller
         ]);
 
         $user = $request->user();
+
+        if (HrEmployeeProfile::withTrashed()->where('user_id', $user->id)->exists()) {
+            throw ValidationException::withMessages([
+                'password' => 'Staff accounts must be offboarded in HR People so employment history and Site provenance are retained.',
+            ]);
+        }
 
         Auth::logout();
 

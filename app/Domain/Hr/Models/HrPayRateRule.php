@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\ServiceContext;
 use App\Models\Site;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,10 +13,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrPayRateRule extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
-        'tenant_id',
         'name',
         'is_active',
         'priority',
@@ -51,11 +51,6 @@ class HrPayRateRule extends Model
         'effective_to' => 'date',
     ];
 
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
-
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
@@ -71,4 +66,3 @@ class HrPayRateRule extends Model
         return $this->belongsTo(ServiceContext::class);
     }
 }
-

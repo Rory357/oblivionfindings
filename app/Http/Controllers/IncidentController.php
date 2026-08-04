@@ -253,7 +253,13 @@ class IncidentController extends Controller
                 $this->incidentReportSiteBypassPermissions(),
             );
             $sites = $siteQuery->orderBy('name')->get(['id', 'name']);
-            $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
+            $clientQuery = Client::query();
+            app(UserSiteAccessService::class)->applyClientScope(
+                $clientQuery,
+                $user,
+                $this->incidentReportSiteBypassPermissions(),
+            );
+            $clients = $clientQuery->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
         }
 
         // Report-wizard data for the modal-first "+ Report": clients the user may
@@ -1616,11 +1622,15 @@ class IncidentController extends Controller
                     ?: $lockedIncident->client?->site_id
                     ?: $lockedIncident->shift?->site_id
                     ?: $lockedIncident->shift?->client?->site_id;
-                app(ControlRoomAlertProvenanceService::class)->assertIncidentTuple(
-                    $alert,
-                    (int) $lockedIncident->client_id,
-                    $incidentSiteId ? (int) $incidentSiteId : null,
-                );
+                try {
+                    app(ControlRoomAlertProvenanceService::class)->assertIncidentTuple(
+                        $alert,
+                        (int) $lockedIncident->client_id,
+                        $incidentSiteId ? (int) $incidentSiteId : null,
+                    );
+                } catch (\DomainException) {
+                    abort(404);
+                }
             }
 
             $at = now();

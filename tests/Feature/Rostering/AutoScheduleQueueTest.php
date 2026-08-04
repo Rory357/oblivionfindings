@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Rostering\AutoSchedule\RosterSuggestionService;
 use App\Jobs\GenerateRosterSuggestionsJob;
 use App\Models\Client;
@@ -15,15 +16,14 @@ it('queues large roster suggestion runs above the evaluation threshold', functio
 
     $site = Site::factory()->create();
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
     ]);
-    $actor = User::factory()->create(['organization_id' => 1]);
-    User::factory()->count(2)->create(['organization_id' => 1]);
+    $actor = autoScheduleQueueStaffAt($site);
+    autoScheduleQueueStaffAt($site);
+    autoScheduleQueueStaffAt($site);
     $weekStart = Carbon::parse('2026-05-04', 'Pacific/Auckland')->startOfDay();
 
     Shift::factory()->unassigned()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'site_id' => $site->id,
         'starts_at' => $weekStart->copy()->setTime(9, 0)->utc(),
@@ -56,3 +56,19 @@ it('generate roster suggestions job completes only pending runs', function () {
 
     (new GenerateRosterSuggestionsJob($run->id))->handle($service);
 });
+
+function autoScheduleQueueStaffAt(Site $site): User
+{
+    $user = User::factory()->create(['approved_at' => now()]);
+
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+
+    return $user;
+}

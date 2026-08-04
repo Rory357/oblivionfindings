@@ -685,7 +685,7 @@ class EmarController extends Controller
      */
     private function handoverBypassPermissions(): array
     {
-        return ['shifts.manageAny', 'handovers.viewAny', 'reports.viewAny'];
+        return ['reports.viewAny'];
     }
 
     private function buildMedicationPayload(array $validated): array
@@ -1186,6 +1186,34 @@ class EmarController extends Controller
         $timezone = $scheduleService->workerTimezone();
         $now = Carbon::now($timezone);
 
+        // The Site picker and explicit filter must use the same medication
+        // visibility boundary as every PRN data query. Assigned-only workers
+        // remain constrained to current HR Sites; explicitly unrestricted
+        // medication viewers retain the existing all-Sites behaviour.
+        $sitesQuery = Site::query()
+            ->select(['id', 'name', 'brand_colour'])
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->orderBy('name');
+        if ($viewableClientIds !== null) {
+            $accessibleSiteIds = $this->siteAccess()->accessibleSiteIds($user);
+            $viewableClientIds = Client::query()
+                ->whereIn('id', $viewableClientIds)
+                ->whereIn('site_id', $accessibleSiteIds)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            $sitesQuery->whereIn('id', $accessibleSiteIds);
+        }
+        $sites = $sitesQuery->get();
+        if ($siteFilter !== null && ! $sites->contains('id', $siteFilter)) {
+            abort(403, UserSiteAccessService::DEFAULT_MESSAGE);
+        }
+        $activeSite = $siteFilter !== null
+            ? $sites->firstWhere('id', $siteFilter)
+            : null;
+
         // Date anchor + lookback window for the register (mirrors the meds/today
         // hero day-stepper). The register ends on the selected day and looks back
         // `range` days; the page filters by tab/search/status client-side.
@@ -1264,7 +1292,6 @@ class EmarController extends Controller
         $dataClientIds = $clientFilter
             ? array_values(array_intersect($siteClientIds, [$clientFilter]))
             : $siteClientIds;
-        $activeSite = $siteFilter ? Site::find($siteFilter) : null;
 
         // BK3 — enrich near/over-limit PRN meds with today's per-dose timeline
         // (derived; no schema) and, for over-limit meds, any incident already
@@ -1329,6 +1356,7 @@ class EmarController extends Controller
             : null;
         $history = ClientMedicationAdministration::query()
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
+            ->when($viewableClientIds !== null, fn ($q) => $q->whereIn('client_id', $viewableClientIds))
             ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
             ->when($clientFilter, fn ($q) => $q->where('client_id', $clientFilter))
             ->whereBetween('administered_at', [$windowStart->copy()->utc(), $windowEnd->copy()->utc()])
@@ -1348,6 +1376,7 @@ class EmarController extends Controller
 
         $giverIds = ClientMedicationAdministration::query()
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
+            ->when($viewableClientIds !== null, fn ($q) => $q->whereIn('client_id', $viewableClientIds))
             ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
             ->when($clientFilter, fn ($q) => $q->where('client_id', $clientFilter))
             ->whereBetween('administered_at', [$windowStart->copy()->utc(), $windowEnd->copy()->utc()])
@@ -1389,7 +1418,7 @@ class EmarController extends Controller
             'range' => $rangeDays,
             'client_id' => $clientFilter,
             'q' => $search,
-            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'sites' => $sites,
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
         ]);
@@ -2841,6 +2870,13 @@ class EmarController extends Controller
         // the reused cards/rail/detail/wizard components — no second shape.
         $presenter = app(HandoverPresenter::class);
         $siteFilter = $request->integer('site_id') ?: null;
+        if ($siteFilter) {
+            $this->siteAccess()->assertCanAccessSiteId(
+                $auth,
+                $siteFilter,
+                $this->handoverBypassPermissions(),
+            );
+        }
 
         // Week (Mon–Sun) is the unit of navigation. Compute the window in the
         // worker timezone, then query the UTC-stored columns with UTC bounds.
@@ -2855,10 +2891,9 @@ class EmarController extends Controller
         $canViewAny = $this->handoverService->canViewAny($auth);
 
         $handovers = ShiftHandover::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->tap(fn ($query) => $this->siteAccess()->applyHandoverScope($query, $auth, $this->handoverBypassPermissions()))
             ->with($presenter->mapEagerLoads())
-            ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
+            ->when($siteFilter, fn ($query) => $this->siteAccess()->applyHandoverSiteScopeForSiteIds($query, [$siteFilter]))
             ->where(function ($dateScope) use ($startUtc, $endUtc) {
                 $dateScope
                     ->whereHas('outgoingShift', fn ($s) => $s->whereNotNull('starts_at')->whereBetween('starts_at', [$startUtc, $endUtc]))

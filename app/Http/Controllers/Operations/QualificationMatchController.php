@@ -3,13 +3,17 @@
 namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
-use App\Models\Client;
 use App\Models\Shift;
 use App\Models\StaffQualificationRequirement;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class QualificationMatchController extends Controller
 {
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     public function index(Request $request)
     {
         $auth = $request->user();
@@ -20,8 +24,7 @@ class QualificationMatchController extends Controller
         ]);
         $search = trim((string) ($filters['q'] ?? ''));
 
-        $requirements = StaffQualificationRequirement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $requirements = $this->visibleRequirementsQuery($auth)
             ->with(['client:id,first_name,last_name'])
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($nested) use ($search) {
@@ -70,8 +73,9 @@ class QualificationMatchController extends Controller
             'description' => ['nullable', 'string'],
         ]);
 
+        $this->siteAccess->assertCanAccessClientId($auth, (int) $data['client_id'], ['shifts.manageAny']);
+
         StaffQualificationRequirement::create([
-            'organization_id' => $auth->organization_id,
             'client_id' => $data['client_id'],
             'qualification_name' => $data['qualification_name'],
             'qualification_type' => $data['qualification_type'] ?? 'certification',
@@ -87,8 +91,7 @@ class QualificationMatchController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canAccessQualifications($auth), 403);
 
-        $requirement = StaffQualificationRequirement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $requirement = $this->visibleRequirementsQuery($auth)
             ->findOrFail($requirement);
 
         $data = $request->validate([
@@ -114,8 +117,7 @@ class QualificationMatchController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canAccessQualifications($auth), 403);
 
-        $requirement = StaffQualificationRequirement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $requirement = $this->visibleRequirementsQuery($auth)
             ->findOrFail($requirement);
 
         $requirement->delete();
@@ -128,13 +130,11 @@ class QualificationMatchController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canAccessQualifications($auth), 403);
 
-        $shift = Shift::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $shift = $this->siteAccess->applyShiftScope(Shift::query(), $auth, ['shifts.manageAny'])
             ->with(['staff.staffTrainingRecords', 'staff.staffCredentials', 'client'])
             ->findOrFail($shift);
 
-        $requirements = StaffQualificationRequirement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $requirements = $this->visibleRequirementsQuery($auth)
             ->where('client_id', $shift->client_id)
             ->get();
 
@@ -166,6 +166,29 @@ class QualificationMatchController extends Controller
             'results' => $results,
             'allMandatoryMet' => $allMandatoryMet,
         ]);
+    }
+
+    private function visibleRequirementsQuery(User $viewer): Builder
+    {
+        $siteIds = $this->siteAccess->accessibleSiteIds($viewer, ['shifts.manageAny']);
+        if ($siteIds === []) {
+            return StaffQualificationRequirement::query()->whereRaw('1 = 0');
+        }
+
+        return StaffQualificationRequirement::query()
+            ->whereHas('client', fn (Builder $clientQuery) => $clientQuery->whereIn('site_id', $siteIds))
+            ->where(function (Builder $context): void {
+                $context->whereNull('service_context_id')
+                    ->orWhereHas('serviceContext', function (Builder $serviceContext): void {
+                        $serviceContext->whereNull('site_id')
+                            ->orWhereExists(function ($clients): void {
+                                $clients->selectRaw('1')
+                                    ->from('clients')
+                                    ->whereColumn('clients.id', 'staff_qualification_requirements.client_id')
+                                    ->whereColumn('clients.site_id', 'service_contexts.site_id');
+                            });
+                    });
+            });
     }
 
     private function canAccessQualifications($auth): bool

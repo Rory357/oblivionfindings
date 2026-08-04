@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Rostering\RosteringFeatureFlags;
 use App\Domain\Rostering\RosterPublishingService;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use App\Services\ShiftSafetyInvariantService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,11 +15,9 @@ use Illuminate\Validation\ValidationException;
 
 class Shift extends Model
 {
-    use AuditableChanges;
-    use HasFactory;
+    use AuditableChanges, HasFactory, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'shift_series_id',
         'client_id',
         'site_id',
@@ -66,18 +65,6 @@ class Shift extends Model
 
     protected static function booted(): void
     {
-        static::saving(function (self $shift): void {
-            if (! $shift->organization_id) {
-                $clientOrganizationId = $shift->client_id
-                    ? Client::query()->whereKey($shift->client_id)->value('organization_id')
-                    : null;
-
-                $shift->organization_id = $clientOrganizationId
-                    ?: auth()->user()?->organization_id
-                    ?: 1;
-            }
-        });
-
         static::saving(function (self $shift): void {
             app(ShiftSafetyInvariantService::class)->assertShift($shift);
         });
@@ -200,9 +187,9 @@ class Shift extends Model
         return $this->timesheets()->where('status', 'approved');
     }
 
-    public function scopeVisibleToFrontline(Builder $query, ?int $organizationId = null): Builder
+    public function scopeVisibleToFrontline(Builder $query): Builder
     {
-        if (app(RosteringFeatureFlags::class)->publishEnabled($organizationId)) {
+        if (app(RosteringFeatureFlags::class)->publishEnabled()) {
             $query->whereNotNull('published_at');
         }
 

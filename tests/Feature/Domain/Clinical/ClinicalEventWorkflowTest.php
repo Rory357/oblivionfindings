@@ -4,8 +4,10 @@ namespace Tests\Feature\Domain\Clinical;
 
 use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Domain\Clinical\Services\ClinicalSignalService;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
@@ -22,12 +24,15 @@ class ClinicalEventWorkflowTest extends TestCase
 
     protected Client $client;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
-        $this->client = Client::factory()->create();
+        $this->site = Site::factory()->create();
+        $this->client = Client::factory()->create(['site_id' => $this->site->id]);
     }
 
     protected function userWithRole(string $role): User
@@ -43,7 +48,10 @@ class ClinicalEventWorkflowTest extends TestCase
 
     private function event(array $overrides = []): ClinicalEvent
     {
-        return ClinicalEvent::factory()->create(array_merge(['client_id' => $this->client->id], $overrides));
+        return ClinicalEvent::factory()->create(array_merge([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ], $overrides));
     }
 
     public function test_review_sets_reviewed_fields(): void
@@ -97,6 +105,14 @@ class ClinicalEventWorkflowTest extends TestCase
         // so the per-record authorize('view') is what stops them completing follow-up on a
         // client they are not assigned to (the route permission alone would let them through).
         $worker = $this->userWithRole('support_worker');
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $worker->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
         $event = $this->event(['requires_followup' => true]);
 
         $this->actingAs($worker)

@@ -2,12 +2,15 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrCandidateDocument extends Model
 {
+    use WritesLegacyStorageContext;
+
     public const CATEGORIES = [
         'cv' => 'CV / Resume',
         'cover_letter' => 'Cover Letter',
@@ -44,7 +47,7 @@ class HrCandidateDocument extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function candidate(): BelongsTo
@@ -63,7 +66,7 @@ class HrCandidateDocument extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                            */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     public function getCategoryLabelAttribute(): string
@@ -75,9 +78,10 @@ class HrCandidateDocument extends Model
     {
         $bytes = $this->size_bytes;
         if ($bytes >= 1048576) {
-            return round($bytes / 1048576, 1) . ' MB';
+            return round($bytes / 1048576, 1).' MB';
         }
-        return round($bytes / 1024) . ' KB';
+
+        return round($bytes / 1024).' KB';
     }
 
     public function isExpired(): bool

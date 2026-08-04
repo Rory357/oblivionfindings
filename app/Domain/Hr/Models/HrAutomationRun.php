@@ -2,13 +2,14 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrAutomationRun extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
         'rule_id',
@@ -28,10 +29,5 @@ class HrAutomationRun extends Model
     public function rule(): BelongsTo
     {
         return $this->belongsTo(HrAutomationRule::class, 'rule_id');
-    }
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 }

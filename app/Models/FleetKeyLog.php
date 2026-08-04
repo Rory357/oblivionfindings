@@ -5,14 +5,15 @@ namespace App\Models;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 
 class FleetKeyLog extends Model
 {
     use AuditableChanges;
 
     protected $fillable = [
-        'tenant_id',
         'asset_id',
+        'site_id',
         'user_id',
         'action',
         'transferred_to_user_id',
@@ -21,9 +22,23 @@ class FleetKeyLog extends Model
         'notes',
     ];
 
+    protected static function booted(): void
+    {
+        static::updating(function (self $log): void {
+            if ($log->isDirty('site_id')) {
+                throw new LogicException('Fleet key event Site provenance is immutable.');
+            }
+        });
+    }
+
     public function asset(): BelongsTo
     {
         return $this->belongsTo(Asset::class);
+    }
+
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class);
     }
 
     public function user(): BelongsTo

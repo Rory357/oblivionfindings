@@ -3,7 +3,9 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
+use Database\Factories\Hr\HrCourseAssignmentFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,11 +18,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class HrCourseAssignment extends Model
 {
-    use AuditableChanges, HasFactory;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Hr\HrCourseAssignmentFactory::new();
+        return HrCourseAssignmentFactory::new();
     }
 
     protected $fillable = [
@@ -52,7 +54,7 @@ class HrCourseAssignment extends Model
     public const STATUSES = ['assigned', 'in_progress', 'completed', 'overdue', 'waived'];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function user(): BelongsTo
@@ -81,13 +83,8 @@ class HrCourseAssignment extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                            */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     /**
      * "Effective" overdue: explicitly flagged, or past-due and not yet

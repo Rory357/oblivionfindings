@@ -2,370 +2,456 @@
 
 namespace App\Http\Controllers\ControlRoom;
 
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Presenters\TrackingWorkspacePresenter;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
-use App\Models\Asset;
 use App\Models\AssetGeofence;
-use App\Models\Client;
-use App\Models\ControlRoom\Device;
 use App\Models\ControlRoomAlert;
 use App\Models\Site;
+use App\Models\User;
+use App\Services\ControlRoom\ControlRoomDeviceVisibilityService;
 use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class ControlRoomMapController extends Controller
 {
-    public function __invoke(Request $request)
+    private const MAP_TYPES = [
+        'personal_tracker',
+        'vehicle_tracker',
+        'asset_tracker',
+    ];
+
+    private const MAP_STATUSES = ['online', 'offline', 'unknown'];
+
+    /** @var list<string> */
+    private const SITE_BYPASS_PERMISSIONS = ['reports.viewAny'];
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly ControlRoomDeviceVisibilityService $projectionVisibility,
+        private readonly SecurityDevicesAccessService $deviceAccess,
+        private readonly TrackingWorkspacePresenter $trackingPresenter,
+    ) {}
+
+    public function __invoke(Request $request): Response
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
-        $siteAccess = app(UserSiteAccessService::class);
-        $bypassPermissions = $this->alertBypassPermissions();
-        $organizationId = is_numeric($user->organization_id) && (int) $user->organization_id > 0
-            ? (int) $user->organization_id
-            : null;
-        $tenantSiteIds = $organizationId
-            ? Site::query()
-                ->where('tenant_id', $organizationId)
-                ->pluck('id')
-                ->map(fn ($siteId) => (int) $siteId)
-                ->all()
-            : [];
-        $accessibleSiteIds = $siteAccess->canBypass($user, $bypassPermissions)
-            ? $tenantSiteIds
-            : array_values(array_intersect(
-                $siteAccess->accessibleSiteIds($user, $bypassPermissions),
-                $tenantSiteIds,
-            ));
-        $selectedSiteId = $request->filled('site_id') && $request->input('site_id') !== 'all'
-            ? (int) $request->input('site_id')
-            : null;
 
-        if ($selectedSiteId) {
+        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(
+            $user,
+            self::SITE_BYPASS_PERMISSIONS,
+        );
+        $selectedSiteId = $this->selectedSiteId($request);
+        if ($selectedSiteId !== null) {
             abort_unless(
                 in_array($selectedSiteId, $accessibleSiteIds, true),
                 403,
-                'You are not authorized to access the Control Room map for that site.',
+                UserSiteAccessService::DEFAULT_MESSAGE,
             );
         }
 
-        // Build device query - only those with coordinates.
-        // Eager-load canonical device for enrichment.
-        $deviceQuery = Device::query()
-            ->with(['canonicalDevice' => function ($query) use ($organizationId): void {
-                $query->select(['id', 'device_uid', 'domain', 'category', 'health_status']);
-                if ($organizationId === null) {
-                    $query->whereRaw('1 = 0');
-                } else {
-                    $query->where('tenant_id', $organizationId);
-                }
-            }])
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude');
-        $this->applyDeviceSiteScope($deviceQuery, $accessibleSiteIds, $organizationId);
+        $typeFilter = $this->allowlistedFilter($request->input('type'), self::MAP_TYPES);
+        $statusFilter = $this->allowlistedFilter($request->input('status'), self::MAP_STATUSES);
+        $alertOnly = $request->boolean('alert_only');
 
-        // Filter by site
-        if ($selectedSiteId) {
-            $this->applyDeviceSiteScope($deviceQuery, [$selectedSiteId], $organizationId);
-        }
+        $tracking = $this->trackingRows($user);
+        $siteTracking = $tracking['rows']
+            ->when(
+                $selectedSiteId !== null,
+                fn (Collection $rows): Collection => $rows
+                    ->filter(fn (array $row): bool => (int) ($row['siteId'] ?? 0) === $selectedSiteId)
+                    ->values(),
+            );
+        $safePositions = $siteTracking
+            ->filter(fn (array $row): bool => is_array($row['location'] ?? null))
+            ->values();
+        $safePositionByDevice = $safePositions->keyBy('id');
 
-        // Filter by device type (vehicle_tracker or personal_tracker)
-        if ($request->filled('type') && $request->input('type') !== 'all') {
-            $deviceQuery->where('type', $request->input('type'));
-        } else {
-            // Default to only tracker types for the map view
-            $deviceQuery->whereIn('type', [
-                Device::TYPE_VEHICLE_TRACKER,
-                Device::TYPE_PERSONAL_TRACKER,
-            ]);
-        }
+        $alerts = $this->alerts($user, $selectedSiteId);
+        $alertCanonicalIds = $alerts
+            ->map(fn (ControlRoomAlert $alert): ?int => is_numeric($alert->device?->canonical_device_id)
+                ? (int) $alert->device->canonical_device_id
+                : null)
+            ->filter()
+            ->unique()
+            ->values();
 
-        // Filter by status
-        if ($request->filled('status') && $request->input('status') !== 'all') {
-            $deviceQuery->where('status', $request->input('status'));
-        }
+        $mapDevices = $safePositions
+            ->map(fn (array $row): array => $this->mapDevice($row))
+            ->when(
+                $typeFilter !== null,
+                fn (Collection $rows): Collection => $rows
+                    ->where('type', $typeFilter)
+                    ->values(),
+            )
+            ->when(
+                $statusFilter !== null,
+                fn (Collection $rows): Collection => $rows
+                    ->where('status', $statusFilter)
+                    ->values(),
+            )
+            ->when(
+                $alertOnly,
+                fn (Collection $rows): Collection => $rows
+                    ->whereIn('id', $alertCanonicalIds)
+                    ->values(),
+            );
 
-        // Alert-only filter: only show devices that have unresolved alerts
-        if ($request->boolean('alert_only')) {
-            $alertDeviceQuery = ControlRoomAlert::query()
-                ->select('device_id')
-                ->whereNotNull('device_id')
-                ->actionable();
-            $this->applyAlertSiteScope($alertDeviceQuery, $accessibleSiteIds, $organizationId);
-            if ($selectedSiteId) {
-                $this->applyAlertSiteScope($alertDeviceQuery, [$selectedSiteId], $organizationId);
-            }
-            $deviceQuery->whereIn('id', $alertDeviceQuery);
-        }
-
-        $devices = $deviceQuery->get();
-
-        // Sites with coordinates for site markers
-        $siteQuery = Site::query()
-            ->where('is_active', true)
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->whereIn('id', $accessibleSiteIds);
-
-        if ($selectedSiteId) {
-            $siteQuery->whereKey($selectedSiteId);
-        }
-
-        $sites = $siteQuery->get();
-
-        // Active geofences
-        $geofenceQuery = AssetGeofence::query()
-            ->where('is_active', true);
-        $this->applyGeofenceSiteScope($geofenceQuery, $accessibleSiteIds);
-
-        if ($selectedSiteId) {
-            $this->applyGeofenceSiteScope($geofenceQuery, [$selectedSiteId]);
-        }
-
-        $geofences = $geofenceQuery->get();
-
-        // Unresolved alerts with location context
-        $alertQuery = ControlRoomAlert::query()
-            ->actionable()
-            ->where(function ($q) {
-                $q->whereNotNull('device_id')
-                    ->orWhereNotNull('site_id');
-            })
-            ->with([
-                'device' => function ($query) use ($accessibleSiteIds, $organizationId, $selectedSiteId): void {
-                    $this->applyDeviceSiteScope($query, $accessibleSiteIds, $organizationId);
-                    if ($selectedSiteId) {
-                        $this->applyDeviceSiteScope($query, [$selectedSiteId], $organizationId);
-                    }
-                    $query->select(['id', 'latitude', 'longitude', 'name']);
-                },
-                'asset' => function ($query) use ($accessibleSiteIds, $selectedSiteId): void {
-                    $this->applyAssetSiteScope($query, $accessibleSiteIds);
-                    if ($selectedSiteId) {
-                        $this->applyAssetSiteScope($query, [$selectedSiteId]);
-                    }
-                    $query->select(['id', 'name']);
-                },
-            ]);
-        $this->applyAlertSiteScope($alertQuery, $accessibleSiteIds, $organizationId);
-
-        if ($selectedSiteId) {
-            $this->applyAlertSiteScope($alertQuery, [$selectedSiteId], $organizationId);
-        }
-
-        $alerts = $alertQuery->latest('triggered_at')->limit(200)->get();
-
-        // All sites for filter dropdown
-        $allSites = Site::query()
-            ->where('is_active', true)
-            ->whereIn('id', $accessibleSiteIds)
-            ->orderBy('name');
-        $allSites = $allSites->get(['id', 'name']);
-
-        // Stats
-        $deviceStatsQuery = Device::query()
-            ->whereIn('type', [Device::TYPE_VEHICLE_TRACKER, Device::TYPE_PERSONAL_TRACKER]);
-        $this->applyDeviceSiteScope($deviceStatsQuery, $accessibleSiteIds, $organizationId);
-        if ($selectedSiteId) {
-            $this->applyDeviceSiteScope($deviceStatsQuery, [$selectedSiteId], $organizationId);
-        }
-
-        $activeAlertStatsQuery = ControlRoomAlert::query()->actionable();
-        $this->applyAlertSiteScope($activeAlertStatsQuery, $accessibleSiteIds, $organizationId);
-        if ($selectedSiteId) {
-            $this->applyAlertSiteScope($activeAlertStatsQuery, [$selectedSiteId], $organizationId);
-        }
-
-        $stats = [
-            'total_devices' => (clone $deviceStatsQuery)->count(),
-            'online' => (clone $deviceStatsQuery)->where('status', 'online')->count(),
-            'offline' => (clone $deviceStatsQuery)->where('status', 'offline')->count(),
-            'active_alerts' => $activeAlertStatsQuery->count(),
-        ];
+        $allSites = $this->projectionVisibility->visibleSites($user)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+        $sites = $this->mapSites($accessibleSiteIds, $selectedSiteId);
+        $geofences = $this->mapGeofences(
+            $accessibleSiteIds,
+            $selectedSiteId,
+            $safePositions,
+        );
+        $activeAlertCount = $this->scopedAlerts($user, $selectedSiteId)->actionable()->count();
 
         return Inertia::render('control-room/map', [
-            'devices' => $devices->map(function (Device $d) {
-                $canonical = $d->canonicalDevice;
+            'devices' => $mapDevices,
+            'sites' => $sites,
+            'geofences' => $geofences,
+            'alerts' => $alerts->map(function (ControlRoomAlert $alert) use ($safePositionByDevice): array {
+                $canonicalId = is_numeric($alert->device?->canonical_device_id)
+                    ? (int) $alert->device->canonical_device_id
+                    : null;
+                $safePosition = $canonicalId ? $safePositionByDevice->get($canonicalId) : null;
+                $location = is_array($safePosition) ? ($safePosition['location'] ?? null) : null;
+
                 return [
-                    'id' => $d->id,
-                    'device_uid' => $d->device_uid,
-                    'name' => $d->name,
-                    'type' => $d->type,
-                    'status' => $d->status,
-                    'latitude' => (float) $d->latitude,
-                    'longitude' => (float) $d->longitude,
-                    'location_description' => $d->location_description,
-                    'battery_level' => $d->battery_level,
-                    'last_seen_at' => optional($d->last_seen_at)->toISOString(),
-                    'vendor' => $d->vendor,
-                    'model' => $d->getAttribute('model'),
-                    'site_id' => $d->site_id,
-                    'client_id' => $d->client_id,
-                    'asset_id' => $d->asset_id,
-                    // Canonical enrichment (safe fallback to null).
-                    'canonical_id' => $canonical?->id,
-                    'canonical_device_uid' => $canonical?->device_uid,
-                    'canonical_health_status' => $canonical?->health_status?->value,
-                    'canonical_detail_url' => $canonical ? "/security-devices/devices/{$canonical->id}" : null,
+                    'id' => $alert->id,
+                    'alert_type' => $alert->alert_type,
+                    'severity' => $alert->severity,
+                    'status' => $alert->status,
+                    'triggered_at' => $alert->triggered_at?->toISOString(),
+                    'device_id' => is_array($safePosition) ? $canonicalId : null,
+                    'site_id' => $alert->site_id,
+                    'latitude' => is_array($location) ? (float) $location['latitude'] : null,
+                    'longitude' => is_array($location) ? (float) $location['longitude'] : null,
+                    'detail_url' => "/control-room/alerts/{$alert->id}",
                 ];
             })->values(),
-            'sites' => $sites->map(fn (Site $s) => [
-                'id' => $s->id,
-                'name' => $s->name,
-                'address' => trim(implode(', ', array_filter([
-                    $s->address_line_1,
-                    $s->suburb,
-                    $s->city,
-                ]))),
-                'latitude' => (float) $s->latitude,
-                'longitude' => (float) $s->longitude,
+            'all_sites' => $allSites->map(fn (Site $site): array => [
+                'id' => $site->id,
+                'name' => $site->name,
             ])->values(),
-            'geofences' => $geofences->map(fn (AssetGeofence $g) => [
-                'id' => $g->id,
-                'name' => $g->name,
-                'type' => $g->type,
-                'shape' => $g->shape,
-                'breach_type' => $g->breach_type,
-                'site_id' => $g->site_id,
-            ])->values(),
-            'alerts' => $alerts->map(fn (ControlRoomAlert $a) => [
-                'id' => $a->id,
-                'alert_type' => $a->alert_type,
-                'severity' => $a->severity,
-                'status' => $a->status,
-                'triggered_at' => optional($a->triggered_at)->toISOString(),
-                'device_id' => $a->device?->id,
-                'site_id' => $a->site_id,
-                'latitude' => $a->device ? (float) $a->device->latitude : null,
-                'longitude' => $a->device ? (float) $a->device->longitude : null,
-                'asset_name' => $a->asset?->name,
-                'notes' => $a->notes ? substr($a->notes, 0, 120) : null,
-            ])->values(),
-            'all_sites' => $allSites->map(fn (Site $s) => [
-                'id' => $s->id,
-                'name' => $s->name,
-            ])->values(),
-            'stats' => $stats,
-            'filters' => $request->only(['site_id', 'type', 'status', 'alert_only']),
+            'stats' => [
+                'total_devices' => $safePositions->count(),
+                'online' => $safePositions
+                    ->filter(fn (array $row): bool => $this->mapStatus($row['status'] ?? null) === 'online')
+                    ->count(),
+                'offline' => $safePositions
+                    ->filter(fn (array $row): bool => $this->mapStatus($row['status'] ?? null) === 'offline')
+                    ->count(),
+                'active_alerts' => $activeAlertCount,
+                'location_restricted' => $siteTracking
+                    ->reject(fn (array $row): bool => is_array($row['location'] ?? null))
+                    ->count(),
+            ],
+            'location_boundary' => [
+                'position_access' => $tracking['position_access'],
+                'title' => 'Location access follows purpose',
+                'description' => $tracking['position_access']
+                    ? 'Positions come from the canonical Tracking workspace. Current Site access, source permissions, purpose, consent and collection state must all agree.'
+                    : 'Control Room access does not grant Security & Devices identity or exact tracker position. Ask an authorised manager if this operational view is required.',
+                'canonical_url' => $tracking['position_access'] ? '/security-devices/tracking' : null,
+            ],
+            'filters' => [
+                'site_id' => $selectedSiteId === null ? null : (string) $selectedSiteId,
+                'type' => $typeFilter,
+                'status' => $statusFilter,
+                'alert_only' => $alertOnly ? '1' : null,
+            ],
         ]);
     }
 
     /**
-     * @param  array<int, int>  $siteIds
+     * @return array{position_access: bool, rows: Collection<int, array<string, mixed>>}
      */
-    protected function applyDeviceSiteScope($query, array $siteIds, ?int $organizationId): void
+    private function trackingRows(User $user): array
     {
-        if ($siteIds === [] || $organizationId === null) {
-            $query->whereRaw('1 = 0');
-
-            return;
+        if (! $this->projectionVisibility->canViewCanonicalDevices($user)) {
+            return [
+                'position_access' => false,
+                'rows' => collect(),
+            ];
         }
 
-        $query->where(function ($siteQuery) use ($siteIds, $organizationId) {
-            $siteQuery->whereIn('site_id', $siteIds)
-                ->orWhere(function ($clientFallback) use ($siteIds, $organizationId) {
-                    $clientFallback->whereNull('site_id')
-                        ->whereIn('client_id', Client::query()
-                            ->select('id')
-                            ->where('organization_id', $organizationId)
-                            ->whereIn('site_id', $siteIds));
-                })
-                ->orWhere(function ($assetFallback) use ($siteIds) {
-                    $assetFallback->whereNull('site_id')
-                        ->whereNull('client_id')
-                        ->whereIn('asset_id', $this->assetIdsForSites($siteIds));
-                });
-        });
+        $payload = $this->trackingPresenter->present(
+            $user,
+            $this->deviceAccess->visibleDevices($user)->where('devices.domain', 'tracking'),
+            [
+                'key' => 'overview',
+                'label' => 'Overview',
+                'description' => 'Current governed tracker positions.',
+            ],
+        );
+
+        $rows = collect(data_get($payload, 'activeTab.devices', []));
+        $personalDeviceIds = $rows
+            ->where('group', 'personal-safety')
+            ->pluck('id')
+            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->values();
+        $personalAssignments = $personalDeviceIds->isEmpty()
+            ? collect()
+            : DeviceAssignment::query()
+                ->active()
+                ->whereIn('device_id', $personalDeviceIds)
+                ->whereIn('assignable_type', [
+                    DeviceAssignment::TARGET_CLIENT,
+                    DeviceAssignment::TARGET_STAFF,
+                ])
+                ->get([
+                    'device_id',
+                    'tracking_purpose',
+                    'authority_basis',
+                    'access_audience',
+                    'collection_stopped_at',
+                ])
+                ->groupBy('device_id');
+
+        $rows = $rows->map(function (array $row) use ($personalAssignments): array {
+            if (($row['group'] ?? null) !== 'personal-safety') {
+                return $row;
+            }
+
+            $assignments = $personalAssignments->get((int) $row['id'], collect());
+            if ($assignments->isEmpty()) {
+                return $row;
+            }
+
+            $destinationAllowed = $assignments->every(function (DeviceAssignment $assignment): bool {
+                $audience = collect($assignment->access_audience ?? [])
+                    ->filter(fn (mixed $value): bool => is_string($value))
+                    ->map(fn (string $value): string => strtolower(trim($value)));
+
+                return $assignment->collection_stopped_at === null
+                    && trim((string) $assignment->tracking_purpose) !== ''
+                    && trim((string) $assignment->authority_basis) !== ''
+                    && $audience->contains('control_room');
+            });
+
+            if ($destinationAllowed) {
+                return $row;
+            }
+
+            return [
+                ...$row,
+                'location' => null,
+                'privacy' => [
+                    'state' => 'restricted',
+                    'basis' => 'none',
+                    'locationAllowed' => false,
+                    'reason' => 'The assignment purpose or approved audience does not allow Control Room location access.',
+                    'expiresAt' => null,
+                ],
+                'historyHref' => null,
+            ];
+        })->values();
+
+        return [
+            'position_access' => true,
+            'rows' => $rows,
+        ];
     }
 
-    /**
-     * @param  array<int, int>  $siteIds
-     */
-    protected function applyGeofenceSiteScope($query, array $siteIds): void
+    /** @return array<string, mixed> */
+    private function mapDevice(array $row): array
     {
-        if ($siteIds === []) {
-            $query->whereRaw('1 = 0');
+        $location = $row['location'];
+        $type = match ($row['group'] ?? null) {
+            'personal-safety' => 'personal_tracker',
+            'fleet' => 'vehicle_tracker',
+            default => 'asset_tracker',
+        };
 
-            return;
+        return [
+            'id' => (int) $row['id'],
+            'device_uid' => $row['deviceUid'] ?? null,
+            'name' => $row['name'],
+            'type' => $type,
+            'type_label' => match ($type) {
+                'personal_tracker' => 'Personal safety tracker',
+                'vehicle_tracker' => 'Fleet tracker',
+                default => 'Asset tracker',
+            },
+            'status' => $this->mapStatus($row['status'] ?? null),
+            'health_status' => $row['health'] ?? null,
+            'latitude' => (float) $location['latitude'],
+            'longitude' => (float) $location['longitude'],
+            'battery_level' => $row['battery'] ?? null,
+            'last_seen_at' => $location['observedAt'] ?? $row['lastSeenAt'] ?? null,
+            'position_source' => $location['source'] ?? 'canonical_device',
+            'site_id' => $row['siteId'] ?? null,
+            'context_label' => data_get($row, 'person.displayName') ?? data_get($row, 'asset.name'),
+            'manufacturer' => $row['manufacturer'] ?? null,
+            'model' => $row['model'] ?? null,
+            'identity_source' => 'canonical',
+            'privacy_state' => data_get($row, 'privacy.state'),
+            'privacy_basis' => data_get($row, 'privacy.basis'),
+            'detail_url' => $row['deviceHref'],
+        ];
+    }
+
+    private function mapStatus(mixed $status): string
+    {
+        return match ($status) {
+            'active', 'degraded' => 'online',
+            'offline' => 'offline',
+            default => 'unknown',
+        };
+    }
+
+    /** @return Collection<int, ControlRoomAlert> */
+    private function alerts(User $user, ?int $selectedSiteId): Collection
+    {
+        return $this->scopedAlerts($user, $selectedSiteId)
+            ->actionable()
+            ->where(function (Builder $query): void {
+                $query->whereNotNull('device_id')->orWhereNotNull('site_id');
+            })
+            ->with(['device:id,canonical_device_id'])
+            ->latest('triggered_at')
+            ->limit(200)
+            ->get();
+    }
+
+    private function scopedAlerts(User $user, ?int $selectedSiteId): Builder
+    {
+        $query = ControlRoomAlert::query();
+        $this->siteAccess->applyAlertScope($query, $user, self::SITE_BYPASS_PERMISSIONS);
+        if ($selectedSiteId !== null) {
+            $this->siteAccess->applyAlertSiteScopeForSiteIds($query, [$selectedSiteId]);
         }
-
-        $query->where(function ($siteQuery) use ($siteIds) {
-            $siteQuery->whereIn('site_id', $siteIds)
-                ->orWhere(function ($assetFallback) use ($siteIds) {
-                    $assetFallback->whereNull('site_id')
-                        ->whereHas('asset', fn ($assetQuery) => $this->applyAssetSiteScope($assetQuery, $siteIds));
-                });
-        });
-    }
-
-    /**
-     * @param  array<int, int>  $siteIds
-     */
-    protected function applyAlertSiteScope($query, array $siteIds, ?int $organizationId): void
-    {
-        if ($siteIds === [] || $organizationId === null) {
-            $query->whereRaw('1 = 0');
-
-            return;
-        }
-
-        $query->where(function ($siteQuery) use ($siteIds, $organizationId) {
-            $siteQuery->whereIn('site_id', $siteIds)
-                ->orWhere(function ($siteFallback) use ($siteIds, $organizationId) {
-                    $siteFallback->whereNull('site_id')
-                        ->where(function ($clientOrDevice) use ($siteIds, $organizationId) {
-                            $clientOrDevice->whereHas('client', fn ($clientQuery) => $clientQuery
-                                ->where('organization_id', $organizationId)
-                                ->whereIn('site_id', $siteIds))
-                                ->orWhere(function ($deviceFallback) use ($siteIds, $organizationId) {
-                                    $deviceFallback->whereNull('client_id')
-                                        ->whereHas('device', fn ($deviceQuery) => $this->applyDeviceSiteScope(
-                                            $deviceQuery,
-                                            $siteIds,
-                                            $organizationId,
-                                        ));
-                                });
-                        });
-                });
-        });
-    }
-
-    /**
-     * @param  array<int, int>  $siteIds
-     */
-    protected function applyAssetSiteScope($query, array $siteIds): void
-    {
-        if ($siteIds === []) {
-            $query->whereRaw('1 = 0');
-
-            return;
-        }
-
-        $query->where(function ($siteQuery) use ($siteIds) {
-            $siteQuery->whereIn('site_id', $siteIds)
-                ->orWhere(function ($homeSiteFallback) use ($siteIds) {
-                    $homeSiteFallback->whereNull('site_id')
-                        ->whereIn('home_site_id', $siteIds);
-                });
-        });
-    }
-
-    /**
-     * @param  array<int, int>  $siteIds
-     */
-    protected function assetIdsForSites(array $siteIds)
-    {
-        $query = Asset::query()->select('id');
-        $this->applyAssetSiteScope($query, $siteIds);
 
         return $query;
     }
 
-    /**
-     * @return array<int, string>
-     */
-    protected function alertBypassPermissions(): array
+    /** @param list<int> $accessibleSiteIds */
+    private function mapSites(array $accessibleSiteIds, ?int $selectedSiteId): Collection
     {
-        return ['reports.viewAny'];
+        if ($accessibleSiteIds === []) {
+            return collect();
+        }
+
+        return Site::query()
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereIn('id', $accessibleSiteIds)
+            ->when($selectedSiteId !== null, fn (Builder $query): Builder => $query->whereKey($selectedSiteId))
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->get()
+            ->map(fn (Site $site): array => [
+                'id' => $site->id,
+                'name' => $site->name,
+                'address' => trim(implode(', ', array_filter([
+                    $site->address_line_1,
+                    $site->suburb,
+                    $site->city,
+                ]))),
+                'latitude' => (float) $site->latitude,
+                'longitude' => (float) $site->longitude,
+            ])->values();
+    }
+
+    /**
+     * @param  list<int>  $accessibleSiteIds
+     * @param  Collection<int, array<string, mixed>>  $safePositions
+     */
+    private function mapGeofences(
+        array $accessibleSiteIds,
+        ?int $selectedSiteId,
+        Collection $safePositions,
+    ): Collection {
+        if ($accessibleSiteIds === []) {
+            return collect();
+        }
+
+        $safeAssetIds = $safePositions
+            ->pluck('asset.id')
+            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $query = AssetGeofence::query()
+            ->where('is_active', true)
+            ->where(function (Builder $scope) use ($accessibleSiteIds, $safeAssetIds): void {
+                $scope->where(function (Builder $siteOnly) use ($accessibleSiteIds): void {
+                    $siteOnly->whereNull('asset_id')->whereIn('site_id', $accessibleSiteIds);
+                });
+
+                if ($safeAssetIds !== []) {
+                    $scope->orWhere(function (Builder $assetBound) use ($accessibleSiteIds, $safeAssetIds): void {
+                        $assetBound->whereIn('asset_id', $safeAssetIds)
+                            ->where(function (Builder $site) use ($accessibleSiteIds): void {
+                                $site->whereIn('site_id', $accessibleSiteIds)
+                                    ->orWhere(function (Builder $assetFallback) use ($accessibleSiteIds): void {
+                                        $assetFallback->whereNull('site_id')
+                                            ->whereHas('asset', function (Builder $asset) use ($accessibleSiteIds): void {
+                                                $asset->whereIn('site_id', $accessibleSiteIds)
+                                                    ->orWhereIn('home_site_id', $accessibleSiteIds);
+                                            });
+                                    });
+                            });
+                    });
+                }
+            });
+
+        if ($selectedSiteId !== null) {
+            $query->where(function (Builder $selected) use ($selectedSiteId): void {
+                $selected->where('site_id', $selectedSiteId)
+                    ->orWhere(function (Builder $assetFallback) use ($selectedSiteId): void {
+                        $assetFallback->whereNull('site_id')
+                            ->whereHas('asset', fn (Builder $asset): Builder => $asset
+                                ->where('site_id', $selectedSiteId)
+                                ->orWhere('home_site_id', $selectedSiteId));
+                    });
+            });
+        }
+
+        return $query->get()->map(fn (AssetGeofence $geofence): array => [
+            'id' => $geofence->id,
+            'name' => $geofence->name,
+            'type' => $geofence->type,
+            'shape' => $geofence->shape,
+            'breach_type' => $geofence->breach_type,
+            'site_id' => $geofence->site_id,
+        ])->values();
+    }
+
+    private function selectedSiteId(Request $request): ?int
+    {
+        $value = $request->input('site_id');
+        if ($value === null || $value === '' || $value === 'all') {
+            return null;
+        }
+
+        $validated = filter_var($value, FILTER_VALIDATE_INT);
+        abort_unless($validated !== false && (int) $validated > 0, 422, 'Choose a valid Site.');
+
+        return (int) $validated;
+    }
+
+    /** @param list<string> $allowed */
+    private function allowlistedFilter(mixed $value, array $allowed): ?string
+    {
+        if (! is_string($value) || $value === '' || $value === 'all') {
+            return null;
+        }
+
+        return in_array($value, $allowed, true) ? $value : null;
     }
 }

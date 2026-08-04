@@ -2,18 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Per-organisation break-glass policy. Resolve with {@see forOrganization()},
- * which always returns a usable instance — the stored row, or an unsaved one
- * carrying the canonical {@see ClientBreakGlassAccess} constant defaults.
+ * The application-wide break-glass policy. {@see current()} always returns a
+ * usable instance: the stored record, or an unsaved record carrying the
+ * canonical {@see ClientBreakGlassAccess} constant defaults.
  */
 class BreakGlassPolicy extends Model
 {
+    use WritesLegacyOrganizationStorageContext;
+
     protected $fillable = [
-        'organization_id',
         'default_minutes',
         'max_minutes',
         'extend_minutes',
@@ -31,11 +32,6 @@ class BreakGlassPolicy extends Model
         'repeat_window_days' => 'integer',
     ];
 
-    public function organization(): BelongsTo
-    {
-        return $this->belongsTo(Organization::class);
-    }
-
     /** Canonical defaults (single source of truth = the access-model constants). */
     public static function defaults(): array
     {
@@ -50,15 +46,26 @@ class BreakGlassPolicy extends Model
     }
 
     /**
-     * The effective policy for an organisation: the stored row, or an unsaved
+     * The effective application policy: the stored record, or an unsaved
      * instance carrying the constant defaults so callers always read usable values.
      */
-    public static function forOrganization(?int $organizationId): self
+    public static function current(): self
     {
-        if (! $organizationId) {
-            return new self(self::defaults());
-        }
+        $policy = self::query()->oldest('id')->first();
 
-        return self::firstOrNew(['organization_id' => $organizationId], self::defaults());
+        return $policy ?? new self(self::defaults());
+    }
+
+    /**
+     * Persist the one application policy without consulting compatibility storage.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public static function updateApplicationPolicy(array $attributes): self
+    {
+        $policy = self::query()->oldest('id')->first() ?? new self;
+        $policy->fill($attributes)->save();
+
+        return $policy;
     }
 }

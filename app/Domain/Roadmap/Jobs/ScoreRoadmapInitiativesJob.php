@@ -17,17 +17,12 @@ class ScoreRoadmapInitiativesJob implements ShouldQueue
     public int $tries = 2;
 
     public function __construct(
-        public ?int $tenantId = null,
         public string $preset = 'board_ceo'
     ) {}
 
     public function handle(RoadmapScoringService $scoringService): void
     {
         $query = Initiative::query()->active();
-
-        if ($this->tenantId !== null) {
-            $query->where('tenant_id', $this->tenantId);
-        }
 
         $initiatives = $query->get();
 
@@ -36,7 +31,6 @@ class ScoreRoadmapInitiativesJob implements ShouldQueue
         }
 
         \Log::info('Roadmap initiative scoring completed', [
-            'tenant_id' => $this->tenantId,
             'preset' => $this->preset,
             'count' => $initiatives->count(),
         ]);

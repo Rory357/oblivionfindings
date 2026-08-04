@@ -392,10 +392,13 @@ abstract class TestCase extends BaseTestCase
         string $password,
         string $database,
     ): bool {
-        $schemaPath = Application::inferBasePath()
-            .DIRECTORY_SEPARATOR.'database'
-            .DIRECTORY_SEPARATOR.'schema'
-            .DIRECTORY_SEPARATOR.'mysql-schema.sql';
+        $configuredSchemaPath = trim((string) ($this->environmentValue('MYSQL_TEST_SCHEMA_PATH') ?? ''));
+        $schemaPath = $configuredSchemaPath !== ''
+            ? $configuredSchemaPath
+            : Application::inferBasePath()
+                .DIRECTORY_SEPARATOR.'database'
+                .DIRECTORY_SEPARATOR.'schema'
+                .DIRECTORY_SEPARATOR.'mysql-schema.sql';
 
         if (! is_file($schemaPath)) {
             return false;

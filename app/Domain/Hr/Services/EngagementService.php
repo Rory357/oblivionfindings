@@ -2,17 +2,22 @@
 
 namespace App\Domain\Hr\Services;
 
-use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementActionPlan;
 use App\Domain\Hr\Models\HrEngagementSurvey;
+use App\Domain\Hr\Models\HrEngagementSurveyQuestion;
 use App\Domain\Hr\Models\HrEngagementSurveyResponse;
 use App\Domain\Hr\Notifications\EngagementSurveyInvitationNotification;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class EngagementService
 {
+    public function __construct(
+        private readonly HrAudienceAccessService $audiences,
+    ) {}
+
     /**
      * Seeded survey templates that prefill the builder's Questions step.
      */
@@ -69,14 +74,10 @@ class EngagementService
         ])->all();
     }
 
-    /**
-     * @throws \InvalidArgumentException
-     */
     public function createSurvey(User $actor, array $data): HrEngagementSurvey
     {
         return DB::transaction(function () use ($actor, $data) {
             $survey = HrEngagementSurvey::create([
-                'tenant_id' => $data['tenant_id'] ?? $actor->tenant_id ?? null,
                 'title' => trim((string) $data['title']),
                 'description' => $data['description'] ?? null,
                 'survey_type' => $data['survey_type'] ?? 'pulse',
@@ -95,7 +96,7 @@ class EngagementService
                 ->values();
 
             if ($questions->isEmpty()) {
-                throw new \InvalidArgumentException('At least one question is required.');
+                throw ValidationException::withMessages(['questions' => 'At least one question is required.']);
             }
 
             $questions->each(function (array $question, int $index) use ($survey) {
@@ -109,19 +110,20 @@ class EngagementService
             });
 
             return $survey->load('questions');
-        });
+        }, attempts: 1);
     }
 
     public function updateSurvey(HrEngagementSurvey $survey, User $actor, array $data): HrEngagementSurvey
     {
         return DB::transaction(function () use ($survey, $actor, $data) {
+            $survey = HrEngagementSurvey::query()->lockForUpdate()->findOrFail($survey->getKey());
             if ($survey->status !== 'draft') {
-                throw new \InvalidArgumentException('Only draft surveys can be edited.');
+                throw ValidationException::withMessages(['survey' => 'Only draft surveys can be edited.']);
             }
 
             $survey->update([
                 'title' => trim((string) ($data['title'] ?? $survey->title)),
-                'description' => $data['description'] ?? $survey->description,
+                'description' => array_key_exists('description', $data) ? $data['description'] : $survey->description,
                 'survey_type' => $data['survey_type'] ?? $survey->survey_type,
                 'is_anonymous' => array_key_exists('is_anonymous', $data)
                     ? (bool) $data['is_anonymous']
@@ -130,8 +132,8 @@ class EngagementService
                 'audience_site_ids' => array_key_exists('audience_type', $data)
                     ? (($data['audience_type'] === 'site') ? array_values($data['audience_site_ids'] ?? []) : null)
                     : $survey->audience_site_ids,
-                'starts_at' => $data['starts_at'] ?? $survey->starts_at,
-                'ends_at' => $data['ends_at'] ?? $survey->ends_at,
+                'starts_at' => array_key_exists('starts_at', $data) ? $data['starts_at'] : $survey->starts_at,
+                'ends_at' => array_key_exists('ends_at', $data) ? $data['ends_at'] : $survey->ends_at,
                 'updated_by' => $actor->id,
             ]);
 
@@ -152,25 +154,28 @@ class EngagementService
             }
 
             return $survey->fresh('questions');
-        });
+        }, attempts: 1);
     }
 
     public function publishSurvey(HrEngagementSurvey $survey, User $actor): HrEngagementSurvey
     {
-        if ($survey->status !== 'draft') {
-            throw new \InvalidArgumentException('Only draft surveys can be published.');
-        }
+        $survey = DB::transaction(function () use ($survey, $actor): HrEngagementSurvey {
+            $locked = HrEngagementSurvey::query()->lockForUpdate()->findOrFail($survey->getKey());
+            if ($locked->status !== 'draft') {
+                throw ValidationException::withMessages(['survey' => 'Only draft surveys can be published.']);
+            }
+            if ($locked->questions()->count() === 0) {
+                throw ValidationException::withMessages(['questions' => 'Survey must include at least one question before publishing.']);
+            }
+            $locked->update([
+                'status' => 'published',
+                'published_by' => $actor->id,
+                'published_at' => now(),
+                'updated_by' => $actor->id,
+            ]);
 
-        if ($survey->questions()->count() === 0) {
-            throw new \InvalidArgumentException('Survey must include at least one question before publishing.');
-        }
-
-        $survey->update([
-            'status' => 'published',
-            'published_by' => $actor->id,
-            'published_at' => now(),
-            'updated_by' => $actor->id,
-        ]);
+            return $locked->fresh();
+        }, attempts: 1);
 
         $recipients = $this->recipientsFor($survey);
 
@@ -183,34 +188,37 @@ class EngagementService
     }
 
     /**
-     * Resolve the active recipients for a survey based on its audience scope.
-     * Null / 'all' audience = every active staff member in the tenant (legacy).
+     * Resolve current staff recipients for a survey based on its audience scope.
+     * Null / 'all' audience means every current staff member in the application.
      *
      * @return Collection<int, User>
      */
     public function recipientsFor(HrEngagementSurvey $survey): Collection
     {
-        $siteIds = ($survey->audience_type === 'site')
+        $audienceType = $survey->audience_type ?: 'all';
+        if (! in_array($audienceType, ['all', 'site'], true)) {
+            return collect();
+        }
+
+        $siteIds = ($audienceType === 'site')
             ? collect($survey->audience_site_ids ?? [])->map(fn ($id) => (int) $id)->filter()->values()
             : collect();
 
-        return HrEmployeeProfile::query()
-            ->where('is_active', true)
-            ->when($survey->tenant_id !== null, fn ($query) => $query->where('tenant_id', $survey->tenant_id))
-            ->when($siteIds->isNotEmpty(), function ($query) use ($siteIds) {
-                $query->where(function ($inner) use ($siteIds) {
-                    $inner->whereIn('primary_site_id', $siteIds->all());
-                    foreach ($siteIds as $siteId) {
-                        $inner->orWhereJsonContains('secondary_site_ids', $siteId);
-                    }
-                });
-            })
-            ->with('user:id,email,name')
-            ->get()
-            ->pluck('user')
-            ->filter()
-            ->unique('id')
-            ->values();
+        if ($audienceType === 'site' && $siteIds->isEmpty()) {
+            return collect();
+        }
+
+        $targets = $audienceType === 'all'
+            ? [['type' => 'all', 'value' => null]]
+            : $siteIds->map(fn (int $siteId) => ['type' => 'site', 'value' => (string) $siteId])->all();
+
+        return $this->audiences->resolveUsers($targets);
+    }
+
+    public function isCurrentRecipient(HrEngagementSurvey $survey, User $user): bool
+    {
+        return $this->recipientsFor($survey)
+            ->contains(fn (User $recipient) => (int) $recipient->id === (int) $user->id);
     }
 
     public function recipientCount(HrEngagementSurvey $survey): int
@@ -224,10 +232,13 @@ class EngagementService
     public function duplicateSurvey(HrEngagementSurvey $survey, User $actor): HrEngagementSurvey
     {
         return DB::transaction(function () use ($survey, $actor) {
+            $survey = HrEngagementSurvey::query()
+                ->with('questions')
+                ->lockForUpdate()
+                ->findOrFail($survey->getKey());
             $survey->loadMissing('questions');
 
             $copy = HrEngagementSurvey::create([
-                'tenant_id' => $survey->tenant_id,
                 'title' => $this->copyTitle($survey->title),
                 'description' => $survey->description,
                 'survey_type' => $survey->survey_type,
@@ -250,12 +261,12 @@ class EngagementService
             ]));
 
             return $copy->load('questions');
-        });
+        }, attempts: 1);
     }
 
     protected function copyTitle(string $title): string
     {
-        return mb_substr(trim($title) . ' (copy)', 0, 255);
+        return mb_substr(trim($title).' (copy)', 0, 255);
     }
 
     /**
@@ -266,7 +277,7 @@ class EngagementService
     public function nudgeNonResponders(HrEngagementSurvey $survey, User $actor): int
     {
         if ($survey->status !== 'published') {
-            throw new \InvalidArgumentException('Only published surveys can be nudged.');
+            throw ValidationException::withMessages(['survey' => 'Only published surveys can be nudged.']);
         }
 
         $recipients = $this->recipientsFor($survey);
@@ -282,7 +293,7 @@ class EngagementService
 
         $pending = $recipients->filter(function (User $recipient) use ($survey, $key, $respondedHashes, $respondedUserIds) {
             if ($survey->is_anonymous) {
-                $hash = hash_hmac('sha256', $survey->id . ':' . $recipient->id, $key);
+                $hash = hash_hmac('sha256', $survey->id.':'.$recipient->id, $key);
 
                 return ! in_array($hash, $respondedHashes, true);
             }
@@ -305,13 +316,15 @@ class EngagementService
      */
     public function archiveSurvey(HrEngagementSurvey $survey, User $actor): HrEngagementSurvey
     {
-        if (! in_array($survey->status, ['closed', 'archived'], true)) {
-            throw new \InvalidArgumentException('Only closed surveys can be archived.');
-        }
+        return DB::transaction(function () use ($survey, $actor): HrEngagementSurvey {
+            $locked = HrEngagementSurvey::query()->lockForUpdate()->findOrFail($survey->getKey());
+            if (! in_array($locked->status, ['closed', 'archived'], true)) {
+                throw ValidationException::withMessages(['survey' => 'Only closed surveys can be archived.']);
+            }
+            $locked->update(['status' => 'archived', 'updated_by' => $actor->id]);
 
-        $survey->update(['status' => 'archived', 'updated_by' => $actor->id]);
-
-        return $survey->fresh();
+            return $locked->fresh();
+        }, attempts: 1);
     }
 
     /**
@@ -319,16 +332,18 @@ class EngagementService
      */
     public function archiveDraftSurvey(HrEngagementSurvey $survey, User $actor): HrEngagementSurvey
     {
-        if ($survey->status !== 'draft') {
-            throw new \InvalidArgumentException('Only draft surveys can be archived through this action.');
-        }
+        return DB::transaction(function () use ($survey, $actor): HrEngagementSurvey {
+            $locked = HrEngagementSurvey::query()->lockForUpdate()->findOrFail($survey->getKey());
+            if ($locked->status !== 'draft') {
+                throw ValidationException::withMessages(['survey' => 'Only draft surveys can be archived through this action.']);
+            }
+            $locked->update([
+                'status' => 'archived',
+                'updated_by' => $actor->id,
+            ]);
 
-        $survey->update([
-            'status' => 'archived',
-            'updated_by' => $actor->id,
-        ]);
-
-        return $survey->fresh();
+            return $locked->fresh();
+        }, attempts: 1);
     }
 
     /**
@@ -338,75 +353,85 @@ class EngagementService
      */
     public function closeSurvey(HrEngagementSurvey $survey, ?User $actor = null): HrEngagementSurvey
     {
-        if ($survey->status !== 'published') {
-            throw new \InvalidArgumentException('Only published surveys can be closed.');
-        }
+        return DB::transaction(function () use ($survey, $actor): HrEngagementSurvey {
+            $locked = HrEngagementSurvey::query()->lockForUpdate()->findOrFail($survey->getKey());
+            if ($locked->status !== 'published') {
+                throw ValidationException::withMessages(['survey' => 'Only published surveys can be closed.']);
+            }
+            $locked->update([
+                'status' => 'closed',
+                'closed_at' => now(),
+                'updated_by' => $actor?->id,
+            ]);
 
-        $survey->update([
-            'status' => 'closed',
-            'closed_at' => now(),
-            'updated_by' => $actor?->id,
-        ]);
-
-        return $survey->fresh();
+            return $locked->fresh();
+        }, attempts: 1);
     }
 
     public function submitResponse(HrEngagementSurvey $survey, User $user, array $answers): HrEngagementSurveyResponse
     {
-        if ($survey->status !== 'published') {
-            throw new \InvalidArgumentException('This survey is not accepting responses.');
-        }
+        return DB::transaction(function () use ($survey, $user, $answers): HrEngagementSurveyResponse {
+            $survey = HrEngagementSurvey::query()
+                ->with('questions')
+                ->lockForUpdate()
+                ->findOrFail($survey->getKey());
+            if ($survey->status !== 'published') {
+                throw ValidationException::withMessages(['survey' => 'This survey is not accepting responses.']);
+            }
 
-        if ($survey->starts_at && $survey->starts_at->isFuture()) {
-            throw new \InvalidArgumentException('This survey has not started yet.');
-        }
+            if ($survey->starts_at && $survey->starts_at->isFuture()) {
+                throw ValidationException::withMessages(['survey' => 'This survey has not started yet.']);
+            }
 
-        if ($survey->ends_at && $survey->ends_at->isPast()) {
-            throw new \InvalidArgumentException('This survey has closed.');
-        }
+            if ($survey->ends_at && $survey->ends_at->isPast()) {
+                throw ValidationException::withMessages(['survey' => 'This survey has closed.']);
+            }
 
-        $respondentHash = hash_hmac('sha256', $survey->id . ':' . $user->id, (string) config('app.key'));
+            $respondentHash = hash_hmac('sha256', $survey->id.':'.$user->id, (string) config('app.key'));
 
-        $existing = HrEngagementSurveyResponse::query()
-            ->where('survey_id', $survey->id)
-            ->where(function ($query) use ($survey, $user, $respondentHash) {
-                if ($survey->is_anonymous) {
-                    $query->where('respondent_hash', $respondentHash);
-                } else {
-                    $query->where('user_id', $user->id);
+            $existing = HrEngagementSurveyResponse::query()
+                ->where('survey_id', $survey->id)
+                ->where(function ($query) use ($survey, $user, $respondentHash) {
+                    if ($survey->is_anonymous) {
+                        $query->where('respondent_hash', $respondentHash);
+                    } else {
+                        $query->where('user_id', $user->id);
+                    }
+                })
+                ->exists();
+
+            if ($existing) {
+                throw ValidationException::withMessages(['survey' => 'You have already submitted this survey.']);
+            }
+
+            $survey->loadMissing('questions');
+            $normalizedAnswers = [];
+            foreach ($survey->questions as $question) {
+                $key = (string) $question->id;
+                $answer = $answers[$key] ?? null;
+
+                if ($question->is_required && ($answer === null || $answer === '')) {
+                    throw ValidationException::withMessages([
+                        'answers.'.(string) $question->id => 'Please complete all required survey questions.',
+                    ]);
                 }
-            })
-            ->exists();
 
-        if ($existing) {
-            throw new \InvalidArgumentException('You have already submitted this survey.');
-        }
-
-        $survey->loadMissing('questions');
-        $normalizedAnswers = [];
-        foreach ($survey->questions as $question) {
-            $key = (string) $question->id;
-            $answer = $answers[$key] ?? null;
-
-            if ($question->is_required && ($answer === null || $answer === '')) {
-                throw new \InvalidArgumentException('Please complete all required survey questions.');
+                if ($answer !== null && $answer !== '') {
+                    $normalizedAnswers[$key] = $answer;
+                }
             }
 
-            if ($answer !== null && $answer !== '') {
-                $normalizedAnswers[$key] = $answer;
-            }
-        }
+            $overallScore = $this->computeOverallScore($survey->questions, $normalizedAnswers);
 
-        $overallScore = $this->computeOverallScore($survey->questions, $normalizedAnswers);
-
-        return HrEngagementSurveyResponse::create([
-            'survey_id' => $survey->id,
-            'user_id' => $survey->is_anonymous ? null : $user->id,
-            'respondent_hash' => $respondentHash,
-            'answers' => $normalizedAnswers,
-            'overall_score' => $overallScore,
-            'submitted_at' => now(),
-        ]);
+            return HrEngagementSurveyResponse::create([
+                'survey_id' => $survey->id,
+                'user_id' => $survey->is_anonymous ? null : $user->id,
+                'respondent_hash' => $respondentHash,
+                'answers' => $normalizedAnswers,
+                'overall_score' => $overallScore,
+                'submitted_at' => now(),
+            ]);
+        }, attempts: 1);
     }
 
     /**
@@ -458,26 +483,19 @@ class EngagementService
     /**
      * @return array<string, int|float>
      */
-    public function actionPlanSlaSummary(?int $tenantId, ?int $viewerUserId, bool $canManage): array
+    public function actionPlanSlaSummary(Collection $plans): array
     {
         $openStatuses = ['open', 'in_progress'];
-        $baseQuery = HrEngagementActionPlan::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->when(! $canManage && $viewerUserId !== null, fn ($query) => $query->where('owner_user_id', $viewerUserId));
-
-        $openPlans = (clone $baseQuery)
-            ->whereIn('status', $openStatuses)
-            ->get();
+        $openPlans = $plans->whereIn('status', $openStatuses)->values();
 
         $overdue = $openPlans->filter(fn (HrEngagementActionPlan $plan) => $plan->due_date && $plan->due_date->isBefore(now()->startOfDay()));
         $dueToday = $openPlans->filter(fn (HrEngagementActionPlan $plan) => $plan->due_date && $plan->due_date->isToday());
         $dueNext7 = $openPlans->filter(fn (HrEngagementActionPlan $plan) => $plan->due_date
             && $plan->due_date->isBetween(now()->startOfDay(), now()->addDays(7)->endOfDay()));
 
-        $completedLast30 = (clone $baseQuery)
-            ->where('status', 'completed')
-            ->whereNotNull('completed_at')
-            ->whereBetween('completed_at', [now()->subDays(30)->toDateString(), now()->toDateString()])
+        $completedLast30 = $plans->filter(fn (HrEngagementActionPlan $plan) => $plan->status === 'completed'
+            && $plan->completed_at
+            && $plan->completed_at->betweenIncluded(now()->subDays(30)->startOfDay(), now()->endOfDay()))
             ->count();
 
         return [
@@ -494,13 +512,9 @@ class EngagementService
     /**
      * @return array<int, array<string, int|string|null>>
      */
-    public function actionPlanOwnerWorkload(?int $tenantId): array
+    public function actionPlanOwnerWorkload(Collection $plans): array
     {
-        $plans = HrEngagementActionPlan::query()
-            ->with('owner:id,name')
-            ->whereIn('status', ['open', 'in_progress'])
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->get();
+        $plans = $plans->whereIn('status', ['open', 'in_progress']);
 
         return $plans
             ->groupBy('owner_user_id')
@@ -526,8 +540,8 @@ class EngagementService
     }
 
     /**
-     * @param  Collection<int, \App\Domain\Hr\Models\HrEngagementSurveyQuestion>  $questions
-     * @param  array<string, mixed>                                                $answers
+     * @param  Collection<int, HrEngagementSurveyQuestion>  $questions
+     * @param  array<string, mixed>  $answers
      */
     protected function computeOverallScore(Collection $questions, array $answers): ?float
     {

@@ -5,15 +5,12 @@ namespace App\Http\Controllers\Hr;
 use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrPosition;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class DepartmentController extends Controller
 {
-    use ResolvesHrTenant;
-
     private function canManage($user): bool
     {
         return $user && ($user->canDo('hr.settings.manage') || $user->canDo('hr.employees.manage'));
@@ -43,10 +40,8 @@ class DepartmentController extends Controller
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255', Rule::unique('hr_departments')->where('tenant_id', $tenantId)],
+            'name' => ['required', 'string', 'max:255', Rule::unique('hr_departments', 'name')],
             'code' => ['nullable', 'string', 'max:50'],
             'cost_centre' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:1000'],
@@ -62,7 +57,6 @@ class DepartmentController extends Controller
 
         $department = HrDepartment::create([
             ...$validated,
-            'tenant_id' => $tenantId,
             'sort_order' => $validated['sort_order'] ?? 0,
         ]);
 
@@ -139,10 +133,8 @@ class DepartmentController extends Controller
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255', Rule::unique('hr_departments')->where('tenant_id', $tenantId)->ignore($department->id)],
+            'name' => ['required', 'string', 'max:255', Rule::unique('hr_departments', 'name')->ignore($department->id)],
             'code' => ['nullable', 'string', 'max:50'],
             'cost_centre' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:1000'],

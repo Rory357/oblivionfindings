@@ -11,7 +11,6 @@ beforeEach(function () {
 
     // hr.surveys.* are in SeedHrPermissionsSeeder → the hr role gets them.
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);

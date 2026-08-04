@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientDocument;
@@ -10,6 +11,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\Gate;
@@ -41,49 +43,65 @@ function grantClinicalDirectRoutePermissions(User $user, array $permissionKeys):
     $user->roles()->sync([$role->id]);
 }
 
-function makeClinicalDirectRouteActor(int $organizationId, array $permissionKeys): User
+/**
+ * @param  array<int, Site>  $secondarySites
+ */
+function makeClinicalDirectRouteActor(Site $primarySite, array $permissionKeys, array $secondarySites = []): User
 {
     $user = User::factory()->create([
-        'organization_id' => $organizationId,
         'role' => 'staff',
         'approved_at' => now(),
     ]);
     grantClinicalDirectRoutePermissions($user, $permissionKeys);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $primarySite->id,
+        'secondary_site_ids' => array_map(
+            static fn (Site $site): int => (int) $site->id,
+            $secondarySites,
+        ),
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+    ]);
 
     return $user;
 }
 
-it('cannot bootstrap medication access by opening break glass for another organization', function () {
-    $actor = makeClinicalDirectRouteActor(1, [
+it('cannot bootstrap medication access for a Client outside the actors Site access', function () {
+    $actorSite = Site::factory()->create();
+    $outsideSite = Site::factory()->create();
+    $actor = makeClinicalDirectRouteActor($actorSite, [
         'medications.breakglass',
         'medications.view',
     ]);
-    $foreignClient = Client::factory()->create(['organization_id' => 2]);
+    $outsideSiteClient = Client::factory()->create(['site_id' => $outsideSite->id]);
 
     $this->mock(NotificationService::class)
         ->shouldReceive('notifyCrud')
         ->zeroOrMoreTimes();
 
     $this->actingAs($actor)
-        ->post(route('operations.clients.break_glass.store', $foreignClient, false), [
+        ->post(route('operations.clients.break_glass.store', $outsideSiteClient, false), [
             'reason' => 'Emergency cover',
             'acknowledged_min_necessary' => true,
         ])
         ->assertForbidden();
 
     expect(ClientBreakGlassAccess::query()
-        ->where('client_id', $foreignClient->id)
+        ->where('client_id', $outsideSiteClient->id)
         ->where('user_id', $actor->id)
         ->exists())->toBeFalse()
-        ->and(Gate::forUser($actor)->allows('viewMedications', $foreignClient))->toBeFalse();
+        ->and(Gate::forUser($actor)->allows('viewMedications', $outsideSiteClient))->toBeFalse();
 });
 
 it('keeps direct document and routine reads aligned with profile section access', function () {
     Storage::fake('local');
 
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $restrictedViewer = makeClinicalDirectRouteActor(1, ['clients.viewAny']);
-    $editor = makeClinicalDirectRouteActor(1, ['clients.viewAny', 'clients.update']);
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $restrictedViewer = makeClinicalDirectRouteActor($site, ['clients.viewAny']);
+    $editor = makeClinicalDirectRouteActor($site, ['clients.viewAny', 'clients.update']);
 
     Storage::disk('local')->put('client-documents/private.txt', 'private care document');
     $document = ClientDocument::query()->create([
@@ -99,7 +117,6 @@ it('keeps direct document and routine reads aligned with profile section access'
     ]);
     ClientRoutine::query()->create([
         'client_id' => $client->id,
-        'organization_id' => 1,
         'time_block' => 'morning',
         'body' => 'Sensitive morning support details',
         'display_order' => 10,
@@ -132,16 +149,19 @@ it('keeps direct document and routine reads aligned with profile section access'
         ->assertJsonPath('0.body', 'Sensitive morning support details');
 });
 
-it('rejects client notes linked to another clients shift', function (int $shiftOrganizationId) {
-    $actor = makeClinicalDirectRouteActor(1, [
+it('rejects a Client note linked to another Clients Shift', function (bool $shiftUsesAnotherAccessibleSite) {
+    $clientSite = Site::factory()->create();
+    $shiftSite = $shiftUsesAnotherAccessibleSite ? Site::factory()->create() : $clientSite;
+    $actor = makeClinicalDirectRouteActor($clientSite, [
         'clients.viewAny',
         'timeline.create',
-    ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $otherClient = Client::factory()->create(['organization_id' => $shiftOrganizationId]);
+    ], $shiftUsesAnotherAccessibleSite ? [$shiftSite] : []);
+    $client = Client::factory()->create(['site_id' => $clientSite->id]);
+    $otherClient = Client::factory()->create(['site_id' => $shiftSite->id]);
     $shift = Shift::factory()->create([
-        'organization_id' => $shiftOrganizationId,
         'client_id' => $otherClient->id,
+        'site_id' => $shiftSite->id,
+        'service_context_id' => $otherClient->service_context_id,
         'user_id' => $actor->id,
         'created_by' => $actor->id,
     ]);
@@ -149,7 +169,7 @@ it('rejects client notes linked to another clients shift', function (int $shiftO
     $this->actingAs($actor)
         ->postJson(route('operations.clients.notes.store', $client, false), [
             'type' => 'shift_note',
-            'body' => 'Must not cross the client boundary',
+            'body' => 'Must not attach to a different Client Shift',
             'shift_id' => $shift->id,
         ])
         ->assertUnprocessable()
@@ -157,28 +177,31 @@ it('rejects client notes linked to another clients shift', function (int $shiftO
 
     expect(ClientNote::query()
         ->where('client_id', $client->id)
-        ->where('body', 'Must not cross the client boundary')
+        ->where('body', 'Must not attach to a different Client Shift')
         ->exists())->toBeFalse();
 })->with([
-    'same organization, different client' => 1,
-    'different organization and client' => 2,
+    'same Site, different Client' => false,
+    'another accessible Site, different Client' => true,
 ]);
 
-it('rejects medication administrations linked to another clients shift before side effects', function (int $shiftOrganizationId) {
-    $actor = makeClinicalDirectRouteActor(1, [
+it('rejects medication administrations linked to another Clients Shift before side effects', function (bool $shiftUsesAnotherAccessibleSite) {
+    $clientSite = Site::factory()->create();
+    $shiftSite = $shiftUsesAnotherAccessibleSite ? Site::factory()->create() : $clientSite;
+    $actor = makeClinicalDirectRouteActor($clientSite, [
         'clients.viewAny',
         'medications.view',
         'medications.administer.record',
-    ]);
+    ], $shiftUsesAnotherAccessibleSite ? [$shiftSite] : []);
     $serviceContext = ServiceContext::factory()->create();
     $client = Client::factory()->create([
-        'organization_id' => 1,
+        'site_id' => $clientSite->id,
         'service_context_id' => $serviceContext->id,
     ]);
-    $otherClient = Client::factory()->create(['organization_id' => $shiftOrganizationId]);
+    $otherClient = Client::factory()->create(['site_id' => $shiftSite->id]);
     $shift = Shift::factory()->create([
-        'organization_id' => $shiftOrganizationId,
         'client_id' => $otherClient->id,
+        'site_id' => $shiftSite->id,
+        'service_context_id' => $otherClient->service_context_id,
         'user_id' => $actor->id,
         'created_by' => $actor->id,
     ]);
@@ -225,6 +248,6 @@ it('rejects medication administrations linked to another clients shift before si
         'type' => 'medication_given',
     ]);
 })->with([
-    'same organization, different client' => 1,
-    'different organization and client' => 2,
+    'same Site, different Client' => false,
+    'another accessible Site, different Client' => true,
 ]);

@@ -6,10 +6,14 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEmployeeSkill;
 use App\Domain\Hr\Models\HrSkill;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class SkillsMatrixService
 {
+    public function __construct(private readonly HrPerformanceAccessService $access) {}
+
     /**
      * Proficiency levels in order.
      */
@@ -18,53 +22,61 @@ class SkillsMatrixService
     /**
      * Assess or update an employee's skill level.
      *
-     * @param  int     $tenantId
-     * @param  int     $employeeProfileId
-     * @param  int     $skillId
-     * @param  array   $data
-     * @return HrEmployeeSkill
+     * @param  array{proficiency_level: string, notes?: string|null}  $data
      */
-    public function assessSkill(?int $tenantId, int $employeeProfileId, int $skillId, array $data): HrEmployeeSkill
+    public function assessSkill(User $actor, int $employeeProfileId, int $skillId, array $data): HrEmployeeSkill
     {
-        return DB::transaction(function () use ($tenantId, $employeeProfileId, $skillId, $data) {
-            return HrEmployeeSkill::updateOrCreate(
-                [
-                    'employee_profile_id' => $employeeProfileId,
-                    'skill_id' => $skillId,
-                ],
-                [
-                    'tenant_id' => $tenantId,
-                    'proficiency_level' => $data['proficiency_level'],
-                    'self_assessed' => $data['self_assessed'] ?? true,
-                    'assessed_by' => $data['assessed_by'] ?? null,
-                    'assessed_at' => $data['assessed_by'] ? now() : null,
-                    'notes' => $data['notes'] ?? null,
-                ]
-            );
+        return DB::transaction(function () use ($actor, $employeeProfileId, $skillId, $data): HrEmployeeSkill {
+            $profile = $this->access
+                ->applyCurrentProfileScope(HrEmployeeProfile::query(), $actor)
+                ->lockForUpdate()
+                ->findOrFail($employeeProfileId);
+            $skill = HrSkill::query()
+                ->active()
+                ->lockForUpdate()
+                ->findOrFail($skillId);
+
+            $assessment = HrEmployeeSkill::query()
+                ->firstOrNew([
+                    'employee_profile_id' => $profile->getKey(),
+                    'skill_id' => $skill->getKey(),
+                ]);
+            $assessment->fill([
+                'proficiency_level' => $data['proficiency_level'],
+                'self_assessed' => false,
+                'assessed_by' => $actor->getKey(),
+                'assessed_at' => now(),
+                'notes' => $data['notes'] ?? null,
+            ]);
+            $assessment->save();
+
+            return $assessment->refresh();
         });
     }
 
     /**
      * Get the full skills matrix: employees vs skills with proficiency levels.
      *
-     * @param  int|null  $tenantId
-     * @return array{employees: array, skills: array, matrix: array}
+     * @return array{employees: array, skills: array}
      */
-    public function getSkillsMatrix(?int $tenantId): array
+    public function getSkillsMatrix(User $viewer): array
     {
-        $skills = HrSkill::forTenant($tenantId)
+        $skills = HrSkill::query()
             ->active()
             ->orderBy('category')
             ->orderBy('name')
             ->get(['id', 'name', 'category']);
 
-        $employees = HrEmployeeProfile::forTenant($tenantId)
-            ->active()
+        $employees = $this->access
+            ->applyCurrentProfileScope(HrEmployeeProfile::query(), $viewer)
             ->with('user:id,name')
+            ->orderBy('user_id')
             ->get(['id', 'user_id', 'position_title', 'department']);
 
-        $employeeSkills = HrEmployeeSkill::forTenant($tenantId)
-            ->get()
+        $employeeSkills = HrEmployeeSkill::query()
+            ->whereIn('employee_profile_id', $employees->pluck('id'))
+            ->whereIn('skill_id', $skills->pluck('id'))
+            ->get(['id', 'employee_profile_id', 'skill_id', 'proficiency_level'])
             ->groupBy('employee_profile_id');
 
         $matrix = [];
@@ -95,15 +107,17 @@ class SkillsMatrixService
     /**
      * Find employees with a specific skill at or above a given proficiency.
      *
-     * @param  int|null  $tenantId
-     * @param  int       $skillId
-     * @param  string|null  $minProficiency
-     * @return \Illuminate\Support\Collection
+     * @return Collection<int, HrEmployeeSkill>
      */
-    public function findEmployeesWithSkill(?int $tenantId, int $skillId, ?string $minProficiency = null)
+    public function findEmployeesWithSkill(User $viewer, int $skillId, ?string $minProficiency = null): Collection
     {
-        $query = HrEmployeeSkill::forTenant($tenantId)
-            ->where('skill_id', $skillId)
+        $skill = HrSkill::query()->active()->findOrFail($skillId);
+        $profileIds = $this->access
+            ->applyCurrentProfileScope(HrEmployeeProfile::query(), $viewer)
+            ->select('hr_employee_profiles.id');
+        $query = HrEmployeeSkill::query()
+            ->where('skill_id', $skill->getKey())
+            ->whereIn('employee_profile_id', $profileIds)
             ->with(['employeeProfile.user:id,name', 'skill:id,name']);
 
         if ($minProficiency) {
@@ -120,21 +134,21 @@ class SkillsMatrixService
     /**
      * Identify skill gaps: skills where less than a threshold of employees have coverage.
      *
-     * @param  int|null  $tenantId
-     * @param  float     $coverageThreshold  Percentage (0-100)
-     * @return array
+     * @return array<int, array<string, int|float|string>>
      */
-    public function getSkillGaps(?int $tenantId, float $coverageThreshold = 50): array
+    public function getSkillGaps(User $viewer, float $coverageThreshold = 50): array
     {
-        $totalEmployees = HrEmployeeProfile::forTenant($tenantId)->active()->count();
+        $profileIds = $this->visibleCurrentProfileIds($viewer);
+        $totalEmployees = (clone $profileIds)->count();
 
         if ($totalEmployees === 0) {
             return [];
         }
 
-        $skills = HrSkill::forTenant($tenantId)
+        $skills = HrSkill::query()
             ->active()
-            ->withCount('employeeSkills')
+            ->withCount(['employeeSkills' => fn (Builder $query): Builder => $query
+                ->whereIn('employee_profile_id', clone $profileIds)])
             ->get();
 
         $gaps = [];
@@ -153,5 +167,22 @@ class SkillsMatrixService
         }
 
         return collect($gaps)->sortBy('coverage_pct')->values()->all();
+    }
+
+    /** @return Builder<HrSkill> */
+    public function withVisibleAssessmentCount(Builder $query, User $viewer): Builder
+    {
+        $profileIds = $this->visibleCurrentProfileIds($viewer);
+
+        return $query->withCount(['employeeSkills' => fn (Builder $assessment): Builder => $assessment
+            ->whereIn('employee_profile_id', $profileIds)]);
+    }
+
+    /** @return Builder<HrEmployeeProfile> */
+    private function visibleCurrentProfileIds(User $viewer): Builder
+    {
+        return $this->access
+            ->applyCurrentProfileScope(HrEmployeeProfile::query(), $viewer)
+            ->select('hr_employee_profiles.id');
     }
 }

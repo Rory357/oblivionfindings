@@ -8,14 +8,12 @@ use App\Models\Site;
 
 beforeEach(function () {
     $this->site = Site::factory()->create([
-        'tenant_id' => 1,
         'type' => 'house',
     ]);
 });
 
 test('public careers application creates candidate and application', function () {
     $job = HrJobRequisition::query()->create([
-        'tenant_id' => 1,
         'title' => 'Night Support Worker',
         'slug' => 'night-support-worker',
         'position_role' => 'support_worker',
@@ -50,7 +48,6 @@ test('public careers application creates candidate and application', function ()
 
 test('public offer acceptance requires signature and records e-sign details', function () {
     $candidate = HrCandidate::query()->create([
-        'tenant_id' => 1,
         'first_name' => 'Ari',
         'last_name' => 'Offer',
         'personal_email' => 'ari.offer@example.test',
@@ -60,7 +57,6 @@ test('public offer acceptance requires signature and records e-sign details', fu
     ]);
 
     $application = HrApplication::query()->create([
-        'tenant_id' => 1,
         'candidate_id' => $candidate->id,
         'position_title' => 'Team Lead',
         'position_role' => 'team_lead',
@@ -108,12 +104,10 @@ test('public offer acceptance requires signature and records e-sign details', fu
 
 test('careers index supports role, employment type, and site filters', function () {
     $otherSite = Site::factory()->create([
-        'tenant_id' => 1,
         'type' => 'house',
     ]);
 
     HrJobRequisition::query()->create([
-        'tenant_id' => 1,
         'title' => 'Team Lead',
         'slug' => 'team-lead',
         'position_role' => 'team_lead',
@@ -125,7 +119,6 @@ test('careers index supports role, employment type, and site filters', function 
     ]);
 
     $targetJob = HrJobRequisition::query()->create([
-        'tenant_id' => 1,
         'title' => 'Casual Support Worker',
         'slug' => 'casual-support-worker',
         'position_role' => 'support_worker',
@@ -149,7 +142,6 @@ test('careers index supports role, employment type, and site filters', function 
 
 test('careers application captures sourcing channel metadata', function () {
     $job = HrJobRequisition::query()->create([
-        'tenant_id' => 1,
         'title' => 'Community Support Worker',
         'slug' => 'community-support-worker',
         'position_role' => 'support_worker',

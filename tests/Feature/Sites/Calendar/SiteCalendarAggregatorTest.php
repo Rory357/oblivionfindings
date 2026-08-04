@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\Sites\Calendar\SiteCalendarAggregator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Crypt;
 
 uses(RefreshDatabase::class);
 
@@ -16,7 +17,6 @@ function makeMeal(Site $site, string $date, string $slot, string $name): SiteMea
 {
     return SiteMealPlanEntry::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'plan_date' => $date,
         'meal_slot' => $slot,
         'source_type' => 'ad_hoc',
@@ -31,7 +31,6 @@ test('aggregator unions manual events with auto-derived obligations', function (
 
     SiteCalendarEvent::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'event_type' => 'general',
         'title' => 'House meeting',
         'start_at' => Carbon::parse('2026-05-20 16:00'),
@@ -107,7 +106,6 @@ test('aggregator can filter to a single source layer', function () {
 
     SiteCalendarEvent::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'event_type' => 'general',
         'title' => 'House meeting',
         'start_at' => Carbon::parse('2026-05-20 16:00'),
@@ -132,10 +130,9 @@ test('credential rotation reminders deep-link to the unified /vendors view, not 
 
     SiteCredential::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'label' => 'Alarm Panel',
         'credential_type' => 'pin',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('1234'),
+        'encrypted_value' => Crypt::encryptString('1234'),
         // Default rotation cadence is 90 days, so this falls due 2026-05-16.
         'last_rotated_at' => Carbon::parse('2026-02-15'),
     ]);
@@ -158,7 +155,6 @@ test('vendor insurance reminders deep-link to the unified /vendors view, not the
 
     SiteVendor::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'service_type' => 'electrician',
         'company_name' => 'Hamilton Electrical Ltd',
         'preferred_contact_method' => 'phone',

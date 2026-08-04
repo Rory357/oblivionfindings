@@ -5,22 +5,24 @@ namespace App\Http\Controllers\Hr;
 use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
+use App\Domain\Hr\Services\HrRecruitmentAccessService;
 use App\Domain\Hr\Services\RecruitmentAnalyticsService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Server-side, uncapped CSV export for the recruitment hub tabs. Streams rows so
- * a large pipeline doesn't buffer in memory. Tenant-scoped, gated on view.
+ * a large pipeline doesn't buffer in memory. Access is gated on view.
  */
 class RecruitmentExportController extends Controller
 {
-    use ResolvesHrTenant;
-
     private const DATASETS = ['pipeline', 'requisitions', 'offers', 'analytics'];
+
+    public function __construct(
+        private readonly HrRecruitmentAccessService $access,
+    ) {}
 
     public function export(Request $request, RecruitmentAnalyticsService $analytics): StreamedResponse
     {
@@ -32,18 +34,18 @@ class RecruitmentExportController extends Controller
             'format' => ['nullable', 'string', Rule::in(['csv'])],
         ]);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $scope = $this->access->scope($user);
         $dataset = $validated['dataset'];
         $filename = "recruitment-{$dataset}-".date('Y-m-d').'.csv';
 
-        return response()->streamDownload(function () use ($dataset, $tenantId, $analytics) {
+        return response()->streamDownload(function () use ($dataset, $scope, $analytics) {
             $out = fopen('php://output', 'w');
 
             match ($dataset) {
-                'pipeline' => $this->streamPipeline($out, $tenantId),
-                'requisitions' => $this->streamRequisitions($out, $tenantId),
-                'offers' => $this->streamOffers($out, $tenantId),
-                'analytics' => $this->streamAnalytics($out, $tenantId, $analytics),
+                'pipeline' => $this->streamPipeline($out, $scope['candidate_ids']),
+                'requisitions' => $this->streamRequisitions($out, $scope['requisition_ids'], $scope['application_ids']),
+                'offers' => $this->streamOffers($out, $scope['offer_ids']),
+                'analytics' => $this->streamAnalytics($out, $scope['candidate_ids'], $scope['application_ids'], $analytics),
             };
 
             fclose($out);
@@ -51,12 +53,12 @@ class RecruitmentExportController extends Controller
     }
 
     /** @param resource $out */
-    private function streamPipeline($out, ?int $tenantId): void
+    private function streamPipeline($out, array $candidateIds): void
     {
         $this->putCsv($out, ['Name', 'Email', 'Stage', 'Requisition', 'Source', 'Days in stage', 'Created']);
 
         HrCandidate::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereKey($candidateIds)
             ->whereNotIn('status', ['withdrawn', 'rejected', 'hired'])
             ->with(['applications' => fn ($q) => $q->select('id', 'candidate_id', 'requisition_id')->latest('id'), 'applications.requisition:id,title'])
             ->orderByDesc('current_stage_entered_at')
@@ -77,14 +79,14 @@ class RecruitmentExportController extends Controller
     }
 
     /** @param resource $out */
-    private function streamRequisitions($out, ?int $tenantId): void
+    private function streamRequisitions($out, array $requisitionIds, array $applicationIds): void
     {
         $this->putCsv($out, ['Title', 'Site', 'Status', 'Openings', 'Applicants', 'Hiring manager', 'Employment type']);
 
         HrJobRequisition::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereKey($requisitionIds)
             ->with(['site:id,name', 'hiringManager:id,name'])
-            ->withCount('applications')
+            ->withCount(['applications' => fn ($applications) => $applications->whereIn('id', $applicationIds)])
             ->orderByDesc('created_at')
             ->chunk(500, function ($reqs) use ($out) {
                 foreach ($reqs as $r) {
@@ -102,13 +104,13 @@ class RecruitmentExportController extends Controller
     }
 
     /** @param resource $out */
-    private function streamOffers($out, ?int $tenantId): void
+    private function streamOffers($out, array $offerIds): void
     {
         $this->putCsv($out, ['Candidate', 'Role', 'Approval', 'Response', 'Hourly rate', 'Annual salary', 'Sent at', 'Created']);
 
         HrOffer::query()
-            ->with(['application.candidate:id,first_name,last_name,tenant_id'])
-            ->when($tenantId !== null, fn ($q) => $q->whereHas('application.candidate', fn ($c) => $c->where('tenant_id', $tenantId)))
+            ->whereKey($offerIds)
+            ->with(['application.candidate:id,first_name,last_name'])
             ->orderByDesc('created_at')
             ->chunk(500, function ($offers) use ($out) {
                 foreach ($offers as $o) {
@@ -127,17 +129,17 @@ class RecruitmentExportController extends Controller
     }
 
     /** @param resource $out */
-    private function streamAnalytics($out, ?int $tenantId, RecruitmentAnalyticsService $analytics): void
+    private function streamAnalytics($out, array $candidateIds, array $applicationIds, RecruitmentAnalyticsService $analytics): void
     {
         $this->putCsv($out, ['Section', 'Label', 'Count', 'Detail']);
 
-        foreach ($analytics->getPipelineConversion($tenantId) as $row) {
+        foreach ($analytics->getPipelineConversion($candidateIds) as $row) {
             $this->putCsv($out, ['Conversion funnel', $row['stage'], $row['count'], ($row['percentage'] ?? 0).'%']);
         }
-        foreach ($analytics->getSourceEffectiveness($tenantId) as $row) {
+        foreach ($analytics->getSourceEffectiveness($candidateIds) as $row) {
             $this->putCsv($out, ['Source', $row['source'] ?: 'Unknown', $row['total'], $row['hired'].' hired · '.$row['conversion_rate'].'%']);
         }
-        foreach ($analytics->getOpenPositionsSummary($tenantId) as $row) {
+        foreach ($analytics->getOpenPositionsSummary($applicationIds) as $row) {
             $this->putCsv($out, ['Open position', $row['position_title'], $row['applications'], $row['days_open'].' days open']);
         }
     }

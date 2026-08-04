@@ -3,10 +3,12 @@
 namespace Tests\Feature\Operations;
 
 use App\Domain\Finance\Models\FinInvoice;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\BillingEntry;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\ServiceAgreement;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\Operations\BillingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,22 +20,24 @@ class OperationsInvoiceFinInvoiceTest extends TestCase
 
     public function test_billing_service_generates_fin_invoice_without_creating_legacy_invoice_rows(): void
     {
+        $site = Site::factory()->create();
         $client = Client::factory()->create([
-            'organization_id' => 1,
+            'site_id' => $site->id,
             'first_name' => 'Aroha',
             'last_name' => 'Kingi',
         ]);
-        $staff = User::factory()->create(['organization_id' => 1]);
-        $creator = User::factory()->create(['organization_id' => 1]);
+        $staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $creator = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
+        $this->scopeUserToSite($staff, $site, 'support_worker');
+        $this->scopeUserToSite($creator, $site, 'coordinator');
         $agreement = ServiceAgreement::factory()->create([
-            'organization_id' => 1,
             'client_id' => $client->id,
             'funding_body' => 'Whaikaha',
         ]);
 
         $entry = BillingEntry::create([
-            'organization_id' => 1,
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'staff_id' => $staff->id,
             'service_agreement_id' => $agreement->id,
             'service_date' => '2026-05-01',
@@ -44,14 +48,13 @@ class OperationsInvoiceFinInvoiceTest extends TestCase
             'status' => 'pending',
         ]);
 
-        $invoice = app(BillingService::class)->generateInvoice([$entry->id], 1, $creator->id);
+        $invoice = app(BillingService::class)->generateInvoice([$entry->id], $creator->id);
 
         $this->assertInstanceOf(FinInvoice::class, $invoice);
         $this->assertDatabaseCount('invoices', 0);
         $this->assertDatabaseCount('invoice_items', 0);
         $this->assertDatabaseHas('fin_invoices', [
             'id' => $invoice->id,
-            'organization_id' => 1,
             'client_id' => $client->id,
             'funding_body' => 'Whaikaha',
             'source' => 'operations',
@@ -76,14 +79,16 @@ class OperationsInvoiceFinInvoiceTest extends TestCase
 
     public function test_finance_invoice_store_creates_fin_invoice_from_operations_billing_payload(): void
     {
+        $site = Site::factory()->create(['is_active' => true]);
         $user = User::factory()->create([
-            'organization_id' => 1,
+            'role' => 'finance',
             'approved_at' => now(),
         ]);
         $this->grantPermissions($user, ['finance.ar.manage']);
+        $this->scopeUserToSite($user, $site, 'finance');
 
         $client = Client::factory()->create([
-            'organization_id' => 1,
+            'site_id' => $site->id,
             'first_name' => 'Mere',
             'last_name' => 'Rangi',
         ]);
@@ -106,6 +111,7 @@ class OperationsInvoiceFinInvoiceTest extends TestCase
             ],
         ]);
 
+        $response->assertRedirect()->assertSessionHasNoErrors();
         $invoice = FinInvoice::firstOrFail();
 
         $response->assertRedirect(route('finance.invoices.show', $invoice));
@@ -131,6 +137,21 @@ class OperationsInvoiceFinInvoiceTest extends TestCase
             'line_total' => '276.00',
             'service_date' => '2026-05-01',
             'category' => 'weekday',
+        ]);
+    }
+
+    private function scopeUserToSite(User $user, Site $site, string $positionRole): void
+    {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'position_role' => $positionRole,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
         ]);
     }
 

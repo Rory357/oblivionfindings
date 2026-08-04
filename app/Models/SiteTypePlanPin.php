@@ -3,32 +3,56 @@
 namespace App\Models;
 
 use App\Domain\SecurityDevices\Models\Device;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SiteTypePlanPin extends Model
 {
+    use WritesLegacyStorageContext;
+
     public const KIND_DEVICE = 'device';
+
     public const KIND_MEDICATION_STORAGE = 'medication_storage';
+
     public const KIND_EMERGENCY_EXIT = 'emergency_exit';
+
     public const KIND_EVACUATION_ROUTE = 'evacuation_route';
+
     public const KIND_ASSEMBLY_POINT = 'assembly_point';
+
     public const KIND_YOU_ARE_HERE = 'you_are_here';
+
     public const KIND_FIRE_EXTINGUISHER = 'fire_extinguisher';
+
     public const KIND_FIRE_BLANKET = 'fire_blanket';
+
     public const KIND_FIRE_HOSE_REEL = 'fire_hose_reel';
+
     public const KIND_FIRE_PANEL = 'fire_panel';
+
     public const KIND_FIRE_DOOR = 'fire_door';
+
     public const KIND_SPRINKLER_HEAD = 'sprinkler_head';
+
     public const KIND_MANUAL_CALL_POINT = 'manual_call_point';
+
     public const KIND_HYDRANT = 'hydrant';
+
     public const KIND_FIRST_AID_KIT = 'first_aid_kit';
+
     public const KIND_SMOKE_ALARM = 'smoke_alarm';
+
     public const KIND_DEFIBRILLATOR = 'defibrillator';
+
     public const KIND_EVACUATION_DIAGRAM = 'evacuation_diagram';
+
     public const KIND_GAS_SHUTOFF = 'gas_shutoff';
+
     public const KIND_WATER_SHUTOFF = 'water_shutoff';
+
     public const KIND_ELECTRICAL_PANEL = 'electrical_panel';
+
     public const KIND_CUSTOM_MARKER = 'custom_marker';
 
     public const KINDS = [
@@ -124,4 +148,3 @@ class SiteTypePlanPin extends Model
         return $query->whereHas('plan', fn ($plan) => $plan->where('site_id', $siteId));
     }
 }
-

@@ -136,7 +136,6 @@ class SiteHazardObserver implements ShouldHandleEventsAfterCommit
                 'reported_at' => $hazard->created_at,
                 'site_id' => $hazard->site_id,
                 'staff_id' => $hazard->reported_by_user_id,
-                'organization_id' => $hazard->tenant_id,
                 'created_by' => $hazard->reported_by_user_id,
             ]);
         } catch (\Throwable $e) {

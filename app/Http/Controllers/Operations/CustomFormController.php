@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
-use App\Models\Shift;
 use App\Models\CustomForm;
 use App\Models\CustomFormSubmission;
+use App\Models\Shift;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -17,8 +18,7 @@ class CustomFormController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('custom_forms.viewAny'), 403);
 
-        $scope = CustomForm::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id));
+        $scope = CustomForm::query();
 
         $forms = (clone $scope)
             ->withCount('submissions')
@@ -54,11 +54,6 @@ class CustomFormController extends Controller
             'total' => (clone $scope)->count(),
             'active' => (clone $scope)->where('is_active', true)->count(),
             'submissions_this_week' => CustomFormSubmission::query()
-                ->whereHas('form', function ($query) use ($auth) {
-                    if ($auth->organization_id) {
-                        $query->where('organization_id', $auth->organization_id);
-                    }
-                })
                 ->where('created_at', '>=', now()->startOfWeek())
                 ->count(),
         ];
@@ -78,9 +73,7 @@ class CustomFormController extends Controller
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('custom_forms.view') || $auth->canDo('custom_forms.viewAny')), 403);
 
-        $form = CustomForm::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($form);
+        $form = CustomForm::query()->findOrFail($form);
 
         return inertia('operations/forms/Show', [
             'form' => $form,
@@ -114,7 +107,6 @@ class CustomFormController extends Controller
         ]);
 
         CustomForm::create([
-            'organization_id' => $auth->organization_id,
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
             'form_type' => $data['form_type'],
@@ -131,9 +123,7 @@ class CustomFormController extends Controller
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('custom_forms.edit') || $auth->canDo('custom_forms.update')), 403);
 
-        $form = CustomForm::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($form);
+        $form = CustomForm::query()->findOrFail($form);
 
         return inertia('operations/forms/Edit', [
             'form' => $form,
@@ -145,9 +135,7 @@ class CustomFormController extends Controller
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('custom_forms.edit') || $auth->canDo('custom_forms.update')), 403);
 
-        $form = CustomForm::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($form);
+        $form = CustomForm::query()->findOrFail($form);
 
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
@@ -172,12 +160,18 @@ class CustomFormController extends Controller
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('custom_forms.view') || $auth->canDo('custom_forms.viewAny')), 403);
 
-        $form = CustomForm::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($form);
+        $form = CustomForm::query()->findOrFail($form);
 
         $submissions = CustomFormSubmission::query()
             ->where('custom_form_id', $form->id)
+            ->when(! $auth->canDo('custom_forms.viewAny'), function ($query) use ($auth): void {
+                $siteAccess = app(UserSiteAccessService::class);
+                $query->where(function ($visible) use ($auth, $siteAccess): void {
+                    $visible->where('submitted_by', $auth->id)
+                        ->orWhereHas('client', fn ($clients) => $siteAccess->applyClientScope($clients, $auth))
+                        ->orWhereHas('shift', fn ($shifts) => $siteAccess->applyShiftScope($shifts, $auth));
+                });
+            })
             ->with(['submitter:id,name'])
             ->orderByDesc('created_at')
             ->paginate(20)
@@ -194,9 +188,7 @@ class CustomFormController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('custom_forms.submit'), 403);
 
-        $form = CustomForm::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($form);
+        $form = CustomForm::query()->findOrFail($form);
 
         $data = $request->validate([
             'data' => ['required', 'array'],
@@ -210,7 +202,21 @@ class CustomFormController extends Controller
                 ->select(['id', 'client_id'])
                 ->findOrFail($data['shift_id']);
 
+            app(UserSiteAccessService::class)->assertCanAccessShift(
+                $auth,
+                $shift,
+                ['custom_forms.viewAny'],
+            );
+
             $data['client_id'] = $data['client_id'] ?? $shift->client_id;
+        }
+
+        if (! empty($data['client_id'])) {
+            app(UserSiteAccessService::class)->assertCanAccessClientId(
+                $auth,
+                (int) $data['client_id'],
+                ['custom_forms.viewAny'],
+            );
         }
 
         if ($shift && !empty($data['client_id']) && (int) $shift->client_id !== (int) $data['client_id']) {
@@ -222,7 +228,6 @@ class CustomFormController extends Controller
         $this->validateSubmissionAgainstSchema($form, $data['data']);
 
         CustomFormSubmission::create([
-            'organization_id' => $auth->organization_id,
             'custom_form_id' => $form->id,
             'data' => $data['data'],
             'submitted_by' => $auth->id,

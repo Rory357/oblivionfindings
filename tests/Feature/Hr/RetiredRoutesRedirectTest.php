@@ -1,6 +1,8 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -13,7 +15,6 @@ beforeEach(function () {
     // various retired routes are gated by (employees.viewAny, recruitment.view,
     // surveys.view, announcements.manage, ...).
     $this->user = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'provider_manager',
         'approved_at' => now(),
     ]);
@@ -22,6 +23,18 @@ beforeEach(function () {
             $this->user->roles()->syncWithoutDetaching([$role->id]);
         }
     }
+
+    $this->site = Site::factory()->create([
+        'name' => 'Retired Routes Site',
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->user->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subMonth(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 });
 
 /**

@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Domain\Finance\Jobs\ProcessFinancialEventJob;
 use App\Domain\Finance\Models\FinFinancialEvent;
 use App\Models\ClientLedgerEntry;
+use App\Support\LegacyStorageContext;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -43,11 +44,6 @@ class ClientLedgerEntryObserver
         }
 
         try {
-            $orgId = $entry->tenant_id;
-            if (! $orgId) {
-                return;
-            }
-
             [$eventType, $debitCode, $creditCode] = $this->resolveAccounts($entry);
 
             if (! $eventType) {
@@ -55,7 +51,7 @@ class ClientLedgerEntryObserver
             }
 
             ProcessFinancialEventJob::dispatch([
-                'organization_id' => $orgId,
+                'organization_id' => LegacyStorageContext::id(),
                 'source_type' => ClientLedgerEntry::class,
                 'source_id' => $entry->id,
                 'event_type' => $eventType,

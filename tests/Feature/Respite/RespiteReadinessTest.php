@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Respite;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\RespiteBooking;
@@ -10,7 +11,9 @@ use App\Models\RespiteStay;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
@@ -23,13 +26,15 @@ class RespiteReadinessTest extends TestCase
 
     private ServiceContext $serviceContext;
 
+    private Site $site;
+
     private Client $client;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
@@ -37,11 +42,22 @@ class RespiteReadinessTest extends TestCase
         ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
 
+        $this->site = Site::factory()->create();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth(),
+            'end_date' => null,
+        ]);
+
         $this->serviceContext = ServiceContext::factory()->create([
             'type' => 'planned_respite',
             'is_active' => true,
         ]);
         $this->client = Client::factory()->create([
+            'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
         ]);
     }
@@ -113,12 +129,14 @@ class RespiteReadinessTest extends TestCase
     {
         $booking = RespiteBooking::factory()->create([
             'client_id' => $this->client->id,
+            'location_id' => $this->site->id,
             'status' => 'confirmed',
             'start_at' => now()->addDays(5)->setTime(9, 0),
             'end_at' => now()->addDays(5)->setTime(17, 0),
         ]);
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
             'respite_booking_id' => $booking->id,
             'status' => 'scheduled',
@@ -140,10 +158,12 @@ class RespiteReadinessTest extends TestCase
 
         $completedBooking = RespiteBooking::factory()->create([
             'client_id' => $this->client->id,
+            'location_id' => $this->site->id,
             'status' => 'confirmed',
         ]);
         $completedShift = Shift::factory()->completed()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
             'respite_booking_id' => $completedBooking->id,
         ]);
@@ -195,12 +215,14 @@ class RespiteReadinessTest extends TestCase
 
         $booking = RespiteBooking::factory()->create([
             'client_id' => $this->client->id,
+            'location_id' => $this->site->id,
             'status' => 'confirmed',
             'start_at' => Carbon::parse('2026-05-02 09:00:00'),
             'end_at' => Carbon::parse('2026-05-04 17:00:00'),
         ]);
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
             'respite_booking_id' => $booking->id,
             'starts_at' => $booking->start_at,
@@ -254,12 +276,14 @@ class RespiteReadinessTest extends TestCase
     {
         $booking = RespiteBooking::factory()->create([
             'client_id' => $this->client->id,
+            'location_id' => $this->site->id,
             'status' => 'confirmed',
             'start_at' => now()->addDays(3)->setTime(9, 0),
             'end_at' => now()->addDays(3)->setTime(17, 0),
         ]);
-        $shift = Shift::factory()->create([
+        $shift = Shift::factory()->unassigned()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
             'respite_booking_id' => $booking->id,
             'starts_at' => $booking->start_at,

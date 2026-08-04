@@ -31,7 +31,7 @@ class TodayDashboardController extends Controller
         if (!$user->canDo('shifts.manageAny')) {
             $shiftQuery
                 ->where('user_id', $user->id)
-                ->visibleToFrontline($user->organization_id);
+                ->visibleToFrontline();
         }
 
         $shifts = $shiftQuery->get();

@@ -79,16 +79,25 @@ beforeEach(function () {
         Role::query()->where('name', 'hr')->first()->id,
     ]);
 
-    $this->site = Site::factory()->create(['tenant_id' => 1]);
+    $this->site = Site::factory()->create();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'position_role' => 'hr',
+        'is_active' => true,
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+    ]);
 });
 
 function makeApplicant(int $hrId, string $stage = 'screening'): array
 {
     $requisition = HrJobRequisition::query()->create([
-        'tenant_id' => 1,
         'title' => 'Support Worker',
         'slug' => 'support-worker-'.uniqid(),
         'position_role' => 'support_worker',
+        'site_id' => test()->site->id,
         'employment_type' => 'full_time',
         'openings' => 2,
         'status' => 'published',
@@ -96,21 +105,62 @@ function makeApplicant(int $hrId, string $stage = 'screening'): array
     ]);
 
     $candidate = HrCandidate::factory()->create([
-        'tenant_id' => 1,
         'status' => $stage,
         'current_stage_entered_at' => now()->subDays(3),
         'created_by' => $hrId,
     ]);
 
     $application = HrApplication::factory()->create([
-        'tenant_id' => 1,
         'candidate_id' => $candidate->id,
         'requisition_id' => $requisition->id,
+        'target_site_id' => test()->site->id,
         'position_title' => 'Support Worker',
         'status' => 'active',
     ]);
 
     return compact('requisition', 'candidate', 'application');
+}
+
+function assignRecruitmentTestSite(User $user, Site $site): HrEmployeeProfile
+{
+    return HrEmployeeProfile::query()->updateOrCreate(
+        ['user_id' => $user->id],
+        [
+            'employee_number' => 'REC-'.$user->id,
+            'work_email' => 'recruitment-'.$user->id.'@example.test',
+            'position_title' => 'Recruitment Team',
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'position_role' => 'hr',
+            'employment_type' => 'full_time',
+            'is_active' => true,
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+        ],
+    );
+}
+
+function attachRecruitmentTestCandidate(HrCandidate $candidate, Site $site, int $creatorId): HrApplication
+{
+    $requisition = HrJobRequisition::query()->create([
+        'title' => 'Candidate review '.uniqid(),
+        'slug' => 'candidate-review-'.uniqid(),
+        'position_role' => 'support_worker',
+        'site_id' => $site->id,
+        'employment_type' => 'full_time',
+        'openings' => 1,
+        'status' => 'published',
+        'created_by' => $creatorId,
+    ]);
+
+    return HrApplication::query()->create([
+        'candidate_id' => $candidate->id,
+        'requisition_id' => $requisition->id,
+        'position_title' => $requisition->title,
+        'position_role' => 'support_worker',
+        'target_site_id' => $site->id,
+        'status' => 'active',
+    ]);
 }
 
 test('the unified hub renders with the full aggregated contract', function () {
@@ -177,7 +227,6 @@ test('rejecting an application records the reason and closes it out', function (
 
 test('creating a requisition writes the establishment seat (position_id)', function () {
     $position = HrPosition::factory()->create([
-        'tenant_id' => 1,
         'title' => 'Support Worker',
         'is_active' => true,
         'headcount_budget' => 5,
@@ -187,6 +236,7 @@ test('creating a requisition writes the establishment seat (position_id)', funct
     $this->actingAs($this->hr)->post(route('hr.jobs.store'), [
         'title' => 'Support Worker — Hamilton',
         'position_id' => $position->id,
+        'site_id' => $this->site->id,
         'employment_type' => 'full_time',
         'openings' => 2,
         'description' => 'Provide person-centred support to clients in their homes.',
@@ -201,7 +251,6 @@ test('creating a requisition writes the establishment seat (position_id)', funct
 test('creating an offer writes position_id and keeps the manager on the hub', function () {
     ['candidate' => $candidate, 'application' => $application] = makeApplicant($this->hr->id, 'interview_completed');
     $position = HrPosition::factory()->create([
-        'tenant_id' => 1,
         'title' => 'Support Worker',
         'is_active' => true,
         'headcount_budget' => 5,
@@ -274,7 +323,7 @@ test('resend re-delivers the offer link without re-advancing the stage', functio
 /* ---- A1: segregation of duties on convert (#9) ---- */
 
 test('converting to an employee requires hr.employees.manage', function () {
-    ['application' => $application] = makeApplicant($this->hr->id, 'offer_accepted');
+    ['application' => $application, 'candidate' => $candidate] = makeApplicant($this->hr->id, 'offer_accepted');
     $offer = makeOffer(['application' => $application], 'accepted', $this->hr->id, $this->site->id);
 
     // Deny employees.manage for this recruiter while keeping recruitment.manage.
@@ -282,7 +331,7 @@ test('converting to an employee requires hr.employees.manage', function () {
     $this->hr->permissionOverrides()->attach($deny->id, ['allowed' => false]);
 
     $this->actingAs($this->hr)->post(route('hr.offers.convert', $offer->id))->assertForbidden();
-    expect(HrEmployeeProfile::query()->count())->toBe(0);
+    expect(HrEmployeeProfile::query()->where('candidate_id', $candidate->id)->exists())->toBeFalse();
 });
 
 test('respondOffer does not auto-mint a login without hr.employees.manage', function () {
@@ -298,18 +347,33 @@ test('respondOffer does not auto-mint a login without hr.employees.manage', func
 
     expect($offer->fresh()->response)->toBe('accepted');
     expect($candidate->fresh()->status)->toBe('offer_accepted');
-    expect(HrEmployeeProfile::query()->count())->toBe(0);
+    expect(HrEmployeeProfile::query()->where('candidate_id', $candidate->id)->exists())->toBeFalse();
 });
 
-/* ---- A4: offer-letter download is tenant-scoped ---- */
+/* ---- A4: offer-letter download is Site-scoped ---- */
 
-test('offer letter download is tenant-scoped', function () {
-    $foreign = HrCandidate::factory()->create(['tenant_id' => 2, 'status' => 'offer_sent', 'created_by' => $this->hr->id]);
-    $foreignApp = HrApplication::factory()->create(['tenant_id' => 2, 'candidate_id' => $foreign->id, 'position_title' => 'Nurse', 'status' => 'active']);
-    $foreignOffer = makeOffer(['application' => $foreignApp], 'sent', $this->hr->id, $this->site->id);
+test('offer letter download conceals a hidden Site offer', function () {
+    $hiddenSite = Site::factory()->create();
+    $hiddenRequisition = HrJobRequisition::query()->create([
+        'title' => 'Hidden Site Nurse',
+        'slug' => 'hidden-site-nurse',
+        'site_id' => $hiddenSite->id,
+        'employment_type' => 'full_time',
+        'openings' => 1,
+        'status' => 'published',
+        'created_by' => $this->hr->id,
+    ]);
+    $foreign = HrCandidate::factory()->create(['status' => 'offer_sent', 'created_by' => $this->hr->id]);
+    $foreignApp = HrApplication::factory()->create([
+        'candidate_id' => $foreign->id,
+        'requisition_id' => $hiddenRequisition->id,
+        'target_site_id' => $hiddenSite->id,
+        'position_title' => 'Nurse',
+        'status' => 'active',
+    ]);
+    $foreignOffer = makeOffer(['application' => $foreignApp], 'sent', $this->hr->id, $hiddenSite->id);
     $foreignOffer->update(['offer_letter_path' => 'offers/x/letter.pdf', 'offer_letter_name' => 'letter.pdf']);
 
-    // hr user resolves to tenant 1 → cross-tenant letter is not reachable.
     $this->actingAs($this->hr)->get(route('hr.offers.letter', $foreignOffer->id))->assertNotFound();
 });
 
@@ -341,15 +405,18 @@ test('responding to an offer acknowledges the candidate', function () {
 test('converting notifies the hiring manager and provisions the work email', function () {
     Notification::fake();
     $manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    $manager->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
+    assignRecruitmentTestSite($manager, $this->site);
     $requisition = HrJobRequisition::query()->create([
-        'tenant_id' => 1, 'title' => 'Support Worker', 'slug' => 'sw-'.uniqid(),
+        'title' => 'Support Worker', 'slug' => 'sw-'.uniqid(),
         'position_role' => 'support_worker', 'employment_type' => 'full_time', 'openings' => 1,
+        'site_id' => $this->site->id,
         'status' => 'published', 'hiring_manager_user_id' => $manager->id, 'created_by' => $this->hr->id,
     ]);
-    $candidate = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'offer_accepted', 'personal_email' => 'new.hire@example.test', 'created_by' => $this->hr->id]);
+    $candidate = HrCandidate::factory()->create(['status' => 'offer_accepted', 'personal_email' => 'new.hire@example.test', 'created_by' => $this->hr->id]);
     $application = HrApplication::factory()->create([
-        'tenant_id' => 1, 'candidate_id' => $candidate->id, 'requisition_id' => $requisition->id,
-        'position_title' => 'Support Worker', 'status' => 'active',
+        'candidate_id' => $candidate->id, 'requisition_id' => $requisition->id,
+        'position_title' => 'Support Worker', 'target_site_id' => $this->site->id, 'status' => 'active',
     ]);
     $offer = makeOffer(['application' => $application], 'accepted', $this->hr->id, $this->site->id);
 
@@ -396,14 +463,14 @@ test('uploading a document carries the application context', function () {
 
 test('retention scrub nulls screening_answers and soft-deletes the candidate', function () {
     config(['hr.candidate_retention_months' => 1]);
-    $candidate = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'rejected', 'created_by' => $this->hr->id]);
+    $candidate = HrCandidate::factory()->create(['status' => 'rejected', 'created_by' => $this->hr->id]);
     HrCandidate::query()->where('id', $candidate->id)->update(['updated_at' => now()->subMonths(6)]);
     $application = HrApplication::factory()->create([
-        'tenant_id' => 1, 'candidate_id' => $candidate->id, 'status' => 'rejected',
+        'candidate_id' => $candidate->id, 'status' => 'rejected',
         'screening_answers' => ['why' => 'sensitive personal answer'],
     ]);
 
-    (new ArchiveCandidateDataJob(1))->handle();
+    (new ArchiveCandidateDataJob)->handle();
 
     expect($application->fresh()->screening_answers)->toBeNull();
     expect(HrCandidate::withTrashed()->find($candidate->id)?->trashed())->toBeTrue();
@@ -426,7 +493,7 @@ test('analytics keys open positions on requisition, not free-text title', functi
 
 /* ---- A10: server-side streamed export (#26) ---- */
 
-test('server export streams a tenant-scoped pipeline csv', function () {
+test('server export streams the authorised Site-visible pipeline csv', function () {
     ['candidate' => $candidate] = makeApplicant($this->hr->id, 'screening');
 
     $response = $this->actingAs($this->hr)->get(route('hr.recruitment.export', ['dataset' => 'pipeline', 'format' => 'csv']));
@@ -449,8 +516,9 @@ test('a public requisition application notifies the candidate and hiring manager
     Notification::fake();
     $manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $job = HrJobRequisition::query()->create([
-        'tenant_id' => 1, 'title' => 'Support Worker', 'slug' => 'sw-apply-'.uniqid(),
+        'title' => 'Support Worker', 'slug' => 'sw-apply-'.uniqid(),
         'position_role' => 'support_worker', 'employment_type' => 'full_time', 'openings' => 1,
+        'site_id' => $this->site->id,
         'status' => 'published', 'hiring_manager_user_id' => $manager->id, 'created_by' => $this->hr->id,
     ]);
 
@@ -465,8 +533,9 @@ test('a public requisition application notifies the candidate and hiring manager
 
 test('a public application captures screening answers against the requisition questions', function () {
     $job = HrJobRequisition::query()->create([
-        'tenant_id' => 1, 'title' => 'Support Worker', 'slug' => 'sw-screen-'.uniqid(),
+        'title' => 'Support Worker', 'slug' => 'sw-screen-'.uniqid(),
         'position_role' => 'support_worker', 'employment_type' => 'full_time', 'openings' => 1,
+        'site_id' => $this->site->id,
         'status' => 'published',
         'screening_questions' => ['Do you hold a current NZ driver licence?', 'Are you available for weekend shifts?'],
         'created_by' => $this->hr->id,
@@ -498,8 +567,9 @@ test('a public application captures screening answers against the requisition qu
 
 test('a public application is trackable via a requisition-aware status page', function () {
     $job = HrJobRequisition::query()->create([
-        'tenant_id' => 1, 'title' => 'Support Worker', 'slug' => 'sw-track-'.uniqid(),
+        'title' => 'Support Worker', 'slug' => 'sw-track-'.uniqid(),
         'position_role' => 'support_worker', 'employment_type' => 'full_time', 'openings' => 1,
+        'site_id' => $this->site->id,
         'status' => 'published', 'created_by' => $this->hr->id,
     ]);
 
@@ -540,6 +610,7 @@ test('a public offer response acknowledges the candidate', function () {
 test('scheduling an interview emails the candidate and panel a calendar invite', function () {
     Notification::fake();
     $panelist = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    assignRecruitmentTestSite($panelist, $this->site);
     ['application' => $application] = makeApplicant($this->hr->id, 'screening');
 
     $this->actingAs($this->hr)->post(route('hr.interviews.store', $application->id), [
@@ -589,6 +660,7 @@ test('a manager can create, edit and toggle an interview kit', function () {
 test('a requisition stores salary, screening and approval fields', function () {
     $this->actingAs($this->hr)->post(route('hr.jobs.store'), [
         'title' => 'Support Worker — Pay',
+        'site_id' => $this->site->id,
         'employment_type' => 'full_time',
         'openings' => 1,
         'description' => 'Provide person-centred support.',
@@ -609,9 +681,20 @@ test('a requisition stores salary, screening and approval fields', function () {
 test('the requisition approval workflow transitions and notifies', function () {
     Notification::fake();
     $manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    $manager->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $manager->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'position_role' => 'hr',
+        'is_active' => true,
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+    ]);
     $req = HrJobRequisition::query()->create([
-        'tenant_id' => 1, 'title' => 'Team Leader', 'slug' => 'tl-'.uniqid(),
+        'title' => 'Team Leader', 'slug' => 'tl-'.uniqid(),
         'position_role' => 'lead', 'employment_type' => 'full_time', 'openings' => 1,
+        'site_id' => $this->site->id,
         'status' => 'draft', 'requires_approval' => true, 'hiring_manager_user_id' => $manager->id,
         'created_by' => $this->hr->id,
     ]);
@@ -620,12 +703,13 @@ test('the requisition approval workflow transitions and notifies', function () {
     expect($req->fresh()->status)->toBe('pending_approval');
     Notification::assertSentTo($manager, RequisitionApprovalRequestNotification::class);
 
-    $this->actingAs($this->hr)->post(route('hr.jobs.approve', $req->id))->assertRedirect();
+    $this->actingAs($manager)->post(route('hr.jobs.approve', $req->id))->assertRedirect();
     expect($req->fresh()->status)->toBe('published');
 
     $req2 = HrJobRequisition::query()->create([
-        'tenant_id' => 1, 'title' => 'BSP', 'slug' => 'bsp-'.uniqid(),
+        'title' => 'BSP', 'slug' => 'bsp-'.uniqid(),
         'position_role' => 'bsp', 'employment_type' => 'full_time', 'openings' => 1,
+        'site_id' => $this->site->id,
         'status' => 'pending_approval', 'created_by' => $this->hr->id,
     ]);
     $this->actingAs($this->hr)->post(route('hr.jobs.reject-approval', $req2->id))->assertRedirect();
@@ -679,11 +763,11 @@ test('a referee submits the public reference questionnaire', function () {
 
 test('a pooled candidate survives the retention archive job', function () {
     config(['hr.candidate_retention_months' => 1]);
-    $candidate = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'rejected', 'first_name' => 'Keepme', 'created_by' => $this->hr->id]);
+    $candidate = HrCandidate::factory()->create(['status' => 'rejected', 'first_name' => 'Keepme', 'created_by' => $this->hr->id]);
     HrCandidate::query()->where('id', $candidate->id)->update(['updated_at' => now()->subMonths(6)]);
-    HrTalentPool::query()->create(['tenant_id' => 1, 'candidate_id' => $candidate->id, 'reason' => 'Strong', 'pooled_by' => $this->hr->id]);
+    HrTalentPool::query()->create(['candidate_id' => $candidate->id, 'reason' => 'Strong', 'pooled_by' => $this->hr->id]);
 
-    (new ArchiveCandidateDataJob(1))->handle();
+    (new ArchiveCandidateDataJob)->handle();
 
     // Pre-fix this candidate would be anonymised + soft-deleted; the guard spares it.
     expect(HrCandidate::withTrashed()->find($candidate->id)?->trashed())->toBeFalse();
@@ -706,10 +790,11 @@ test('rejecting with add_to_pool keeps the candidate warm and lists them in the 
 
 test('reactivating a pooled candidate creates a fresh application and clears the pool entry', function () {
     ['candidate' => $candidate] = makeApplicant($this->hr->id, 'screening');
-    HrTalentPool::query()->create(['tenant_id' => 1, 'candidate_id' => $candidate->id, 'reason' => 'x', 'pooled_by' => $this->hr->id]);
+    HrTalentPool::query()->create(['candidate_id' => $candidate->id, 'reason' => 'x', 'pooled_by' => $this->hr->id]);
     $requisition = HrJobRequisition::query()->create([
-        'tenant_id' => 1, 'title' => 'Registered Nurse', 'slug' => 'rn-'.uniqid(),
+        'title' => 'Registered Nurse', 'slug' => 'rn-'.uniqid(),
         'position_role' => 'nurse', 'employment_type' => 'full_time', 'openings' => 1,
+        'site_id' => $this->site->id,
         'status' => 'published', 'created_by' => $this->hr->id,
     ]);
 
@@ -758,8 +843,10 @@ test('bulk reject closes out every selected candidate', function () {
 
 test('bulk email sends a message to every selected candidate', function () {
     Notification::fake();
-    $a = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'screening', 'personal_email' => 'a.cand@example.test', 'created_by' => $this->hr->id]);
-    $b = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'screening', 'personal_email' => 'b.cand@example.test', 'created_by' => $this->hr->id]);
+    $a = makeApplicant($this->hr->id, 'screening')['candidate'];
+    $a->update(['personal_email' => 'a.cand@example.test']);
+    $b = makeApplicant($this->hr->id, 'screening')['candidate'];
+    $b->update(['personal_email' => 'b.cand@example.test']);
 
     $this->actingAs($this->hr)->post(route('hr.candidates.bulk-email'), [
         'candidate_ids' => [$a->id, $b->id],
@@ -862,7 +949,6 @@ test('scoring an interview against its kit persists a weighted scorecard and com
     ['application' => $application] = makeApplicant($this->hr->id, 'interview_scheduled');
 
     $kit = HrInterviewKit::query()->create([
-        'tenant_id' => 1,
         'name' => 'SW panel',
         'role' => 'support_worker',
         'criteria' => [['label' => 'Values', 'weight' => 40], ['label' => 'Reliability', 'weight' => 60]],
@@ -925,7 +1011,7 @@ test('re-scoring an interview updates the same interviewer scorecard rather than
 test('scoring requires recruitment manage and rejects unknown criteria labels', function () {
     ['application' => $application] = makeApplicant($this->hr->id, 'interview_scheduled');
     $kit = HrInterviewKit::query()->create([
-        'tenant_id' => 1, 'name' => 'Kit', 'criteria' => [['label' => 'Values', 'weight' => 100]],
+        'name' => 'Kit', 'criteria' => [['label' => 'Values', 'weight' => 100]],
         'is_active' => true, 'created_by' => $this->hr->id,
     ]);
     $application->update(['interview_kit_id' => $kit->id]);
@@ -956,6 +1042,7 @@ test('createApplication persists screening answers and the legacy answers column
         $candidate->fresh(),
         [
             'position_title' => 'Team Leader',
+            'target_site_id' => $this->site->id,
             'screening_answers' => ['drivers_licence' => 'Yes', 'availability' => 'Weekends'],
         ],
     );
@@ -968,21 +1055,23 @@ test('createApplication persists screening answers and the legacy answers column
 /* ---- Analytics date-range filter (Analytics tab) ---- */
 
 test('analytics conversion and sources honour the date window', function () {
-    HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'screening', 'source' => 'seek', 'created_at' => now()->subYear(), 'created_by' => $this->hr->id]);
-    HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'screening', 'source' => 'referral', 'created_at' => now()->subDays(2), 'created_by' => $this->hr->id]);
+    $candidateIds = [
+        HrCandidate::factory()->create(['status' => 'screening', 'source' => 'seek', 'created_at' => now()->subYear(), 'created_by' => $this->hr->id])->id,
+        HrCandidate::factory()->create(['status' => 'screening', 'source' => 'referral', 'created_at' => now()->subDays(2), 'created_by' => $this->hr->id])->id,
+    ];
 
     $svc = app(RecruitmentAnalyticsService::class);
 
-    $allScreening = collect($svc->getPipelineConversion(1))->firstWhere('stage', 'screening')['count'];
+    $allScreening = collect($svc->getPipelineConversion($candidateIds))->firstWhere('stage', 'screening')['count'];
     expect($allScreening)->toBe(2);
 
     $from = now()->subWeek()->toDateString();
     $to = now()->addDay()->toDateString();
 
-    $windowedScreening = collect($svc->getPipelineConversion(1, $from, $to))->firstWhere('stage', 'screening')['count'];
+    $windowedScreening = collect($svc->getPipelineConversion($candidateIds, $from, $to))->firstWhere('stage', 'screening')['count'];
     expect($windowedScreening)->toBe(1);
 
-    $sources = collect($svc->getSourceEffectiveness(1, $from, $to))->pluck('source');
+    $sources = collect($svc->getSourceEffectiveness($candidateIds, $from, $to))->pluck('source');
     expect($sources->all())->toContain('referral');
     expect($sources->all())->not->toContain('seek');
 });
@@ -999,7 +1088,6 @@ test('a manager can save, surface and remove a candidate email template', functi
     $template = HrCandidateEmailTemplate::query()->where('name', 'Interview invite')->first();
     expect($template)->not->toBeNull();
     expect($template->subject)->toBe('Invitation to interview');
-    expect($template->tenant_id)->not->toBeNull();
 
     // The hub surfaces it for the compose dialog.
     $this->actingAs($this->hr)->get(route('hr.recruitment.index'))
@@ -1056,15 +1144,17 @@ test('an offer must be submitted, approved (or declined) before it can be sent',
     Notification::fake();
     $manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $manager->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
+    assignRecruitmentTestSite($manager, $this->site);
     $req = HrJobRequisition::query()->create([
-        'tenant_id' => 1, 'title' => 'Support Worker', 'slug' => 'sw-appr-'.uniqid(),
+        'title' => 'Support Worker', 'slug' => 'sw-appr-'.uniqid(),
         'position_role' => 'support_worker', 'employment_type' => 'full_time', 'openings' => 1,
+        'site_id' => $this->site->id,
         'status' => 'published', 'hiring_manager_user_id' => $manager->id, 'created_by' => $this->hr->id,
     ]);
-    $candidate = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'offer_pending', 'personal_email' => 'c.appr@example.test', 'created_by' => $this->hr->id]);
+    $candidate = HrCandidate::factory()->create(['status' => 'offer_pending', 'personal_email' => 'c.appr@example.test', 'created_by' => $this->hr->id]);
     $application = HrApplication::factory()->create([
-        'tenant_id' => 1, 'candidate_id' => $candidate->id, 'requisition_id' => $req->id,
-        'position_title' => 'Support Worker', 'status' => 'active',
+        'candidate_id' => $candidate->id, 'requisition_id' => $req->id,
+        'position_title' => 'Support Worker', 'target_site_id' => $this->site->id, 'status' => 'active',
     ]);
     $offer = HrOffer::create([
         'application_id' => $application->id, 'position_title' => 'Support Worker', 'position_role' => 'support_worker',
@@ -1132,14 +1222,15 @@ test('stuck pending-approval offers escalate to the hiring manager once', functi
     Notification::fake();
     $manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $req = HrJobRequisition::query()->create([
-        'tenant_id' => 1, 'title' => 'Support Worker', 'slug' => 'sw-rem-'.uniqid(),
+        'title' => 'Support Worker', 'slug' => 'sw-rem-'.uniqid(),
         'position_role' => 'support_worker', 'employment_type' => 'full_time', 'openings' => 1,
+        'site_id' => $this->site->id,
         'status' => 'published', 'hiring_manager_user_id' => $manager->id, 'created_by' => $this->hr->id,
     ]);
-    $candidate = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'offer_pending', 'personal_email' => 'c.rem@example.test', 'created_by' => $this->hr->id]);
+    $candidate = HrCandidate::factory()->create(['status' => 'offer_pending', 'personal_email' => 'c.rem@example.test', 'created_by' => $this->hr->id]);
     $application = HrApplication::factory()->create([
-        'tenant_id' => 1, 'candidate_id' => $candidate->id, 'requisition_id' => $req->id,
-        'position_title' => 'Support Worker', 'status' => 'active',
+        'candidate_id' => $candidate->id, 'requisition_id' => $req->id,
+        'position_title' => 'Support Worker', 'target_site_id' => $this->site->id, 'status' => 'active',
     ]);
 
     // Stale: pending approval for 3 days, never reminded → eligible.
@@ -1151,8 +1242,9 @@ test('stuck pending-approval offers escalate to the hiring manager once', functi
     ]);
 
     // Fresh: submitted today → NOT yet eligible (under the 2-day threshold).
+    $freshContext = makeApplicant($this->hr->id, 'offer_pending');
     $fresh = HrOffer::create([
-        'application_id' => $application->id, 'position_title' => 'Support Worker', 'position_role' => 'support_worker',
+        'application_id' => $freshContext['application']->id, 'position_title' => 'Support Worker', 'position_role' => 'support_worker',
         'proposed_start_date' => now()->addWeeks(2)->toDateString(), 'employment_type' => 'full_time',
         'hours_per_week' => 40, 'hourly_rate' => 28.5, 'primary_site_id' => $this->site->id,
         'approval_status' => 'pending_approval', 'approval_requested_at' => now(), 'created_by' => $this->hr->id,
@@ -1193,7 +1285,9 @@ test('the candidate timeline records the offer approval history', function () {
 test('the approval timeline keeps a declined entry after the offer is re-approved (durable audit trail)', function () {
     $manager = User::factory()->create(['role' => 'hr', 'name' => 'Aroha Manager', 'approved_at' => now()]);
     $manager->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
+    assignRecruitmentTestSite($manager, $this->site);
     $ctx = makeApplicant($this->hr->id, 'offer_pending');
+    $ctx['requisition']->update(['hiring_manager_user_id' => $manager->id]);
     $offer = HrOffer::create([
         'application_id' => $ctx['application']->id, 'position_title' => 'Support Worker', 'position_role' => 'support_worker',
         'proposed_start_date' => now()->addWeeks(2)->toDateString(), 'employment_type' => 'full_time',
@@ -1281,15 +1375,22 @@ test('a manager can rename (merging) and delete a tag across every candidate', f
 
 test('the hub flags possible duplicate candidates and nudges to review them', function () {
     // Same email as an INACTIVE candidate — the intake guard (active-only) misses this.
-    $active = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'screening', 'personal_email' => 'dupe@example.test', 'created_by' => $this->hr->id]);
-    HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'withdrawn', 'personal_email' => 'dupe@example.test', 'created_by' => $this->hr->id]);
+    $active = HrCandidate::factory()->create(['status' => 'screening', 'personal_email' => 'dupe@example.test', 'created_by' => $this->hr->id]);
+    HrCandidate::factory()->create(['status' => 'withdrawn', 'personal_email' => 'dupe@example.test', 'created_by' => $this->hr->id]);
 
     // Same name + phone (differently formatted), different email — same person, no email match.
-    $x = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'new', 'first_name' => 'Aroha', 'last_name' => 'Ngata', 'personal_phone' => '021 555 0000', 'personal_email' => 'aroha1@example.test', 'created_by' => $this->hr->id]);
-    HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'interview', 'first_name' => 'Aroha', 'last_name' => 'Ngata', 'personal_phone' => '021-555-0000', 'personal_email' => 'aroha2@example.test', 'created_by' => $this->hr->id]);
+    $x = HrCandidate::factory()->create(['status' => 'new', 'first_name' => 'Aroha', 'last_name' => 'Ngata', 'personal_phone' => '021 555 0000', 'personal_email' => 'aroha1@example.test', 'created_by' => $this->hr->id]);
+    HrCandidate::factory()->create(['status' => 'interview', 'first_name' => 'Aroha', 'last_name' => 'Ngata', 'personal_phone' => '021-555-0000', 'personal_email' => 'aroha2@example.test', 'created_by' => $this->hr->id]);
 
     // A genuinely unique candidate is not flagged.
-    $solo = HrCandidate::factory()->create(['tenant_id' => 1, 'status' => 'new', 'first_name' => 'Solo', 'last_name' => 'Unique', 'personal_phone' => '027 111 2222', 'personal_email' => 'solo@example.test', 'created_by' => $this->hr->id]);
+    $solo = HrCandidate::factory()->create(['status' => 'new', 'first_name' => 'Solo', 'last_name' => 'Unique', 'personal_phone' => '027 111 2222', 'personal_email' => 'solo@example.test', 'created_by' => $this->hr->id]);
+    HrCandidate::query()->whereIn('id', [$active->id, $x->id, $solo->id])
+        ->get()
+        ->each(fn (HrCandidate $candidate) => attachRecruitmentTestCandidate($candidate, $this->site, $this->hr->id));
+    HrCandidate::query()
+        ->whereNotIn('id', [$active->id, $x->id, $solo->id])
+        ->get()
+        ->each(fn (HrCandidate $candidate) => attachRecruitmentTestCandidate($candidate, $this->site, $this->hr->id));
 
     $this->actingAs($this->hr)->get(route('hr.recruitment.index'))->assertInertia(fn ($page) => $page
         ->where('candidates', fn ($list) => collect($list)

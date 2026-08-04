@@ -8,6 +8,8 @@ use App\Domain\Hr\Services\HrWebhookService;
 use App\Models\Role;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
+use Database\Seeders\RbacSeeder;
+use Database\Seeders\SeedHrPermissionsSeeder;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -16,8 +18,8 @@ beforeEach(function () {
     Storage::fake('private');
     Notification::fake();
 
-    $this->seed(\Database\Seeders\RbacSeeder::class);
-    $this->seed(\Database\Seeders\SeedHrPermissionsSeeder::class);
+    $this->seed(RbacSeeder::class);
+    $this->seed(SeedHrPermissionsSeeder::class);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -29,9 +31,15 @@ beforeEach(function () {
         'approved_at' => now(),
     ]);
 
+    $this->reportRecipient = User::factory()->create([
+        'role' => 'hr',
+        'approved_at' => now(),
+    ]);
+
     $hrRole = Role::query()->where('name', 'hr')->first();
     if ($hrRole) {
         $this->hr->roles()->syncWithoutDetaching([$hrRole->id]);
+        $this->reportRecipient->roles()->syncWithoutDetaching([$hrRole->id]);
     }
 
     $supportRole = Role::query()->where('name', 'support_worker')->first();
@@ -74,7 +82,6 @@ test('hr user can create and toggle automation rule', function () {
 
 test('automation sends user notification when conditions match', function () {
     $rule = HrAutomationRule::query()->create([
-        'tenant_id' => null,
         'name' => 'Notify on approved leave',
         'event_type' => 'leave.request.approved',
         'conditions' => [
@@ -95,7 +102,7 @@ test('automation sends user notification when conditions match', function () {
         'updated_by' => $this->hr->id,
     ]);
 
-    app(HrWebhookService::class)->publish(null, 'leave.request.approved', [
+    app(HrWebhookService::class)->publishApplicationEvent('leave.request.approved', [
         'status' => 'approved',
         'leave_request_id' => 55,
     ]);
@@ -113,12 +120,12 @@ test('automation sends user notification when conditions match', function () {
         AppEventNotification::class,
         fn (AppEventNotification $notification) => ($notification->payload['event_type'] ?? null) === 'leave.request.approved'
             && ($notification->payload['kind'] ?? null) === 'hr_automation'
+            && ! array_key_exists('ten'.'ant_id', $notification->payload)
     );
 });
 
 test('automation queues report export and notifies recipients', function () {
     $rule = HrAutomationRule::query()->create([
-        'tenant_id' => null,
         'name' => 'Export payroll snapshot',
         'event_type' => 'payroll.run.exported',
         'conditions' => [],
@@ -129,7 +136,7 @@ test('automation queues report export and notifies recipients', function () {
                 'date_from' => now()->subMonth()->toDateString(),
                 'date_to' => now()->toDateString(),
             ],
-            'recipient_user_ids' => [$this->recipient->id],
+            'recipient_user_ids' => [$this->reportRecipient->id],
         ]],
         'is_active' => true,
         'stop_on_match' => false,
@@ -137,7 +144,7 @@ test('automation queues report export and notifies recipients', function () {
         'updated_by' => $this->hr->id,
     ]);
 
-    app(HrWebhookService::class)->publish(null, 'payroll.run.exported', [
+    app(HrWebhookService::class)->publishApplicationEvent('payroll.run.exported', [
         'run_id' => 201,
     ]);
 
@@ -154,12 +161,19 @@ test('automation queues report export and notifies recipients', function () {
     expect($export->report_type)->toBe('headcount');
     expect(Storage::disk('private')->exists($export->storage_path))->toBeTrue();
 
-    Notification::assertSentTo($this->recipient, HrScheduledReportReadyNotification::class);
+    $reports = $this->actingAs($this->hr)->get('/hr/reports');
+    $reports->assertOk();
+    expect(collect($reports->inertiaProps('recentExports'))->pluck('id'))->toContain($export->id);
+    $this->actingAs($this->hr)
+        ->get("/hr/reports/exports/{$export->id}/download")
+        ->assertDownload();
+
+    Notification::assertSentTo($this->reportRecipient, HrScheduledReportReadyNotification::class);
+    Notification::assertNotSentTo($this->recipient, HrScheduledReportReadyNotification::class);
 });
 
 test('automation records skipped run when conditions do not match', function () {
     $rule = HrAutomationRule::query()->create([
-        'tenant_id' => null,
         'name' => 'Skip non-approved leave',
         'event_type' => 'leave.request.approved',
         'conditions' => [
@@ -177,7 +191,7 @@ test('automation records skipped run when conditions do not match', function () 
         'updated_by' => $this->hr->id,
     ]);
 
-    app(HrWebhookService::class)->publish(null, 'leave.request.approved', [
+    app(HrWebhookService::class)->publishApplicationEvent('leave.request.approved', [
         'status' => 'declined',
         'leave_request_id' => 78,
     ]);
@@ -199,7 +213,6 @@ test('automation sends microsoft teams webhook message', function () {
     ]);
 
     $rule = HrAutomationRule::query()->create([
-        'tenant_id' => null,
         'name' => 'Notify Teams on leave approval',
         'event_type' => 'leave.request.approved',
         'conditions' => [],
@@ -217,7 +230,7 @@ test('automation sends microsoft teams webhook message', function () {
         'updated_by' => $this->hr->id,
     ]);
 
-    app(HrWebhookService::class)->publish(null, 'leave.request.approved', [
+    app(HrWebhookService::class)->publishApplicationEvent('leave.request.approved', [
         'status' => 'approved',
         'leave_request_id' => 321,
     ]);
@@ -228,7 +241,8 @@ test('automation sends microsoft teams webhook message', function () {
         return $request->url() === 'https://example.test/teams-hook'
             && ($data['title'] ?? null) === 'Leave approved'
             && str_contains((string) ($data['text'] ?? ''), 'Automation fired.')
-            && ($data['event_type'] ?? null) === 'leave.request.approved';
+            && ($data['event_type'] ?? null) === 'leave.request.approved'
+            && ! array_key_exists('ten'.'ant_id', $data);
     });
 
     $run = HrAutomationRun::query()
@@ -242,7 +256,6 @@ test('automation sends microsoft teams webhook message', function () {
 
 test('automation evaluates advanced any-logic condition rules', function () {
     $rule = HrAutomationRule::query()->create([
-        'tenant_id' => null,
         'name' => 'Advanced any-rule matcher',
         'event_type' => 'leave.request.approved',
         'conditions' => [
@@ -264,7 +277,7 @@ test('automation evaluates advanced any-logic condition rules', function () {
         'updated_by' => $this->hr->id,
     ]);
 
-    app(HrWebhookService::class)->publish(null, 'leave.request.approved', [
+    app(HrWebhookService::class)->publishApplicationEvent('leave.request.approved', [
         'status' => 'declined',
         'leave_type' => 'annual',
     ]);
@@ -281,7 +294,6 @@ test('automation evaluates advanced any-logic condition rules', function () {
 
 test('automation rule can execute multiple actions in one run', function () {
     $rule = HrAutomationRule::query()->create([
-        'tenant_id' => null,
         'name' => 'Multi action rule',
         'event_type' => 'payroll.run.exported',
         'conditions' => [],
@@ -299,7 +311,7 @@ test('automation rule can execute multiple actions in one run', function () {
                     'date_from' => now()->subMonth()->toDateString(),
                     'date_to' => now()->toDateString(),
                 ],
-                'recipient_user_ids' => [$this->recipient->id],
+                'recipient_user_ids' => [$this->reportRecipient->id],
             ],
         ],
         'is_active' => true,
@@ -308,7 +320,7 @@ test('automation rule can execute multiple actions in one run', function () {
         'updated_by' => $this->hr->id,
     ]);
 
-    app(HrWebhookService::class)->publish(null, 'payroll.run.exported', ['run_id' => 999]);
+    app(HrWebhookService::class)->publishApplicationEvent('payroll.run.exported', ['run_id' => 999]);
 
     $run = HrAutomationRun::query()
         ->where('rule_id', $rule->id)
@@ -318,7 +330,8 @@ test('automation rule can execute multiple actions in one run', function () {
     expect($run)->not->toBeNull();
     expect($run->status)->toBe('success');
     Notification::assertSentTo($this->recipient, AppEventNotification::class);
-    Notification::assertSentTo($this->recipient, HrScheduledReportReadyNotification::class);
+    Notification::assertSentTo($this->reportRecipient, HrScheduledReportReadyNotification::class);
+    Notification::assertNotSentTo($this->recipient, HrScheduledReportReadyNotification::class);
     expect(HrReportExport::query()->where('report_type', 'headcount')->exists())->toBeTrue();
 });
 

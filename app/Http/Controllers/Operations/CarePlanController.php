@@ -13,7 +13,9 @@ use App\Models\ClientOnboardingWorkflow;
 use App\Models\ServiceAgreement;
 use App\Models\User;
 use App\Services\Timeline\TimelineEmitter;
+use App\Services\UserSiteAccessService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -22,6 +24,12 @@ use Illuminate\Validation\ValidationException;
 
 class CarePlanController extends Controller
 {
+    private const CLIENT_SITE_BYPASS_PERMISSIONS = ['clients.viewAny'];
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     public function index(Request $request)
     {
         $auth = $request->user();
@@ -35,8 +43,7 @@ class CarePlanController extends Controller
             'review_due' => ['nullable', 'boolean'],
         ]);
 
-        $baseQuery = CarePlan::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id));
+        $baseQuery = $this->visibleCarePlans($auth);
 
         // Stats
         $stats = [
@@ -52,8 +59,7 @@ class CarePlanController extends Controller
             'plans_without_goals' => (clone $baseQuery)->whereDoesntHave('goals')->where('status', '!=', 'archived')->count(),
             'overdue_goals' => CarePlanGoal::query()
                 ->whereHas('carePlan', function ($q) use ($auth) {
-                    $q->where('status', 'active')
-                        ->when($auth->organization_id, fn ($q2) => $q2->where('organization_id', $auth->organization_id));
+                    $this->applyCarePlanVisibility($q->where('status', 'active'), $auth);
                 })
                 ->where('status', '!=', 'completed')
                 ->whereNotNull('target_date')
@@ -69,8 +75,7 @@ class CarePlanController extends Controller
             ->toArray();
 
         // Filtered query for listing
-        $carePlans = CarePlan::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $carePlans = $this->visibleCarePlans($auth)
             ->when(! empty($data['q']), fn ($q) => $q->where('title', 'like', '%'.$data['q'].'%'))
             ->when(! empty($data['status']), fn ($q) => $q->where('status', $data['status']))
             ->when(! empty($data['plan_type']), fn ($q) => $q->where('plan_type', $data['plan_type']))
@@ -84,8 +89,7 @@ class CarePlanController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $clients = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $clients = $this->visibleClients($auth)
             ->select('id', 'first_name', 'last_name')
             ->orderBy('last_name')
             ->get();
@@ -104,8 +108,7 @@ class CarePlanController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('care_plans.create'), 403);
 
-        $clients = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $clients = $this->visibleClients($auth)
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
@@ -126,11 +129,7 @@ class CarePlanController extends Controller
             'client_id' => [
                 'required',
                 'integer',
-                Rule::exists('clients', 'id')->where(
-                    fn ($query) => $auth->organization_id !== null
-                        ? $query->where('organization_id', $auth->organization_id)
-                        : $query,
-                ),
+                Rule::exists('clients', 'id'),
             ],
             'title' => ['required', 'string', 'max:255'],
             'plan_type' => ['required', 'string', 'max:100'],
@@ -146,7 +145,14 @@ class CarePlanController extends Controller
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'next_review_at' => ['nullable', 'date'],
             'status' => ['nullable', 'string', 'in:draft,active'],
-        ], $this->planContentRules($auth->organization_id, $clientId)));
+        ], $this->planContentRules($clientId)));
+
+        $this->siteAccess->assertCanAccessClientId(
+            $auth,
+            (int) $data['client_id'],
+            self::CLIENT_SITE_BYPASS_PERMISSIONS,
+        );
+        $client = Client::query()->findOrFail($data['client_id']);
 
         if (($data['status'] ?? 'draft') === 'active'
             && ! $this->hasStructuredDomains($data['content'] ?? [])) {
@@ -156,7 +162,6 @@ class CarePlanController extends Controller
         }
 
         $carePlan = CarePlan::create([
-            'organization_id' => $auth->organization_id,
             'client_id' => $data['client_id'],
             'title' => $data['title'],
             'plan_type' => $data['plan_type'],
@@ -169,7 +174,6 @@ class CarePlanController extends Controller
             'version' => 1,
         ]);
 
-        $client = Client::find($data['client_id']);
         app(TimelineEmitter::class)->record([
             'source_type' => CarePlan::class,
             'source_id' => $carePlan->id,
@@ -225,7 +229,6 @@ class CarePlanController extends Controller
         abort_unless($auth && $auth->canDo('care_plans.viewAny'), 403);
 
         $carePlan = CarePlan::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with([
                 'client:id,first_name,last_name',
                 'creator:id,name',
@@ -242,6 +245,7 @@ class CarePlanController extends Controller
                 'goals as goals_in_progress' => fn ($q) => $q->where('status', 'in_progress'),
             ])
             ->findOrFail($carePlan);
+        $this->authorize('view', $carePlan);
 
         $progressStats = [
             'total_goals' => $carePlan->goals_count,
@@ -274,6 +278,7 @@ class CarePlanController extends Controller
 
         // Review history via parent_id chain
         $reviewHistory = CarePlan::query()
+            ->where('client_id', $carePlan->client_id)
             ->where(function ($q) use ($carePlan) {
                 $q->where('parent_id', $carePlan->parent_id ?? $carePlan->id)
                     ->orWhere('id', $carePlan->parent_id ?? $carePlan->id);
@@ -283,9 +288,12 @@ class CarePlanController extends Controller
             ->orderByDesc('version')
             ->get();
 
-        // Staff in same org for reviewer assignment
-        $staff = User::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        // Current staff at Sites visible to the viewer for reviewer assignment.
+        $staff = $this->siteAccess->applyStaffScope(
+            User::query(),
+            $auth,
+            self::CLIENT_SITE_BYPASS_PERMISSIONS,
+        )
             ->select('id', 'name')
             ->orderBy('name')
             ->get();
@@ -305,12 +313,11 @@ class CarePlanController extends Controller
         abort_unless($auth && $auth->canDo('care_plans.update'), 403);
 
         $carePlan = CarePlan::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name'])
             ->findOrFail($carePlan);
+        $this->authorize('update', $carePlan);
 
-        $clients = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $clients = $this->visibleClients($auth)
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
@@ -325,9 +332,8 @@ class CarePlanController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('care_plans.update'), 403);
 
-        $carePlan = CarePlan::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($carePlan);
+        $carePlan = CarePlan::query()->findOrFail($carePlan);
+        $this->authorize('update', $carePlan);
 
         $this->ensureMutableCarePlan($carePlan);
 
@@ -354,7 +360,7 @@ class CarePlanController extends Controller
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'next_review_at' => ['nullable', 'date'],
             'status' => ['nullable', 'string', 'in:draft,active,review,archived'],
-        ], $this->planContentRules($auth->organization_id, (int) $carePlan->client_id)));
+        ], $this->planContentRules((int) $carePlan->client_id)));
 
         if (! $carePlan->allowsGenericTransitionTo($data['status'] ?? null)) {
             throw ValidationException::withMessages([
@@ -383,7 +389,6 @@ class CarePlanController extends Controller
 
         $reviewCreated = DB::transaction(function () use ($auth, $carePlan): bool {
             $source = CarePlan::query()
-                ->where('organization_id', $carePlan->organization_id)
                 ->where('client_id', $carePlan->client_id)
                 ->lockForUpdate()
                 ->findOrFail($carePlan->id);
@@ -396,7 +401,6 @@ class CarePlanController extends Controller
 
             $rootId = $source->parent_id ?? $source->id;
             $existingReview = CarePlan::query()
-                ->where('organization_id', $source->organization_id)
                 ->where('client_id', $source->client_id)
                 ->where('status', 'review')
                 ->where(function ($query) use ($rootId) {
@@ -424,7 +428,13 @@ class CarePlanController extends Controller
                 ])->values()->all(),
             );
 
-            $newVersion = $source->replicate(['id', 'created_at', 'updated_at', 'deleted_at']);
+            $newVersion = $source->replicate([
+                ...$source->getHidden(),
+                'id',
+                'created_at',
+                'updated_at',
+                'deleted_at',
+            ]);
             $newVersion->version = $source->version + 1;
             $newVersion->parent_id = $rootId;
             $newVersion->status = 'review';
@@ -435,13 +445,25 @@ class CarePlanController extends Controller
             $newVersion->save();
 
             foreach ($source->goals as $goal) {
-                $newGoal = $goal->replicate(['id', 'created_at', 'updated_at', 'deleted_at']);
+                $newGoal = $goal->replicate([
+                    ...$goal->getHidden(),
+                    'id',
+                    'created_at',
+                    'updated_at',
+                    'deleted_at',
+                ]);
                 $newGoal->care_plan_id = $newVersion->id;
                 $newGoal->created_by = $auth->id;
                 $newGoal->save();
 
                 foreach ($goal->steps as $step) {
-                    $newStep = $step->replicate(['id', 'created_at', 'updated_at', 'deleted_at']);
+                    $newStep = $step->replicate([
+                        ...$step->getHidden(),
+                        'id',
+                        'created_at',
+                        'updated_at',
+                        'deleted_at',
+                    ]);
                     $newStep->care_plan_goal_id = $newGoal->id;
                     $newStep->created_by = $auth->id;
                     $newStep->save();
@@ -473,7 +495,10 @@ class CarePlanController extends Controller
         ]);
 
         DB::transaction(function () use ($auth, $carePlan, $data): void {
-            $locked = CarePlan::query()->lockForUpdate()->findOrFail($carePlan->id);
+            $locked = CarePlan::query()
+                ->where('client_id', $carePlan->client_id)
+                ->lockForUpdate()
+                ->findOrFail($carePlan->id);
             if ($locked->status !== 'review') {
                 throw ValidationException::withMessages([
                     'status' => 'Only an in-progress review can be completed.',
@@ -493,7 +518,6 @@ class CarePlanController extends Controller
             $rootId = $locked->parent_id ?? $locked->id;
 
             CarePlan::query()
-                ->where('organization_id', $locked->organization_id)
                 ->where('client_id', $locked->client_id)
                 ->where('id', '!=', $locked->id)
                 ->where(function ($query) use ($rootId) {
@@ -527,9 +551,7 @@ class CarePlanController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('care_plans.delete'), 403);
 
-        $carePlan = CarePlan::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($carePlan);
+        $carePlan = CarePlan::query()->findOrFail($carePlan);
 
         $this->authorize('delete', $carePlan);
         $this->ensureMutableCarePlan($carePlan);
@@ -545,9 +567,8 @@ class CarePlanController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('care_plans.update'), 403);
 
-        $carePlan = CarePlan::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($carePlan);
+        $carePlan = CarePlan::query()->findOrFail($carePlan);
+        $this->authorize('update', $carePlan);
 
         $this->ensureMutableCarePlan($carePlan);
 
@@ -562,7 +583,6 @@ class CarePlanController extends Controller
 
         DB::transaction(function () use ($auth, $carePlan, $data): void {
             $signOff = $carePlan->signOffs()->create([
-                'organization_id' => $carePlan->organization_id,
                 'party_role' => $data['party_role'],
                 'party_name' => $data['party_name'],
                 'relationship' => $data['relationship'] ?? null,
@@ -601,9 +621,8 @@ class CarePlanController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('care_plans.update'), 403);
 
-        $carePlan = CarePlan::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($carePlan);
+        $carePlan = CarePlan::query()->findOrFail($carePlan);
+        $this->authorize('update', $carePlan);
 
         $this->ensureMutableCarePlan($carePlan);
 
@@ -622,7 +641,6 @@ class CarePlanController extends Controller
         abort_unless($auth && $auth->canDo('care_plans.viewAny'), 403);
 
         $carePlan = CarePlan::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with([
                 'client:id,first_name,last_name,date_of_birth',
                 'creator:id,name',
@@ -632,6 +650,7 @@ class CarePlanController extends Controller
                 'signOffs.recorder:id,name',
             ])
             ->findOrFail($carePlan);
+        $this->authorize('view', $carePlan);
 
         $content = is_array($carePlan->content) ? $carePlan->content : [];
 
@@ -639,7 +658,6 @@ class CarePlanController extends Controller
         $agreementId = data_get($content, 'funding.service_agreement_id');
         if ($agreementId) {
             $agreement = ServiceAgreement::query()
-                ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
                 ->where('client_id', $carePlan->client_id)
                 ->find($agreementId);
         }
@@ -676,7 +694,6 @@ class CarePlanController extends Controller
 
         return [
             'id' => $note->id,
-            'organization_id' => $note->organization_id,
             'client_id' => $note->client_id,
             'shift_id' => $note->shift_id,
             'care_plan_goal_id' => $note->care_plan_goal_id,
@@ -707,7 +724,7 @@ class CarePlanController extends Controller
      *
      * @return array<string, array<int, mixed>>
      */
-    private function planContentRules(?int $organizationId, int $clientId): array
+    private function planContentRules(int $clientId): array
     {
         return [
             'content.about_me' => ['nullable', 'array'],
@@ -738,11 +755,7 @@ class CarePlanController extends Controller
                 Rule::exists('service_agreements', 'id')->where(
                     fn ($query) => $query
                         ->where('client_id', $clientId)
-                        ->whereNull('deleted_at')
-                        ->when(
-                            $organizationId !== null,
-                            fn ($scoped) => $scoped->where('organization_id', $organizationId),
-                        ),
+                        ->whereNull('deleted_at'),
                 ),
             ],
             'content.funding.allocated_hours' => ['nullable', 'numeric', 'min:0', 'max:10000'],
@@ -798,5 +811,28 @@ class CarePlanController extends Controller
                 'care_plan' => 'Only the current working care plan version can be changed.',
             ]);
         }
+    }
+
+    private function visibleCarePlans(User $user): Builder
+    {
+        return $this->applyCarePlanVisibility(CarePlan::query(), $user);
+    }
+
+    private function applyCarePlanVisibility(Builder $query, User $user): Builder
+    {
+        return $query->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+            $clientQuery,
+            $user,
+            self::CLIENT_SITE_BYPASS_PERMISSIONS,
+        ));
+    }
+
+    private function visibleClients(User $user): Builder
+    {
+        return $this->siteAccess->applyClientScope(
+            Client::query(),
+            $user,
+            self::CLIENT_SITE_BYPASS_PERMISSIONS,
+        );
     }
 }

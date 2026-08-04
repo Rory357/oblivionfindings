@@ -10,13 +10,16 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Services\ConsentValidationService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 class FleetDeviceRuntimeService
 {
-    public function recentSnapshotsForDevice(Device $device, int $limit = 20): Collection
-    {
+    public function recentSnapshotsForDevice(
+        Device $device,
+        int $limit = 20,
+        ?Carbon $notBefore = null,
+    ): Collection {
         return AssetTelemetrySnapshot::query()
             ->where(function (Builder $query) use ($device): void {
                 $query->where('device_id', $device->id);
@@ -28,6 +31,8 @@ class FleetDeviceRuntimeService
                     });
                 }
             })
+            ->when($notBefore, fn (Builder $query, Carbon $cutoff) => $query
+                ->where('occurred_at', '>=', $cutoff))
             ->latest('occurred_at')
             ->latest('id')
             ->limit($limit)
@@ -105,7 +110,6 @@ class FleetDeviceRuntimeService
         }
 
         return Device::create([
-            'tenant_id' => $this->resolveTenantIdForTracker($tracker),
             'name' => "Tracker {$tracker->device_uid}",
             'domain' => 'tracking',
             'category' => 'vehicle_tracker',
@@ -126,11 +130,12 @@ class FleetDeviceRuntimeService
         $device->loadMissing([
             'activeAssetLinks.asset.client:id,first_name,last_name',
             'legacyAssetTracker.asset.client:id,first_name,last_name',
+            'legacyAssetTracker.consent.consentType',
             'legacyAssetTracker.consent.givenBy:id,name',
         ]);
 
         $assignment = DeviceAssignment::query()
-            ->with(['consent.givenBy:id,name'])
+            ->with(['consent.consentType', 'consent.givenBy:id,name'])
             ->where('device_id', $device->id)
             ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
             ->whereNull('released_at')
@@ -155,7 +160,13 @@ class FleetDeviceRuntimeService
         $clientConsent = $client
             ? ConsentValidationService::latestValidTrackingConsentForClient($client)
             : null;
-        $usableConsent = $this->firstUsableConsent($assignmentConsent, $trackerConsent, $clientConsent);
+        $usableConsent = match (true) {
+            $assignment !== null => $assignment->isCollectionActive()
+                ? $this->usableTrackingConsent($assignmentConsent, $client)
+                : null,
+            $tracker?->consent_id !== null => $this->usableTrackingConsent($trackerConsent, $client),
+            default => $this->usableTrackingConsent($clientConsent, $client),
+        };
 
         return [
             'assignment' => $assignment,
@@ -204,26 +215,15 @@ class FleetDeviceRuntimeService
         return $value === '' ? null : $value;
     }
 
-    private function firstUsableConsent(?ClientConsent ...$consents): ?ClientConsent
+    private function usableTrackingConsent(?ClientConsent $consent, ?Client $client): ?ClientConsent
     {
-        foreach ($consents as $consent) {
-            if ($consent && ! $consent->withdrawn_at && $consent->isValid()) {
-                return $consent;
-            }
+        if (! $consent || ! $client || (int) $consent->client_id !== (int) $client->id) {
+            return null;
         }
 
-        return null;
-    }
-
-    private function resolveTenantIdForTracker(AssetTracker $tracker): int
-    {
-        $siteId = $tracker->asset?->site_id;
-
-        if (! $siteId) {
-            return 1;
-        }
-
-        return (int) (DB::table('sites')->where('id', $siteId)->value('tenant_id') ?? 1);
+        return ConsentValidationService::isValidTrackingConsent($consent)
+            ? $consent
+            : null;
     }
 
     private function mapTrackerStatus(?string $status): string
@@ -232,7 +232,7 @@ class FleetDeviceRuntimeService
             'paired' => 'active',
             'suspended' => 'offline',
             'unpaired' => 'in_stock',
-            default => 'active',
+            default => 'in_stock',
         };
     }
 }

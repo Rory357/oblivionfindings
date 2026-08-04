@@ -9,6 +9,10 @@ use Illuminate\Validation\Rule;
 
 class ProfileUpdateRequest extends FormRequest
 {
+    private bool $phoneWasSubmitted = false;
+
+    private bool $jobTitleWasSubmitted = false;
+
     /**
      * Prepare the data for validation so each card can submit partial data
      * against the shared profile endpoint without clobbering other fields.
@@ -21,11 +25,14 @@ class ProfileUpdateRequest extends FormRequest
             return;
         }
 
+        $this->phoneWasSubmitted = $this->has('phone');
+        $this->jobTitleWasSubmitted = $this->has('job_title');
+
         $this->merge([
             'name' => $this->input('name', $user->name),
             'email' => $this->input('email', $user->email),
             'phone' => $this->has('phone') ? $this->input('phone') : $user->cellphone,
-            'job_title' => $this->has('job_title') ? $this->input('job_title') : $user->staffProfile?->job_title,
+            'job_title' => $this->jobTitleWasSubmitted ? $this->input('job_title') : null,
             'timezone' => $this->input('timezone', $user->timezone ?? 'Pacific/Auckland'),
             'locale' => $this->input('locale', $user->locale ?? 'en'),
             'date_format' => $this->input('date_format', $user->date_format ?? 'DD/MM/YYYY'),
@@ -58,5 +65,15 @@ class ProfileUpdateRequest extends FormRequest
             'date_format' => ['required', Rule::in(['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'])],
             'time_format' => ['required', Rule::in(['12', '24'])],
         ];
+    }
+
+    public function phoneWasSubmitted(): bool
+    {
+        return $this->phoneWasSubmitted;
+    }
+
+    public function jobTitleWasSubmitted(): bool
+    {
+        return $this->jobTitleWasSubmitted;
     }
 }

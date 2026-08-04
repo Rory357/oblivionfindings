@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Models;
 
 use App\Domain\Finance\Models\FinJournal;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Database\Factories\Hr\HrCourseEnrollmentFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrCourseEnrollment extends Model
 {
-    use AuditableChanges, HasFactory;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
@@ -29,6 +30,7 @@ class HrCourseEnrollment extends Model
         'enrolled_at',
         'completed_at',
         'score',
+        'certificate_number',
         'certificate_path',
         'notes',
         'journal_id',
@@ -67,11 +69,6 @@ class HrCourseEnrollment extends Model
     /* ------------------------------------------------------------------ */
     /*  Scopes */
     /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeCompleted(Builder $query): Builder
     {

@@ -1,18 +1,24 @@
 <?php
 
 use App\Domain\Hr\Jobs\SendEngagementActionPlanRemindersJob;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementActionPlan;
 use App\Domain\Hr\Models\HrEngagementSurvey;
 use App\Domain\Hr\Notifications\EngagementActionPlanDueNotification;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Carbon\Carbon;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     Carbon::setTestNow(Carbon::parse('2026-02-18 07:30:00'));
+
+    $this->site = Site::factory()->create(['name' => 'Action plan reminder site']);
+    $this->otherSite = Site::factory()->create(['name' => 'Other action plan reminder site']);
 
     $this->manager = User::factory()->create([
         'role' => 'hr',
@@ -39,26 +45,42 @@ beforeEach(function () {
         $this->owner->roles()->syncWithoutDetaching([$workerRole->id]);
         $this->externalOwner->roles()->syncWithoutDetaching([$workerRole->id]);
     }
+
+    engagementReminderProfile($this->manager, $this->site);
+    engagementReminderProfile($this->owner, $this->site);
+    engagementReminderProfile($this->externalOwner, $this->otherSite);
 });
 
 afterEach(function () {
     Carbon::setTestNow();
 });
 
+function engagementReminderProfile(User $user, Site $site): HrEmployeeProfile
+{
+    return HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+}
+
 test('engagement action-plan reminder job sends upcoming and overdue notifications once per trigger', function () {
     $survey = HrEngagementSurvey::query()->create([
-        'tenant_id' => 1,
         'title' => 'Quarterly Pulse',
         'survey_type' => 'pulse',
         'status' => 'published',
         'is_anonymous' => true,
+        'audience_type' => 'site',
+        'audience_site_ids' => [$this->site->id],
         'created_by' => $this->manager->id,
         'updated_by' => $this->manager->id,
     ]);
 
     $upcoming = HrEngagementActionPlan::query()->create([
         'survey_id' => $survey->id,
-        'tenant_id' => 1,
         'owner_user_id' => $this->owner->id,
         'title' => 'Workload rebalance',
         'priority' => 'medium',
@@ -71,7 +93,6 @@ test('engagement action-plan reminder job sends upcoming and overdue notificatio
 
     $overdue = HrEngagementActionPlan::query()->create([
         'survey_id' => $survey->id,
-        'tenant_id' => 1,
         'owner_user_id' => $this->owner->id,
         'title' => 'Roster recovery plan',
         'priority' => 'high',
@@ -82,7 +103,7 @@ test('engagement action-plan reminder job sends upcoming and overdue notificatio
         'updated_by' => $this->manager->id,
     ]);
 
-    (new SendEngagementActionPlanRemindersJob(1))->handle();
+    (new SendEngagementActionPlanRemindersJob)->handle();
 
     $rows = DB::table('notifications')
         ->where('type', EngagementActionPlanDueNotification::class)
@@ -109,7 +130,7 @@ test('engagement action-plan reminder job sends upcoming and overdue notificatio
     expect($upcomingOwnerNotification)->toBeTrue();
     expect($overdueManagerNotification)->toBeTrue();
 
-    (new SendEngagementActionPlanRemindersJob(1))->handle();
+    (new SendEngagementActionPlanRemindersJob)->handle();
 
     $countAfterSecondRun = DB::table('notifications')
         ->where('type', EngagementActionPlanDueNotification::class)
@@ -118,27 +139,28 @@ test('engagement action-plan reminder job sends upcoming and overdue notificatio
     expect($countAfterSecondRun)->toBe(4);
 });
 
-test('engagement action-plan reminder job respects tenant scoping', function () {
-    $tenantOneSurvey = HrEngagementSurvey::query()->create([
-        'tenant_id' => 1,
-        'title' => 'Tenant 1 Pulse',
+test('engagement action-plan reminder job processes every Site in the application', function () {
+    $siteSurvey = HrEngagementSurvey::query()->create([
+        'title' => 'Site pulse',
         'survey_type' => 'pulse',
         'status' => 'published',
         'is_anonymous' => true,
+        'audience_type' => 'site',
+        'audience_site_ids' => [$this->site->id],
         'created_by' => $this->manager->id,
         'updated_by' => $this->manager->id,
     ]);
 
-    $tenantTwoManager = User::factory()->create([
+    $otherManager = User::factory()->create([
         'role' => 'hr',
         'approved_at' => now(),
     ]);
+    engagementReminderProfile($otherManager, $this->otherSite);
 
     HrEngagementActionPlan::query()->create([
-        'survey_id' => $tenantOneSurvey->id,
-        'tenant_id' => 1,
+        'survey_id' => $siteSurvey->id,
         'owner_user_id' => $this->owner->id,
-        'title' => 'Tenant one plan',
+        'title' => 'First Site plan',
         'priority' => 'medium',
         'status' => 'open',
         'progress_percent' => 10,
@@ -147,30 +169,30 @@ test('engagement action-plan reminder job respects tenant scoping', function () 
         'updated_by' => $this->manager->id,
     ]);
 
-    $tenantTwoSurvey = HrEngagementSurvey::query()->create([
-        'tenant_id' => 2,
-        'title' => 'Tenant 2 Pulse',
+    $otherSiteSurvey = HrEngagementSurvey::query()->create([
+        'title' => 'Other Site pulse',
         'survey_type' => 'pulse',
         'status' => 'published',
         'is_anonymous' => true,
-        'created_by' => $tenantTwoManager->id,
-        'updated_by' => $tenantTwoManager->id,
+        'audience_type' => 'site',
+        'audience_site_ids' => [$this->otherSite->id],
+        'created_by' => $otherManager->id,
+        'updated_by' => $otherManager->id,
     ]);
 
     HrEngagementActionPlan::query()->create([
-        'survey_id' => $tenantTwoSurvey->id,
-        'tenant_id' => 2,
+        'survey_id' => $otherSiteSurvey->id,
         'owner_user_id' => $this->externalOwner->id,
-        'title' => 'Tenant two plan',
+        'title' => 'Other Site plan',
         'priority' => 'medium',
         'status' => 'open',
         'progress_percent' => 15,
         'due_date' => now()->addDays(1)->toDateString(),
-        'created_by' => $tenantTwoManager->id,
-        'updated_by' => $tenantTwoManager->id,
+        'created_by' => $otherManager->id,
+        'updated_by' => $otherManager->id,
     ]);
 
-    (new SendEngagementActionPlanRemindersJob(1))->handle();
+    (new SendEngagementActionPlanRemindersJob)->handle();
 
     $ownerHasNotification = DB::table('notifications')
         ->where('type', EngagementActionPlanDueNotification::class)
@@ -183,5 +205,6 @@ test('engagement action-plan reminder job respects tenant scoping', function () 
         ->exists();
 
     expect($ownerHasNotification)->toBeTrue();
-    expect($externalOwnerHasNotification)->toBeFalse();
+    expect($externalOwnerHasNotification)->toBeTrue();
+    expect(DB::table('notifications')->where('type', EngagementActionPlanDueNotification::class)->count())->toBe(4);
 });

@@ -7,6 +7,7 @@ use App\Domain\Clinical\Models\ClinicalRiskAssessment;
 use App\Domain\Clinical\Services\Assessments\ClinicalAssessmentScorerRegistry;
 use App\Models\Client;
 use App\Models\User;
+use App\Support\LegacyStorageContext;
 use Carbon\Carbon;
 
 /**
@@ -36,7 +37,8 @@ class ClinicalAssessmentService
         $when = $assessedAt ? Carbon::parse($assessedAt) : now();
 
         return ClinicalRiskAssessment::create([
-            'organization_id' => $client->organization_id,
+            // Inert compatibility only; Client Site provenance governs access.
+            'organization_id' => LegacyStorageContext::id(),
             'client_id' => $client->id,
             'assessed_by' => $assessor->id,
             'assessment_type' => $type,

@@ -12,7 +12,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Device-to-asset links are managed via device_asset_links (DeviceAssetLink model).
  *
  * Remaining intentional uses:
- * - FleetTelemetryIngestService: vendor+device_uid lookup for telemetry routing
+ * - Optional historical lineage on telemetry rows after canonical Device and
+ *   DeviceAssetLink ownership have already been resolved
  * - Compatibility fallback for consent-linked tracker rows when no canonical
  *   assignment consent exists yet
  * - Telemetry/signal lineage: asset_tracker_id remains on historical tables
@@ -20,9 +21,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * Do NOT add new queries against this model for device identity or ownership.
  * Use Device + DeviceAssetLink + DeviceAssignment instead.
+ * Existing asset_id, status, paired_at, unpaired_at, and consent_id values are
+ * historical read-only compatibility projections. Pairing and release flows
+ * must not create, update, or synchronise them.
  * The temporary asset_trackers.device_id bridge FK was removed in PR26 after
  * audit confirmed no live consumers still depended on it.
- * This model remains intentionally for telemetry lineage, ingest routing, and
+ * This model remains intentionally for historical telemetry lineage and
  * consent compatibility until those remaining bridges are explicitly retired.
  */
 class AssetTracker extends Model

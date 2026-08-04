@@ -3,16 +3,15 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ServiceAgreementLineItem extends Model
 {
-    use HasFactory;
-    use AuditableChanges;
+    use AuditableChanges, HasFactory, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'service_agreement_id',
         'item_number',
         'description',

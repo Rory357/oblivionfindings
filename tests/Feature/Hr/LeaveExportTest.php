@@ -13,15 +13,15 @@ beforeEach(function () {
 
     $this->manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->manager->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
-    $this->manager->setAttribute('tenant_id', 1);
+    $this->site = ensureCanonicalHrStaffProfile($this->manager);
 
     $this->staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
-    $this->staff->setAttribute('tenant_id', 1);
+    ensureCanonicalHrStaffProfile($this->staff, $this->site);
 });
 
 test('requests export streams a formula-guarded CSV', function () {
     HrLeaveRequest::query()->create([
-        'tenant_id' => 1, 'user_id' => $this->staff->id, 'leave_type' => 'annual', 'period' => 'full_day',
+        'user_id' => $this->staff->id, 'leave_type' => 'annual', 'period' => 'full_day',
         'starts_at' => now()->addDays(5)->startOfDay(), 'ends_at' => now()->addDays(5)->endOfDay(),
         'hours_requested' => 8, 'status' => 'pending', 'submitted_at' => now(), 'escalation_level' => 1,
         'reason' => '=1+1',
@@ -38,7 +38,7 @@ test('requests export streams a formula-guarded CSV', function () {
 
 test('balances export downloads a CSV', function () {
     HrLeaveBalance::query()->create([
-        'tenant_id' => 1, 'user_id' => $this->staff->id, 'leave_type' => 'annual', 'year' => now()->year,
+        'user_id' => $this->staff->id, 'leave_type' => 'annual', 'year' => now()->year,
         'balance_hours' => 160, 'accrued_hours' => 160, 'used_hours' => 40, 'pending_hours' => 8,
     ]);
 

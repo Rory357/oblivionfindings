@@ -6,25 +6,24 @@ use App\Domain\Finance\Models\FinJournal;
 use App\Models\Client;
 use App\Models\ClientFund;
 use App\Models\ClientFundTransaction;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
 
 function makeRecoverableClientFundTransaction(array $attributes = []): ClientFundTransaction
 {
-    $organizationId = (int) ($attributes['organization_id'] ?? 1);
-    $client = Client::factory()->create(['organization_id' => $organizationId]);
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $fund = ClientFund::query()->create([
-        'organization_id' => $organizationId,
         'client_id' => $client->id,
         'fund_name' => 'Recovery test fund',
         'fund_type' => 'trust',
         'balance' => '10.00',
         'is_active' => true,
     ]);
-    $actor = User::factory()->create(['organization_id' => $organizationId]);
+    $actor = User::factory()->create();
 
     $transaction = $fund->transactions()->create(array_merge([
-        'organization_id' => $organizationId,
         'transaction_type' => 'credit',
         'amount' => '10.00',
         'running_balance' => '10.00',

@@ -5,19 +5,18 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteCredential;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
     $this->site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
-    // The registry is tenant-scoped via the user's organization_id.
     $this->admin = User::factory()->create([
         'role' => 'admin',
         'approved_at' => now(),
-        'organization_id' => $this->site->tenant_id,
     ]);
     $this->admin->roles()->sync([Role::query()->where('name', 'admin')->firstOrFail()->id]);
 });
@@ -26,8 +25,7 @@ function ctCredential(Site $site, string $type): SiteCredential
 {
     return SiteCredential::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
-        'label' => 'cred ' . $type,
+        'label' => 'cred '.$type,
         'credential_type' => $type,
         'encrypted_value' => Crypt::encryptString('x'),
         'requires_reauth' => false,
@@ -61,12 +59,11 @@ test('bulk save persists overrides, custom types, and hides a type', function ()
         ->assertOk()
         ->assertJson(['ok' => true]);
 
-    $tenant = $this->admin->organization_id;
-    $this->assertDatabaseHas('credential_types', ['tenant_id' => $tenant, 'key' => 'password', 'label' => 'Master Password']);
-    $this->assertDatabaseHas('credential_types', ['tenant_id' => $tenant, 'key' => 'pin', 'active' => false]);
-    $this->assertDatabaseHas('credential_types', ['tenant_id' => $tenant, 'key' => 'database', 'is_system' => false]);
+    $this->assertDatabaseHas('credential_types', ['key' => 'password', 'label' => 'Master Password']);
+    $this->assertDatabaseHas('credential_types', ['key' => 'pin', 'active' => false]);
+    $this->assertDatabaseHas('credential_types', ['key' => 'database', 'is_system' => false]);
 
-    $picker = CredentialType::pickerOptionsForTenant($tenant)->pluck('key');
+    $picker = CredentialType::pickerOptions()->pluck('key');
     expect($picker)->toContain('database');
     expect($picker)->not->toContain('pin'); // hidden
 });
@@ -79,14 +76,12 @@ test('system types can never be hidden even when requested', function () {
         ]])
         ->assertOk();
 
-    $tenant = $this->admin->organization_id;
-    expect((bool) CredentialType::query()->where('tenant_id', $tenant)->where('key', 'password')->value('active'))->toBeTrue();
-    expect((bool) CredentialType::query()->where('tenant_id', $tenant)->where('key', 'other')->value('active'))->toBeTrue();
+    expect((bool) CredentialType::query()->where('key', 'password')->value('active'))->toBeTrue();
+    expect((bool) CredentialType::query()->where('key', 'other')->value('active'))->toBeTrue();
 });
 
 test('a custom type still in use is kept even if removed from the payload', function () {
-    $tenant = $this->admin->organization_id;
-    CredentialType::create(['tenant_id' => $tenant, 'key' => 'database', 'label' => 'Database', 'icon' => 'database', 'active' => true, 'sort_order' => 10, 'is_system' => false]);
+    CredentialType::create(['key' => 'database', 'label' => 'Database', 'icon' => 'database', 'active' => true, 'sort_order' => 10, 'is_system' => false]);
     ctCredential($this->site, 'database');
 
     $this->actingAs($this->admin)
@@ -95,12 +90,11 @@ test('a custom type still in use is kept even if removed from the payload', func
         ]])
         ->assertOk();
 
-    expect(CredentialType::query()->where('tenant_id', $tenant)->where('key', 'database')->exists())->toBeTrue();
+    expect(CredentialType::query()->where('key', 'database')->exists())->toBeTrue();
 });
 
 test('an unused custom type removed from the payload is deleted', function () {
-    $tenant = $this->admin->organization_id;
-    CredentialType::create(['tenant_id' => $tenant, 'key' => 'legacy', 'label' => 'Legacy', 'icon' => 'shield', 'active' => true, 'sort_order' => 10, 'is_system' => false]);
+    CredentialType::create(['key' => 'legacy', 'label' => 'Legacy', 'icon' => 'shield', 'active' => true, 'sort_order' => 10, 'is_system' => false]);
 
     $this->actingAs($this->admin)
         ->putJson('/credential-types', ['types' => [
@@ -108,7 +102,19 @@ test('an unused custom type removed from the payload is deleted', function () {
         ]])
         ->assertOk();
 
-    expect(CredentialType::query()->where('tenant_id', $tenant)->where('key', 'legacy')->exists())->toBeFalse();
+    expect(CredentialType::query()->where('key', 'legacy')->exists())->toBeFalse();
+});
+
+test('normalised custom type keys must remain unique application-wide', function () {
+    $this->actingAs($this->admin)
+        ->putJson('/credential-types', ['types' => [
+            ['key' => 'Router Admin', 'label' => 'Router admin', 'icon' => 'wifi', 'active' => true],
+            ['key' => 'router-admin', 'label' => 'Duplicate router admin', 'icon' => 'wifi', 'active' => true],
+        ]])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['types']);
+
+    expect(CredentialType::query()->where('key', 'router_admin')->exists())->toBeFalse();
 });
 
 test('the global page exposes active type options and the manage flag', function () {

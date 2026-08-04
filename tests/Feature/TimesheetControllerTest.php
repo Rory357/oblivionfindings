@@ -13,6 +13,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -42,7 +43,7 @@ class TimesheetControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
         $this->travelTo(Carbon::parse('2026-04-12 09:00:00'));
 
         $this->site = Site::factory()->create([
@@ -672,12 +673,71 @@ class TimesheetControllerTest extends TestCase
             ->assertRedirect("/operations/timesheets?view={$timesheet->id}");
     }
 
+    public function test_non_modal_show_and_edit_deny_a_foreign_owner(): void
+    {
+        $this->grantPermissions($this->otherStaff, [
+            'timesheets.viewAssigned',
+            'timesheets.update',
+        ]);
+        $timesheet = $this->makeDraftTimesheet($this->staff);
+
+        $this->actingAs($this->otherStaff)
+            ->get(route('operations.timesheets.show', $timesheet))
+            ->assertForbidden();
+        $this->get(route('operations.timesheets.edit', $timesheet))
+            ->assertForbidden();
+    }
+
+    public function test_non_modal_show_and_edit_deny_an_owner_outside_their_current_site(): void
+    {
+        $foreignSite = Site::factory()->create([
+            'name' => 'Foreign House',
+            'type' => 'house',
+        ]);
+        $foreignClient = Client::factory()->create([
+            'site_id' => $foreignSite->id,
+            'service_context_id' => $this->serviceContext->id,
+            'status' => 'active',
+        ]);
+        $timesheet = $this->makeDraftTimesheet($this->staff, [
+            'shift_overrides' => [
+                'client_id' => $foreignClient->id,
+                'site_id' => $foreignSite->id,
+            ],
+            'shift_site_name_snapshot' => $foreignSite->name,
+            'client_name_snapshot' => trim($foreignClient->first_name.' '.$foreignClient->last_name),
+        ]);
+
+        $this->actingAs($this->staff)
+            ->get(route('operations.timesheets.show', $timesheet))
+            ->assertForbidden();
+        $this->get(route('operations.timesheets.edit', $timesheet))
+            ->assertForbidden();
+    }
+
     public function test_edit_route_redirects_to_unified_edit_dialog(): void
     {
         $timesheet = $this->makeDraftTimesheet($this->staff);
 
         $this->actingAs($this->staff)
             ->get(route('operations.timesheets.edit', $timesheet))
+            ->assertRedirect("/operations/timesheets?edit={$timesheet->id}");
+    }
+
+    public function test_manager_can_open_view_and_edit_dialog_redirects(): void
+    {
+        $manager = $this->finance;
+        $this->grantPermissions($manager, [
+            'timesheets.viewAny',
+            'timesheets.update',
+            'timesheets.manageAny',
+        ]);
+        $timesheet = $this->makeDraftTimesheet($this->staff);
+
+        $this->actingAs($manager)
+            ->get(route('operations.timesheets.show', $timesheet))
+            ->assertRedirect("/operations/timesheets?view={$timesheet->id}");
+        $this->get(route('operations.timesheets.edit', $timesheet))
             ->assertRedirect("/operations/timesheets?edit={$timesheet->id}");
     }
 

@@ -6,6 +6,8 @@ use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRiskAssessment;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 
 /**
@@ -24,14 +26,21 @@ use Carbon\Carbon;
  */
 class HsComplianceExportService
 {
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     /* ------------------------------------------------------------------ */
-    /*  Report type identifiers — stable contract values                   */
-    /*  These are used in report envelopes and must not be renamed.        */
+    /*  Report type identifiers — stable contract values */
+    /*  These are used in report envelopes and must not be renamed. */
     /* ------------------------------------------------------------------ */
 
     public const REPORT_WORKSAFE_REGISTER = 'worksafe_register';
+
     public const REPORT_INVESTIGATION_OUTCOMES = 'investigation_outcomes';
+
     public const REPORT_CORRECTIVE_ACTION_TRACEABILITY = 'corrective_action_traceability';
+
     public const REPORT_RISK_ASSESSMENT_REGISTER = 'risk_assessment_register';
 
     /** All available report types. */
@@ -43,7 +52,7 @@ class HsComplianceExportService
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  WorkSafe Notifiable Events Register                                */
+    /*  WorkSafe Notifiable Events Register */
     /* ------------------------------------------------------------------ */
 
     public function worksafeRegister(?Carbon $from = null, ?Carbon $to = null): array
@@ -80,7 +89,7 @@ class HsComplianceExportService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Investigation Outcomes Report                                       */
+    /*  Investigation Outcomes Report */
     /* ------------------------------------------------------------------ */
 
     public function investigationOutcomes(?Carbon $from = null, ?Carbon $to = null): array
@@ -129,7 +138,7 @@ class HsComplianceExportService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Corrective Action Traceability Report                              */
+    /*  Corrective Action Traceability Report */
     /* ------------------------------------------------------------------ */
 
     public function correctiveActionTraceability(?string $statusFilter = null, ?Carbon $from = null, ?Carbon $to = null): array
@@ -182,12 +191,23 @@ class HsComplianceExportService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Risk Assessment Register                                           */
+    /*  Risk Assessment Register */
     /* ------------------------------------------------------------------ */
 
-    public function riskAssessmentRegister(): array
+    public function riskAssessmentRegister(?User $viewer = null): array
     {
-        $assessments = HsRiskAssessment::active()
+        $query = HsRiskAssessment::query()->active();
+        if ($viewer) {
+            $this->siteAccess->applyHsRiskAssessmentScope(
+                $query,
+                $viewer,
+                ['healthSafety.viewAllSites'],
+            );
+        } else {
+            $this->siteAccess->applyHsRiskAssessmentApplicationScope($query);
+        }
+
+        $assessments = $query
             ->with(['assessedBy:id,name', 'approvedBy:id,name'])
             ->orderByDesc('risk_score')
             ->get();
@@ -219,7 +239,7 @@ class HsComplianceExportService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Internal helpers                                                    */
+    /*  Internal helpers */
     /* ------------------------------------------------------------------ */
 
     /**

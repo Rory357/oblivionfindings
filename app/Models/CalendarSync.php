@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CalendarSync extends Model
 {
+    use WritesLegacyOrganizationStorageContext;
+
     protected $table = 'calendar_syncs';
 
     protected $fillable = [
-        'organization_id',
         'user_id',
         'provider',
         'calendar_id',

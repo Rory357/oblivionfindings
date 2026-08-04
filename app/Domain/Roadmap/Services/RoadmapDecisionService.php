@@ -13,13 +13,11 @@ use Illuminate\Support\Facades\Log;
 class RoadmapDecisionService
 {
     public function resolveApplicableRule(
-        ?int $tenantId,
         string $scope,
         float $amount,
         ?float $riskScore = null
     ): ?DelegationOfAuthorityRule {
         $rules = DelegationOfAuthorityRule::query()
-            ->forTenant($tenantId)
             ->active()
             ->where('scope', $scope)
             ->get();
@@ -45,7 +43,7 @@ class RoadmapDecisionService
         }
 
         $riskScore = (float) ($initiative->priority_score ?? 0);
-        $rule = $this->resolveApplicableRule($initiative->tenant_id, $scope, $amount, $riskScore);
+        $rule = $this->resolveApplicableRule($scope, $amount, $riskScore);
 
         if (! $rule) {
             return null;
@@ -60,7 +58,6 @@ class RoadmapDecisionService
 
         if (! $request) {
             $request = DecisionRequest::create([
-                'tenant_id' => $initiative->tenant_id,
                 'source_type' => Initiative::class,
                 'source_id' => $initiative->id,
                 'request_type' => $requestType,

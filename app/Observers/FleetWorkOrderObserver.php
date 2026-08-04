@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Log;
 
 class FleetWorkOrderObserver
 {
+    private const APPLICATION_CONTEXT = 1;
+
     public function __construct(
         private readonly HsEventService $hsEventService,
     ) {}
@@ -60,18 +62,10 @@ class FleetWorkOrderObserver
                 return;
             }
 
-            $orgId = $workOrder->tenant_id;
-            if (! $orgId) {
-                $orgId = $asset->site?->tenant_id;
-            }
-            if (! $orgId) {
-                return;
-            }
-
             $accountConfig = config('finance.event_accounts.fleet_maintenance_expense');
 
             ProcessFinancialEventJob::dispatch([
-                'organization_id' => $orgId,
+                'organization_id' => self::APPLICATION_CONTEXT,
                 'source_type' => FleetWorkOrder::class,
                 'source_id' => $workOrder->id,
                 'event_type' => 'fleet_maintenance_expense',
@@ -105,7 +99,6 @@ class FleetWorkOrderObserver
                 'site_id' => $workOrder->asset?->site_id,
                 'asset_id' => $workOrder->asset_id,
                 'staff_id' => $workOrder->reported_by_user_id,
-                'organization_id' => $workOrder->tenant_id,
                 'created_by' => $workOrder->reported_by_user_id,
             ]);
         } catch (\Throwable $e) {

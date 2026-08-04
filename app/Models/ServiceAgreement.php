@@ -3,18 +3,16 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ServiceAgreement extends Model
 {
-    use HasFactory;
-    use AuditableChanges;
-    use SoftDeletes;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'client_id',
         'title',
         'reference_number',
@@ -153,12 +151,14 @@ class ServiceAgreement extends Model
     public function getBudgetRemainingAttribute()
     {
         $used = $this->budget_used > 0 ? $this->budget_used : $this->budget_used_from_items;
+
         return $this->total_budget - $used;
     }
 
     public function getBudgetUtilisationPercentAttribute()
     {
         $used = $this->budget_used > 0 ? $this->budget_used : $this->budget_used_from_items;
+
         return $this->total_budget > 0
             ? round(($used / $this->total_budget) * 100, 1)
             : 0;

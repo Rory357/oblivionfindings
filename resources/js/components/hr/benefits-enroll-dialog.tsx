@@ -16,9 +16,9 @@ import {
 import { FormEvent, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
 
 import {
     Field,
@@ -131,9 +131,24 @@ interface FormState {
 }
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'who', label: 'Employee & plan', blurb: 'Who & which benefit', icon: UserRound },
-    { key: 'contrib', label: 'Contributions', blurb: 'Rates & cost', icon: Banknote },
-    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: ClipboardCheck },
+    {
+        key: 'who',
+        label: 'Employee & plan',
+        blurb: 'Who & which benefit',
+        icon: UserRound,
+    },
+    {
+        key: 'contrib',
+        label: 'Contributions',
+        blurb: 'Rates & cost',
+        icon: Banknote,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & save',
+        icon: ClipboardCheck,
+    },
 ];
 
 export function BenefitsEnrollDialog({
@@ -151,7 +166,10 @@ export function BenefitsEnrollDialog({
     plans: BenefitPlanOption[];
     employees: BenefitEmployeeOption[];
     edit?: BenefitEnrollmentEdit | null;
-    annualSalaryByProfileId?: Record<number, number | string | null | undefined>;
+    annualSalaryByProfileId?: Record<
+        number,
+        number | string | null | undefined
+    >;
 }) {
     const isEdit = edit !== null;
     const wiz = useWizard(STEPS.length);
@@ -166,8 +184,10 @@ export function BenefitsEnrollDialog({
                 employee_profile_id: String(edit.employee_profile.id),
                 benefit_plan_id: String(edit.benefit_plan.id),
                 enrollment_date: todayIso(),
-                employee_contribution_rate: edit.employee_contribution_rate ?? '',
-                employer_contribution_rate: edit.employer_contribution_rate ?? '',
+                employee_contribution_rate:
+                    edit.employee_contribution_rate ?? '',
+                employer_contribution_rate:
+                    edit.employer_contribution_rate ?? '',
                 notes: edit.notes ?? '',
                 status: edit.status,
                 opt_out_date: edit.opt_out_date ?? '',
@@ -190,7 +210,9 @@ export function BenefitsEnrollDialog({
     }, [edit]);
 
     const [form, setForm] = useState<FormState>(initial);
-    const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
+    const [serverErrors, setServerErrors] = useState<Record<string, string>>(
+        {},
+    );
 
     // Re-seed the form whenever the dialog is (re)opened for a new target.
     const [seedKey, setSeedKey] = useState<string>('');
@@ -206,15 +228,24 @@ export function BenefitsEnrollDialog({
         setForm((prev) => ({ ...prev, [key]: value }));
 
     const selectedPlan = useMemo(
-        () => plans.find((p) => String(p.id) === form.benefit_plan_id) ?? edit?.benefit_plan ?? null,
+        () =>
+            plans.find((p) => String(p.id) === form.benefit_plan_id) ??
+            edit?.benefit_plan ??
+            null,
         [plans, form.benefit_plan_id, edit],
     );
     const planType = selectedPlan?.type ?? '';
     const isKiwiSaver = planType === 'kiwisaver';
 
     const selectedEmployeeName = useMemo(() => {
-        if (edit) return edit.employee_profile.user?.name ?? `Profile #${edit.employee_profile.id}`;
-        const e = employees.find((x) => String(x.id) === form.employee_profile_id);
+        if (edit)
+            return (
+                edit.employee_profile.user?.name ??
+                `Profile #${edit.employee_profile.id}`
+            );
+        const e = employees.find(
+            (x) => String(x.id) === form.employee_profile_id,
+        );
         return e?.user?.name ?? '';
     }, [edit, employees, form.employee_profile_id]);
 
@@ -230,7 +261,11 @@ export function BenefitsEnrollDialog({
         ? annualSalaryByProfileId?.[Number(form.employee_profile_id)]
         : undefined;
     const annualSalary =
-        annualSalaryRaw == null ? NaN : typeof annualSalaryRaw === 'number' ? annualSalaryRaw : parseFloat(annualSalaryRaw);
+        annualSalaryRaw == null
+            ? NaN
+            : typeof annualSalaryRaw === 'number'
+              ? annualSalaryRaw
+              : parseFloat(annualSalaryRaw);
     const hasSalary = !Number.isNaN(annualSalary) && annualSalary > 0;
 
     const cost = useMemo(() => {
@@ -261,10 +296,14 @@ export function BenefitsEnrollDialog({
             );
         }
         if (i === 1) {
-            const eeOk = !Number.isNaN(empRate) && empRate >= 0 && empRate <= 100;
+            const eeOk =
+                !Number.isNaN(empRate) && empRate >= 0 && empRate <= 100;
             const erOk =
                 form.employer_contribution_rate === '' ||
-                (!Number.isNaN(erRate) && erRate >= 0 && erRate <= 100 && !employerBelowMin);
+                (!Number.isNaN(erRate) &&
+                    erRate >= 0 &&
+                    erRate <= 100 &&
+                    !employerBelowMin);
             // Opt-out requires a date when the status is opted_out (on edit).
             const optOk = !optedOut || form.opt_out_date !== '';
             return eeOk && erOk && optOk;
@@ -279,10 +318,13 @@ export function BenefitsEnrollDialog({
             form.employee_profile_id !== '',
             form.benefit_plan_id !== '',
             !Number.isNaN(empRate) && empRate >= 0,
-            form.employer_contribution_rate === '' || (!Number.isNaN(erRate) && !employerBelowMin),
+            form.employer_contribution_rate === '' ||
+                (!Number.isNaN(erRate) && !employerBelowMin),
             isEdit ? form.status !== '' : true,
         ];
-        return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+        return Math.round(
+            (checks.filter(Boolean).length / checks.length) * 100,
+        );
     }, [form, empRate, erRate, employerBelowMin, isEdit]);
 
     const err = (field: string) => serverErrors[field];
@@ -301,7 +343,9 @@ export function BenefitsEnrollDialog({
             .join('\n')
             .trim();
         if (optedOut && form.opt_out_reason.trim()) {
-            return [base, `${REASON_TAG} ${form.opt_out_reason.trim()}`].filter(Boolean).join('\n');
+            return [base, `${REASON_TAG} ${form.opt_out_reason.trim()}`]
+                .filter(Boolean)
+                .join('\n');
         }
         return base;
     };
@@ -315,7 +359,11 @@ export function BenefitsEnrollDialog({
         const opts = {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success(isEdit ? 'Enrollment updated.' : 'Employee enrolled in benefit plan.');
+                toast.success(
+                    isEdit
+                        ? 'Enrollment updated.'
+                        : 'Employee enrolled in benefit plan.',
+                );
                 close();
             },
             onError: (errors: Record<string, string>) => {
@@ -352,7 +400,8 @@ export function BenefitsEnrollDialog({
                 notes: buildNotes() || null,
             };
             if (form.employer_contribution_rate !== '') {
-                editPayload.employer_contribution_rate = form.employer_contribution_rate;
+                editPayload.employer_contribution_rate =
+                    form.employer_contribution_rate;
             }
             router.put(
                 `/hr/compensation/benefits/enrollments/${edit.id}`,
@@ -367,7 +416,8 @@ export function BenefitsEnrollDialog({
                     benefit_plan_id: form.benefit_plan_id,
                     enrollment_date: form.enrollment_date,
                     employee_contribution_rate: form.employee_contribution_rate,
-                    employer_contribution_rate: form.employer_contribution_rate || null,
+                    employer_contribution_rate:
+                        form.employer_contribution_rate || null,
                     notes: form.notes || null,
                 },
                 opts,
@@ -378,19 +428,23 @@ export function BenefitsEnrollDialog({
     /* ----- rail live cost preview ----- */
     const railExtra = (
         <div className="rounded-lg border border-border bg-card/60 p-3">
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                 Live cost
             </div>
             {cost ? (
                 <div className="space-y-1">
                     <div className="flex items-baseline justify-between">
-                        <span className="text-[11px] text-muted-foreground">Total / yr</span>
+                        <span className="text-[11px] text-muted-foreground">
+                            Total / yr
+                        </span>
                         <span className="text-sm font-bold text-foreground">
                             {nzd.format(cost.totalAnnual)}
                         </span>
                     </div>
                     <div className="flex items-baseline justify-between">
-                        <span className="text-[11px] text-muted-foreground">Total / mo</span>
+                        <span className="text-[11px] text-muted-foreground">
+                            Total / mo
+                        </span>
                         <span className="text-[13px] font-semibold text-foreground">
                             {nzd.format(cost.totalMonthly)}
                         </span>
@@ -410,7 +464,9 @@ export function BenefitsEnrollDialog({
         <WizardShell
             open={open}
             onClose={close}
-            title={isEdit ? 'Update enrollment' : 'Enroll employee in benefit plan'}
+            title={
+                isEdit ? 'Update enrollment' : 'Enroll employee in benefit plan'
+            }
             description="Guided benefit enrollment — choose a plan, set contribution rates, and review."
             railIcon={HandCoins}
             railTitle={isEdit ? 'Update enrollment' : 'Enroll employee'}
@@ -418,7 +474,9 @@ export function BenefitsEnrollDialog({
             steps={STEPS}
             stepIndex={wiz.index}
             onStepClick={(i) => {
-                const forwardOk = Array.from({ length: i }, (_, s) => stepValid(s)).every(Boolean);
+                const forwardOk = Array.from({ length: i }, (_, s) =>
+                    stepValid(s),
+                ).every(Boolean);
                 if (i <= wiz.index || forwardOk) wiz.goTo(i);
             }}
             pct={completeness}
@@ -431,7 +489,11 @@ export function BenefitsEnrollDialog({
             footerEnd={
                 <>
                     {!wiz.isFirst ? (
-                        <Button type="button" variant="outline" onClick={wiz.back}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={wiz.back}
+                        >
                             Back
                         </Button>
                     ) : null}
@@ -480,12 +542,16 @@ export function BenefitsEnrollDialog({
                             {isEdit ? (
                                 <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
                                     <UserRound className="h-4 w-4 text-muted-foreground" />
-                                    <span className="font-medium">{selectedEmployeeName}</span>
+                                    <span className="font-medium">
+                                        {selectedEmployeeName}
+                                    </span>
                                 </div>
                             ) : (
                                 <SelectInput
                                     value={form.employee_profile_id}
-                                    onChange={(v) => set('employee_profile_id', v)}
+                                    onChange={(v) =>
+                                        set('employee_profile_id', v)
+                                    }
                                     placeholder="Select an employee"
                                     ariaLabel="Employee"
                                     options={employees.map((e) => ({
@@ -508,10 +574,16 @@ export function BenefitsEnrollDialog({
                             {isEdit ? (
                                 <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
                                     {(() => {
-                                        const Icon = PLAN_TYPE_ICON[planType] ?? HandCoins;
-                                        return <Icon className="h-4 w-4 text-muted-foreground" />;
+                                        const Icon =
+                                            PLAN_TYPE_ICON[planType] ??
+                                            HandCoins;
+                                        return (
+                                            <Icon className="h-4 w-4 text-muted-foreground" />
+                                        );
                                     })()}
-                                    <span className="font-medium">{selectedPlan?.name}</span>
+                                    <span className="font-medium">
+                                        {selectedPlan?.name}
+                                    </span>
                                     <span className="text-xs text-muted-foreground">
                                         {PLAN_TYPE_LABELS[planType] ?? planType}
                                     </span>
@@ -522,22 +594,30 @@ export function BenefitsEnrollDialog({
                                     onChange={(v) => {
                                         set('benefit_plan_id', v);
                                         // Prefill employer rate from the plan default when known.
-                                        const p = plans.find((pl) => String(pl.id) === v);
+                                        const p = plans.find(
+                                            (pl) => String(pl.id) === v,
+                                        );
                                         if (
-                                            p?.employer_contribution_rate != null &&
-                                            form.employer_contribution_rate === ''
+                                            p?.employer_contribution_rate !=
+                                                null &&
+                                            form.employer_contribution_rate ===
+                                                ''
                                         ) {
                                             set(
                                                 'employer_contribution_rate',
-                                                String(p.employer_contribution_rate),
+                                                String(
+                                                    p.employer_contribution_rate,
+                                                ),
                                             );
                                         }
                                     }}
                                     options={plans.map((p) => ({
                                         key: String(p.id),
                                         label: p.name,
-                                        description: PLAN_TYPE_LABELS[p.type] ?? p.type,
-                                        icon: PLAN_TYPE_ICON[p.type] ?? HandCoins,
+                                        description:
+                                            PLAN_TYPE_LABELS[p.type] ?? p.type,
+                                        icon:
+                                            PLAN_TYPE_ICON[p.type] ?? HandCoins,
                                         meta:
                                             p.employer_contribution_rate != null
                                                 ? `Employer default ${p.employer_contribution_rate}%`
@@ -546,7 +626,8 @@ export function BenefitsEnrollDialog({
                                 />
                             ) : (
                                 <InfoCard icon={Shield} tone="warn">
-                                    No active benefit plans available. Create a plan first.
+                                    No active benefit plans available. Create a
+                                    plan first.
                                 </InfoCard>
                             )}
                         </Field>
@@ -560,7 +641,9 @@ export function BenefitsEnrollDialog({
                                 <Input
                                     type="date"
                                     value={form.enrollment_date}
-                                    onChange={(e) => set('enrollment_date', e.target.value)}
+                                    onChange={(e) =>
+                                        set('enrollment_date', e.target.value)
+                                    }
                                 />
                             </Field>
                         ) : null}
@@ -583,17 +666,24 @@ export function BenefitsEnrollDialog({
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         {isKiwiSaver ? (
                             <div className="sm:col-span-2">
-                                <SubHead icon={PiggyBank}>KiwiSaver employee rate</SubHead>
+                                <SubHead icon={PiggyBank}>
+                                    KiwiSaver employee rate
+                                </SubHead>
                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                     {KIWISAVER_EMPLOYEE_RATES.map((r) => {
-                                        const active = form.employee_contribution_rate === r;
+                                        const active =
+                                            form.employee_contribution_rate ===
+                                            r;
                                         return (
                                             <button
                                                 key={r}
                                                 type="button"
                                                 aria-pressed={active}
                                                 onClick={() =>
-                                                    set('employee_contribution_rate', r)
+                                                    set(
+                                                        'employee_contribution_rate',
+                                                        r,
+                                                    )
                                                 }
                                                 className={
                                                     'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors ' +
@@ -625,7 +715,10 @@ export function BenefitsEnrollDialog({
                                 max="100"
                                 value={form.employee_contribution_rate}
                                 onChange={(e) =>
-                                    set('employee_contribution_rate', e.target.value)
+                                    set(
+                                        'employee_contribution_rate',
+                                        e.target.value,
+                                    )
                                 }
                             />
                         </Field>
@@ -647,14 +740,17 @@ export function BenefitsEnrollDialog({
                                 max="100"
                                 value={form.employer_contribution_rate}
                                 onChange={(e) =>
-                                    set('employer_contribution_rate', e.target.value)
+                                    set(
+                                        'employer_contribution_rate',
+                                        e.target.value,
+                                    )
                                 }
                             />
                         </Field>
 
                         {/* Live cost preview (only if a salary was provided). */}
                         {cost ? (
-                            <div className="sm:col-span-2 rounded-xl border border-border bg-muted/30 p-4">
+                            <div className="rounded-xl border border-border bg-muted/30 p-4 sm:col-span-2">
                                 <div className="mb-3 flex items-center justify-between">
                                     <div className="flex items-center gap-2 text-sm font-bold">
                                         <Banknote className="h-4 w-4 text-primary" />
@@ -702,15 +798,18 @@ export function BenefitsEnrollDialog({
                             </div>
                         ) : (
                             <InfoCard icon={Banknote} tone="info">
-                                Cost preview shows once an annual salary is available for this
-                                employee. Rates are still saved.
+                                Cost preview shows once an annual salary is
+                                available for this employee. Rates are still
+                                saved.
                             </InfoCard>
                         )}
 
                         {/* Edit-only: status + opt-out path. */}
                         {isEdit ? (
-                            <div className="sm:col-span-2 mt-1 space-y-4 border-t border-border pt-4">
-                                <SubHead icon={Shield}>Enrollment status</SubHead>
+                            <div className="mt-1 space-y-4 border-t border-border pt-4 sm:col-span-2">
+                                <SubHead icon={Shield}>
+                                    Enrollment status
+                                </SubHead>
                                 <Field label="Status" error={err('status')}>
                                     <Segmented
                                         value={form.status}
@@ -732,16 +831,26 @@ export function BenefitsEnrollDialog({
                                                 type="date"
                                                 value={form.opt_out_date}
                                                 onChange={(e) =>
-                                                    set('opt_out_date', e.target.value)
+                                                    set(
+                                                        'opt_out_date',
+                                                        e.target.value,
+                                                    )
                                                 }
                                             />
                                         </Field>
-                                        <Field label="Opt-out reason" hint="optional" span>
+                                        <Field
+                                            label="Opt-out reason"
+                                            hint="optional"
+                                            span
+                                        >
                                             <Textarea
                                                 rows={2}
                                                 value={form.opt_out_reason}
                                                 onChange={(e) =>
-                                                    set('opt_out_reason', e.target.value)
+                                                    set(
+                                                        'opt_out_reason',
+                                                        e.target.value,
+                                                    )
                                                 }
                                                 placeholder="e.g. Joined a different scheme; financial hardship…"
                                             />
@@ -751,7 +860,12 @@ export function BenefitsEnrollDialog({
                             </div>
                         ) : null}
 
-                        <Field label="Notes" hint="optional" span error={err('notes')}>
+                        <Field
+                            label="Notes"
+                            hint="optional"
+                            span
+                            error={err('notes')}
+                        >
                             <Textarea
                                 rows={3}
                                 value={form.notes}
@@ -770,10 +884,13 @@ export function BenefitsEnrollDialog({
                         <Ring pct={completeness} />
                         <div>
                             <h2 className="text-lg font-bold">
-                                {isEdit ? 'Review the changes' : 'Review the enrollment'}
+                                {isEdit
+                                    ? 'Review the changes'
+                                    : 'Review the enrollment'}
                             </h2>
                             <p className="text-sm text-muted-foreground">
-                                Confirm the details below, then {isEdit ? 'update' : 'enroll'}.
+                                Confirm the details below, then{' '}
+                                {isEdit ? 'update' : 'enroll'}.
                             </p>
                         </div>
                     </div>
@@ -783,20 +900,30 @@ export function BenefitsEnrollDialog({
                             title="Employee & plan"
                             onEdit={() => wiz.goTo(0)}
                         >
-                            <ReviewRow label="Employee" value={selectedEmployeeName} />
-                            <ReviewRow label="Plan" value={selectedPlan?.name} />
+                            <ReviewRow
+                                label="Employee"
+                                value={selectedEmployeeName}
+                            />
+                            <ReviewRow
+                                label="Plan"
+                                value={selectedPlan?.name}
+                            />
                             <ReviewRow
                                 label="Type"
                                 value={PLAN_TYPE_LABELS[planType] ?? planType}
                             />
                             {!isEdit ? (
-                                <ReviewRow label="Enrolled" value={form.enrollment_date} />
+                                <ReviewRow
+                                    label="Enrolled"
+                                    value={form.enrollment_date}
+                                />
                             ) : (
                                 <ReviewRow
                                     label="Status"
                                     value={
-                                        STATUS_OPTIONS.find((s) => s.value === form.status)
-                                            ?.label ?? form.status
+                                        STATUS_OPTIONS.find(
+                                            (s) => s.value === form.status,
+                                        )?.label ?? form.status
                                     }
                                 />
                             )}
@@ -838,7 +965,11 @@ export function BenefitsEnrollDialog({
                         </ReviewCard>
 
                         {optedOut && form.opt_out_reason.trim() ? (
-                            <ReviewCard icon={Shield} title="Opt-out reason" span>
+                            <ReviewCard
+                                icon={Shield}
+                                title="Opt-out reason"
+                                span
+                            >
                                 <p className="text-[13px] text-foreground">
                                     {form.opt_out_reason}
                                 </p>
@@ -847,18 +978,28 @@ export function BenefitsEnrollDialog({
 
                         {employerBelowMin ? (
                             <InfoCard icon={Shield} tone="crit">
-                                Employer contribution is below the {KIWISAVER_EMPLOYER_MIN}%
-                                KiwiSaver minimum — adjust it before saving.
+                                Employer contribution is below the{' '}
+                                {KIWISAVER_EMPLOYER_MIN}% KiwiSaver minimum —
+                                adjust it before saving.
                             </InfoCard>
                         ) : null}
 
                         {form.notes.trim() &&
                         !form.notes.trim().startsWith(REASON_TAG) ? (
-                            <ReviewCard icon={ClipboardCheck} title="Notes" span>
-                                <p className="whitespace-pre-line text-[13px] text-foreground">
+                            <ReviewCard
+                                icon={ClipboardCheck}
+                                title="Notes"
+                                span
+                            >
+                                <p className="text-[13px] whitespace-pre-line text-foreground">
                                     {form.notes
                                         .split('\n')
-                                        .filter((l) => !l.trim().startsWith(REASON_TAG))
+                                        .filter(
+                                            (l) =>
+                                                !l
+                                                    .trim()
+                                                    .startsWith(REASON_TAG),
+                                        )
                                         .join('\n')
                                         .trim()}
                                 </p>

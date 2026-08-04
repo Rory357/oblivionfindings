@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 /**
  * Control Room device projection — signal pipeline support model.
@@ -17,8 +18,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * This model exists to support Control Room-specific concerns:
  * - Signal pipeline: control_room_signals.device_id references this table
  * - Alert linkage: control_room_alerts.device_id references this table
- * - CR-specific status: last_signal_at, stale detection, battery alerts
- * - Offline detection: DetectCrDeviceOfflineJob monitors this table
+ * - Historical CR-local status fields and last-signal enrichment for retained rows
+ *
+ * Canonical Device assignments and native monitors own current Site and health
+ * state. This projection must not schedule, infer, or emit Device health changes.
  *
  * For canonical device identity, use the canonicalDevice() relationship
  * which follows the canonical_device_id bridge FK to the devices table.
@@ -77,7 +80,7 @@ class Device extends Model
     {
         static::creating(function (self $device): void {
             if (empty($device->device_uid)) {
-                $device->device_uid = 'dev-' . (string) \Illuminate\Support\Str::uuid();
+                $device->device_uid = 'dev-'.(string) Str::uuid();
             }
 
             if (empty($device->type)) {
@@ -116,16 +119,6 @@ class Device extends Model
         return $this->belongsTo(\App\Domain\SecurityDevices\Models\Device::class, 'canonical_device_id');
     }
 
-    public function scopeOnline($query)
-    {
-        return $query->where('status', 'online');
-    }
-
-    public function scopeOffline($query)
-    {
-        return $query->where('status', 'offline');
-    }
-
     public function scopeByType($query, string $type)
     {
         return $query->where('type', $type);
@@ -136,79 +129,28 @@ class Device extends Model
         return $query->where('site_id', $siteId);
     }
 
-    public function scopeStale($query, int $minutes = 30)
-    {
-        return $query->where('status', 'online')
-            ->where(function ($q) use ($minutes) {
-                $q->whereNull('last_seen_at')
-                    ->orWhere('last_seen_at', '<', now()->subMinutes($minutes));
-            });
-    }
-
-    public function scopeLowBattery($query, int $threshold = 20)
-    {
-        return $query->whereNotNull('battery_level')
-            ->where('battery_level', '<=', $threshold);
-    }
-
-    public function markOnline(): void
-    {
-        $this->update([
-            'status' => 'online',
-            'last_seen_at' => now(),
-        ]);
-    }
-
-    public function markOffline(): void
-    {
-        $this->update(['status' => 'offline']);
-    }
-
-    public function updateBattery(int $level): void
-    {
-        $this->update([
-            'battery_level' => $level,
-            'battery_updated_at' => now(),
-        ]);
-    }
-
     public function recordSignal(): void
     {
-        $this->update([
-            'last_signal_at' => now(),
-            'last_seen_at' => now(),
-            'status' => 'online',
-        ]);
-    }
-
-    public function isOnline(): bool
-    {
-        return $this->status === 'online';
-    }
-
-    public function isStale(int $minutes = 30): bool
-    {
-        if (!$this->last_seen_at) {
-            return true;
-        }
-
-        return $this->last_seen_at->lt(now()->subMinutes($minutes));
-    }
-
-    public function hasLowBattery(int $threshold = 20): bool
-    {
-        return $this->battery_level !== null && $this->battery_level <= $threshold;
+        $this->update(['last_signal_at' => now()]);
     }
 
     // Device types
     public const TYPE_CAMERA = 'camera';
+
     public const TYPE_DOOR = 'door';
+
     public const TYPE_SENSOR = 'sensor';
+
     public const TYPE_ALARM_PANEL = 'alarm_panel';
+
     public const TYPE_BED_SENSOR = 'bed_sensor';
+
     public const TYPE_PERSONAL_TRACKER = 'personal_tracker';
+
     public const TYPE_VEHICLE_TRACKER = 'vehicle_tracker';
+
     public const TYPE_ENVIRONMENTAL = 'environmental';
+
     public const TYPE_NETWORK = 'network';
 
     public static function types(): array

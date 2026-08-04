@@ -3,16 +3,17 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class FundingClaimItem extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
+    use WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'funding_claim_id',
         'service_agreement_line_item_id',
         'shift_id',

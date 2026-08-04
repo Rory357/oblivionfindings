@@ -19,6 +19,7 @@ class TimeTrackingService
     public function __construct(
         private readonly AttendanceService $attendanceService,
         private readonly DraftTimesheetService $draftTimesheets,
+        private readonly HrCurrentStaffService $currentStaff,
     ) {}
 
     /**
@@ -27,10 +28,10 @@ class TimeTrackingService
      */
     public function clockIn(User $user, ?string $notes = null, ?string $projectCode = null, ?int $shiftId = null): HrTimeEntry
     {
-        $tenantId = $this->resolveTenantId($user);
+        $this->assertCurrentStaff($user);
 
         // Check HrTimeEntry level for active clock
-        $existing = HrTimeEntry::forTenant($tenantId)
+        $existing = HrTimeEntry::query()
             ->forUser($user->id)
             ->active()
             ->first();
@@ -40,7 +41,6 @@ class TimeTrackingService
         }
 
         $session = $this->attendanceService->clockIn($user, [
-            'tenant_id' => $tenantId,
             'shift_id' => $shiftId,
             'notes' => $notes,
             'source' => 'hr_module',
@@ -52,7 +52,7 @@ class TimeTrackingService
         ]);
 
         if (! $entry) {
-            throw new \LogicException('Could not record the time entry — your account has no resolvable HR tenant.');
+            throw new \LogicException('Could not record the time entry for this staff profile.');
         }
 
         return $entry;
@@ -64,21 +64,10 @@ class TimeTrackingService
      * create-or-update the one matching HrTimeEntry (keyed on the now-unique
      * attendance_session_id). Every clock source (/my-day, /hr/my, /hr/time)
      * routes through here so the NZ break formula + payload live in ONE place and
-     * every clocker produces a consistent HrTimeEntry. Returns null only when the
-     * actor has no resolvable tenant (frontline edge) — callers that need the
-     * entry treat that as an error; the clock itself never breaks.
+     * every clocker produces a consistent HrTimeEntry.
      */
     public function syncEntryFromSession(HrAttendanceSession $session, User $actor, array $extra = []): ?HrTimeEntry
     {
-        $tenantId = $session->tenant_id;
-        if (! is_numeric($tenantId)) {
-            try {
-                $tenantId = $this->resolveTenantId($actor);
-            } catch (\LogicException) {
-                return null;
-            }
-        }
-
         $session->loadMissing('shift');
         $clockIn = $session->clock_in_at;
         $clockOut = $session->clock_out_at;
@@ -89,7 +78,6 @@ class TimeTrackingService
 
         if (! $entry) {
             $entry = new HrTimeEntry([
-                'tenant_id' => (int) $tenantId,
                 'user_id' => $session->user_id,
                 'shift_id' => $session->shift_id,
                 'attendance_session_id' => $session->id,
@@ -130,9 +118,9 @@ class TimeTrackingService
      * Used by the self-service clock-out to self-heal orphaned actives without
      * re-implementing the NZ break formula. Returns the number closed.
      */
-    public function closeOpenEntries(User $user, int $tenantId, Carbon $clockOut, int $breakMinutes, ?float $mileageKm = null, ?string $notes = null): int
+    public function closeOpenEntries(User $user, Carbon $clockOut, int $breakMinutes, ?float $mileageKm = null, ?string $notes = null): int
     {
-        $open = HrTimeEntry::forTenant($tenantId)
+        $open = HrTimeEntry::query()
             ->forUser($user->id)
             ->active()
             ->get();
@@ -180,9 +168,9 @@ class TimeTrackingService
      */
     public function clockOut(User $user, int $breakMinutes = 0, ?string $notes = null, ?float $mileageKm = null): HrTimeEntry
     {
-        $tenantId = $this->resolveTenantId($user);
+        $this->assertCurrentStaff($user);
 
-        $entry = HrTimeEntry::forTenant($tenantId)
+        $entry = HrTimeEntry::query()
             ->forUser($user->id)
             ->active()
             ->first();
@@ -225,7 +213,12 @@ class TimeTrackingService
      */
     public function createManualEntry(User $user, array $data): HrTimeEntry
     {
-        $tenantId = $this->resolveTenantId($user);
+        $this->assertCurrentStaff($user);
+        $targetUserId = (int) ($data['user_id'] ?? $user->id);
+        if (! $this->currentStaff->isCurrent($targetUserId)) {
+            throw new \LogicException('Time entries can be created only for current approved staff.');
+        }
+
         $clockInLocal = $this->parseWorkerLocalDateTime($data['clock_in']);
         $clockOutLocal = $this->parseWorkerLocalDateTime($data['clock_out']);
         $clockIn = $clockInLocal->copy()->utc();
@@ -234,10 +227,9 @@ class TimeTrackingService
         $totalMinutes = $clockIn->diffInMinutes($clockOut) - $breakMinutes;
         $totalHours = max(0, round($totalMinutes / 60, 2));
 
-        return DB::transaction(function () use ($tenantId, $data, $user, $clockInLocal, $clockIn, $clockOut, $breakMinutes, $totalHours) {
+        return DB::transaction(function () use ($targetUserId, $data, $user, $clockInLocal, $clockIn, $clockOut, $breakMinutes, $totalHours) {
             $entry = HrTimeEntry::create([
-                'tenant_id' => $tenantId,
-                'user_id' => $data['user_id'] ?? $user->id,
+                'user_id' => $targetUserId,
                 'shift_id' => $data['shift_id'] ?? null,
                 'site_id' => $data['site_id'] ?? null,
                 'client_id' => $data['client_id'] ?? null,
@@ -269,12 +261,12 @@ class TimeTrackingService
     /**
      * Get a weekly summary of hours for a user.
      */
-    public function getWeeklySummary(?int $tenantId, int $userId, ?string $weekStart = null): array
+    public function getWeeklySummary(int $userId, ?string $weekStart = null): array
     {
         $start = $weekStart ? Carbon::parse($weekStart)->startOfWeek() : now()->startOfWeek();
         $end = $start->copy()->endOfWeek();
 
-        $entries = HrTimeEntry::forTenant($tenantId)
+        $entries = HrTimeEntry::query()
             ->forUser($userId)
             ->forDateRange($start->toDateString(), $end->toDateString())
             ->whereNotNull('clock_out')
@@ -303,9 +295,11 @@ class TimeTrackingService
 
     public function getTeamUserIds(User $manager): array
     {
-        return HrEmployeeProfile::where('manager_user_id', $manager->id)
-            ->where('is_active', true)
+        return HrEmployeeProfile::query()
+            ->where('manager_user_id', $manager->id)
+            ->whereIn('user_id', $this->currentStaff->currentUsersQuery()->select('users.id'))
             ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
             ->all();
     }
 
@@ -327,12 +321,11 @@ class TimeTrackingService
             throw new \LogicException("This entry's timesheet is payroll-linked and cannot be {$action}.");
         }
 
-        if (! $entry->entry_date || ! $entry->tenant_id) {
+        if (! $entry->entry_date) {
             return;
         }
 
         $locked = HrPayrollRun::query()
-            ->where('tenant_id', $entry->tenant_id)
             ->whereIn('status', ['locked', 'exported'])
             ->where('period_start', '<=', $entry->entry_date)
             ->where('period_end', '>=', $entry->entry_date)
@@ -379,7 +372,6 @@ class TimeTrackingService
         $result = DB::transaction(function () use ($entry, $editor, $data, $reason) {
             $editableFields = ['clock_in', 'clock_out', 'break_minutes', 'pay_type', 'notes', 'is_sleepover', 'is_on_call', 'is_public_holiday', 'mileage_km', 'cost_centre', 'project_code'];
             $originalValues = [];
-            $tenantId = $entry->tenant_id;
 
             foreach ($editableFields as $field) {
                 if (! array_key_exists($field, $data)) {
@@ -396,7 +388,6 @@ class TimeTrackingService
                 $originalValues[$field] = $oldValue;
 
                 HrTimeEntryAmendment::create([
-                    'tenant_id' => $tenantId,
                     'hr_time_entry_id' => $entry->id,
                     'amended_by' => $editor->id,
                     'field_name' => $field,
@@ -478,7 +469,11 @@ class TimeTrackingService
 
     public function clockOnBehalf(User $manager, int $targetUserId, array $data): HrTimeEntry
     {
-        $tenantId = $this->resolveTenantId($manager);
+        $this->assertCurrentStaff($manager);
+        if (! $this->currentStaff->isCurrent($targetUserId)) {
+            throw new \LogicException('You can clock on behalf of current approved staff only.');
+        }
+
         $teamUserIds = $this->getTeamUserIds($manager);
         $isAdmin = $manager->canDo('timesheets.manageAny');
 
@@ -504,9 +499,8 @@ class TimeTrackingService
 
         $reason = isset($data['reason']) ? trim((string) $data['reason']) : '';
 
-        $result = DB::transaction(function () use ($tenantId, $targetUserId, $data, $clockInLocal, $clockIn, $clockOut, $breakMinutes, $totalHours, $breakCompliant, $manager, $reason) {
+        $result = DB::transaction(function () use ($targetUserId, $data, $clockInLocal, $clockIn, $clockOut, $breakMinutes, $totalHours, $breakCompliant, $manager, $reason) {
             $entry = HrTimeEntry::create([
-                'tenant_id' => $tenantId,
                 'user_id' => $targetUserId,
                 'shift_id' => $data['shift_id'] ?? null,
                 'site_id' => $data['site_id'] ?? null,
@@ -534,7 +528,6 @@ class TimeTrackingService
             // amendment history drawer explains why a manager created the entry.
             if ($reason !== '') {
                 HrTimeEntryAmendment::create([
-                    'tenant_id' => $tenantId,
                     'hr_time_entry_id' => $entry->id,
                     'amended_by' => $manager->id,
                     'field_name' => 'created_on_behalf',
@@ -573,7 +566,6 @@ class TimeTrackingService
 
         DB::transaction(function () use ($entry, $actor, $reason) {
             HrTimeEntryAmendment::create([
-                'tenant_id' => $entry->tenant_id,
                 'hr_time_entry_id' => $entry->id,
                 'amended_by' => $actor->id,
                 'field_name' => 'voided',
@@ -607,7 +599,6 @@ class TimeTrackingService
     public function addNote(HrTimeEntry $entry, User $actor, string $note): HrTimeEntryAmendment
     {
         return HrTimeEntryAmendment::create([
-            'tenant_id' => $entry->tenant_id,
             'hr_time_entry_id' => $entry->id,
             'amended_by' => $actor->id,
             'field_name' => 'note',
@@ -662,7 +653,6 @@ class TimeTrackingService
 
         $result = DB::transaction(function () use ($entry, $actor, $clockOutUtc, $breakMinutes, $totalHours, $requiredBreak, $reason) {
             HrTimeEntryAmendment::create([
-                'tenant_id' => $entry->tenant_id,
                 'hr_time_entry_id' => $entry->id,
                 'amended_by' => $actor->id,
                 'field_name' => 'clock_out',
@@ -706,32 +696,10 @@ class TimeTrackingService
         return Carbon::parse((string) $value, $timezone);
     }
 
-    private function resolveTenantId(User $user): int
+    private function assertCurrentStaff(User $user): void
     {
-        $candidateTenantId = $user->getAttribute('tenant_id');
-        if (is_numeric($candidateTenantId)) {
-            return (int) $candidateTenantId;
+        if (! $this->currentStaff->isCurrent($user)) {
+            throw new \LogicException('Time tracking is available only to current approved staff.');
         }
-
-        $organizationTenantId = $user->getAttribute('organization_id');
-        if (is_numeric($organizationTenantId)) {
-            return (int) $organizationTenantId;
-        }
-
-        $profileTenantId = HrEmployeeProfile::query()
-            ->where('user_id', $user->id)
-            ->value('tenant_id');
-
-        if (is_numeric($profileTenantId)) {
-            return (int) $profileTenantId;
-        }
-
-        // No silent cross-tenant fallback: writing time entries against an
-        // arbitrary tenant_id would corrupt audit and payroll data. Surface
-        // the malformed user instead so the caller can fix configuration.
-        throw new \LogicException(sprintf(
-            'Cannot resolve tenant_id for user %d (no tenant_id, organization_id, or HR profile).',
-            $user->id,
-        ));
     }
 }

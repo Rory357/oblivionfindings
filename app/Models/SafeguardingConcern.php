@@ -56,7 +56,6 @@ class SafeguardingConcern extends Model
         'lessons_learned',
         'related_incident_id',
         'site_id',
-        'organization_id',
         'created_by',
         'updated_by',
     ];
@@ -161,14 +160,6 @@ class SafeguardingConcern extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
-    }
-
-    /**
-     * Organization.
-     */
-    public function organization(): BelongsTo
-    {
-        return $this->belongsTo(Organization::class);
     }
 
     /**

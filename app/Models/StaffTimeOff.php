@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
+use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class StaffTimeOff extends Model
 {
-    use HasFactory;
-    use AuditableChanges;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
         'tenant_id',
@@ -48,11 +49,6 @@ class StaffTimeOff extends Model
      */
     public function leaveRequest()
     {
-        return $this->belongsTo(\App\Domain\Hr\Models\HrLeaveRequest::class, 'hr_leave_request_id');
-    }
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
+        return $this->belongsTo(HrLeaveRequest::class, 'hr_leave_request_id');
     }
 }

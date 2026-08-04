@@ -13,8 +13,6 @@ class CateringSeeder extends Seeder
 {
     public function run(): void
     {
-        $tenantId = null;
-
         $tags = [
             // Dietary preferences
             ['key' => 'vegetarian', 'label' => 'Vegetarian', 'kind' => 'dietary', 'severity' => 'info', 'color' => '#16a34a'],
@@ -49,8 +47,8 @@ class CateringSeeder extends Seeder
         $tagMap = [];
         foreach ($tags as $row) {
             $tag = MealDietaryTag::firstOrCreate(
-                ['tenant_id' => $tenantId, 'key' => $row['key']],
-                $row + ['tenant_id' => $tenantId]
+                ['key' => $row['key']],
+                $row,
             );
             $tagMap[$row['key']] = $tag;
         }
@@ -112,10 +110,9 @@ class CateringSeeder extends Seeder
 
         $productMap = [];
         foreach ($products as $row) {
-            $product = MealProduct::firstOrCreate(
-                ['tenant_id' => $tenantId, 'name' => $row['name']],
+            $product = MealProduct::withTrashed()->firstOrCreate(
+                ['name' => $row['name']],
                 [
-                    'tenant_id' => $tenantId,
                     'category' => $row['category'],
                     'default_unit' => $row['default_unit'],
                     'pack_size' => $row['pack_size'] ?? null,
@@ -124,6 +121,11 @@ class CateringSeeder extends Seeder
                     'currency' => 'NZD',
                 ]
             );
+
+            if ($product->trashed()) {
+                continue;
+            }
+
             $productMap[$row['name']] = $product;
 
             $tagIds = collect($row['tags'] ?? [])
@@ -211,10 +213,9 @@ class CateringSeeder extends Seeder
         ];
 
         foreach ($recipes as $row) {
-            $recipe = MealRecipe::firstOrCreate(
-                ['tenant_id' => $tenantId, 'slug' => Str::slug($row['name'])],
+            $recipe = MealRecipe::withTrashed()->firstOrCreate(
+                ['slug' => Str::slug($row['name'])],
                 [
-                    'tenant_id' => $tenantId,
                     'name' => $row['name'],
                     'description' => $row['description'],
                     'serves_default' => $row['serves_default'],
@@ -224,6 +225,10 @@ class CateringSeeder extends Seeder
                     'is_active' => false,
                 ]
             );
+
+            if ($recipe->trashed()) {
+                continue;
+            }
 
             $tagIds = collect($row['tags'] ?? [])
                 ->map(fn ($key) => $tagMap[$key]?->id ?? null)

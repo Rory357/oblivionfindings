@@ -15,10 +15,6 @@ class ArchiveCandidateDataJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(
-        public ?int $tenantId = null
-    ) {}
-
     public function handle(): void
     {
         $retentionMonths = config('hr.candidate_retention_months', 24);
@@ -31,15 +27,11 @@ class ArchiveCandidateDataJob implements ShouldQueue
             // or soft-delete them on retention (handover item 22).
             ->whereDoesntHave('talentPoolMembership');
 
-        if ($this->tenantId) {
-            $query->where('tenant_id', $this->tenantId);
-        }
-
         $count = $query->count();
         $anonymise = (bool) config('hr.retention.anonymise_candidates_before_archive', true);
 
         // Soft-delete in chunks to avoid memory issues
-        $query->chunkById(200, function ($candidates) {
+        $query->chunkById(200, function ($candidates) use ($anonymise) {
             foreach ($candidates as $candidate) {
                 $cvPaths = $candidate->applications()
                     ->whereNotNull('cv_storage_path')
@@ -68,7 +60,7 @@ class ArchiveCandidateDataJob implements ShouldQueue
                     'screening_answers' => null,
                 ]);
 
-                if ((bool) config('hr.retention.anonymise_candidates_before_archive', true)) {
+                if ($anonymise) {
                     $candidate->update([
                         'first_name' => 'Archived',
                         'last_name' => "Candidate {$candidate->id}",
@@ -86,7 +78,7 @@ class ArchiveCandidateDataJob implements ShouldQueue
         });
 
         Log::info("ArchiveCandidateDataJob: Archived {$count} candidates older than {$retentionMonths} months.", [
-            'tenant_id'   => $this->tenantId,
+            'scope' => 'application',
             'cutoff_date' => $cutoffDate->toDateString(),
             'anonymised' => $anonymise,
         ]);

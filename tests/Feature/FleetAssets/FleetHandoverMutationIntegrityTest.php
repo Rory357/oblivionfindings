@@ -8,6 +8,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Controllers\FleetAssets\HandoverController;
 use App\Models\Asset;
 use App\Models\AuditLog;
+use App\Models\Client;
 use App\Models\FleetShiftHandover;
 use App\Models\Permission;
 use App\Models\Role;
@@ -32,18 +33,16 @@ class FleetHandoverMutationIntegrityTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-    public function test_handover_creation_rejects_an_incoming_user_from_another_tenant(): void
+    public function test_handover_creation_rejects_an_incoming_user_from_another_site(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 301]);
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
         $vehicle = Asset::factory()->vehicle()->create(['site_id' => $site->id]);
-        $manager = $this->tenantFleetManager(301);
-        $foreignWorker = User::factory()->create([
-            'organization_id' => 302,
-            'role' => 'support_worker',
-        ]);
+        $manager = $this->siteFleetManager($site);
+        $otherSiteWorker = $this->siteUser('support_worker', $otherSite);
 
         $this->actingAs($manager)
-            ->post('/fleet-assets/handovers', $this->handoverPayload($vehicle, $foreignWorker))
+            ->post('/fleet-assets/handovers', $this->handoverPayload($vehicle, $otherSiteWorker))
             ->assertForbidden();
 
         $this->assertDatabaseCount('fleet_shift_handovers', 0);
@@ -51,13 +50,13 @@ class FleetHandoverMutationIntegrityTest extends TestCase
 
     public function test_handover_creation_rejects_an_accessible_non_vehicle_without_writing_audit_history(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 303]);
+        $site = Site::factory()->create();
         $nonVehicle = Asset::factory()->create([
             'site_id' => $site->id,
             'category' => 'medical_device',
         ]);
-        $manager = $this->tenantFleetManager(303);
-        $incoming = $this->tenantUser(303, 'support_worker', $site);
+        $manager = $this->siteFleetManager($site);
+        $incoming = $this->siteUser('support_worker', $site);
         $auditCount = AuditLog::query()->count();
 
         $this->actingAs($manager)
@@ -70,11 +69,10 @@ class FleetHandoverMutationIntegrityTest extends TestCase
 
     public function test_handover_creation_rejects_a_client_portal_user_as_incoming_staff(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 311]);
+        $site = Site::factory()->create();
         $vehicle = Asset::factory()->vehicle()->create(['site_id' => $site->id]);
-        $manager = $this->tenantFleetManager(311);
+        $manager = $this->siteFleetManager($site);
         $clientPortalUser = User::factory()->create([
-            'organization_id' => 311,
             'role' => 'client',
         ]);
         $clientPortalUser->roles()->attach(Role::query()->where('name', 'client')->firstOrFail());
@@ -88,14 +86,14 @@ class FleetHandoverMutationIntegrityTest extends TestCase
 
     public function test_handover_creation_requires_the_recipient_to_be_currently_eligible_for_the_authoritative_site(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 312]);
-        $otherSite = Site::factory()->create(['tenant_id' => 312]);
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
         $vehicle = Asset::factory()->vehicle()->create([
             'site_id' => $site->id,
             'home_site_id' => $otherSite->id,
         ]);
-        $manager = $this->tenantFleetManager(312);
-        $wrongSiteWorker = $this->tenantUser(312, 'support_worker', $otherSite);
+        $manager = $this->siteFleetManager($site);
+        $wrongSiteWorker = $this->siteUser('support_worker', $otherSite);
 
         $this->actingAs($manager)
             ->post('/fleet-assets/handovers', $this->handoverPayload($vehicle, $wrongSiteWorker))
@@ -106,13 +104,13 @@ class FleetHandoverMutationIntegrityTest extends TestCase
 
     public function test_handover_creation_rejects_unapproved_inactive_and_profileless_recipients(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 313]);
+        $site = Site::factory()->create();
         $vehicle = Asset::factory()->vehicle()->create(['site_id' => $site->id]);
-        $manager = $this->tenantFleetManager(313);
-        $unapproved = $this->tenantUser(313, 'support_worker', $site, false);
-        $inactive = $this->tenantUser(313, 'support_worker', $site);
+        $manager = $this->siteFleetManager($site);
+        $unapproved = $this->siteUser('support_worker', $site, false);
+        $inactive = $this->siteUser('support_worker', $site);
         $inactive->hrEmployeeProfile()->update(['is_active' => false]);
-        $profileless = $this->tenantUser(313);
+        $profileless = $this->siteUser();
 
         foreach ([$unapproved, $inactive, $profileless] as $recipient) {
             $this->actingAs($manager)
@@ -123,39 +121,29 @@ class FleetHandoverMutationIntegrityTest extends TestCase
         $this->assertDatabaseCount('fleet_shift_handovers', 0);
     }
 
-    public function test_platform_admin_cannot_create_a_cross_tenant_recipient_site_tuple(): void
+    public function test_all_sites_manager_cannot_create_a_recipient_tuple_for_another_site(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 314]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 315]);
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
         $vehicle = Asset::factory()->vehicle()->create(['site_id' => $site->id]);
-        $platformAdmin = User::factory()->create([
-            'organization_id' => null,
-            'approved_at' => now(),
-            'role' => 'admin',
-        ]);
-        $platformAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
-        $foreignWorker = $this->tenantUser(315, 'support_worker', $foreignSite);
+        $applicationManager = $this->applicationFleetManager($site);
+        $otherSiteWorker = $this->siteUser('support_worker', $otherSite);
 
-        $this->actingAs($platformAdmin)
-            ->post('/fleet-assets/handovers', $this->handoverPayload($vehicle, $foreignWorker))
+        $this->actingAs($applicationManager)
+            ->post('/fleet-assets/handovers', $this->handoverPayload($vehicle, $otherSiteWorker))
             ->assertForbidden();
 
         $this->assertDatabaseCount('fleet_shift_handovers', 0);
     }
 
-    public function test_organization_less_platform_admin_cannot_originate_even_a_valid_tenant_handover(): void
+    public function test_all_sites_manager_cannot_originate_without_current_assignment_to_the_vehicle_site(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 315]);
+        $site = Site::factory()->create();
         $vehicle = Asset::factory()->vehicle()->create(['site_id' => $site->id]);
-        $incoming = $this->tenantUser(315, 'support_worker', $site);
-        $platformAdmin = User::factory()->create([
-            'organization_id' => null,
-            'approved_at' => now(),
-            'role' => 'admin',
-        ]);
-        $platformAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+        $incoming = $this->siteUser('support_worker', $site);
+        $applicationManager = $this->applicationFleetManager();
 
-        $this->actingAs($platformAdmin)
+        $this->actingAs($applicationManager)
             ->post('/fleet-assets/handovers', $this->handoverPayload($vehicle, $incoming))
             ->assertForbidden();
 
@@ -164,10 +152,10 @@ class FleetHandoverMutationIntegrityTest extends TestCase
 
     public function test_handover_creation_rolls_back_when_strict_audit_writing_fails(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 316]);
+        $site = Site::factory()->create();
         $vehicle = Asset::factory()->vehicle()->create(['site_id' => $site->id]);
-        $manager = $this->tenantFleetManager(316);
-        $incoming = $this->tenantUser(316, 'support_worker', $site);
+        $manager = $this->siteFleetManager($site);
+        $incoming = $this->siteUser('support_worker', $site);
 
         $caught = $this->captureStrictAuditFailure(fn () => $this->actingAs($manager)
             ->post('/fleet-assets/handovers', $this->handoverPayload($vehicle, $incoming)));
@@ -178,11 +166,11 @@ class FleetHandoverMutationIntegrityTest extends TestCase
 
     public function test_accept_reauthorizes_the_locked_handover_instead_of_trusting_a_stale_participant(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 321]);
+        $site = Site::factory()->create();
         $vehicle = Asset::factory()->vehicle()->create(['site_id' => $site->id]);
-        $outgoing = $this->tenantUser(321, 'support_worker', $site);
-        $originalIncoming = $this->tenantUser(321, 'support_worker', $site);
-        $replacementIncoming = $this->tenantUser(321, 'support_worker', $site);
+        $outgoing = $this->siteUser('support_worker', $site);
+        $originalIncoming = $this->siteUser('support_worker', $site);
+        $replacementIncoming = $this->siteUser('support_worker', $site);
         $handover = $this->makeHandover($vehicle, $outgoing, $originalIncoming);
         $staleHandover = FleetShiftHandover::query()->findOrFail($handover->id);
 
@@ -206,10 +194,10 @@ class FleetHandoverMutationIntegrityTest extends TestCase
 
     public function test_accept_and_dispute_do_not_overwrite_a_transition_that_won_the_race(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 331]);
+        $site = Site::factory()->create();
         $vehicle = Asset::factory()->vehicle()->create(['site_id' => $site->id]);
-        $outgoing = $this->tenantUser(331, 'support_worker', $site);
-        $incoming = $this->tenantUser(331, 'support_worker', $site);
+        $outgoing = $this->siteUser('support_worker', $site);
+        $incoming = $this->siteUser('support_worker', $site);
 
         $acceptTarget = $this->makeHandover($vehicle, $outgoing, $incoming);
         $staleAcceptTarget = FleetShiftHandover::query()->findOrFail($acceptTarget->id);
@@ -244,23 +232,31 @@ class FleetHandoverMutationIntegrityTest extends TestCase
         $this->assertStringNotContainsString('stale dispute', strtolower((string) $disputeTarget->fresh()->notes));
     }
 
-    public function test_accept_rejects_poisoned_handover_tenant_and_outgoing_user_tuples(): void
+    public function test_accept_rejects_poisoned_vehicle_site_client_and_outgoing_user_tuples(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 332]);
-        $vehicle = Asset::factory()->vehicle()->create(['site_id' => $site->id]);
-        $outgoing = $this->tenantUser(332, 'support_worker', $site);
-        $incoming = $this->tenantUser(332, 'support_worker', $site);
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $poisonedVehicle = Asset::factory()->vehicle()->create([
+            'site_id' => $site->id,
+            'client_id' => $client->id,
+        ]);
+        $outgoing = $this->siteUser('support_worker', $site);
+        $incoming = $this->siteUser('support_worker', $site);
 
-        $wrongTenant = $this->makeHandover($vehicle, $outgoing, $incoming);
-        FleetShiftHandover::query()->whereKey($wrongTenant->id)->update(['tenant_id' => 999332]);
+        $wrongVehicleSite = $this->makeHandover($poisonedVehicle, $outgoing, $incoming);
+        $poisonedVehicle->update(['site_id' => $otherSite->id]);
         $this->actingAs($incoming)
-            ->post("/fleet-assets/handovers/{$wrongTenant->id}/accept")
+            ->post("/fleet-assets/handovers/{$wrongVehicleSite->id}/accept")
             ->assertForbidden();
-        $this->assertSame('pending_acceptance', $wrongTenant->fresh()->status);
+        $this->assertSame('pending_acceptance', $wrongVehicleSite->fresh()->status);
 
-        $foreignOutgoing = $this->tenantUser(333);
-        $wrongOutgoing = $this->makeHandover($vehicle, $foreignOutgoing, $incoming);
-        FleetShiftHandover::query()->whereKey($wrongOutgoing->id)->update(['tenant_id' => $site->tenant_id]);
+        $vehicle = Asset::factory()->vehicle()->create([
+            'site_id' => $site->id,
+            'client_id' => $client->id,
+        ]);
+        $otherSiteOutgoing = $this->siteUser('support_worker', $otherSite);
+        $wrongOutgoing = $this->makeHandover($vehicle, $otherSiteOutgoing, $incoming);
         $this->actingAs($incoming)
             ->post("/fleet-assets/handovers/{$wrongOutgoing->id}/accept")
             ->assertForbidden();
@@ -269,11 +265,11 @@ class FleetHandoverMutationIntegrityTest extends TestCase
 
     public function test_accept_and_dispute_reject_a_recipient_who_became_ineligible_after_creation(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 334]);
-        $otherSite = Site::factory()->create(['tenant_id' => 334]);
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
         $vehicle = Asset::factory()->vehicle()->create(['site_id' => $site->id]);
-        $outgoing = $this->tenantUser(334, 'support_worker', $site);
-        $incoming = $this->tenantUser(334, 'support_worker', $site);
+        $outgoing = $this->siteUser('support_worker', $site);
+        $incoming = $this->siteUser('support_worker', $site);
 
         $acceptTarget = $this->makeHandover($vehicle, $outgoing, $incoming);
         $incoming->hrEmployeeProfile()->update(['primary_site_id' => $otherSite->id]);
@@ -297,10 +293,10 @@ class FleetHandoverMutationIntegrityTest extends TestCase
 
     public function test_accept_and_dispute_roll_back_when_strict_audit_writing_fails(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 335]);
+        $site = Site::factory()->create();
         $vehicle = Asset::factory()->vehicle()->create(['site_id' => $site->id]);
-        $outgoing = $this->tenantUser(335, 'support_worker', $site);
-        $incoming = $this->tenantUser(335, 'support_worker', $site);
+        $outgoing = $this->siteUser('support_worker', $site);
+        $incoming = $this->siteUser('support_worker', $site);
 
         $acceptTarget = $this->makeHandover($vehicle, $outgoing, $incoming);
         $caught = $this->captureStrictAuditFailure(fn () => $this->actingAs($incoming)
@@ -336,7 +332,6 @@ class FleetHandoverMutationIntegrityTest extends TestCase
     private function makeHandover(Asset $vehicle, User $outgoing, User $incoming): FleetShiftHandover
     {
         return FleetShiftHandover::query()->create([
-            'tenant_id' => $outgoing->organization_id,
             'asset_id' => $vehicle->id,
             'outgoing_user_id' => $outgoing->id,
             'incoming_user_id' => $incoming->id,
@@ -347,9 +342,9 @@ class FleetHandoverMutationIntegrityTest extends TestCase
         ]);
     }
 
-    private function tenantFleetManager(int $organizationId): User
+    private function siteFleetManager(Site $site): User
     {
-        $manager = $this->tenantUser($organizationId, 'manager');
+        $manager = $this->siteUser('manager', $site);
         $permission = Permission::query()->where('key', 'fleet.manage')->firstOrFail();
         $manager->permissionOverrides()->syncWithoutDetaching([
             $permission->id => ['allowed' => true],
@@ -358,21 +353,26 @@ class FleetHandoverMutationIntegrityTest extends TestCase
         return $manager;
     }
 
-    private function tenantUser(
-        int $organizationId,
+    private function applicationFleetManager(?Site $site = null): User
+    {
+        $manager = $this->siteUser('admin', $site);
+        $manager->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+
+        return $manager;
+    }
+
+    private function siteUser(
         string $role = 'support_worker',
         ?Site $site = null,
         bool $approved = true,
     ): User {
         $user = User::factory()->create([
-            'organization_id' => $organizationId,
             'approved_at' => $approved ? now() : null,
             'role' => $role,
         ]);
 
         if ($site) {
             HrEmployeeProfile::factory()->create([
-                'tenant_id' => $organizationId,
                 'user_id' => $user->id,
                 'primary_site_id' => $site->id,
                 'secondary_site_ids' => [],

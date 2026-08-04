@@ -6,17 +6,21 @@ use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
+use App\Models\CustomForm;
 use App\Models\Permission;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
+use App\Models\ShiftSeries;
 use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\ShiftHandoverService;
+use App\Services\ShiftOrphanDetectionService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -218,8 +222,9 @@ class ShiftSiteIsolationTest extends TestCase
 
     public function test_handover_acknowledgement_is_blocked_for_foreign_site(): void
     {
-        $incomingUser = $this->makeSiteScopedUser([$this->siteA], ['shifts.update', 'shifts.viewAssigned']);
-        $outgoingUser = User::factory()->create(['approved_at' => now(), 'role' => 'support_worker']);
+        $viewer = $this->makeSiteScopedUser([$this->siteA], ['handovers.viewAny']);
+        $incomingUser = $this->makeSiteScopedUser([$this->siteB], ['shifts.viewAssigned']);
+        $outgoingUser = $this->makeSiteScopedUser([$this->siteB], ['shifts.viewAssigned']);
 
         $outgoingShift = Shift::factory()->create([
             'client_id' => $this->clientB->id,
@@ -242,7 +247,6 @@ class ShiftSiteIsolationTest extends TestCase
         ]);
 
         $handover = ShiftHandover::factory()->create([
-            'organization_id' => $incomingUser->organization_id,
             'outgoing_shift_id' => $outgoingShift->id,
             'incoming_shift_id' => $incomingShift->id,
             'client_id' => $this->clientB->id,
@@ -253,9 +257,105 @@ class ShiftSiteIsolationTest extends TestCase
             'submitted_by' => $outgoingUser->id,
         ]);
 
-        $this->actingAs($incomingUser)
+        $this->actingAs($viewer)
             ->patch("/operations/handovers/{$handover->id}/acknowledge")
-            ->assertForbidden();
+            ->assertNotFound();
+    }
+
+    public function test_handover_view_any_remains_site_scoped_and_hides_conflicting_provenance(): void
+    {
+        $viewer = $this->makeSiteScopedUser([$this->siteA], ['handovers.viewAny']);
+        $localOutgoing = $this->makeSiteScopedUser([$this->siteA], ['shifts.viewAssigned']);
+        $localIncoming = $this->makeSiteScopedUser([$this->siteA], ['shifts.viewAssigned']);
+        $foreignOutgoing = $this->makeSiteScopedUser([$this->siteB], ['shifts.viewAssigned']);
+        $foreignIncoming = $this->makeSiteScopedUser([$this->siteB], ['shifts.viewAssigned']);
+
+        $localOutgoingShift = $this->makeHandoverShift($this->clientA, $this->siteA, $localOutgoing, 'in_progress');
+        $localIncomingShift = $this->makeHandoverShift($this->clientA, $this->siteA, $localIncoming, 'scheduled');
+        $foreignOutgoingShift = $this->makeHandoverShift($this->clientB, $this->siteB, $foreignOutgoing, 'in_progress');
+        $foreignIncomingShift = $this->makeHandoverShift($this->clientB, $this->siteB, $foreignIncoming, 'scheduled');
+
+        $visible = ShiftHandover::factory()->create([
+            'outgoing_shift_id' => $localOutgoingShift->id,
+            'incoming_shift_id' => $localIncomingShift->id,
+            'client_id' => $this->clientA->id,
+            'outgoing_staff_id' => $localOutgoing->id,
+            'incoming_staff_id' => $localIncoming->id,
+            'submitted_by' => $localOutgoing->id,
+        ]);
+        $hidden = ShiftHandover::factory()->create([
+            'outgoing_shift_id' => $foreignOutgoingShift->id,
+            'incoming_shift_id' => $foreignIncomingShift->id,
+            'client_id' => $this->clientB->id,
+            'outgoing_staff_id' => $foreignOutgoing->id,
+            'incoming_staff_id' => $foreignIncoming->id,
+            'submitted_by' => $foreignOutgoing->id,
+        ]);
+
+        $corruptId = DB::table('shift_handovers')->insertGetId([
+            'organization_id' => 1,
+            'outgoing_shift_id' => $localOutgoingShift->id,
+            'incoming_shift_id' => null,
+            'client_id' => $this->clientB->id,
+            'outgoing_staff_id' => $localOutgoing->id,
+            'incoming_staff_id' => null,
+            'status' => ShiftHandoverService::STATUS_SUBMITTED,
+            'handover_notes' => 'Conflicting Client and Shift Site provenance.',
+            'submitted_at' => now(),
+            'submitted_by' => $localOutgoing->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($viewer)
+            ->get('/operations/handovers')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('handovers', 1)
+                ->where('handovers.0.id', $visible->id)
+            );
+
+        $this->actingAs($viewer)
+            ->get("/operations/handovers/{$hidden->id}")
+            ->assertNotFound();
+
+        $this->actingAs($viewer)
+            ->get("/operations/handovers/{$corruptId}")
+            ->assertNotFound();
+
+        $orphans = app(ShiftOrphanDetectionService::class)->handoversWithoutValidShiftLinkage();
+        $this->assertTrue($orphans->contains(fn (ShiftHandover $handover) => $handover->id === $corruptId));
+        $this->assertSame(1, (int) $visible->fresh()->getRawOriginal('organization_id'));
+        $this->assertArrayNotHasKey('organization_id', $visible->fresh()->toArray());
+    }
+
+    public function test_handover_creation_rejects_client_and_incoming_shift_site_mismatches(): void
+    {
+        $manager = $this->makeSiteScopedUser([$this->siteA], ['handovers.create', 'shifts.manageAny']);
+        $outgoing = $this->makeSiteScopedUser([$this->siteA], ['shifts.viewAssigned']);
+        $foreignIncoming = $this->makeSiteScopedUser([$this->siteB], ['shifts.viewAssigned']);
+        $outgoingShift = $this->makeHandoverShift($this->clientA, $this->siteA, $outgoing, 'in_progress');
+        $foreignIncomingShift = $this->makeHandoverShift($this->clientB, $this->siteB, $foreignIncoming, 'scheduled');
+
+        $this->actingAs($manager)
+            ->post('/operations/handovers', [
+                'shift_id' => $outgoingShift->id,
+                'incoming_shift_id' => $foreignIncomingShift->id,
+                'handover_notes' => 'This mismatched incoming Shift must be rejected.',
+            ])
+            ->assertSessionHasErrors('incoming_shift_id');
+
+        $this->actingAs($manager)
+            ->post('/operations/handovers', [
+                'shift_id' => $outgoingShift->id,
+                'client_id' => $this->clientB->id,
+                'handover_notes' => 'This mismatched Client must be rejected.',
+            ])
+            ->assertSessionHasErrors('handover');
+
+        $this->assertDatabaseMissing('shift_handovers', [
+            'outgoing_shift_id' => $outgoingShift->id,
+        ]);
     }
 
     public function test_reporting_only_includes_accessible_site_data(): void
@@ -380,12 +480,14 @@ class ShiftSiteIsolationTest extends TestCase
         // to UTC explicitly so Eloquent stores the UTC instant (the cast format
         // does not auto-convert from a non-UTC Carbon).
         $tz = 'Pacific/Auckland';
+        $siteAStaff = $this->makeSiteScopedUser([$this->siteA], []);
+        $siteBStaff = $this->makeSiteScopedUser([$this->siteB], []);
 
         $shiftA = Shift::factory()->create([
             'client_id' => $this->clientA->id,
             'site_id' => $this->siteA->id,
             'service_context_id' => $this->serviceContext->id,
-            'user_id' => User::factory(),
+            'user_id' => $siteAStaff->id,
             'starts_at' => Carbon::parse('2026-04-06 09:00', $tz)->utc(),
             'ends_at' => Carbon::parse('2026-04-06 13:00', $tz)->utc(),
             'status' => 'scheduled',
@@ -395,7 +497,7 @@ class ShiftSiteIsolationTest extends TestCase
             'client_id' => $this->clientB->id,
             'site_id' => $this->siteB->id,
             'service_context_id' => $this->serviceContext->id,
-            'user_id' => User::factory(),
+            'user_id' => $siteBStaff->id,
             'starts_at' => Carbon::parse('2026-04-06 14:00', $tz)->utc(),
             'ends_at' => Carbon::parse('2026-04-06 18:00', $tz)->utc(),
             'status' => 'scheduled',
@@ -569,6 +671,214 @@ class ShiftSiteIsolationTest extends TestCase
         ]);
     }
 
+    public function test_shift_store_requires_assignee_to_be_current_at_the_canonical_client_site(): void
+    {
+        $scheduler = $this->makeSiteScopedUser([$this->siteA, $this->siteB], ['shifts.create']);
+        $siteAStaff = $this->makeSiteScopedUser([$this->siteA], ['shifts.viewAssigned']);
+
+        $this->actingAs($scheduler)
+            ->post(route('operations.shifts.store'), [
+                'client_id' => $this->clientB->id,
+                'service_context_id' => $this->serviceContext->id,
+                'user_id' => $siteAStaff->id,
+                'starts_at' => now()->copy()->addDay()->setTime(9, 0)->format('Y-m-d H:i:s'),
+                'ends_at' => now()->copy()->addDay()->setTime(13, 0)->format('Y-m-d H:i:s'),
+                'status' => 'scheduled',
+            ])
+            ->assertSessionHasErrors('user_id');
+
+        $this->assertDatabaseMissing('shifts', [
+            'client_id' => $this->clientB->id,
+            'user_id' => $siteAStaff->id,
+        ]);
+    }
+
+    public function test_eligibility_preview_enforces_target_site_and_existing_shift_access(): void
+    {
+        $scheduler = $this->makeSiteScopedUser([$this->siteA, $this->siteB], ['shifts.create', 'shifts.update']);
+        $siteAStaff = $this->makeSiteScopedUser([$this->siteA], ['shifts.viewAssigned']);
+
+        $this->actingAs($scheduler)
+            ->getJson(route('operations.shifts.eligibility_preview', [
+                'user_id' => $siteAStaff->id,
+                'site_id' => $this->siteB->id,
+                'starts_at' => now()->copy()->addDay()->setTime(9, 0)->toIso8601String(),
+                'ends_at' => now()->copy()->addDay()->setTime(13, 0)->toIso8601String(),
+            ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('user_id');
+
+        $siteAScheduler = $this->makeSiteScopedUser([$this->siteA], ['shifts.create', 'shifts.update']);
+        $siteBStaff = $this->makeSiteScopedUser([$this->siteB], ['shifts.viewAssigned']);
+        $foreignShift = Shift::factory()->create([
+            'client_id' => $this->clientB->id,
+            'site_id' => $this->siteB->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $siteBStaff->id,
+            'starts_at' => now()->copy()->addDay()->setTime(9, 0),
+            'ends_at' => now()->copy()->addDay()->setTime(13, 0),
+            'status' => 'scheduled',
+        ]);
+
+        $this->actingAs($siteAScheduler)
+            ->getJson(route('operations.shifts.eligibility_preview', [
+                'user_id' => $siteAStaff->id,
+                'site_id' => $this->siteA->id,
+                'shift_id' => $foreignShift->id,
+                'starts_at' => now()->copy()->addDay()->setTime(9, 0)->toIso8601String(),
+                'ends_at' => now()->copy()->addDay()->setTime(13, 0)->toIso8601String(),
+            ]))
+            ->assertForbidden();
+    }
+
+    public function test_shift_duplicate_is_site_scoped_and_uses_hidden_legacy_storage_compatibility(): void
+    {
+        $scheduler = $this->makeSiteScopedUser([$this->siteA], ['shifts.create']);
+        $localShift = Shift::factory()->create([
+            'client_id' => $this->clientA->id,
+            'site_id' => $this->siteA->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => null,
+            'starts_at' => now()->copy()->addDay()->setTime(9, 0),
+            'ends_at' => now()->copy()->addDay()->setTime(13, 0),
+            'status' => 'scheduled',
+        ]);
+        $foreignShift = Shift::factory()->create([
+            'client_id' => $this->clientB->id,
+            'site_id' => $this->siteB->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => null,
+            'starts_at' => now()->copy()->addDay()->setTime(14, 0),
+            'ends_at' => now()->copy()->addDay()->setTime(18, 0),
+            'status' => 'scheduled',
+        ]);
+
+        $this->actingAs($scheduler)
+            ->post(route('operations.shifts.duplicate', $localShift), [
+                'date' => now()->copy()->addDays(2)->toDateString(),
+            ])
+            ->assertRedirect();
+
+        $copy = Shift::query()
+            ->whereKeyNot($localShift->id)
+            ->where('client_id', $this->clientA->id)
+            ->firstOrFail();
+        $this->assertSame(1, (int) $copy->getRawOriginal('organization_id'));
+        $this->assertArrayNotHasKey('organization_id', $copy->toArray());
+
+        $this->actingAs($scheduler)
+            ->post(route('operations.shifts.duplicate', $foreignShift))
+            ->assertForbidden();
+
+        $this->assertSame(1, Shift::query()->where('client_id', $this->clientB->id)->count());
+    }
+
+    public function test_shift_forms_are_application_definitions_after_shift_site_authorization(): void
+    {
+        $viewer = $this->makeSiteScopedUser([$this->siteA], ['shifts.viewAssigned', 'custom_forms.viewAny']);
+        $shift = Shift::factory()->create([
+            'client_id' => $this->clientA->id,
+            'site_id' => $this->siteA->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $viewer->id,
+            'starts_at' => now()->copy()->setTime(9, 0),
+            'ends_at' => now()->copy()->setTime(13, 0),
+            'status' => 'scheduled',
+        ]);
+        $form = CustomForm::query()->create([
+            'name' => 'Shift wellbeing check',
+            'description' => 'Application-wide form definition.',
+            'form_type' => 'shift',
+            'schema' => [],
+            'is_active' => true,
+            'created_by' => $viewer->id,
+        ]);
+        DB::table('custom_forms')->where('id', $form->id)->update(['organization_id' => 99]);
+
+        $this->actingAs($viewer)
+            ->get(route('operations.shifts.show', $shift))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('forms.available', 1)
+                ->where('forms.available.0.id', $form->id)
+            );
+    }
+
+    public function test_recurring_shift_creation_rejects_an_inaccessible_client_site(): void
+    {
+        $scheduler = $this->makeSiteScopedUser([$this->siteA], ['shifts.create']);
+
+        $this->actingAs($scheduler)
+            ->post(route('operations.shifts.series.store'), [
+                'client_id' => $this->clientB->id,
+                'service_context_id' => $this->serviceContext->id,
+                'user_id' => null,
+                'start_date' => '2026-04-06',
+                'end_date' => '2026-04-06',
+                'timezone' => 'Pacific/Auckland',
+                'by_weekday' => ['mon'],
+                'starts_time' => '09:00',
+                'ends_time' => '13:00',
+                'status' => 'scheduled',
+            ])
+            ->assertForbidden();
+
+        $this->assertSame(0, ShiftSeries::query()->count());
+    }
+
+    public function test_recurring_shift_creation_requires_current_staff_at_the_client_site(): void
+    {
+        $scheduler = $this->makeSiteScopedUser([$this->siteA, $this->siteB], ['shifts.create']);
+        $siteAStaff = $this->makeSiteScopedUser([$this->siteA], ['shifts.viewAssigned']);
+
+        $this->actingAs($scheduler)
+            ->post(route('operations.shifts.series.store'), [
+                'client_id' => $this->clientB->id,
+                'service_context_id' => $this->serviceContext->id,
+                'user_id' => $siteAStaff->id,
+                'start_date' => '2026-04-06',
+                'end_date' => '2026-04-06',
+                'timezone' => 'Pacific/Auckland',
+                'by_weekday' => ['mon'],
+                'starts_time' => '09:00',
+                'ends_time' => '13:00',
+                'status' => 'scheduled',
+            ])
+            ->assertSessionHasErrors('user_id');
+
+        $this->assertSame(0, ShiftSeries::query()->count());
+    }
+
+    public function test_recurring_occurrences_converge_on_client_site_and_hidden_legacy_storage(): void
+    {
+        $scheduler = $this->makeSiteScopedUser([$this->siteA], ['shifts.create']);
+
+        $this->actingAs($scheduler)
+            ->post(route('operations.shifts.series.store'), [
+                'client_id' => $this->clientA->id,
+                'service_context_id' => $this->serviceContext->id,
+                'user_id' => null,
+                'start_date' => '2026-04-06',
+                'end_date' => '2026-04-06',
+                'timezone' => 'Pacific/Auckland',
+                'by_weekday' => ['mon'],
+                'starts_time' => '09:00',
+                'ends_time' => '13:00',
+                'status' => 'scheduled',
+            ])
+            ->assertRedirect();
+
+        $series = ShiftSeries::query()->firstOrFail();
+        $occurrence = Shift::query()->where('shift_series_id', $series->id)->firstOrFail();
+
+        $this->assertSame($this->clientA->id, $series->client_id);
+        $this->assertSame($this->siteA->id, $series->site_id);
+        $this->assertSame($this->clientA->id, $occurrence->client_id);
+        $this->assertSame($this->siteA->id, $occurrence->site_id);
+        $this->assertSame(1, (int) $occurrence->getRawOriginal('organization_id'));
+        $this->assertArrayNotHasKey('organization_id', $occurrence->toArray());
+    }
+
     /**
      * @param  array<int, Site>  $sites
      * @param  array<int, string>  $permissionKeys
@@ -597,6 +907,25 @@ class ShiftSiteIsolationTest extends TestCase
         ]);
 
         return $user;
+    }
+
+    protected function makeHandoverShift(
+        Client $client,
+        Site $site,
+        User $staff,
+        string $status,
+    ): Shift {
+        return Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $staff->id,
+            'starts_at' => $status === 'in_progress' ? now()->subHours(4) : now()->addHour(),
+            'ends_at' => $status === 'in_progress' ? now()->addMinutes(30) : now()->addHours(5),
+            'actual_starts_at' => $status === 'in_progress' ? now()->subHours(4) : null,
+            'status' => $status,
+            'created_by' => $staff->id,
+        ]);
     }
 
     /**

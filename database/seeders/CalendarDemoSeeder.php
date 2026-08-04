@@ -111,7 +111,6 @@ class CalendarDemoSeeder extends Seeder
             $start = $now->copy()->addDays($e['day'])->setTime($e['h'], 0);
             SiteCalendarEvent::create([
                 'site_id' => $site->id,
-                'tenant_id' => $site->tenant_id,
                 'event_type' => $e['event_type'],
                 'title' => $e['title'],
                 'start_at' => $start->copy()->utc(),
@@ -137,7 +136,6 @@ class CalendarDemoSeeder extends Seeder
         foreach ($meals as $m) {
             SiteMealPlanEntry::create([
                 'site_id' => $site->id,
-                'tenant_id' => $site->tenant_id,
                 'plan_date' => $now->copy()->addDays($m['day'])->toDateString(),
                 'meal_slot' => $m['slot'],
                 'source_type' => 'ad_hoc',

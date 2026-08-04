@@ -4,12 +4,19 @@ use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrCaseEvent;
 use App\Domain\Hr\Models\HrDisciplinaryAction;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Notifications\HrCaseUpdateNotification;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
+
+    $this->site = Site::factory()->create([
+        'name' => 'HR cases contract Site',
+    ]);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -32,7 +39,6 @@ beforeEach(function () {
     }
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->hr->id,
         'employee_number' => 'EMP-HR-2001',
         'work_email' => "hr-{$this->hr->id}@example.test",
@@ -41,10 +47,10 @@ beforeEach(function () {
         'employment_type' => 'full_time',
         'start_date' => now()->subYears(2)->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
     ]);
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'employee_number' => 'EMP-STF-2002',
         'work_email' => "staff-{$this->staff->id}@example.test",
@@ -53,12 +59,12 @@ beforeEach(function () {
         'employment_type' => 'full_time',
         'start_date' => now()->subYears(1)->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
     ]);
 });
 
 test('hr cases index exposes case_type and severity filter contract', function () {
     HrCase::query()->create([
-        'tenant_id' => 1,
         'case_number' => 'HR-71001',
         'user_id' => $this->staff->id,
         'case_type' => 'disciplinary',
@@ -87,7 +93,6 @@ test('hr cases index exposes case_type and severity filter contract', function (
 
 test('hr cases index supports search by case number title and subject name', function () {
     HrCase::query()->create([
-        'tenant_id' => 1,
         'case_number' => 'HR-71011',
         'user_id' => $this->staff->id,
         'case_type' => 'disciplinary',
@@ -107,7 +112,6 @@ test('hr cases index supports search by case number title and subject name', fun
     ]);
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $anotherStaff->id,
         'employee_number' => 'EMP-STF-2003',
         'work_email' => "staff-{$anotherStaff->id}@example.test",
@@ -116,10 +120,10 @@ test('hr cases index supports search by case number title and subject name', fun
         'employment_type' => 'full_time',
         'start_date' => now()->subMonths(8)->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
     ]);
 
     HrCase::query()->create([
-        'tenant_id' => 1,
         'case_number' => 'HR-71012',
         'user_id' => $anotherStaff->id,
         'case_type' => 'complaint',
@@ -150,7 +154,6 @@ test('hr cases index supports search by case number title and subject name', fun
 
 test('hr case show exposes timeline and disciplinary action payload used by ui', function () {
     $case = HrCase::query()->create([
-        'tenant_id' => 1,
         'case_number' => 'HR-71002',
         'user_id' => $this->staff->id,
         'case_type' => 'disciplinary',
@@ -174,7 +177,6 @@ test('hr case show exposes timeline and disciplinary action payload used by ui',
     ]);
 
     HrDisciplinaryAction::query()->create([
-        'tenant_id' => 1,
         'case_id' => $case->id,
         'employee_user_id' => $this->staff->id,
         'stage' => 'response_period',
@@ -199,7 +201,6 @@ test('hr case show exposes timeline and disciplinary action payload used by ui',
 
 test('hr cases index supports disciplinary sla filter windows and summary counts', function () {
     $overdueCase = HrCase::query()->create([
-        'tenant_id' => 1,
         'case_number' => 'HR-72001',
         'user_id' => $this->staff->id,
         'case_type' => 'disciplinary',
@@ -214,7 +215,6 @@ test('hr cases index supports disciplinary sla filter windows and summary counts
     ]);
 
     $dueSoonCase = HrCase::query()->create([
-        'tenant_id' => 1,
         'case_number' => 'HR-72002',
         'user_id' => $this->staff->id,
         'case_type' => 'disciplinary',
@@ -229,7 +229,6 @@ test('hr cases index supports disciplinary sla filter windows and summary counts
     ]);
 
     HrDisciplinaryAction::query()->create([
-        'tenant_id' => 1,
         'case_id' => $overdueCase->id,
         'employee_user_id' => $this->staff->id,
         'investigator_user_id' => $this->hr->id,
@@ -241,7 +240,6 @@ test('hr cases index supports disciplinary sla filter windows and summary counts
     ]);
 
     HrDisciplinaryAction::query()->create([
-        'tenant_id' => 1,
         'case_id' => $dueSoonCase->id,
         'employee_user_id' => $this->staff->id,
         'investigator_user_id' => $this->hr->id,
@@ -265,7 +263,6 @@ test('hr cases index supports disciplinary sla filter windows and summary counts
 
 test('hr case timeline enforces event visibility rules for non-managers', function () {
     $case = HrCase::query()->create([
-        'tenant_id' => 1,
         'case_number' => 'HR-73001',
         'user_id' => $this->staff->id,
         'case_type' => 'disciplinary',
@@ -285,6 +282,17 @@ test('hr case timeline enforces event visibility rules for non-managers', functi
         'description' => 'Only HR managers should see this.',
         'occurred_at' => now()->subHours(3),
         'visibility' => 'internal',
+        'created_by' => $this->hr->id,
+    ]);
+
+    HrDisciplinaryAction::query()->create([
+        'case_id' => $case->id,
+        'employee_user_id' => $this->staff->id,
+        'stage' => 'response_period',
+        'action_type' => 'written_warning',
+        'allegation_summary' => 'Management-only allegation detail.',
+        'investigation_notes' => 'Management-only investigation notes.',
+        'employee_response' => 'Private employee response.',
         'created_by' => $this->hr->id,
     ]);
 
@@ -324,7 +332,6 @@ test('hr case timeline enforces event visibility rules for non-managers', functi
     }
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $participant->id,
         'employee_number' => 'EMP-STF-2201',
         'work_email' => "participant-{$participant->id}@example.test",
@@ -333,10 +340,10 @@ test('hr case timeline enforces event visibility rules for non-managers', functi
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
     ]);
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $observer->id,
         'employee_number' => 'EMP-STF-2202',
         'work_email' => "observer-{$observer->id}@example.test",
@@ -345,6 +352,7 @@ test('hr case timeline enforces event visibility rules for non-managers', functi
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
     ]);
 
     // hr_cases.is_confidential defaults to true, so grant the observer explicit
@@ -376,6 +384,7 @@ test('hr case timeline enforces event visibility rules for non-managers', functi
     expect($participantTitles)->not->toContain('Internal HR note');
     expect($participantTitles)->toContain('Restricted manager update');
     expect($participantTitles)->toContain('Full visibility update');
+    expect($participantResponse->inertiaProps('case.disciplinary_actions'))->toBe([]);
 
     $observerResponse = $this->actingAs($observer)->get("/hr/cases/{$case->id}");
     $observerResponse->assertOk();
@@ -387,4 +396,53 @@ test('hr case timeline enforces event visibility rules for non-managers', functi
     expect($observerTitles)->not->toContain('Internal HR note');
     expect($observerTitles)->not->toContain('Restricted manager update');
     expect($observerTitles)->toContain('Full visibility update');
+    expect($observerResponse->inertiaProps('case.disciplinary_actions'))->toBe([]);
+});
+
+test('queued case notifications recheck current ownership staff eligibility permission and Site access', function () {
+    $assignee = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    $assignee->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'support_worker')->firstOrFail()->id,
+    ]);
+    $profile = HrEmployeeProfile::query()->create([
+        'user_id' => $assignee->id,
+        'employee_number' => 'EMP-NOTIFY-'.$assignee->id,
+        'work_email' => $assignee->email,
+        'position_title' => 'Case participant',
+        'position_role' => 'support_worker',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $this->site->id,
+    ]);
+    $permission = Permission::query()->where('key', 'hr.cases.view')->firstOrFail();
+    $assignee->permissionOverrides()->syncWithoutDetaching([
+        $permission->id => ['allowed' => true],
+    ]);
+    $case = HrCase::query()->create([
+        'case_number' => 'HR-74001',
+        'user_id' => $this->staff->id,
+        'case_type' => 'welfare',
+        'severity' => 'medium',
+        'status' => 'open',
+        'title' => 'Queued notification boundary',
+        'description' => 'Sensitive case title must be reauthorised at delivery.',
+        'reported_by' => $this->hr->id,
+        'assigned_to' => $assignee->id,
+        'opened_at' => now(),
+        'created_by' => $this->hr->id,
+    ]);
+
+    $notification = new HrCaseUpdateNotification($case, 'assigned');
+    expect($notification->via($assignee->fresh()))->toBe(['database']);
+
+    $case->update(['assigned_to' => $this->hr->id]);
+    expect($notification->via($assignee->fresh()))->toBe([]);
+
+    $case->update(['assigned_to' => $assignee->id]);
+    $profile->update(['end_date' => now()->subDay()->toDateString()]);
+    expect($notification->via($assignee->fresh()))->toBe([]);
 });

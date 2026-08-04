@@ -12,6 +12,7 @@ use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -23,7 +24,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Impersonate, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, Impersonate, Notifiable, TwoFactorAuthenticatable, WritesLegacyOrganizationStorageContext;
 
     /**
      * The attributes that are mass assignable.
@@ -34,8 +35,6 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'organization_id',
-
         // Keep this while you migrate off users.role
         // (You already reference auth.user.role in React)
         'role',
@@ -155,17 +154,6 @@ class User extends Authenticatable
         return $this->profile_photo_url;
     }
 
-    public function getOrganizationIdAttribute($value): ?int
-    {
-        if (array_key_exists('organization_id', $this->attributes)) {
-            return $value === null ? null : (int) $value;
-        }
-
-        // A number of domain controllers still scope records by organization_id,
-        // while lighter local schemas do not add the column to users.
-        return 1;
-    }
-
     // ---------------------------
     // Existing relationship
     // ---------------------------
@@ -202,18 +190,16 @@ class User extends Authenticatable
 
     public function canAccessClientPortal(Client $client): bool
     {
-        $userOrganizationId = $this->organization_id;
-        $clientOrganizationId = $client->organization_id;
-
         if (
-            $userOrganizationId !== null
-            && $clientOrganizationId !== null
-            && (int) $userOrganizationId !== (int) $clientOrganizationId
+            ! $this->exists
+            || ! $client->exists
+            || ! $this->hasRole('client', 'next_of_kin')
+            || $this->hrEmployeeProfile()->withTrashed()->exists()
         ) {
             return false;
         }
 
-        return $this->portalClients()->whereKey($client->id)->exists();
+        return $this->portalClients()->whereKey($client->getKey())->exists();
     }
 
     public function staffProfile()

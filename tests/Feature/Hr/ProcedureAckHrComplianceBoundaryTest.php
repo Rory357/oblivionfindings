@@ -30,7 +30,7 @@ use App\Models\User;
  */
 test('S16 seam: a Safe Work Procedure ack is H&S-owned, federates read-only into HR, and never writes HR compliance', function () {
     $procedure = SafeWorkProcedure::factory()->create();
-    $staff = User::factory()->create(['organization_id' => 1]);
+    $staff = User::factory()->create();
 
     // What SafeWorkProcedureController writes when the worker acknowledges (H&S path).
     ProcedureAcknowledgement::create([

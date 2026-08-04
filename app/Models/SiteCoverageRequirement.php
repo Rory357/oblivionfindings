@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Client;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,7 +11,6 @@ class SiteCoverageRequirement extends Model
     use HasFactory;
 
     protected $fillable = [
-        'organization_id',
         'site_id',
         'service_context_id',
         'preferred_client_id',

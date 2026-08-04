@@ -45,7 +45,7 @@ it('builds a payday filing from a posted payroll run with payslip totals', funct
     paydayPayslip($run, 500, 100, 15, 15, 0);
 
     $service = app(IrdFilingService::class);
-    $filing = $service->createPaydayFiling(1, $run, '49091850');
+    $filing = $service->createPaydayFiling($run, '49091850');
 
     expect($filing->filing_type)->toBe('payday')
         ->and($filing->payroll_run_id)->toBe($run->id)
@@ -88,7 +88,8 @@ it('builds a net-pay direct-credit CSV from payslip net pay + employee bank acco
 
     $csv = app(PayrollJournalService::class)->buildNetPayDirectCreditCsv($run);
 
-    expect($csv)->toContain('Employee Name,Bank Account Number,Amount,Reference')
-        ->and($csv)->toContain('12-3456-7890123-00')
-        ->and($csv)->toContain('800.00');
+    $rows = array_map('str_getcsv', array_filter(preg_split('/\r?\n/', $csv)));
+    expect($rows[0])->toBe(['Employee Name', 'Bank Account Number', 'Amount', 'Reference'])
+        ->and($rows[1][1])->toBe('12-3456-7890123-00')
+        ->and($rows[1][2])->toBe('800.00');
 });

@@ -153,7 +153,10 @@ class DeviceAssignmentConsentEnforcementTest extends TestCase
 
     private function givenConsentFor(Client $client, ?\DateTimeInterface $expiresAt = null): ClientConsent
     {
-        $consentType = ConsentType::factory()->create();
+        $consentType = ConsentType::factory()->create([
+            'name' => 'Personal Tracker (Wandering Risk)',
+            'purpose' => 'Client personal safety tracking',
+        ]);
 
         return ClientConsent::create([
             'client_id' => $client->id,

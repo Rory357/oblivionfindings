@@ -39,12 +39,14 @@ import { toast } from 'sonner';
 import { fireConfetti } from '@/lib/confetti';
 
 type ImportResult = { created: number; updated: number; errors: string[] };
+type SiteOption = { id: number; name: string };
 
 type Props = {
     stats: {
         exportable: number;
         profiles: number;
     };
+    sites: SiteOption[];
 };
 
 const MAX_CSV_BYTES = 5 * 1024 * 1024; // matches the 5MB server rule
@@ -73,11 +75,27 @@ function splitCsvLine(line: string): string[] {
 /* ================================================================== */
 
 const IMPORT_STEPS: readonly WizardStep[] = [
-    { key: 'file', label: 'CSV file', blurb: 'Choose the upload', icon: Upload },
-    { key: 'confirm', label: 'Preview & confirm', blurb: 'Check, then run', icon: ClipboardCheck },
+    {
+        key: 'file',
+        label: 'CSV file',
+        blurb: 'Choose the upload',
+        icon: Upload,
+    },
+    {
+        key: 'confirm',
+        label: 'Preview & confirm',
+        blurb: 'Check, then run',
+        icon: ClipboardCheck,
+    },
 ];
 
-function ImportWizard({ onClose }: { onClose: () => void }) {
+function ImportWizard({
+    onClose,
+    sites,
+}: {
+    onClose: () => void;
+    sites: SiteOption[];
+}) {
     const wizard = useWizard(IMPORT_STEPS.length);
     const [result, setResult] = useState<ImportResult | null>(null);
     const [preview, setPreview] = useState<string[][]>([]);
@@ -170,7 +188,9 @@ function ImportWizard({ onClose }: { onClose: () => void }) {
                                     <>
                                         {' '}
                                         {result.errors.length} row
-                                        {result.errors.length === 1 ? '' : 's'}{' '}
+                                        {result.errors.length === 1
+                                            ? ''
+                                            : 's'}{' '}
                                         failed — the details are listed on the
                                         page behind this dialog.
                                     </>
@@ -196,7 +216,11 @@ function ImportWizard({ onClose }: { onClose: () => void }) {
                     {wizard.isLast ? (
                         <Button
                             onClick={submit}
-                            disabled={form.processing || !form.data.file}
+                            disabled={
+                                form.processing ||
+                                !form.data.file ||
+                                sites.length === 0
+                            }
                         >
                             {form.processing
                                 ? form.progress
@@ -205,7 +229,10 @@ function ImportWizard({ onClose }: { onClose: () => void }) {
                                 : `Import ${rowCount > 0 ? `${rowCount} row${rowCount === 1 ? '' : 's'}` : 'CSV'}`}
                         </Button>
                     ) : (
-                        <Button onClick={wizard.next} disabled={!form.data.file}>
+                        <Button
+                            onClick={wizard.next}
+                            disabled={!form.data.file || sites.length === 0}
+                        >
                             Continue
                         </Button>
                     )}
@@ -221,14 +248,17 @@ function ImportWizard({ onClose }: { onClose: () => void }) {
                     />
                     <Field label="CSV file" required error={form.errors.file}>
                         {form.data.file ? (
-                            <StagedFileCard file={form.data.file} onRemove={clearFile} />
+                            <StagedFileCard
+                                file={form.data.file}
+                                onRemove={clearFile}
+                            />
                         ) : (
                             <FileDropzone
                                 onFiles={stageFile}
                                 accept=".csv,.txt,text/csv"
                                 multiple={false}
                                 title="Drag & drop the CSV here"
-                                hint="CSV up to 5MB — name and email columns are required"
+                                hint="CSV up to 5MB — name, email, position_role and primary_site_id are required"
                             />
                         )}
                     </Field>
@@ -243,6 +273,34 @@ function ImportWizard({ onClose }: { onClose: () => void }) {
                                 blank template
                             </a>{' '}
                             — it has every supported header pre-filled.
+                        </div>
+                    </div>
+                    <div className="mt-4 rounded-xl border border-border p-4">
+                        <div className="text-sm font-medium">
+                            Available Site IDs
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Every row needs a primary_site_id from this list.
+                            Hidden, inactive, or archived Sites are rejected.
+                        </p>
+                        <div className="mt-3 max-h-32 space-y-1 overflow-y-auto text-xs">
+                            {sites.length > 0 ? (
+                                sites.map((site) => (
+                                    <div
+                                        key={site.id}
+                                        className="flex items-center justify-between gap-3"
+                                    >
+                                        <span>{site.name}</span>
+                                        <code className="rounded bg-muted px-1.5 py-0.5">
+                                            {site.id}
+                                        </code>
+                                    </div>
+                                ))
+                            ) : (
+                                <span className="text-status-critical">
+                                    No active Sites are available for import.
+                                </span>
+                            )}
                         </div>
                     </div>
                 </WizardStepPane>
@@ -272,7 +330,10 @@ function ImportWizard({ onClose }: { onClose: () => void }) {
                                 </thead>
                                 <tbody>
                                     {preview.slice(1, 6).map((row, ri) => (
-                                        <tr key={ri} className="border-t border-border">
+                                        <tr
+                                            key={ri}
+                                            className="border-t border-border"
+                                        >
                                             {row.map((c, ci) => (
                                                 <td
                                                     key={ci}
@@ -286,14 +347,23 @@ function ImportWizard({ onClose }: { onClose: () => void }) {
                                 </tbody>
                             </table>
                             <div className="border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
-                                Showing first {Math.min(preview.length - 1, 5)} of{' '}
-                                {rowCount} data row{rowCount === 1 ? '' : 's'}
+                                Showing first {Math.min(preview.length - 1, 5)}{' '}
+                                of {rowCount} data row
+                                {rowCount === 1 ? '' : 's'}
                             </div>
                         </div>
                     ) : null}
                     <div className="mt-4">
-                        <ReviewCard icon={Table2} title="Import" onEdit={() => wizard.goTo(0)} span>
-                            <ReviewRow label="File" value={form.data.file?.name} />
+                        <ReviewCard
+                            icon={Table2}
+                            title="Import"
+                            onEdit={() => wizard.goTo(0)}
+                            span
+                        >
+                            <ReviewRow
+                                label="File"
+                                value={form.data.file?.name}
+                            />
                             <ReviewRow
                                 label="Data rows"
                                 value={String(rowCount)}
@@ -314,7 +384,7 @@ function ImportWizard({ onClose }: { onClose: () => void }) {
 /*  Page                                                              */
 /* ================================================================== */
 
-export default function ImportExportIndex({ stats }: Props) {
+export default function ImportExportIndex({ stats, sites }: Props) {
     const { props } = usePage<{ flash?: { importResult?: ImportResult } }>();
     const importResult = props.flash?.importResult ?? null;
     const [importing, setImporting] = useState(false);
@@ -346,7 +416,8 @@ export default function ImportExportIndex({ stats }: Props) {
             <Head title="Employee Import / Export" />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={UploadCloud}
                         title="Employee Import / Export"
                         description="Bulk import or export employee records via CSV."
@@ -356,7 +427,10 @@ export default function ImportExportIndex({ stats }: Props) {
                                 value: stats.exportable,
                                 tone: 'success',
                             },
-                            { label: 'Profiles on record', value: stats.profiles },
+                            {
+                                label: 'Profiles on record',
+                                value: stats.profiles,
+                            },
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
@@ -366,10 +440,16 @@ export default function ImportExportIndex({ stats }: Props) {
                                     variant="outline"
                                     className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                 >
-                                    <Download className="mr-1.5 h-4 w-4" /> Export CSV
+                                    <Download className="mr-1.5 h-4 w-4" />{' '}
+                                    Export CSV
                                 </Button>
-                                <Button size="sm" onClick={() => setImporting(true)}>
-                                    <Upload className="mr-1.5 h-4 w-4" /> Import CSV
+                                <Button
+                                    size="sm"
+                                    onClick={() => setImporting(true)}
+                                    disabled={sites.length === 0}
+                                >
+                                    <Upload className="mr-1.5 h-4 w-4" /> Import
+                                    CSV
                                 </Button>
                             </div>
                         }
@@ -413,7 +493,10 @@ export default function ImportExportIndex({ stats }: Props) {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="flex flex-col gap-4">
-                            <Button onClick={() => setImporting(true)}>
+                            <Button
+                                onClick={() => setImporting(true)}
+                                disabled={sites.length === 0}
+                            >
                                 <Upload className="mr-2 h-4 w-4" /> Start import
                             </Button>
                             <div className="text-sm text-muted-foreground">
@@ -473,7 +556,10 @@ export default function ImportExportIndex({ stats }: Props) {
             </PageLayout>
 
             {importing ? (
-                <ImportWizard onClose={() => setImporting(false)} />
+                <ImportWizard
+                    onClose={() => setImporting(false)}
+                    sites={sites}
+                />
             ) : null}
         </AppLayout>
     );

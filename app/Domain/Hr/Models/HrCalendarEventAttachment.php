@@ -2,19 +2,21 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * A file attached to an HR calendar event, stored on the private disk and served
- * through the hardened {@see \App\Http\Controllers\Concerns\ServesPrivateAttachments}
+ * through the hardened {@see ServesPrivateAttachments}
  * route (mirrors {@see HrFeedAttachment}).
  */
 class HrCalendarEventAttachment extends Model
 {
-    use AuditableChanges;
+    use AuditableChanges, WritesLegacyStorageContext;
 
     protected $table = 'hr_calendar_event_attachments';
 

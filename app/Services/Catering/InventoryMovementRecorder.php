@@ -35,7 +35,6 @@ class InventoryMovementRecorder
             $item = SiteMealInventoryItem::firstOrCreate(
                 ['site_id' => $site->id, 'product_id' => $productId],
                 [
-                    'tenant_id' => $site->tenant_id ?? auth()->user()?->organization_id,
                     'unit' => $unit,
                     'current_qty' => 0,
                 ]
@@ -49,7 +48,6 @@ class InventoryMovementRecorder
             }
 
             $movement = SiteMealInventoryMovement::create([
-                'tenant_id' => $item->tenant_id,
                 'site_id' => $site->id,
                 'product_id' => $productId,
                 'delta' => $deltaInItemUnit,
@@ -88,7 +86,6 @@ class InventoryMovementRecorder
             $item = SiteMealInventoryItem::firstOrCreate(
                 ['site_id' => $site->id, 'product_id' => $productId],
                 [
-                    'tenant_id' => $site->tenant_id ?? auth()->user()?->organization_id,
                     'unit' => $unit,
                     'current_qty' => 0,
                 ]

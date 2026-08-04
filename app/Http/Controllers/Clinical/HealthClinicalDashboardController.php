@@ -218,7 +218,7 @@ class HealthClinicalDashboardController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('clinical.dashboard'), 403);
 
-        $lens = $this->dashboardService->getCarePlanLens((int) ($auth->organization_id ?? 0));
+        $lens = $this->dashboardService->getCarePlanLens($auth);
         $kpis = $this->dashboardService->getKpis();
 
         return inertia('health-clinical/CarePlans', [
@@ -360,7 +360,7 @@ class HealthClinicalDashboardController extends Controller
 
     /**
      * Cross-client Assessments & Risk register (FRAT / Braden / MUST / IDDSI).
-     * Org-scoped; serialised here with the band tone + review status.
+     * Canonical Client Site access is applied before serialisation.
      */
     public function assessments(Request $request): \Inertia\Response
     {
@@ -374,9 +374,7 @@ class HealthClinicalDashboardController extends Controller
             'review_due' => ['nullable', 'boolean'],
         ]);
 
-        $orgId = (int) ($auth->organization_id ?? 0);
-
-        $records = $this->dashboardService->getAssessmentsRegister($orgId, $filters)
+        $records = $this->dashboardService->getAssessmentsRegister($auth, $filters)
             ->through(fn (ClinicalRiskAssessment $a) => [
                 'id' => $a->id,
                 'assessment_type' => $a->assessment_type->value,
@@ -411,9 +409,9 @@ class HealthClinicalDashboardController extends Controller
 
         return inertia('health-clinical/Assessments', [
             'records' => $records,
-            'stats' => $this->dashboardService->getAssessmentsRegisterStats($orgId),
+            'stats' => $this->dashboardService->getAssessmentsRegisterStats($auth),
             'filters' => $filters,
-            'filter_options' => $this->dashboardService->getAssessmentsFilterOptions(),
+            'filter_options' => $this->dashboardService->getAssessmentsFilterOptions($auth),
             'kpis' => $kpis,
             'tab_counts' => $this->dashboardService->getTabCounts($kpis),
         ]);

@@ -9,6 +9,7 @@ use App\Domain\Hr\Models\HrPolicyVersion;
 use App\Domain\Hr\Models\HrSuccessionCandidate;
 use App\Domain\Hr\Models\HrSuccessionPlan;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -16,11 +17,10 @@ use Illuminate\Support\Facades\Storage;
 
 function c4ArchiveDocument(HrEmployeeProfile $profile, User $actor, string $name): HrDocument
 {
-    $path = "hr-documents/{$profile->tenant_id}/{$profile->id}/{$name}.pdf";
+    $path = "hr-documents/{$profile->id}/{$name}.pdf";
     Storage::disk('private')->put($path, '%PDF-1.4 retained');
 
     return HrDocument::query()->create([
-        'tenant_id' => $profile->tenant_id,
         'employee_profile_id' => $profile->id,
         'title' => $name,
         'category' => 'contract',
@@ -39,32 +39,45 @@ beforeEach(function () {
     Storage::fake('private');
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
+    $this->site = Site::factory()->create(['name' => 'Archive contract Site']);
 
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->firstOrFail()->id,
     ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 
     $this->manager = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'provider_manager',
         'approved_at' => now(),
     ]);
     $this->manager->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'provider_manager')->firstOrFail()->id,
     ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->manager->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 
     $this->worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
     $this->profile = HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'employee_number' => 'C4-'.$this->worker->id,
         'work_email' => $this->worker->email,
@@ -73,12 +86,13 @@ beforeEach(function () {
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
     ]);
 });
 
 test('C4: deleting an onboarding checklist archives it and retains its tasks', function () {
     $checklist = HrOnboardingChecklist::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $this->profile->id,
         'template_key' => 'c4-retention',
         'status' => 'in_progress',
@@ -107,7 +121,6 @@ test('C4: deleting an onboarding checklist archives it and retains its tasks', f
 
 test('C4: deleting a draft wellbeing survey archives it and retains its questions', function () {
     $survey = HrEngagementSurvey::query()->create([
-        'tenant_id' => 1,
         'title' => 'Draft wellbeing pulse',
         'survey_type' => 'pulse',
         'status' => 'draft',
@@ -135,7 +148,6 @@ test('C4: deleting a policy deactivates it and retains versions and stored files
     $path = 'policies/1/c4-retention.pdf';
     Storage::disk('private')->put($path, '%PDF-1.4 retained');
     $policy = HrPolicy::query()->create([
-        'tenant_id' => 1,
         'title' => 'Retention policy',
         'slug' => 'c4-retention-policy',
         'category' => 'employment',
@@ -166,7 +178,7 @@ test('C4: deleting a policy deactivates it and retains versions and stored files
 
 test('C4: deleting a succession plan deactivates it and retains candidates', function () {
     $plan = HrSuccessionPlan::query()->create([
-        'tenant_id' => 1,
+        'site_id' => $this->site->id,
         'role_title' => 'Service Manager',
         'risk_level' => 'high',
         'is_active' => true,

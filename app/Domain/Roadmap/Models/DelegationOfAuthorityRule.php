@@ -2,17 +2,18 @@
 
 namespace App\Domain\Roadmap\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class DelegationOfAuthorityRule extends Model
 {
     use HasFactory;
+    use WritesLegacyStorageContext;
 
     protected $table = 'roadmap_delegation_authority_rules';
 
     protected $fillable = [
-        'tenant_id',
         'scope',
         'amount_min',
         'amount_max',
@@ -35,15 +36,6 @@ class DelegationOfAuthorityRule extends Model
         'active_to' => 'date',
         'is_active' => 'boolean',
     ];
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        if ($tenantId === null) {
-            return $query;
-        }
-
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeActive($query)
     {

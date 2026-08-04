@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPolicyAttestation;
+use App\Domain\Hr\Services\PolicyAttestationService;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class PolicyAttestationController extends Controller
 {
-    use ResolvesHrTenant;
+    public function __construct(private readonly PolicyAttestationService $attestations) {}
 
     /**
      * Show attestation status overview.
@@ -23,15 +23,14 @@ class PolicyAttestationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.attest'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $attestations = HrPolicyAttestation::with(['user:id,name', 'policy:id,title', 'policyVersion'])
-            ->where('tenant_id', $tenantId)
+            ->when(! $user->canDo('hr.policies.manage'), fn ($query) => $query->where('user_id', $user->id))
             ->when($request->query('policy_id'), fn ($q, $id) => $q->where('policy_id', $id))
             ->when($request->query('q'), function ($q, $search) {
                 $q->where(function ($q) use ($search) {
                     $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%"))
-                      ->orWhereHas('policy', fn ($p) => $p->where('title', 'like', "%{$search}%"));
+                        ->orWhereHas('policy', fn ($p) => $p->where('title', 'like', "%{$search}%"));
                 });
             })
             ->orderByDesc('attested_at')
@@ -56,44 +55,18 @@ class PolicyAttestationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.attest'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
-
-        // Ensure the policy requires attestation
-        if (! $policy->requires_attestation) {
-            return redirect()->back()->withErrors(['policy' => 'This policy does not require attestation.']);
-        }
-
-        $currentVersion = $policy->currentVersion;
-
-        if (! $currentVersion) {
-            return redirect()->back()->withErrors(['policy' => 'This policy has no published version to attest.']);
-        }
-
-        // Check for existing attestation on this version
-        $existing = HrPolicyAttestation::where('user_id', $user->id)
-            ->where('policy_id', $policy->id)
-            ->where('policy_version_id', $currentVersion->id)
-            ->first();
-
-        if ($existing) {
-            return redirect()->back()->withErrors(['policy' => 'You have already attested to this version of the policy.']);
-        }
 
         $data = $request->validate([
             'attestation_method' => ['sometimes', 'string', 'in:checkbox,signature,digital'],
         ]);
 
-        HrPolicyAttestation::create([
-            'tenant_id' => $tenantId,
-            'user_id' => $user->id,
-            'policy_id' => $policy->id,
-            'policy_version_id' => $currentVersion->id,
-            'attested_at' => now(),
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'attestation_method' => $data['attestation_method'] ?? 'checkbox',
-        ]);
+        $this->attestations->attest(
+            $user,
+            $policy,
+            $request->ip(),
+            $request->userAgent(),
+            $data['attestation_method'] ?? 'checkbox',
+        );
 
         return redirect()->back()->with('success', 'Policy attestation recorded.');
     }

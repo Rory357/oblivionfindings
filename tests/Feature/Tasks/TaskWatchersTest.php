@@ -1,15 +1,16 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\IncidentFollowup;
 use App\Models\Permission;
 use App\Models\SafeguardingActionPlan;
 use App\Models\SafeguardingConcern;
+use App\Models\Site;
 use App\Models\TaskWatcher;
 use App\Models\User;
-use App\Services\Tasks\TaskAggregator;
 use Database\Seeders\RbacSeeder;
-use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -19,7 +20,7 @@ beforeEach(function () {
  * A user with the given permission keys granted via overrides — the same
  * seeding idiom as AllTasksDashboardTest::makeTasksUser().
  */
-function makeWatcherUser(array $permissionKeys): User
+function makeWatcherUser(array $permissionKeys, ?Site $site = null): User
 {
     $user = User::factory()->create(['approved_at' => now()]);
 
@@ -31,7 +32,30 @@ function makeWatcherUser(array $permissionKeys): User
         $user->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
     }
 
+    if ($site) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth(),
+            'end_date' => null,
+        ]);
+    }
+
     return $user;
+}
+
+/** @param array<string, mixed> $attributes */
+function makeWatcherIncident(Site $site, array $attributes = []): ClientIncident
+{
+    $client = Client::factory()->create(['site_id' => $site->id]);
+
+    return ClientIncident::factory()->create([
+        'client_id' => $client->id,
+        'site_id' => $site->id,
+        ...$attributes,
+    ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -39,8 +63,9 @@ function makeWatcherUser(array $permissionKeys): User
 // ---------------------------------------------------------------------------
 
 it('adds a task_watchers row and surfaces the item under the following filter only after watching', function () {
-    $user = makeWatcherUser(['incidents.viewAny']);
-    $incident = ClientIncident::factory()->create(['status' => 'submitted']);
+    $site = Site::factory()->create();
+    $user = makeWatcherUser(['incidents.viewAny'], $site);
+    $incident = makeWatcherIncident($site, ['status' => 'submitted']);
 
     $inList = fn ($items) => collect($items)->contains(fn ($i) => $i['id'] === 'incident-'.$incident->id);
 
@@ -88,10 +113,11 @@ it('adds a task_watchers row and surfaces the item under the following filter on
 });
 
 it('reflects the watched count in stats.watching', function () {
-    $user = makeWatcherUser(['incidents.viewAny']);
-    $a = ClientIncident::factory()->create(['status' => 'submitted']);
-    $b = ClientIncident::factory()->create(['status' => 'submitted']);
-    ClientIncident::factory()->create(['status' => 'submitted']); // unwatched
+    $site = Site::factory()->create();
+    $user = makeWatcherUser(['incidents.viewAny'], $site);
+    $a = makeWatcherIncident($site, ['status' => 'submitted']);
+    $b = makeWatcherIncident($site, ['status' => 'submitted']);
+    makeWatcherIncident($site, ['status' => 'submitted']); // unwatched
 
     $this->actingAs($user)->get('/tasks')
         ->assertInertia(fn ($page) => $page->where('stats.watching', 0));
@@ -104,11 +130,12 @@ it('reflects the watched count in stats.watching', function () {
 });
 
 it('scopes the following filter to the acting user — a second user\'s watch does not leak', function () {
-    $me = makeWatcherUser(['incidents.viewAny']);
-    $other = makeWatcherUser(['incidents.viewAny']);
+    $site = Site::factory()->create();
+    $me = makeWatcherUser(['incidents.viewAny'], $site);
+    $other = makeWatcherUser(['incidents.viewAny'], $site);
 
-    $mine = ClientIncident::factory()->create(['status' => 'submitted']);
-    $theirs = ClientIncident::factory()->create(['status' => 'submitted']);
+    $mine = makeWatcherIncident($site, ['status' => 'submitted']);
+    $theirs = makeWatcherIncident($site, ['status' => 'submitted']);
 
     TaskWatcher::query()->create(['source' => 'incident', 'item_id' => $mine->id, 'user_id' => $me->id]);
     TaskWatcher::query()->create(['source' => 'incident', 'item_id' => $theirs->id, 'user_id' => $other->id]);
@@ -162,9 +189,10 @@ it('notifies a watcher when a followed item is reassigned to someone else', func
 // ---------------------------------------------------------------------------
 
 it('splits an incident into a follow-up assigned to the chosen user', function () {
-    $user = makeWatcherUser(['incidents.viewAny', 'incidents.followups.manage']);
-    $assignee = makeWatcherUser(['incidents.viewAny']);
-    $incident = ClientIncident::factory()->create(['status' => 'submitted']);
+    $site = Site::factory()->create();
+    $user = makeWatcherUser(['incidents.viewAny', 'incidents.followups.manage'], $site);
+    $assignee = makeWatcherUser(['incidents.viewAny'], $site);
+    $incident = makeWatcherIncident($site, ['status' => 'submitted']);
 
     $this->actingAs($user)
         ->post("/tasks/incident/{$incident->id}/split", [

@@ -4,17 +4,17 @@ namespace App\Models;
 
 use App\Contracts\Timeline\EmitsToTimeline;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClientExcursionRequest extends Model implements EmitsToTimeline
 {
-    use AuditableChanges, SoftDeletes;
+    use AuditableChanges, SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
         'client_id',
-        'organization_id',
         'starts_at',
         'ends_at',
         'destination',

@@ -8,18 +8,14 @@ use App\Domain\Hr\Services\HrAutomationService;
 use App\Domain\Hr\Services\HrReportingService;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class HrAutomationController extends Controller
 {
-    use ResolvesHrTenant;
-
     private const ROLE_GROUPS = [
         'managers',
         'managers_core',
@@ -27,6 +23,7 @@ class HrAutomationController extends Controller
         'auditors',
         'approvers',
     ];
+
     private const CONDITION_OPERATORS = [
         'equals',
         'not_equals',
@@ -54,10 +51,7 @@ class HrAutomationController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.settings.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
         $rules = HrAutomationRule::query()
-            ->forTenant($tenantId)
             ->withCount([
                 'runs',
                 'runs as failed_runs_count' => fn ($query) => $query->where('status', 'failed'),
@@ -82,7 +76,6 @@ class HrAutomationController extends Controller
             ->values();
 
         $recentRuns = HrAutomationRun::query()
-            ->forTenant($tenantId)
             ->with('rule:id,name')
             ->orderByDesc('id')
             ->limit(100)
@@ -99,10 +92,6 @@ class HrAutomationController extends Controller
             ->values();
 
         $recipientOptions = User::query()
-            ->when(
-                Schema::hasColumn('users', 'tenant_id'),
-                fn ($query) => $query->where('tenant_id', $tenantId)
-            )
             ->orderBy('name')
             ->limit(200)
             ->get(['id', 'name', 'email'])
@@ -146,12 +135,9 @@ class HrAutomationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.settings.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $validated = $this->validatePayload($request, $tenantId);
+        $validated = $this->validatePayload($request);
 
         HrAutomationRule::query()->create([
-            'tenant_id' => $tenantId,
             'name' => $validated['name'],
             'event_type' => $validated['event_type'],
             'conditions' => $this->buildConditions($validated),
@@ -169,10 +155,7 @@ class HrAutomationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.settings.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $rule->tenant_id);
-
-        $validated = $this->validatePayload($request, $tenantId, $rule->id);
+        $validated = $this->validatePayload($request, $rule->id);
 
         $rule->update([
             'name' => $validated['name'],
@@ -191,9 +174,6 @@ class HrAutomationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.settings.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $rule->tenant_id);
-
         $wasActive = (bool) $rule->is_active;
         $rule->update([
             'is_active' => ! $wasActive,
@@ -207,9 +187,6 @@ class HrAutomationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.settings.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $rule->tenant_id);
-
         $rule->delete();
 
         return redirect()->back()->with('success', 'Automation rule deleted.');
@@ -218,15 +195,10 @@ class HrAutomationController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function validatePayload(Request $request, int $tenantId, ?int $ignoreRuleId = null): array
+    private function validatePayload(Request $request, ?int $ignoreRuleId = null): array
     {
         $recipientRule = Rule::exists('users', 'id');
-        if (Schema::hasColumn('users', 'tenant_id')) {
-            $recipientRule = $recipientRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        }
-
-        $nameRule = Rule::unique('hr_automation_rules', 'name')
-            ->where(fn ($query) => $query->where('tenant_id', $tenantId));
+        $nameRule = Rule::unique('hr_automation_rules', 'name');
 
         if ($ignoreRuleId !== null) {
             $nameRule = $nameRule->ignore($ignoreRuleId);
@@ -290,7 +262,7 @@ class HrAutomationController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
     private function buildConditions(array $validated): array
@@ -367,7 +339,7 @@ class HrAutomationController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
     private function buildAction(array $validated): array
@@ -376,7 +348,7 @@ class HrAutomationController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return array<int, array<string, mixed>>
      */
     private function buildActions(array $validated): array
@@ -403,7 +375,7 @@ class HrAutomationController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
     private function normalizeActionPayload(array $payload, string $errorPrefix = 'action'): array
@@ -430,6 +402,7 @@ class HrAutomationController extends Controller
                 ]);
             }
             $base['role_group'] = $roleGroup;
+
             return $base;
         }
 
@@ -440,6 +413,7 @@ class HrAutomationController extends Controller
                 ->unique()
                 ->values()
                 ->all();
+
             return $base;
         }
 
@@ -469,6 +443,7 @@ class HrAutomationController extends Controller
                 ->unique()
                 ->values()
                 ->all();
+
             return $base;
         }
 
@@ -483,6 +458,7 @@ class HrAutomationController extends Controller
             $base['webhook_url'] = $webhookUrl;
             $base['timeout_seconds'] = max(2, min(30, (int) ($payload['action_webhook_timeout_seconds'] ?? $payload['timeout_seconds'] ?? 10)));
             $base['include_payload'] = (bool) ($payload['action_include_payload'] ?? $payload['include_payload'] ?? false);
+
             return $base;
         }
 
@@ -490,7 +466,7 @@ class HrAutomationController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
     private function normalizeAdvancedPayload(array $validated): array

@@ -25,7 +25,6 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
-    ArrowLeft,
     Calendar,
     CheckCircle2,
     Clock,
@@ -267,7 +266,7 @@ export default function UserShow({
                     backLabel="Back to Users"
                     avatar={{ src: u.avatar, fallback: initials }}
                     title={
-                        <span className="flex items-center gap-3 flex-wrap">
+                        <span className="flex flex-wrap items-center gap-3">
                             <span>{u.name}</span>
                             {u.is_active ? (
                                 <Badge className="bg-status-success-bg text-xs text-status-success">
@@ -529,7 +528,7 @@ export default function UserShow({
                                 <CardContent className="space-y-3">
                                     {showAddRole &&
                                         availableRoles.length > 0 && (
-                                            <div className="bg-primary/10 flex flex-wrap gap-1.5 rounded-lg border border-dashed border-primary p-3">
+                                            <div className="flex flex-wrap gap-1.5 rounded-lg border border-dashed border-primary bg-primary/10 p-3">
                                                 <span className="mb-1 w-full text-xs text-muted-foreground">
                                                     Click to assign:
                                                 </span>
@@ -1053,7 +1052,7 @@ export default function UserShow({
                                     <div className="border-t pt-4">
                                         <Button variant="outline" asChild>
                                             <Link
-                                                href={`/hr/staff/${u.staff_profile.id}`}
+                                                href={`/hr/people/${u.staff_profile.id}`}
                                             >
                                                 <UserCog className="mr-2 h-4 w-4" />
                                                 View Full HR Profile

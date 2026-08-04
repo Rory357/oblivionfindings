@@ -1,6 +1,13 @@
 <?php
 
-pest()->extend(Tests\DuskTestCase::class)
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Site;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\DuskTestCase;
+use Tests\TestCase;
+
+pest()->extend(DuskTestCase::class)
 //  ->use(Illuminate\Foundation\Testing\DatabaseMigrations::class)
     ->in('Browser');
 
@@ -15,12 +22,12 @@ pest()->extend(Tests\DuskTestCase::class)
 |
 */
 
-pest()->extend(Tests\TestCase::class)
-    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+pest()->extend(TestCase::class)
+    ->use(RefreshDatabase::class)
     ->in('Feature');
 
-pest()->extend(Tests\TestCase::class)
-    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+pest()->extend(TestCase::class)
+    ->use(RefreshDatabase::class)
     ->in('Integration');
 
 /*
@@ -52,4 +59,50 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Attach the minimum canonical current-staff Site provenance needed by HR
+ * feature tests. Product code must never infer staff eligibility from a legacy
+ * storage marker, so focused tests use this helper instead of setting one.
+ */
+function ensureCanonicalHrStaffProfile(
+    User $user,
+    ?Site $site = null,
+    array $overrides = [],
+): Site {
+    $site ??= Site::factory()->create([
+        'name' => 'Canonical HR test Site '.$user->id,
+        'is_active' => true,
+        'archived' => false,
+    ]);
+
+    $profile = HrEmployeeProfile::withTrashed()
+        ->where('user_id', $user->id)
+        ->first();
+    $attributes = [
+        'employee_number' => 'TEST-HR-'.$user->id,
+        'work_email' => $user->email,
+        'position_role' => $user->role ?: 'support_worker',
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        ...$overrides,
+    ];
+
+    if ($profile) {
+        if ($profile->trashed()) {
+            $profile->restore();
+        }
+        $profile->forceFill($attributes)->save();
+    } else {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            ...$attributes,
+        ]);
+    }
+
+    return $site;
 }

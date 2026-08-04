@@ -22,23 +22,26 @@ class HsTrainingRequirement extends Model
     protected $table = 'hs_training_requirements';
 
     /* ------------------------------------------------------------------ */
-    /*  Constants                                                          */
+    /*  Constants */
     /* ------------------------------------------------------------------ */
 
     public const SCOPE_GLOBAL = 'global';
+
     public const SCOPE_ROLE = 'role';
+
     public const SCOPE_SITE = 'site';
+
     public const SCOPE_CLIENT = 'client';
 
     public const ENFORCEMENT_WARN = 'warn';
+
     public const ENFORCEMENT_BLOCK = 'block';
 
     /* ------------------------------------------------------------------ */
-    /*  Fillable / Casts                                                   */
+    /*  Fillable / Casts */
     /* ------------------------------------------------------------------ */
 
     protected $fillable = [
-        'organization_id',
         'name',
         'code',
         'hr_compliance_requirement_id',
@@ -66,7 +69,7 @@ class HsTrainingRequirement extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeActive($query)
@@ -80,7 +83,7 @@ class HsTrainingRequirement extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Applicability checks                                               */
+    /*  Applicability checks */
     /* ------------------------------------------------------------------ */
 
     /**

@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrPolicy;
+use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrPolicyVersion;
 use App\Models\Role;
 use App\Models\User;
@@ -11,7 +12,6 @@ beforeEach(function () {
 
     // hr.policies.view/manage are granted to provider_manager via RbacSeeder.
     $this->manager = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'provider_manager',
         'approved_at' => now(),
     ]);
@@ -20,13 +20,11 @@ beforeEach(function () {
     ]);
 
     $this->worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
 
     $this->policy = HrPolicy::query()->create([
-        'tenant_id' => 1,
         'title' => 'Code of Conduct',
         'slug' => 'code-of-conduct',
         'category' => 'conduct',
@@ -68,4 +66,35 @@ test('the policy show page does not render content via an XSS sink', function ()
     // dangerouslySetInnerHTML (which would execute an injected <script>).
     $source = file_get_contents(resource_path('js/pages/hr/documents/policies/show.tsx'));
     expect($source)->not->toContain('dangerouslySetInnerHTML');
+});
+
+test('an ordinary attester sees only their own policy attestation records', function () {
+    $attester = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    $attester->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'support_worker')->firstOrFail()->id,
+    ]);
+    $colleague = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+
+    foreach ([$attester, $colleague] as $person) {
+        HrPolicyAttestation::query()->create([
+            'user_id' => $person->id,
+            'policy_id' => $this->policy->id,
+            'policy_version_id' => $this->version->id,
+            'attested_at' => now(),
+            'attestation_method' => 'checkbox',
+        ]);
+    }
+
+    $response = $this->actingAs($attester)
+        ->get('/hr/documents/policies/attestations')
+        ->assertOk();
+
+    expect(collect($response->inertiaProps('attestations.data'))->pluck('user_id')->all())
+        ->toBe([$attester->id]);
 });

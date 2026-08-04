@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
+use App\Services\References\ReferenceNumberGenerator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,30 +12,39 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HsCorrectiveAction extends Model
 {
-    use AuditableChanges, HasFactory, SoftDeletes;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     protected $table = 'hs_corrective_actions';
 
     /* ------------------------------------------------------------------ */
-    /*  Constants                                                          */
+    /*  Constants */
     /* ------------------------------------------------------------------ */
 
     // Action types
     public const TYPE_CORRECTIVE = 'corrective';
+
     public const TYPE_PREVENTIVE = 'preventive';
+
     public const TYPE_IMPROVEMENT = 'improvement';
 
     // Priority levels (aligned with HsEvent severity)
     public const PRIORITY_LOW = 'low';
+
     public const PRIORITY_MEDIUM = 'medium';
+
     public const PRIORITY_HIGH = 'high';
+
     public const PRIORITY_CRITICAL = 'critical';
 
     // Lifecycle statuses
     public const STATUS_OPEN = 'open';
+
     public const STATUS_IN_PROGRESS = 'in_progress';
+
     public const STATUS_COMPLETED = 'completed';
+
     public const STATUS_VERIFIED = 'verified';
+
     public const STATUS_CLOSED = 'closed';
 
     public const ALLOWED_TRANSITIONS = [
@@ -45,13 +56,12 @@ class HsCorrectiveAction extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Fillable / Casts                                                   */
+    /*  Fillable / Casts */
     /* ------------------------------------------------------------------ */
 
     protected $fillable = [
         'hs_event_id',
         'hs_investigation_id',
-        'organization_id',
         'reference_number',
         'recommendation_index',
         'action_type',
@@ -90,7 +100,7 @@ class HsCorrectiveAction extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function hsEvent(): BelongsTo
@@ -134,7 +144,7 @@ class HsCorrectiveAction extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeOpen($query)
@@ -170,7 +180,7 @@ class HsCorrectiveAction extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Lifecycle helpers                                                   */
+    /*  Lifecycle helpers */
     /* ------------------------------------------------------------------ */
 
     public function canTransitionTo(string $newStatus): bool
@@ -201,11 +211,11 @@ class HsCorrectiveAction extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Reference number generation                                        */
+    /*  Reference number generation */
     /* ------------------------------------------------------------------ */
 
     public static function generateReferenceNumber(): string
     {
-        return app(\App\Services\References\ReferenceNumberGenerator::class)->next('CA');
+        return app(ReferenceNumberGenerator::class)->next('CA');
     }
 }

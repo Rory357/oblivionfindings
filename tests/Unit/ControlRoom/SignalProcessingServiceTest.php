@@ -93,10 +93,19 @@ class SignalProcessingServiceTest extends TestCase
             'category' => 'fleet',
             'default_severity' => 'medium',
         ]);
+        $legacyLastSeen = now()->subDay()->startOfSecond();
+        $device = Device::create([
+            'name' => 'Dedup signal source',
+            'device_type' => Device::TYPE_SENSOR,
+            'signal_source_id' => $source->id,
+            'status' => 'offline',
+            'last_seen_at' => $legacyLastSeen,
+        ]);
 
         $data = [
             'signal_source_id' => $source->id,
             'signal_type_id' => $signalType->id,
+            'device_id' => $device->id,
             'idempotency_key' => 'duplicate-key',
             'payload' => ['test' => true],
             'received_at' => now(),
@@ -107,6 +116,10 @@ class SignalProcessingServiceTest extends TestCase
 
         $this->assertEquals($signal1->id, $signal2->id);
         $this->assertEquals(1, Signal::where('idempotency_key', 'duplicate-key')->count());
+        $this->assertSame(1, $source->refresh()->signal_count_24h);
+        $this->assertNotNull($device->refresh()->last_signal_at);
+        $this->assertSame('offline', $device->status);
+        $this->assertTrue($device->last_seen_at->equalTo($legacyLastSeen));
     }
 
     // ──────────────────────────────────────

@@ -11,6 +11,7 @@ use App\Models\SiteHazardAction;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Sites\SiteHazardRiskCalculator;
+use App\Services\UserSiteAccessService;
 use App\Support\HazardComplianceSnapshot;
 use App\Support\HazardDetailPresenter;
 use App\Support\SiteRecommendedHazards;
@@ -27,8 +28,11 @@ class SiteHazardController extends Controller
 
     private const TABS = ['all', 'open', 'in_progress', 'overdue', 'critical', 'closed'];
 
+    private const SITE_BYPASS_PERMISSIONS = ['sites.viewAll'];
+
     public function __construct(
-        private SiteHazardRiskCalculator $riskCalculator
+        private SiteHazardRiskCalculator $riskCalculator,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     /* ====================================================================
@@ -38,6 +42,7 @@ class SiteHazardController extends Controller
     public function globalIndex(Request $request)
     {
         abort_unless($request->user()?->canDo('hazards.view'), 403);
+        $this->authorize('viewAny', Site::class);
 
         return inertia('compliance/hazards/index', $this->registerProps($request, null));
     }
@@ -46,8 +51,10 @@ class SiteHazardController extends Controller
     public function export(Request $request)
     {
         abort_unless($request->user()?->canDo('hazards.view'), 403);
+        $this->authorize('viewAny', Site::class);
 
         $allowedSiteTypes = $this->allowedSiteTypes($request);
+        $this->assertRequestedSiteAccess($request, null);
         $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab') : 'all';
 
         $query = $this->baseQuery($request, $allowedSiteTypes, null);
@@ -109,6 +116,7 @@ class SiteHazardController extends Controller
     {
         $allowedSiteTypes = $this->allowedSiteTypes($request);
         $siteId = $site?->id;
+        $this->assertRequestedSiteAccess($request, $siteId);
 
         $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab') : 'all';
 
@@ -150,16 +158,25 @@ class SiteHazardController extends Controller
             ->withQueryString()
             ->through(fn (SiteHazard $h) => $this->buildRow($h));
 
-        $sites = Site::active()
+        $sites = Site::query()
+            ->active()
             ->whereIn('type', $allowedSiteTypes)
             ->select(['id', 'name', 'type'])
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+        $this->siteAccess->applySiteScope(
+            $sites,
+            $request->user(),
+            self::SITE_BYPASS_PERMISSIONS,
+        );
 
-        $assignees = User::staff()
+        $assignees = User::query()
             ->select(['id', 'name'])
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+        $this->siteAccess->applyStaffScope(
+            $assignees,
+            $request->user(),
+            self::SITE_BYPASS_PERMISSIONS,
+        );
 
         return [
             'hazards' => $hazards,
@@ -171,8 +188,8 @@ class SiteHazardController extends Controller
                 'q', 'site_id', 'site_type', 'severity', 'risk_rating',
                 'assignee_id', 'due_state', 'tab', 'from', 'to',
             ]),
-            'sites' => $sites,
-            'assignees' => $assignees,
+            'sites' => $sites->get(),
+            'assignees' => $assignees->get(),
             'detail' => $this->resolveDetail($request, $allowedSiteTypes, $siteId),
             'can' => $this->permissions($request),
             'severityOptions' => SiteHazardRiskCalculator::severities(),
@@ -189,7 +206,13 @@ class SiteHazardController extends Controller
     /** Build the filtered, scope-aware base query (without the tab clause). */
     private function baseQuery(Request $request, array $allowedSiteTypes, ?int $siteId): Builder
     {
+        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(
+            $request->user(),
+            self::SITE_BYPASS_PERMISSIONS,
+        );
+
         return SiteHazard::query()
+            ->whereIn('site_id', $accessibleSiteIds)
             ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
             ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
             ->when($request->filled('site_id') && ! $siteId, fn ($q) => $q->where('site_id', $request->query('site_id')))
@@ -212,6 +235,19 @@ class SiteHazardController extends Controller
                         ->orWhereHas('site', fn ($s) => $s->where('name', 'like', $term));
                 });
             });
+    }
+
+    private function assertRequestedSiteAccess(Request $request, ?int $boundSiteId): void
+    {
+        if ($boundSiteId || ! $request->filled('site_id')) {
+            return;
+        }
+
+        $this->siteAccess->assertCanAccessSiteId(
+            $request->user(),
+            (int) $request->query('site_id'),
+            self::SITE_BYPASS_PERMISSIONS,
+        );
     }
 
     private function applyTab(Builder $query, string $tab): void
@@ -277,6 +313,10 @@ class SiteHazardController extends Controller
                 'actions.assignedTo:id,name',
                 'actions.completedBy:id,name',
             ])
+            ->whereIn('site_id', $this->siteAccess->accessibleSiteIds(
+                $request->user(),
+                self::SITE_BYPASS_PERMISSIONS,
+            ))
             ->find($request->query('hazard'));
 
         if (! $hazard
@@ -314,9 +354,18 @@ class SiteHazardController extends Controller
             'actions.completedBy:id,name',
         ]);
 
+        $users = User::query()
+            ->select(['id', 'name'])
+            ->orderBy('name');
+        $this->siteAccess->applyStaffScope(
+            $users,
+            auth()->user(),
+            self::SITE_BYPASS_PERMISSIONS,
+        );
+
         return inertia('sites/hazards/show', [
             'hazard' => $hazard,
-            'users' => User::staff()->select(['id', 'name'])->orderBy('name')->get(),
+            'users' => $users->get(),
             'canAssign' => auth()->user()->canDo('hazards.assign'),
             'canClose' => auth()->user()->canDo('hazards.close'),
         ]);
@@ -348,7 +397,6 @@ class SiteHazardController extends Controller
         // officer auto-assignment, the HsEvent and the Control-Room bridge.
         $hazard = SiteHazard::create([
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'reported_by_user_id' => $request->user()->id,
             'hazard_type' => $validated['hazard_type'],
             'custom_hazard_type' => $validated['custom_hazard_type'] ?? null,
@@ -528,7 +576,6 @@ class SiteHazardController extends Controller
 
         $action = SiteHazardAction::create([
             'hazard_id' => $hazard->id,
-            'tenant_id' => $hazard->tenant_id,
             'reference_number' => $this->nextActionReference(),
             'action_description' => $validated['title'],
             'action_type' => $validated['action_type'] ?? null,

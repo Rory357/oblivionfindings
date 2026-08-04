@@ -2,7 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -24,25 +27,54 @@ class TimesheetHeroWeekScopeTest extends TestCase
 
     protected User $admin;
 
+    protected Client $client;
+
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->seed(\Database\Seeders\RbacSeeder::class);
 
+        $this->site = Site::factory()->create(['name' => 'Hero Week Site']);
+
         $this->admin = User::factory()->create([
             'role' => 'admin',
             'approved_at' => now(),
         ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+
+        $this->client = Client::factory()->create([
+            'site_id' => $this->site->id,
+            'first_name' => 'Hero',
+            'last_name' => 'Resident',
+        ]);
     }
 
     private function timesheetOn(string $workDate): Timesheet
     {
         return Timesheet::factory()->create([
+            'shift_id' => null,
+            'user_id' => $this->admin->id,
+            'client_id' => $this->client->id,
+            'shift_site_id' => $this->site->id,
+            'site_id' => $this->site->id,
             'work_date' => $workDate,
             'starts_at' => "{$workDate} 09:00:00",
             'ends_at' => "{$workDate} 17:00:00",
+            'shift_site_name_snapshot' => $this->site->name,
+            'client_name_snapshot' => $this->client->full_name,
+            'staff_name_snapshot' => $this->admin->name,
             'status' => 'submitted',
         ]);
     }

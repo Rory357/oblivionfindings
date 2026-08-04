@@ -63,7 +63,6 @@ class HsCorrectiveActionService
             $action = HsCorrectiveAction::create([
                 'hs_event_id' => $investigation->hs_event_id,
                 'hs_investigation_id' => $investigation->id,
-                'organization_id' => $investigation->organization_id,
                 'reference_number' => HsCorrectiveAction::generateReferenceNumber(),
                 'recommendation_index' => $recommendationIndex,
                 'action_type' => $overrides['action_type'] ?? HsCorrectiveAction::TYPE_CORRECTIVE,
@@ -108,7 +107,6 @@ class HsCorrectiveActionService
             $action = HsCorrectiveAction::create([
                 'hs_event_id' => $hsEvent->id,
                 'hs_investigation_id' => $data['hs_investigation_id'] ?? null,
-                'organization_id' => $hsEvent->organization_id,
                 'reference_number' => HsCorrectiveAction::generateReferenceNumber(),
                 'action_type' => $data['action_type'] ?? HsCorrectiveAction::TYPE_CORRECTIVE,
                 'priority' => $data['priority'] ?? HsCorrectiveAction::PRIORITY_MEDIUM,

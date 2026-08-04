@@ -63,7 +63,6 @@ class HsInvestigationService
         return DB::transaction(function () use ($hsEvent, $data) {
             $investigation = HsInvestigation::create([
                 'hs_event_id' => $hsEvent->id,
-                'organization_id' => $hsEvent->organization_id,
                 'reference_number' => HsInvestigation::generateReferenceNumber(),
                 'investigation_type' => $data['investigation_type'] ?? $this->inferInvestigationType($hsEvent),
                 'status' => HsInvestigation::STATUS_DRAFT,

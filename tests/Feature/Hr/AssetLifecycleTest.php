@@ -1,30 +1,40 @@
 <?php
 
 use App\Domain\Hr\Models\HrAsset;
+use App\Domain\Hr\Models\HrAssetAssignment;
 use App\Domain\Hr\Models\HrAssetMaintenanceLog;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Services\AssetService;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
+use Illuminate\Database\QueryException;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
 
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
     ]);
+    $this->site = Site::factory()->create();
+    $this->hrProfile = HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+        'start_date' => today()->subYear(),
+    ]);
 });
 
 function makeAsset(array $overrides = []): HrAsset
 {
     return HrAsset::query()->create(array_merge([
-        'tenant_id' => 1,
         'asset_tag' => 'AT-'.fake()->unique()->numberBetween(1000, 999999),
         'name' => 'Test Laptop',
         'category' => 'laptop',
@@ -79,7 +89,10 @@ test('a maintenance asset can be retired', function () {
 });
 
 test('an assigned asset cannot be retired (must be returned first)', function () {
-    $asset = makeAsset(['status' => 'assigned']);
+    $asset = makeAsset();
+    app(AssetService::class)->assignAsset($asset, $this->hrProfile, [
+        'assigned_by' => $this->hr->id,
+    ]);
 
     $this->actingAs($this->hr)
         ->post("/hr/assets/{$asset->id}/retire")
@@ -89,7 +102,10 @@ test('an assigned asset cannot be retired (must be returned first)', function ()
 });
 
 test('an assigned asset cannot be sent for repair', function () {
-    $asset = makeAsset(['status' => 'assigned']);
+    $asset = makeAsset();
+    app(AssetService::class)->assignAsset($asset, $this->hrProfile, [
+        'assigned_by' => $this->hr->id,
+    ]);
 
     $this->actingAs($this->hr)
         ->post("/hr/assets/{$asset->id}/maintenance", ['type' => 'repair'])
@@ -101,7 +117,6 @@ test('an assigned asset cannot be sent for repair', function () {
 test('a user without hr.assets.manage cannot transition an asset', function () {
     $asset = makeAsset();
     $worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
@@ -125,7 +140,7 @@ test('vehicles and keys cannot be hand-typed — they must federate to Fleet', f
     expect(HrAsset::where('asset_tag', 'VH-9999')->exists())->toBeFalse();
 });
 
-test('the assets hub resolves the tenant and lists tenant-1 inventory with aggregates', function () {
+test('the assets hub lists access-approved inventory with complete aggregates', function () {
     $asset = makeAsset(['asset_tag' => 'AT-INDEX-1']);
 
     $response = $this->actingAs($this->hr)->get('/hr/assets');
@@ -138,11 +153,7 @@ test('the assets hub resolves the tenant and lists tenant-1 inventory with aggre
 
 test('an asset can be assigned with a return-by date then returned', function () {
     $asset = makeAsset();
-    $profile = \App\Domain\Hr\Models\HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
-        'user_id' => $this->hr->id,
-        'is_active' => true,
-    ]);
+    $profile = $this->hrProfile;
 
     $this->actingAs($this->hr)
         ->post("/hr/assets/{$asset->id}/assign", [
@@ -169,4 +180,58 @@ test('an asset can be assigned with a return-by date then returned', function ()
         ->assertSessionHas('success');
 
     expect($asset->fresh()->status)->toBe('available');
+});
+
+test('asset lifecycle transitions re-read locked state instead of trusting stale models', function () {
+    $asset = makeAsset(['asset_tag' => 'AT-STALE-STATE']);
+    $staleAvailableAsset = HrAsset::query()->findOrFail($asset->id);
+
+    HrAsset::query()->whereKey($asset->id)->update(['status' => 'assigned']);
+
+    expect(fn () => app(AssetService::class)->assignAsset(
+        $staleAvailableAsset,
+        $this->hrProfile,
+        ['assigned_by' => $this->hr->id],
+    ))->toThrow(LogicException::class);
+
+    expect(HrAssetAssignment::query()->where('asset_id', $asset->id)->count())->toBe(0)
+        ->and($asset->fresh()->status)->toBe('assigned');
+});
+
+test('duplicate maintenance and inconsistent active-assignment retirement fail closed', function () {
+    $asset = makeAsset(['asset_tag' => 'AT-LOCKED-LIFECYCLE']);
+    $staleAvailableAsset = HrAsset::query()->findOrFail($asset->id);
+
+    app(AssetService::class)->logMaintenance($asset, [
+        'type' => 'repair',
+        'performed_by' => $this->hr->id,
+    ]);
+
+    expect(fn () => app(AssetService::class)->logMaintenance($staleAvailableAsset, [
+        'type' => 'repair',
+        'performed_by' => $this->hr->id,
+    ]))->toThrow(LogicException::class)
+        ->and(HrAssetMaintenanceLog::query()->where('asset_id', $asset->id)->count())->toBe(1);
+
+    $inconsistent = makeAsset(['asset_tag' => 'AT-INCONSISTENT-ASSIGNMENT']);
+    HrAssetAssignment::query()->create([
+        'asset_id' => $inconsistent->id,
+        'employee_profile_id' => $this->hrProfile->id,
+        'assigned_at' => now(),
+        'assigned_by' => $this->hr->id,
+    ]);
+
+    expect(fn () => app(AssetService::class)->retireAsset($inconsistent))
+        ->toThrow(LogicException::class)
+        ->and($inconsistent->fresh()->status)->toBe('available');
+});
+
+test('asset tags are one application-wide identity', function () {
+    makeAsset([
+        'asset_tag' => 'AT-GLOBAL-IDENTITY',
+    ]);
+
+    expect(fn () => makeAsset([
+        'asset_tag' => 'AT-GLOBAL-IDENTITY',
+    ]))->toThrow(QueryException::class);
 });

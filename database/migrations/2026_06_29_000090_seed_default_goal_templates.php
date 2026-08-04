@@ -1,12 +1,11 @@
 <?php
 
-use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrGoalTemplate;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Seed a starter set of common objective templates per tenant (item 16 —
+ * Seed one starter set of common application objective templates (item 16 —
  * "create from template"). Runs on deploy; firstOrCreate keeps it idempotent.
  */
 return new class extends Migration
@@ -17,18 +16,11 @@ return new class extends Migration
             return;
         }
 
-        $tenantIds = HrGoal::query()->distinct()->pluck('tenant_id')->filter()->values()->all();
-        if ($tenantIds === []) {
-            $tenantIds = [1];
-        }
-
-        foreach ($tenantIds as $tenantId) {
-            foreach ($this->templates() as $t) {
-                HrGoalTemplate::firstOrCreate(
-                    ['tenant_id' => $tenantId, 'name' => $t['name']],
-                    [...$t, 'is_active' => true],
-                );
-            }
+        foreach ($this->templates() as $template) {
+            HrGoalTemplate::query()->firstOrCreate(
+                ['name' => $template['name']],
+                [...$template, 'is_active' => true],
+            );
         }
     }
 

@@ -9,15 +9,18 @@ use App\Models\ServiceAgreement;
 use App\Models\ServiceAgreementLineItem;
 use App\Models\ServiceAgreementRate;
 use App\Models\Timesheet;
+use App\Services\ShiftOperationalSnapshotService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 class BillingService
 {
+    private const APPLICATION_STORAGE_CONTEXT_ID = 1;
+
     public function __construct(
         protected PayrollRateResolver $rateResolver,
-        protected \App\Services\ShiftOperationalSnapshotService $snapshots,
+        protected ShiftOperationalSnapshotService $snapshots,
     ) {}
 
     /**
@@ -34,7 +37,7 @@ class BillingService
     public function generateFromTimesheet(Timesheet $timesheet): Collection
     {
         if ($timesheet->status !== 'approved') {
-            return new Collection();
+            return new Collection;
         }
 
         if (! $timesheet->is_snapshot_complete) {
@@ -44,7 +47,7 @@ class BillingService
         $allocations = $timesheet->effectiveClientAllocations();
 
         if ($allocations->isEmpty()) {
-            return new Collection();
+            return new Collection;
         }
 
         $rateType = $this->determineRateType($timesheet);
@@ -68,14 +71,21 @@ class BillingService
                 ->where('status', 'pending')
                 ->delete();
 
-            $created = new Collection();
+            $created = new Collection;
             foreach ($allocations as $allocation) {
                 $clientId = (int) $allocation['client_id'];
                 if (! $clientId || in_array($clientId, $invoicedClientIds, true)) {
                     continue;
                 }
 
-                $client = Client::find($clientId);
+                $client = Client::query()
+                    ->whereKey($clientId)
+                    ->whereNotNull('site_id')
+                    ->whereHas('site', fn ($siteQuery) => $siteQuery
+                        ->active()
+                        ->notArchived()
+                        ->whereNull('archived_at'))
+                    ->first();
                 if (! $client) {
                     continue;
                 }
@@ -89,7 +99,6 @@ class BillingService
                 $rate = $this->resolveRate($agreement, $rateType);
 
                 $entry = BillingEntry::create([
-                    'organization_id' => $client->organization_id ?? $timesheet->shift?->organization_id,
                     'timesheet_id' => $timesheet->id,
                     'shift_id' => $timesheet->shift_id,
                     'client_id' => $client->id,
@@ -102,6 +111,7 @@ class BillingService
                     'amount' => round($hours * $rate, 2),
                     'rate_type' => $rateType,
                     ...$baseSnapshot,
+                    'site_id' => $client->site_id,
                     'client_name_snapshot' => $this->clientName($client) ?: $baseSnapshot['client_name_snapshot'] ?? null,
                     'status' => 'pending',
                     'notes' => $allocation['notes'] ?: $timesheet->notes,
@@ -137,17 +147,42 @@ class BillingService
         return $name !== '' ? $name : ($client->full_name ?? null);
     }
 
-    public function generateInvoice(array $billingEntryIds, int $organizationId, int $createdBy): FinInvoice
+    public function generateInvoice(array $billingEntryIds, int $createdBy): FinInvoice
     {
-        $entries = BillingEntry::whereIn('id', $billingEntryIds)
-            ->where('organization_id', $organizationId)
+        $entryIds = collect($billingEntryIds)
+            ->map(fn ($entryId) => (int) $entryId)
+            ->filter(fn (int $entryId) => $entryId > 0)
+            ->unique()
+            ->values();
+
+        $entries = BillingEntry::whereIn('id', $entryIds)
             ->whereIn('status', ['pending', 'approved'])
+            ->whereHas('client', fn ($clientQuery) => $clientQuery
+                ->whereNotNull('site_id')
+                ->whereHas('site', fn ($siteQuery) => $siteQuery
+                    ->active()
+                    ->notArchived()
+                    ->whereNull('archived_at')))
+            ->where(function ($query): void {
+                $query->whereNull('service_agreement_id')
+                    ->orWhereHas('serviceAgreement', fn ($agreementQuery) => $agreementQuery
+                        ->whereColumn('service_agreements.client_id', 'billing_entries.client_id'));
+            })
             ->with(['client', 'serviceAgreement'])
             ->get();
 
-        abort_if($entries->isEmpty(), 422, 'No billable billing entries found.');
+        abort_if(
+            $entries->isEmpty() || $entries->count() !== $entryIds->count(),
+            422,
+            'No complete billable billing-entry selection was found.',
+        );
+        abort_unless(
+            $entries->pluck('client_id')->unique()->count() === 1,
+            422,
+            'Billing entries for different clients cannot share one invoice.',
+        );
 
-        return DB::transaction(function () use ($entries, $organizationId, $createdBy) {
+        return DB::transaction(function () use ($entries, $createdBy) {
             $firstEntry = $entries->first();
             $client = $firstEntry->client;
             $subtotal = $entries->sum('amount');
@@ -155,10 +190,10 @@ class BillingService
             $taxAmount = round($subtotal * $taxRate, 2);
 
             $invoice = FinInvoice::create([
-                'organization_id' => $organizationId,
+                'organization_id' => self::APPLICATION_STORAGE_CONTEXT_ID,
                 'client_id' => $firstEntry->client_id,
                 'funding_body' => $firstEntry->serviceAgreement?->funding_body,
-                'invoice_number' => $this->generateInvoiceNumber($organizationId),
+                'invoice_number' => $this->generateInvoiceNumber(),
                 'invoice_date' => now()->toDateString(),
                 'due_date' => now()->addDays(20)->toDateString(),
                 'client_name' => $client?->full_name ?? $firstEntry->client_name_snapshot ?? 'Client',
@@ -299,10 +334,10 @@ class BillingService
             ->first();
     }
 
-    protected function generateInvoiceNumber(int $organizationId): string
+    protected function generateInvoiceNumber(): string
     {
         $lastInvoice = FinInvoice::withTrashed()
-            ->where('organization_id', $organizationId)
+            ->where('organization_id', self::APPLICATION_STORAGE_CONTEXT_ID)
             ->orderByDesc('id')
             ->first();
 

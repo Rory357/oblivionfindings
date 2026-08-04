@@ -3,6 +3,7 @@
 namespace App\Domain\Roadmap\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,11 +14,11 @@ class InitiativeTask extends Model
 {
     use AuditableChanges;
     use HasFactory;
+    use WritesLegacyStorageContext;
 
     protected $table = 'roadmap_initiative_tasks';
 
     protected $fillable = [
-        'tenant_id',
         'initiative_id',
         'initiative_milestone_id',
         'site_id',

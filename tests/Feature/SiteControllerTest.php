@@ -557,11 +557,11 @@ class SiteControllerTest extends TestCase
         ]);
     }
 
-    public function test_site_document_upload_stores_folder_and_tenant(): void
+    public function test_site_document_upload_stores_folder_and_canonical_site(): void
     {
         Storage::fake('local');
 
-        $site = Site::factory()->create(['tenant_id' => 7]);
+        $site = Site::factory()->create();
         $file = UploadedFile::fake()->create('maintenance-plan.pdf', 12, 'application/pdf');
 
         $this->actingAs($this->admin)
@@ -574,7 +574,6 @@ class SiteControllerTest extends TestCase
             ->assertRedirect();
 
         $this->assertDatabaseHas('site_documents', [
-            'tenant_id' => 7,
             'site_id' => $site->id,
             'title' => 'Maintenance Plan',
             'category' => 'maintenance',

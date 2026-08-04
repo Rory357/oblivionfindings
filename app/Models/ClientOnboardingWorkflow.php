@@ -2,15 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ClientOnboardingWorkflow extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'client_id',
         'status',
         'started_at',
@@ -46,12 +46,9 @@ class ClientOnboardingWorkflow extends Model
         return $this->hasMany(ClientOnboardingStep::class, 'workflow_id');
     }
 
-    public static function createForClient(\App\Models\Client $client, int $createdBy): self
+    public static function createForClient(Client $client, int $createdBy): self
     {
-        $creator = \App\Models\User::find($createdBy);
-
         $workflow = static::create([
-            'organization_id' => $creator?->organization_id,
             'client_id' => $client->id,
             'status' => 'in_progress',
             'started_at' => now(),

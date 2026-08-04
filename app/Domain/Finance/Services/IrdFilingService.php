@@ -14,12 +14,11 @@ class IrdFilingService
     /**
      * Create a GST filing record from an existing GST return.
      */
-    public function createGstFiling(?int $orgId, FinGstReturn $gstReturn, string $irdNumber): FinIrdFiling
+    public function createGstFiling(FinGstReturn $gstReturn, string $irdNumber): FinIrdFiling
     {
         $filingData = $this->buildGstFilingPayload($gstReturn);
 
         return FinIrdFiling::create([
-            'organization_id' => $orgId,
             'ird_number' => $irdNumber,
             'filing_type' => 'gst',
             'period_from' => $gstReturn->period_start,
@@ -37,7 +36,7 @@ class IrdFilingService
      * run. Totals are summed from the run's payslips; the filing is the amount of
      * PAYE payable to IRD. Caller must ensure the run's payroll journal is posted.
      */
-    public function createPaydayFiling(?int $orgId, HrPayrollRun $run, string $irdNumber): FinIrdFiling
+    public function createPaydayFiling(HrPayrollRun $run, string $irdNumber): FinIrdFiling
     {
         $run->loadMissing('payslips');
         $payslips = $run->payslips;
@@ -73,7 +72,6 @@ class IrdFilingService
         $payload['payroll_run_id'] = $run->id;
 
         return FinIrdFiling::create([
-            'organization_id' => $orgId,
             'ird_number' => $irdNumber,
             'filing_type' => 'payday',
             'period_from' => $run->period_start,

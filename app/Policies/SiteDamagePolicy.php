@@ -14,7 +14,9 @@ class SiteDamagePolicy
 
     public function view(User $user, SiteDamage $siteDamage): bool
     {
-        return $user->canDo('sites.damages.view');
+        return $user->canDo('sites.damages.view')
+            && $siteDamage->site !== null
+            && $user->can('view', $siteDamage->site);
     }
 
     public function create(User $user): bool
@@ -24,11 +26,15 @@ class SiteDamagePolicy
 
     public function update(User $user, SiteDamage $siteDamage): bool
     {
-        return $user->canDo('sites.damages.manage');
+        return $user->canDo('sites.damages.manage')
+            && $siteDamage->site !== null
+            && $user->can('view', $siteDamage->site);
     }
 
     public function delete(User $user, SiteDamage $siteDamage): bool
     {
-        return $user->canDo('sites.damages.manage');
+        return $user->canDo('sites.damages.manage')
+            && $siteDamage->site !== null
+            && $user->can('view', $siteDamage->site);
     }
 }

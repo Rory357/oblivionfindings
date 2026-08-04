@@ -63,7 +63,6 @@ class RecordItApiRequest
 
         try {
             $apiRequest = ItApiRequest::query()->create([
-                'tenant_id' => $identity->tenant_id,
                 'service_identity_id' => $identity->id,
                 'method' => strtoupper($request->method()),
                 'path' => '/'.$request->path(),
@@ -137,7 +136,6 @@ class RecordItApiRequest
         ])->save();
 
         AuditLogger::logOrFail('it.api.request', $identity, [
-            'organization_id' => $identity->tenant_id,
             'actor_id' => $identity->actor_user_id,
             'api_request_id' => $apiRequest->id,
             'method' => $apiRequest->method,
@@ -183,7 +181,6 @@ class RecordItApiRequest
             }
 
             AuditLogger::log('it.api.request.replayed', $identity, [
-                'organization_id' => $identity->tenant_id,
                 'actor_id' => $identity->actor_user_id,
                 'api_request_id' => $existing->id,
             ]);

@@ -1,16 +1,35 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteCredential;
 use App\Models\SiteCredentialAuditLog;
+use App\Models\SiteVendor;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
 
 uses(RefreshDatabase::class);
 
+function assignCredentialDialogSite(User $staff, Site $site): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $staff->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $staff->id,
+        'updated_by' => $staff->id,
+    ]);
+}
+
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->admin = User::factory()->create([
         'role' => 'admin',
@@ -28,12 +47,11 @@ beforeEach(function () {
 test('site show page exposes credentials array with safe fields', function () {
     SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'Door Code',
         'username' => 'reception',
         'url' => 'https://door.example.test',
         'credential_type' => 'pin',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('1234'),
+        'encrypted_value' => Crypt::encryptString('1234'),
         'requires_reauth' => false,
         'is_shareable' => true,
         'password_strength' => 3,
@@ -70,6 +88,7 @@ test('retired per-site vendors page redirects to the unified vendors view', func
     $teamLead->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'team_lead')->firstOrFail()->id,
     ]);
+    assignCredentialDialogSite($teamLead, $this->site);
 
     // A vendors.view-level user is still funnelled to the new page (not 403'd).
     expect($teamLead->canDo('vendors.view'))->toBeTrue();
@@ -103,7 +122,7 @@ test('credential store accepts new fields, encrypts password, and writes a creat
     expect($credential->is_shareable)->toBeFalse();
     expect($credential->password_strength)->toBe(4);
     expect($credential->encrypted_value)->not->toBe('Sup3rS3cretPw!');
-    expect(\Illuminate\Support\Facades\Crypt::decryptString($credential->encrypted_value))
+    expect(Crypt::decryptString($credential->encrypted_value))
         ->toBe('Sup3rS3cretPw!');
 
     expect(
@@ -133,11 +152,10 @@ test('credential store rejects unsafe url schemes', function () {
 test('credential update rejects unsafe url schemes', function () {
     $credential = SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'old name',
         'credential_type' => 'password',
         'url' => 'https://safe.example.test',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('keep-me'),
+        'encrypted_value' => Crypt::encryptString('keep-me'),
     ]);
 
     $this->actingAs($this->admin)
@@ -157,10 +175,9 @@ test('credential update rejects unsafe url schemes', function () {
 test('credential update can change metadata without rotating password', function () {
     $credential = SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'old name',
         'credential_type' => 'password',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('keep-me'),
+        'encrypted_value' => Crypt::encryptString('keep-me'),
         'requires_reauth' => false,
         'is_shareable' => false,
     ]);
@@ -180,7 +197,7 @@ test('credential update can change metadata without rotating password', function
     expect($credential->label)->toBe('new name');
     expect($credential->username)->toBe('user@example.test');
     expect($credential->is_shareable)->toBeTrue();
-    expect(\Illuminate\Support\Facades\Crypt::decryptString($credential->encrypted_value))
+    expect(Crypt::decryptString($credential->encrypted_value))
         ->toBe('keep-me');
 
     expect(
@@ -192,9 +209,8 @@ test('credential update can change metadata without rotating password', function
 });
 
 test('site show for a vendor-only user: vendors populated, credentials empty', function () {
-    \App\Models\SiteVendor::create([
+    SiteVendor::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'service_type' => 'electrician',
         'company_name' => 'Sparks NZ',
         'preferred_contact_method' => 'phone',
@@ -202,10 +218,9 @@ test('site show for a vendor-only user: vendors populated, credentials empty', f
     ]);
     SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'Should not be visible',
         'credential_type' => 'password',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('x'),
+        'encrypted_value' => Crypt::encryptString('x'),
     ]);
 
     // team_lead has sites.viewAny + sites.type.house.view + vendors.view +
@@ -215,8 +230,9 @@ test('site show for a vendor-only user: vendors populated, credentials empty', f
     $vendorOnly->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'team_lead')->firstOrFail()->id,
     ]);
+    assignCredentialDialogSite($vendorOnly, $this->site);
     $vendorOnly->permissionOverrides()->syncWithoutDetaching([
-        \App\Models\Permission::query()->where('key', 'credentials.view')->firstOrFail()->id => ['allowed' => false],
+        Permission::query()->where('key', 'credentials.view')->firstOrFail()->id => ['allowed' => false],
     ]);
 
     expect($vendorOnly->canDo('vendors.view'))->toBeTrue();
@@ -235,9 +251,8 @@ test('site show for a vendor-only user: vendors populated, credentials empty', f
 });
 
 test('site show for a credential-only user: credentials populated, vendors empty', function () {
-    \App\Models\SiteVendor::create([
+    SiteVendor::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'service_type' => 'electrician',
         'company_name' => 'Sparks NZ',
         'preferred_contact_method' => 'phone',
@@ -245,10 +260,9 @@ test('site show for a credential-only user: credentials populated, vendors empty
     ]);
     SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'Door Code',
         'credential_type' => 'pin',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('1234'),
+        'encrypted_value' => Crypt::encryptString('1234'),
     ]);
 
     // team_lead minus vendors.view = credential-only tester.
@@ -256,8 +270,9 @@ test('site show for a credential-only user: credentials populated, vendors empty
     $credentialOnly->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'team_lead')->firstOrFail()->id,
     ]);
+    assignCredentialDialogSite($credentialOnly, $this->site);
     $credentialOnly->permissionOverrides()->syncWithoutDetaching([
-        \App\Models\Permission::query()->where('key', 'vendors.view')->firstOrFail()->id => ['allowed' => false],
+        Permission::query()->where('key', 'vendors.view')->firstOrFail()->id => ['allowed' => false],
     ]);
 
     expect($credentialOnly->canDo('vendors.view'))->toBeFalse();
@@ -276,9 +291,8 @@ test('site show for a credential-only user: credentials populated, vendors empty
 });
 
 test('site show for a both-permission user (admin): both sides populated', function () {
-    \App\Models\SiteVendor::create([
+    SiteVendor::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'service_type' => 'electrician',
         'company_name' => 'Sparks NZ',
         'preferred_contact_method' => 'phone',
@@ -286,10 +300,9 @@ test('site show for a both-permission user (admin): both sides populated', funct
     ]);
     SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'Door Code',
         'credential_type' => 'pin',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('1234'),
+        'encrypted_value' => Crypt::encryptString('1234'),
     ]);
 
     $this->actingAs($this->admin)
@@ -306,15 +319,13 @@ test('site show for a both-permission user (admin): both sides populated', funct
 test('credential destroy returns back(303) and audits delete (audit row survives via nullOnDelete)', function () {
     $credential = SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'to delete',
         'credential_type' => 'password',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('x'),
+        'encrypted_value' => Crypt::encryptString('x'),
     ]);
 
-    $tenantId = $this->site->tenant_id;
     $deleteAuditsBefore = SiteCredentialAuditLog::query()
-        ->where('tenant_id', $tenantId)
+        ->where('site_id', $this->site->id)
         ->where('action', 'delete')
         ->count();
 
@@ -327,7 +338,7 @@ test('credential destroy returns back(303) and audits delete (audit row survives
 
     // FK is nullOnDelete; the audit row survives with credential_id = null.
     $deleteAuditsAfter = SiteCredentialAuditLog::query()
-        ->where('tenant_id', $tenantId)
+        ->where('site_id', $this->site->id)
         ->where('action', 'delete')
         ->count();
     expect($deleteAuditsAfter)->toBe($deleteAuditsBefore + 1);

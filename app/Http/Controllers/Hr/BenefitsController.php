@@ -2,23 +2,25 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrBenefitEnrollment;
 use App\Domain\Hr\Models\HrBenefitPlan;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\BenefitsService;
 use App\Domain\Hr\Services\CompensationService;
+use App\Domain\Hr\Services\HrPerformanceAccessService;
+use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class BenefitsController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         protected BenefitsService $benefitsService,
         protected CompensationService $compensationService,
+        private readonly HrPerformanceAccessService $access,
     ) {}
 
     /**
@@ -26,13 +28,10 @@ class BenefitsController extends Controller
      */
     public function index(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.benefits.view'), 403);
+        $user = $this->viewer($request);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $enrollments = HrBenefitEnrollment::query()
-            ->forTenant($tenantId)
+        $enrollments = $this->access
+            ->applyBenefitEnrollmentScope(HrBenefitEnrollment::query(), $user)
             ->with(['employeeProfile.user:id,name', 'benefitPlan'])
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->when($request->query('plan_id'), fn ($q, $planId) => $q->where('benefit_plan_id', $planId))
@@ -42,12 +41,11 @@ class BenefitsController extends Controller
 
         // employer_contribution_rate drives the enroll wizard's employer-default
         // prefill + cost preview.
-        $plans = HrBenefitPlan::forTenant($tenantId)->active()
+        $plans = HrBenefitPlan::query()->active()
             ->get(['id', 'name', 'type', 'employer_contribution_rate']);
 
-        $employees = HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
+        $employees = $this->access
+            ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
             ->with('user:id,name')
             ->orderBy('user_id')
             ->get(['id', 'user_id', 'position_title']);
@@ -55,15 +53,15 @@ class BenefitsController extends Controller
         // profileId → annual salary (decrypted in PHP) so the wizard can show a
         // live $/yr contribution cost preview. Manager-only (it exposes pay).
         $annualSalaryByProfileId = $user->canDo('hr.benefits.manage')
-            ? HrEmployeeProfile::query()
-                ->where('tenant_id', $tenantId)
-                ->where('is_active', true)
+            && $user->canDo('hr.compensation.view')
+            ? $this->access
+                ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
                 ->get(['id', 'annual_salary'])
                 ->mapWithKeys(fn ($p) => [$p->id => $p->annual_salary !== null ? (float) $p->annual_salary : null])
                 ->all()
             : [];
 
-        $summary = $this->benefitsService->getEnrollmentSummary($tenantId);
+        $summary = $this->benefitsService->getEnrollmentSummary($user);
 
         return Inertia::render('hr/compensation/benefits/index', [
             'enrollments' => $enrollments,
@@ -75,8 +73,8 @@ class BenefitsController extends Controller
                 'status' => $request->query('status'),
                 'plan_id' => $request->query('plan_id'),
             ],
-            'stats' => $this->compensationService->heroStats($tenantId, $user),
-            'tabCounts' => $this->compensationService->tabCounts($tenantId),
+            'stats' => $this->compensationService->heroStatsFor($user),
+            'tabCounts' => $this->compensationService->tabCountsFor($user),
             'can' => [
                 'manage' => $user->canDo('hr.benefits.manage'),
             ],
@@ -88,12 +86,12 @@ class BenefitsController extends Controller
      */
     public function plans(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.benefits.view'), 403);
+        $user = $this->viewer($request);
 
         $plans = HrBenefitPlan::query()
-            ->forTenant($this->resolveHrTenantIdForUser($user))
-            ->withCount(['enrollments' => fn ($q) => $q->where('status', 'active')])
+            ->withCount(['enrollments' => fn ($query) => $this->access
+                ->applyBenefitEnrollmentScope($query, $user)
+                ->active()])
             ->when($request->query('type'), fn ($q, $type) => $q->where('type', $type))
             ->orderBy('name')
             ->paginate(20)
@@ -121,11 +119,10 @@ class BenefitsController extends Controller
      */
     public function storePlan(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.benefits.manage'), 403);
+        $this->manager($request);
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', Rule::unique('hr_benefit_plans', 'name')],
             'type' => ['required', 'string', 'in:kiwisaver,health_insurance,life_insurance,other'],
             'provider' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
@@ -133,10 +130,7 @@ class BenefitsController extends Controller
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
-        HrBenefitPlan::create([
-            'tenant_id' => $this->resolveHrTenantIdForUser($user),
-            ...$data,
-        ]);
+        HrBenefitPlan::create($data);
 
         return redirect()->back()->with('success', 'Benefit plan created.');
     }
@@ -146,25 +140,23 @@ class BenefitsController extends Controller
      */
     public function enroll(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.benefits.manage'), 403);
+        $user = $this->manager($request);
 
         $data = $request->validate([
-            'employee_profile_id' => ['required', 'integer', 'exists:hr_employee_profiles,id'],
-            'benefit_plan_id' => ['required', 'integer', 'exists:hr_benefit_plans,id'],
+            'employee_profile_id' => ['required', 'integer'],
+            'benefit_plan_id' => ['required', 'integer'],
             'enrollment_date' => ['required', 'date'],
             'employee_contribution_rate' => ['required', 'numeric', 'min:0', 'max:100'],
             'employer_contribution_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        // Tenant-scope both lookups — a bare exists: rule would accept a
-        // profile or plan from another organisation.
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $profile = HrEmployeeProfile::where('tenant_id', $tenantId)->findOrFail($data['employee_profile_id']);
-        $plan = HrBenefitPlan::where('tenant_id', $tenantId)->findOrFail($data['benefit_plan_id']);
+        $profile = $this->access
+            ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
+            ->findOrFail($data['employee_profile_id']);
+        $plan = HrBenefitPlan::query()->active()->findOrFail($data['benefit_plan_id']);
 
-        $this->benefitsService->enrollEmployee($profile, $plan, $data);
+        $this->benefitsService->enrollEmployee($profile, $plan, $data, $user);
 
         return redirect()->back()->with('success', 'Employee enrolled in benefit plan.');
     }
@@ -174,10 +166,8 @@ class BenefitsController extends Controller
      */
     public function updateEnrollment(Request $request, HrBenefitEnrollment $enrollment)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.benefits.manage'), 403);
-
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $enrollment->tenant_id);
+        $user = $this->manager($request);
+        $enrollment = $this->access->benefitEnrollment($user, $enrollment);
 
         $data = $request->validate([
             'status' => ['sometimes', 'string', 'in:active,opted_out,suspended,terminated'],
@@ -187,26 +177,7 @@ class BenefitsController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $enrollment->update($data);
-
-        // Material change (rate/status) → confirm to the employee. Checked
-        // before any refresh so wasChanged() still reflects this update.
-        $material = $enrollment->wasChanged([
-            'status',
-            'employee_contribution_rate',
-            'employer_contribution_rate',
-        ]);
-
-        // KiwiSaver → payroll sync: payroll reads the employee profile's
-        // kiwisaver_rate (not this enrolment row), so mirror active-rate
-        // changes and zero it on opt-out. See BenefitsService::syncKiwiSaverToProfile.
-        $this->benefitsService->syncKiwiSaverToProfile(
-            $enrollment->fresh(['benefitPlan', 'employeeProfile']),
-        );
-
-        if ($material) {
-            $this->benefitsService->notifyEnrollmentChange($enrollment);
-        }
+        $this->benefitsService->updateEnrollment($enrollment, $data, $user);
 
         return redirect()->back()->with('success', 'Enrollment updated.');
     }
@@ -218,20 +189,38 @@ class BenefitsController extends Controller
      */
     public function updatePlan(Request $request, HrBenefitPlan $plan)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.benefits.manage'), 403);
-
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $plan->tenant_id);
+        $this->manager($request);
 
         $data = $request->validate([
             'is_active' => ['required', 'boolean'],
         ]);
 
-        $plan->update($data);
+        DB::transaction(function () use ($plan, $data): void {
+            HrBenefitPlan::query()
+                ->lockForUpdate()
+                ->findOrFail($plan->getKey())
+                ->update($data);
+        }, attempts: 1);
 
         return redirect()->back()->with(
             'success',
             $data['is_active'] ? 'Benefit plan activated.' : 'Benefit plan deactivated.',
         );
+    }
+
+    private function viewer(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.benefits.view'), 403);
+
+        return $this->access->currentStaff($user, $user);
+    }
+
+    private function manager(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.benefits.manage'), 403);
+
+        return $this->access->currentStaff($user, $user);
     }
 }

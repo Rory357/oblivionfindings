@@ -2,18 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CareNoteTemplate extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     protected $table = 'care_note_templates';
 
     protected $fillable = [
-        'organization_id',
         'name',
         'description',
         'template_type',

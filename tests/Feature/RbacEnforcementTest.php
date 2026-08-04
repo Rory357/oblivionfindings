@@ -1,11 +1,15 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\FinancePermissionsSeeder;
 use Database\Seeders\GovernancePermissionsSeeder;
 use Database\Seeders\RbacSeeder;
+use Inertia\Testing\AssertableInertia as Assert;
+
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(FinancePermissionsSeeder::class);
@@ -115,7 +119,16 @@ test('user without hazards permissions cannot access health safety analytics', f
 });
 
 test('health safety officer can access health safety dashboard', function () {
+    $site = Site::factory()->create(['name' => 'Health and Safety Site']);
     $user = rbacUser('health_safety_officer');
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+    ]);
 
     $response = $this->actingAs($user)->get('/health-safety');
 
@@ -216,26 +229,38 @@ test('admin can access data breaches', function () {
 // ─── 7. Support worker can only see assigned clients ───────────────────
 
 test('support worker with viewAssigned sees only assigned clients', function () {
+    $site = Site::factory()->create(['name' => 'Assigned Client Site']);
     $worker = rbacUser('support_worker');
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $worker->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+    ]);
 
     // Create two clients
-    $assignedClient = Client::factory()->create(['first_name' => 'AssignedClient']);
-    $unassignedClient = Client::factory()->create(['first_name' => 'UnassignedClient']);
+    $assignedClient = Client::factory()->create([
+        'site_id' => $site->id,
+        'first_name' => 'AssignedClient',
+    ]);
+    Client::factory()->create([
+        'site_id' => $site->id,
+        'first_name' => 'UnassignedClient',
+    ]);
 
     // Assign one client to the worker
     $assignedClient->supportWorkers()->attach($worker->id);
 
-    $response = $this->actingAs($worker)->get('/clients');
-
-    // The worker should be able to access the client list (200 or Inertia redirect)
-    expect($response->status())->toBeIn([200, 302]);
-
-    // If we get a 200 with page data, ensure only assigned client appears
-    if ($response->status() === 200) {
-        $content = $response->getContent();
-        expect($content)->toContain('AssignedClient');
-        expect($content)->not->toContain('UnassignedClient');
-    }
+    $this->actingAs($worker)
+        ->get('/clients')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('operations/clients/index')
+            ->has('clients', 1)
+            ->where('clients.0.id', $assignedClient->id)
+            ->where('clients.0.first_name', 'AssignedClient'));
 });
 
 test('coordinator can see all clients', function () {

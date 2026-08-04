@@ -4,7 +4,9 @@ namespace App\Http\Requests\HealthSafety;
 
 use App\Models\Client;
 use App\Models\HsEvent;
+use App\Models\HsRiskAssessment;
 use App\Models\Site;
+use App\Services\UserSiteAccessService;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -16,8 +18,18 @@ class StoreHsRiskAssessmentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Route is already gated by permission:hazards.manage.
-        return true;
+        // Permission remains route-gated. Route-model actions additionally deny
+        // direct objects outside the viewer's canonical Site scope before validation.
+        $assessment = $this->route('assessment');
+        if (! $assessment instanceof HsRiskAssessment) {
+            return true;
+        }
+
+        return app(UserSiteAccessService::class)->applyHsRiskAssessmentScope(
+            HsRiskAssessment::query(),
+            $this->user(),
+            ['healthSafety.viewAllSites'],
+        )->whereKey($assessment->getKey())->exists();
     }
 
     public function rules(): array
@@ -49,21 +61,34 @@ class StoreHsRiskAssessmentRequest extends FormRequest
         $validator->after(function ($validator) {
             $type = $this->input('attach_type');
             $id = $this->input('attach_id');
+            $siteAccess = app(UserSiteAccessService::class);
+            $siteIds = $siteAccess->accessibleSiteIds($this->user(), ['healthSafety.viewAllSites']);
 
-            if ($type === 'standalone' || ! $id) {
+            if ($type === 'standalone') {
+                if (! $siteAccess->canBypass($this->user(), ['healthSafety.viewAllSites'])) {
+                    $validator->errors()->add('attach_type', 'Application-wide assessments require application-wide H&S access.');
+                }
+
                 return;
             }
 
-            $model = match ($type) {
-                'site' => Site::class,
-                'client' => Client::class,
-                'event' => HsEvent::class,
-                default => null,
+            if (! $id) {
+                return;
+            }
+
+            $exists = match ($type) {
+                'site' => Site::query()->whereIn('id', $siteIds)->whereKey($id)->exists(),
+                'client' => Client::query()->whereIn('site_id', $siteIds)->whereKey($id)->exists(),
+                'event' => $siteAccess->applyHsEventScope(
+                    HsEvent::query(),
+                    $this->user(),
+                    ['healthSafety.viewAllSites'],
+                )->whereKey($id)->exists(),
+                default => false,
             };
 
-            // Use the model (respects SoftDeletes) so trashed entities can't be attached.
-            if ($model && ! $model::query()->whereKey($id)->exists()) {
-                $validator->errors()->add('attach_id', 'The selected '.$type.' could not be found.');
+            if (! $exists) {
+                $validator->errors()->add('attach_id', 'The selected '.$type.' is unavailable for your Site access.');
             }
         });
     }

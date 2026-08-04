@@ -176,6 +176,9 @@ class ComplianceDashboardTest extends TestCase
                 ->has('frameworks')
                 ->has('can.manage')
                 ->has('can.triage')
+                ->has('can.viewControlRoom')
+                ->has('can.viewAudit')
+                ->has('can.viewReports')
             );
     }
 

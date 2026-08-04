@@ -12,6 +12,7 @@ use App\Domain\Hr\Notifications\GoalDueNotification;
 use App\Domain\Hr\Notifications\PerformanceReviewDueNotification;
 use App\Domain\Hr\Notifications\PipReviewDueNotification;
 use App\Domain\Hr\Notifications\SupervisionDueNotification;
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Models\User;
 use Illuminate\Console\Command;
 
@@ -30,14 +31,14 @@ class PerformanceRemindersCommand extends Command
 
     protected $description = 'Expire overdue 360 requests and remind reviewers of due 360s and performance reviews.';
 
-    public function handle(): int
+    public function handle(HrCurrentStaffService $currentStaff): int
     {
         $expired = $this->expireOverdueFeedback();
         $reminded = $this->remindDueFeedback();
         $reviewsNudged = $this->remindDueReviews();
         $supNudged = $this->remindOverdueSupervision();
         $pipNudged = $this->remindPipReviews();
-        $goalNudged = $this->remindDueGoals();
+        $goalNudged = $this->remindDueGoals($currentStaff);
 
         $this->info("Performance reminders: {$expired} 360 expired, {$reminded} 360 reminders, {$reviewsNudged} review nudges, {$supNudged} supervision, {$pipNudged} PIP reviews, {$goalNudged} goal due.");
 
@@ -100,9 +101,10 @@ class PerformanceRemindersCommand extends Command
     }
 
     /** Nudge goal owners of active goals due within 7 days and not yet complete. */
-    private function remindDueGoals(): int
+    private function remindDueGoals(HrCurrentStaffService $currentStaff): int
     {
         $goals = HrGoal::query()
+            ->whereIn('user_id', $currentStaff->currentUsersQuery()->select('users.id'))
             ->where('status', 'active')
             ->where('progress_percentage', '<', 100)
             ->whereNotNull('due_date')
@@ -111,7 +113,9 @@ class PerformanceRemindersCommand extends Command
 
         $count = 0;
         foreach ($goals as $goal) {
-            $owner = $goal->user_id ? User::find($goal->user_id) : null;
+            $owner = $goal->user_id
+                ? $currentStaff->currentUsersQuery()->find($goal->user_id)
+                : null;
             if (! $owner) {
                 continue;
             }

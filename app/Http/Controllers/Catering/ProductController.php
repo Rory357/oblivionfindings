@@ -33,7 +33,6 @@ class ProductController extends Controller
         $tagIds = $data['tag_ids'] ?? [];
         unset($data['tag_ids']);
 
-        $data['tenant_id'] = auth()->user()?->tenant_id;
         $product = MealProduct::create($data);
         if (! empty($tagIds)) {
             $product->tags()->sync($tagIds);

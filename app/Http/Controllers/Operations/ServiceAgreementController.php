@@ -8,12 +8,18 @@ use App\Models\ServiceAgreement;
 use App\Models\ServiceAgreementLineItem;
 use App\Models\ServiceAgreementRate;
 use App\Models\ServiceAgreementStatusChange;
+use App\Models\User;
 use App\Services\Operations\OpsNotificationService;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class ServiceAgreementController extends Controller
 {
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     public function index(Request $request)
     {
         $auth = $request->user();
@@ -27,10 +33,17 @@ class ServiceAgreementController extends Controller
             'funding_type' => ['nullable', 'string'],
         ]);
 
-        $baseQuery = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id));
+        $baseQuery = $this->accessibleAgreements($auth);
 
-        // Compute stats from the org-scoped base (before user filters)
+        if (! empty($data['client_id'])) {
+            $this->siteAccess->assertCanAccessClientId(
+                $auth,
+                (int) $data['client_id'],
+                ['reports.viewAny'],
+            );
+        }
+
+        // Compute stats from the Site-scoped base (before user filters).
         $stats = [
             'total' => (clone $baseQuery)->count(),
             'active' => (clone $baseQuery)->where('status', 'active')->count(),
@@ -73,10 +86,7 @@ class ServiceAgreementController extends Controller
             return $agreement;
         });
 
-        $clients = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name']);
+        $clients = $this->accessibleClients($auth);
 
         return inertia('operations/service-agreements/Index', [
             'agreements' => $agreements,
@@ -91,10 +101,7 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.create'), 403);
 
-        $clients = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name']);
+        $clients = $this->accessibleClients($auth);
 
         return inertia('operations/service-agreements/Create', [
             'clients' => $clients,
@@ -107,13 +114,7 @@ class ServiceAgreementController extends Controller
         abort_unless($auth && $auth->canDo('service_agreements.create'), 403);
 
         $data = $request->validate([
-            'client_id' => [
-                'required',
-                'integer',
-                Rule::exists('clients', 'id')->where(
-                    fn ($query) => $query->where('organization_id', $auth->organization_id),
-                ),
-            ],
+            'client_id' => ['required', 'integer', 'exists:clients,id'],
             'title' => ['required', 'string', 'max:255'],
             'agreement_type' => ['required', 'string', 'max:100'],
             'reference_number' => ['nullable', 'string', 'max:100'],
@@ -155,8 +156,13 @@ class ServiceAgreementController extends Controller
             'funder_contact_phone' => ['nullable', 'string', 'max:50'],
         ]);
 
+        $this->siteAccess->assertCanAccessClientId(
+            $auth,
+            (int) $data['client_id'],
+            ['reports.viewAny'],
+        );
+
         $agreement = ServiceAgreement::create([
-            'organization_id' => $auth->organization_id,
             'client_id' => $data['client_id'],
             'title' => $data['title'],
             'agreement_type' => $data['agreement_type'],
@@ -212,8 +218,7 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.viewAny'), 403);
 
-        $agreement = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $agreement = $this->accessibleAgreements($auth)
             ->with([
                 'client:id,first_name,last_name',
                 'creator:id,name',
@@ -277,15 +282,11 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $agreement = $this->accessibleAgreements($auth)
             ->with(['client:id,first_name,last_name', 'lineItems'])
             ->findOrFail($agreement);
 
-        $clients = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name']);
+        $clients = $this->accessibleClients($auth);
 
         return inertia('operations/service-agreements/Edit', [
             'agreement' => $agreement,
@@ -298,19 +299,10 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($agreement);
+        $agreement = $this->accessibleAgreements($auth)->findOrFail($agreement);
 
         $data = $request->validate([
-            'client_id' => [
-                'sometimes',
-                'required',
-                'integer',
-                Rule::exists('clients', 'id')->where(
-                    fn ($query) => $query->where('organization_id', $auth->organization_id),
-                ),
-            ],
+            'client_id' => ['sometimes', 'required', 'integer', 'exists:clients,id'],
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'agreement_type' => ['sometimes', 'required', 'string', 'max:100'],
             'reference_number' => ['nullable', 'string', 'max:100'],
@@ -352,6 +344,14 @@ class ServiceAgreementController extends Controller
             'funder_contact_phone' => ['nullable', 'string', 'max:50'],
         ]);
 
+        if (array_key_exists('client_id', $data)) {
+            $this->siteAccess->assertCanAccessClientId(
+                $auth,
+                (int) $data['client_id'],
+                ['reports.viewAny'],
+            );
+        }
+
         $agreement->update($data);
 
         return redirect()->route('operations.service_agreements.show', $agreement)
@@ -363,9 +363,7 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($serviceAgreement);
+        $agreement = $this->accessibleAgreements($auth)->findOrFail($serviceAgreement);
 
         $data = $request->validate([
             'status' => ['required', 'in:draft,pending_approval,active,under_review,renewed,expired,terminated,suspended'],
@@ -411,9 +409,7 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($serviceAgreement);
+        $agreement = $this->accessibleAgreements($auth)->findOrFail($serviceAgreement);
 
         abort_unless($agreement->status === 'draft', 422, 'Only draft agreements can be submitted for approval.');
 
@@ -442,9 +438,7 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($serviceAgreement);
+        $agreement = $this->accessibleAgreements($auth)->findOrFail($serviceAgreement);
 
         abort_unless($agreement->status === 'pending_approval', 422, 'Only agreements pending approval can be approved.');
 
@@ -475,9 +469,7 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($serviceAgreement);
+        $agreement = $this->accessibleAgreements($auth)->findOrFail($serviceAgreement);
 
         abort_unless($agreement->status === 'pending_approval', 422, 'Only agreements pending approval can be rejected.');
 
@@ -510,9 +502,7 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($agreement);
+        $agreement = $this->accessibleAgreements($auth)->findOrFail($agreement);
 
         $agreement->delete();
 
@@ -529,9 +519,7 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($serviceAgreement);
+        $agreement = $this->accessibleAgreements($auth)->findOrFail($serviceAgreement);
 
         $data = $request->validate([
             'description' => ['required', 'string', 'max:255'],
@@ -544,7 +532,6 @@ class ServiceAgreementController extends Controller
         ]);
 
         $agreement->lineItems()->create([
-            'organization_id' => $auth->organization_id,
             'description' => $data['description'],
             'unit_price' => $data['unit_price'],
             'unit' => $data['unit'],
@@ -562,9 +549,7 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($serviceAgreement);
+        $agreement = $this->accessibleAgreements($auth)->findOrFail($serviceAgreement);
 
         $item = ServiceAgreementLineItem::where('service_agreement_id', $agreement->id)
             ->findOrFail($lineItem);
@@ -597,9 +582,7 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($serviceAgreement);
+        $agreement = $this->accessibleAgreements($auth)->findOrFail($serviceAgreement);
 
         $item = ServiceAgreementLineItem::where('service_agreement_id', $agreement->id)
             ->findOrFail($lineItem);
@@ -618,9 +601,7 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($serviceAgreement);
+        $agreement = $this->accessibleAgreements($auth)->findOrFail($serviceAgreement);
 
         $data = $request->validate([
             'rate_type' => ['required', 'string', 'in:weekday,evening,weekend,public_holiday,sleepover,active_night,overtime,travel,mileage'],
@@ -631,7 +612,6 @@ class ServiceAgreementController extends Controller
         ]);
 
         $agreement->rates()->create([
-            'organization_id' => $auth->organization_id,
             'rate_type' => $data['rate_type'],
             'rate' => $data['rate'],
             'unit' => $data['unit'],
@@ -647,9 +627,7 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($serviceAgreement);
+        $agreement = $this->accessibleAgreements($auth)->findOrFail($serviceAgreement);
 
         $rateModel = ServiceAgreementRate::where('service_agreement_id', $agreement->id)
             ->findOrFail($rate);
@@ -657,5 +635,26 @@ class ServiceAgreementController extends Controller
         $rateModel->delete();
 
         return redirect()->back()->with('success', 'Rate deleted.');
+    }
+
+    private function accessibleAgreements(User $user): Builder
+    {
+        return ServiceAgreement::query()
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+                $clientQuery,
+                $user,
+                ['reports.viewAny'],
+            ));
+    }
+
+    private function accessibleClients(User $user)
+    {
+        return $this->siteAccess->applyClientScope(
+            Client::query(),
+            $user,
+            ['reports.viewAny'],
+        )
+            ->orderBy('first_name')
+            ->get(['id', 'first_name', 'last_name']);
     }
 }

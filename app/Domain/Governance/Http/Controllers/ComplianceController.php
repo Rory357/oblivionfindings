@@ -7,15 +7,23 @@ use App\Domain\Governance\Models\ComplianceObligation;
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Domain\Governance\Services\ComplianceEngineService;
 use App\Http\Controllers\Controller;
+use App\Models\ClientIncident;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ComplianceController extends Controller
 {
+    private const INCIDENT_SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites', 'reports.viewAny'];
+
+    private const STAFF_SITE_BYPASS_PERMISSIONS = ['reports.viewAny'];
+
     public function __construct(
-        protected ComplianceEngineService $complianceService
+        protected ComplianceEngineService $complianceService,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     public function create()
@@ -72,7 +80,7 @@ class ComplianceController extends Controller
 
         $validated = $request->validated();
 
-        $owner = $validated['owner_id'] ? User::find($validated['owner_id']) : null;
+        $owner = $this->resolveOwner($request, $validated['owner_id'] ?? null);
         $dueDate = $validated['due_date'] ? Carbon::parse($validated['due_date']) : null;
 
         $obligation = $this->complianceService->createObligation(
@@ -109,13 +117,17 @@ class ComplianceController extends Controller
             'title' => 'sometimes|string|max:255',
             'description' => 'sometimes|string',
             'due_date' => 'sometimes|date',
-            'owner_id' => 'sometimes|exists:users,id',
+            'owner_id' => 'sometimes|nullable|integer|min:1',
             'notes' => 'nullable|string',
         ]);
 
         if (array_key_exists('title', $validated)) {
             $validated['obligation_title'] = $validated['title'];
             unset($validated['title']);
+        }
+
+        if (array_key_exists('owner_id', $validated) && $validated['owner_id'] !== null) {
+            $validated['owner_id'] = $this->resolveOwner($request, $validated['owner_id'])->id;
         }
 
         $obligation->update($validated);
@@ -208,8 +220,23 @@ class ComplianceController extends Controller
             'severity' => 'required|in:critical,high,medium',
             'occurred_at' => 'required|date',
             'discovered_at' => 'nullable|date',
-            'related_incident_id' => 'nullable|integer',
+            'related_incident_id' => 'nullable|integer|min:1',
         ]);
+
+        if (filled($validated['related_incident_id'] ?? null)) {
+            $relatedIncident = ClientIncident::query()->whereKey((int) $validated['related_incident_id']);
+            $this->siteAccess->applyClientIncidentScope(
+                $relatedIncident,
+                $request->user(),
+                self::INCIDENT_SITE_BYPASS_PERMISSIONS,
+            );
+
+            if (! $relatedIncident->exists()) {
+                throw ValidationException::withMessages([
+                    'related_incident_id' => 'The selected incident is not available.',
+                ]);
+            }
+        }
 
         $incident = NotifiableIncident::create([
             ...$validated,
@@ -224,6 +251,29 @@ class ComplianceController extends Controller
         }
 
         return redirect()->route('governance.compliance.index')->with('success', $message);
+    }
+
+    private function resolveOwner(Request $request, mixed $ownerId): ?User
+    {
+        if (blank($ownerId)) {
+            return null;
+        }
+
+        $owner = User::query()->whereKey((int) $ownerId);
+        $this->siteAccess->applyStaffScope(
+            $owner,
+            $request->user(),
+            self::STAFF_SITE_BYPASS_PERMISSIONS,
+        );
+
+        $resolved = $owner->first();
+        if (! $resolved) {
+            throw ValidationException::withMessages([
+                'owner_id' => 'The selected owner is not available.',
+            ]);
+        }
+
+        return $resolved;
     }
 
     protected function getFrameworks(): array

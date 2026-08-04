@@ -6,6 +6,9 @@ use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPipMilestone;
 use App\Domain\Hr\Notifications\PipEndingNotification;
 use App\Domain\Hr\Notifications\PipMilestoneOverdueNotification;
+use App\Domain\Hr\Services\HrCurrentStaffService;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -23,7 +26,9 @@ use Illuminate\Support\Facades\Log;
  *   recorded → in-app nudge to the PIP manager (one-time via
  *   `end_reminder_sent_at`).
  *
- * All sends are best-effort. Pass a tenant id to scope one tenant.
+ * The sweep runs once for the application. Current-staff eligibility and the
+ * manager's canonical Site visibility are revalidated immediately before each
+ * reminder; historical storage markers are never an execution boundary.
  */
 class SendPipRemindersJob implements ShouldQueue
 {
@@ -31,36 +36,46 @@ class SendPipRemindersJob implements ShouldQueue
 
     private const ACTIVE_STATUSES = ['active', 'in_progress'];
 
-    public function __construct(public ?int $tenantId = null) {}
-
-    public function handle(): void
-    {
-        $milestoneNudges = $this->remindOverdueMilestones();
-        $endNudges = $this->remindEndingPlans();
+    public function handle(
+        HrCurrentStaffService $currentStaff,
+        UserSiteAccessService $siteAccess,
+    ): void {
+        $currentUserIds = $currentStaff->currentUserIds();
+        $milestoneNudges = $this->remindOverdueMilestones(
+            $currentUserIds,
+            $currentStaff,
+            $siteAccess,
+        );
+        $endNudges = $this->remindEndingPlans(
+            $currentUserIds,
+            $currentStaff,
+            $siteAccess,
+        );
 
         Log::info('SendPipRemindersJob: PIP reminder sweep completed.', [
-            'tenant_id' => $this->tenantId,
+            'scope' => 'application',
             'milestone_nudges' => $milestoneNudges,
             'end_nudges' => $endNudges,
         ]);
     }
 
-    private function remindOverdueMilestones(): int
-    {
+    /** @param list<int> $currentUserIds */
+    private function remindOverdueMilestones(
+        array $currentUserIds,
+        HrCurrentStaffService $currentStaff,
+        UserSiteAccessService $siteAccess,
+    ): int {
         $query = HrPipMilestone::query()
             ->with(['pip.manager:id,name,email', 'pip.employee:id,name,email'])
             ->where('status', 'pending')
             ->whereNull('overdue_reminder_sent_at')
             ->whereDate('due_date', '<', now()->toDateString())
-            ->whereHas('pip', function ($q) {
-                $q->whereIn('status', self::ACTIVE_STATUSES);
-                if ($this->tenantId !== null) {
-                    $q->where('tenant_id', $this->tenantId);
-                }
-            });
+            ->whereHas('pip', fn ($pip) => $pip
+                ->whereIn('status', self::ACTIVE_STATUSES)
+                ->whereIn('employee_user_id', $currentUserIds));
 
         $sent = 0;
-        $query->chunkById(200, function ($milestones) use (&$sent) {
+        $query->chunkById(200, function ($milestones) use (&$sent, $currentStaff, $siteAccess) {
             foreach ($milestones as $milestone) {
                 $pip = $milestone->pip;
                 if (! $pip) {
@@ -75,7 +90,16 @@ class SendPipRemindersJob implements ShouldQueue
                     $pip->employee?->name ?? 'an employee',
                 );
 
-                foreach (collect([$pip->manager, $pip->employee])->filter()->unique('id') as $recipient) {
+                $employee = $pip->employee && $currentStaff->isCurrent($pip->employee)
+                    ? $pip->employee
+                    : null;
+                $manager = $this->eligibleManager($pip, $currentStaff, $siteAccess);
+                $recipients = collect([$employee, $manager])->filter()->unique('id');
+                if ($recipients->isEmpty()) {
+                    continue;
+                }
+
+                foreach ($recipients as $recipient) {
                     try {
                         $recipient->notify($notification);
                         $sent++;
@@ -91,34 +115,38 @@ class SendPipRemindersJob implements ShouldQueue
         return $sent;
     }
 
-    private function remindEndingPlans(): int
-    {
+    /** @param list<int> $currentUserIds */
+    private function remindEndingPlans(
+        array $currentUserIds,
+        HrCurrentStaffService $currentStaff,
+        UserSiteAccessService $siteAccess,
+    ): int {
         $query = HrPerformanceImprovementPlan::query()
             ->with(['manager:id,name,email', 'employee:id,name,email'])
             ->whereIn('status', self::ACTIVE_STATUSES)
+            ->whereIn('employee_user_id', $currentUserIds)
             ->whereNull('end_reminder_sent_at')
             ->whereDate('end_date', '<=', now()->addDays(7)->toDateString());
 
-        if ($this->tenantId !== null) {
-            $query->where('tenant_id', $this->tenantId);
-        }
-
         $sent = 0;
-        $query->chunkById(200, function ($pips) use (&$sent) {
+        $query->chunkById(200, function ($pips) use (&$sent, $currentStaff, $siteAccess) {
             foreach ($pips as $pip) {
-                if ($pip->manager) {
-                    try {
-                        $pip->manager->notify(new PipEndingNotification(
-                            $pip->id,
-                            $pip->title,
-                            $pip->end_date?->toDateString() ?? now()->toDateString(),
-                            $pip->employee?->name ?? 'an employee',
-                            (bool) $pip->end_date?->isPast(),
-                        ));
-                        $sent++;
-                    } catch (\Throwable $exception) {
-                        report($exception);
-                    }
+                $manager = $this->eligibleManager($pip, $currentStaff, $siteAccess);
+                if (! $manager) {
+                    continue;
+                }
+
+                try {
+                    $manager->notify(new PipEndingNotification(
+                        $pip->id,
+                        $pip->title,
+                        $pip->end_date?->toDateString() ?? now()->toDateString(),
+                        $pip->employee?->name ?? 'an employee',
+                        (bool) $pip->end_date?->isPast(),
+                    ));
+                    $sent++;
+                } catch (\Throwable $exception) {
+                    report($exception);
                 }
 
                 $pip->update(['end_reminder_sent_at' => now()]);
@@ -126,5 +154,24 @@ class SendPipRemindersJob implements ShouldQueue
         });
 
         return $sent;
+    }
+
+    private function eligibleManager(
+        HrPerformanceImprovementPlan $pip,
+        HrCurrentStaffService $currentStaff,
+        UserSiteAccessService $siteAccess,
+    ): ?User {
+        $manager = $pip->manager;
+        if (! $manager || ! $currentStaff->isCurrent($manager)) {
+            return null;
+        }
+
+        $canSeeSubject = $siteAccess->applyStaffScope(
+            User::query(),
+            $manager,
+            ['hr.performance.manage'],
+        )->whereKey($pip->employee_user_id)->exists();
+
+        return $canSeeSubject ? $manager : null;
     }
 }

@@ -16,22 +16,20 @@ import { formatRelative } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
-    AlertTriangle,
-    Battery,
-    BatteryLow,
-    BatteryWarning,
     Camera,
     Cctv,
     Cpu,
     DoorOpen,
+    Link2,
     Locate,
+    LockKeyhole,
     MonitorSmartphone,
     Network,
     Radio,
     Shield,
+    ShieldCheck,
     Thermometer,
-    Wifi,
-    WifiOff,
+    Unlink,
 } from 'lucide-react';
 
 interface DeviceItem {
@@ -42,15 +40,23 @@ interface DeviceItem {
     type_label: string;
     vendor: string | null;
     model: string | null;
-    status: string;
-    battery_level: number | null;
-    last_seen_at: string | null;
+    reported_battery_level: number | null;
     last_signal_at: string | null;
-    is_stale: boolean;
+    signal_activity: {
+        state: 'recent' | 'quiet' | 'never';
+        label: string;
+        tone: 'success' | 'muted';
+    };
     location_description: string | null;
     site_id: number | null;
     site_name: string | null;
     signal_source_name: string | null;
+    identity_source: 'canonical' | 'signal_projection';
+    canonical_health_status: string | null;
+    canonical_status: string | null;
+    canonical_battery_level: number | null;
+    canonical_last_seen_at: string | null;
+    canonical_detail_url: string | null;
 }
 
 interface Props {
@@ -59,27 +65,22 @@ interface Props {
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
     stats: {
-        total: number;
-        online: number;
-        offline: number;
-        low_battery: number;
+        signal_sources: number;
+        active_24h: number;
+        canonical_linked: number | null;
+        reconciliation_needed: number | null;
     };
     filters: {
         type: string;
-        status: string;
+        activity: string;
         site_id: string;
-        low_battery: boolean;
+        linkage: string;
     };
     sites: Array<{ id: number; name: string }>;
     device_types: Record<string, string>;
+    can: { view_canonical_devices: boolean };
+    canonicalIndexUrl: string | null;
 }
-
-const statusDotColor: Record<string, string> = {
-    online: 'bg-status-success',
-    offline: 'bg-status-critical',
-    maintenance: 'bg-status-warning',
-    retired: 'bg-muted',
-};
 
 const typeIcons: Record<string, React.ReactNode> = {
     camera: <Camera className="h-4 w-4" />,
@@ -109,62 +110,25 @@ const typeBadgeColors: Record<string, string> = {
     network: 'bg-muted text-foreground border-border',
 };
 
-function BatteryIndicator({ level }: { level: number | null }) {
-    if (level === null || level === undefined) {
-        return (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Battery className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>N/A</span>
-            </div>
-        );
-    }
-
-    let color = 'bg-status-success';
-    let textColor = 'text-status-success';
-    let Icon = Battery;
-    if (level <= 20) {
-        color = 'bg-status-critical';
-        textColor = 'text-status-critical';
-        Icon = BatteryLow;
-    } else if (level <= 50) {
-        color = 'bg-status-warning';
-        textColor = 'text-status-warning';
-        Icon = BatteryWarning;
-    }
-
-    return (
-        <div className="flex items-center gap-1.5">
-            <Icon className={`h-3.5 w-3.5 ${textColor}`} />
-            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-                <div
-                    className={`h-full rounded-full ${color}`}
-                    style={{ width: `${level}%` }}
-                />
-            </div>
-            <span className={`text-xs font-medium ${textColor}`}>{level}%</span>
-        </div>
-    );
+function humanise(value: string | null): string {
+    return value ? value.replaceAll('_', ' ') : 'Unknown';
 }
 
 function DeviceCard({ device }: { device: DeviceItem }) {
-    let cardBg = '';
-    if (device.status === 'offline') {
-        cardBg = 'bg-status-critical-bg border-status-critical/50';
-    } else if (device.is_stale) {
-        cardBg = 'bg-status-warning-bg border-status-warning/50';
-    }
+    const activityClass =
+        device.signal_activity.tone === 'success'
+            ? 'border-status-success/30 bg-status-success-bg text-status-success'
+            : 'border-border bg-muted text-muted-foreground';
 
     return (
-        <Link href={`/control-room/devices/${device.id}`} className="block">
-            <Card
-                className={`cursor-pointer transition-all hover:shadow-md ${cardBg}`}
-            >
+        <Link
+            href={`/control-room/devices/${device.id}`}
+            className="frontline-focus block rounded-xl"
+        >
+            <Card className="h-full cursor-pointer transition-all hover:shadow-md">
                 <CardContent className="pt-4 pb-4">
                     <div className="mb-3 flex items-start justify-between gap-2">
                         <div className="flex min-w-0 flex-1 items-center gap-2">
-                            <span
-                                className={`inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full ${statusDotColor[device.status] ?? 'bg-muted'}`}
-                            />
                             <h3 className="truncate text-sm font-medium">
                                 {device.name || device.device_uid}
                             </h3>
@@ -192,18 +156,49 @@ function DeviceCard({ device }: { device: DeviceItem }) {
                         </p>
                     )}
 
-                    <div className="mb-2">
-                        <BatteryIndicator level={device.battery_level} />
+                    <div className="mb-3 space-y-2">
+                        {device.identity_source === 'canonical' ? (
+                            <div className="space-y-1">
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-status-success">
+                                    <ShieldCheck
+                                        className="h-3.5 w-3.5"
+                                        aria-hidden="true"
+                                    />
+                                    Linked managed Device
+                                </span>
+                                <p className="text-xs text-muted-foreground capitalize">
+                                    Device health:{' '}
+                                    {humanise(
+                                        device.canonical_health_status ??
+                                            device.canonical_status,
+                                    )}
+                                </p>
+                            </div>
+                        ) : (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-status-warning">
+                                <Radio
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                />
+                                Needs Device reconciliation
+                            </span>
+                        )}
+                        <Badge
+                            variant="outline"
+                            className={`inline-flex items-center gap-1.5 ${activityClass}`}
+                        >
+                            <Activity
+                                className="h-3.5 w-3.5"
+                                aria-hidden="true"
+                            />
+                            {device.signal_activity.label}
+                        </Badge>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
-                            {device.status === 'online' ? (
-                                <Wifi className="h-3 w-3 text-status-success" />
-                            ) : (
-                                <WifiOff className="h-3 w-3 text-status-critical" />
-                            )}
-                            {formatRelative(device.last_seen_at)}
+                            <Radio className="h-3 w-3" aria-hidden="true" />
+                            Last signal {formatRelative(device.last_signal_at)}
                         </span>
                         {device.signal_source_name && (
                             <span className="flex items-center gap-1">
@@ -215,7 +210,7 @@ function DeviceCard({ device }: { device: DeviceItem }) {
 
                     {device.site_name && (
                         <p className="mt-1.5 truncate text-xs text-muted-foreground">
-                            {device.site_name}
+                            Signal Site: {device.site_name}
                         </p>
                     )}
                 </CardContent>
@@ -224,26 +219,24 @@ function DeviceCard({ device }: { device: DeviceItem }) {
     );
 }
 
-const typeTabMap: Array<{ value: string; label: string }> = [
-    { value: '', label: 'All' },
-    { value: 'camera', label: 'Camera' },
-    { value: 'sensor', label: 'Sensor' },
-    { value: 'personal_tracker', label: 'Tracker' },
-    { value: 'door', label: 'Door' },
-    { value: 'alarm_panel', label: 'Alarm Panel' },
-    { value: 'bed_sensor', label: 'Bed Sensor' },
-    { value: 'environmental', label: 'Environmental' },
-    { value: 'network', label: 'Network' },
-];
-
 export default function DevicesIndex({
     devices,
     stats,
     filters,
     sites,
+    device_types: deviceTypes,
+    can,
+    canonicalIndexUrl,
 }: Props) {
-    const applyFilter = (key: string, value: string | boolean) => {
-        const newFilters: Record<string, string | boolean | undefined> = {
+    const typeTabs = [
+        { value: 'all', label: 'All' },
+        ...Object.entries(deviceTypes).map(([value, label]) => ({
+            value,
+            label,
+        })),
+    ];
+    const applyFilter = (key: string, value: string) => {
+        const newFilters: Record<string, string | undefined> = {
             ...filters,
             [key]: value || undefined,
         };
@@ -262,29 +255,49 @@ export default function DevicesIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Control Room', href: '/control-room' },
-                { title: 'Devices', href: '#' },
+                { title: 'Device signals', href: '/control-room/devices' },
             ]}
         >
-            <Head title="Device Monitoring" />
+            <Head title="Device signals" />
 
             <PageLayout>
                 <CommandCentrePage
                     variant="compact"
                     current="/control-room/devices"
                     icon={Cctv}
-                    title="Devices"
-                    description="Monitor IoT device health, connectivity, battery state, and location context."
-                    status="Device monitoring workspace"
-                    freshness={`${stats.online} online · ${stats.offline} offline`}
+                    title="Device signals"
+                    description="Review Control Room signal activity and reconcile each source with the canonical Security & Devices registry. Device health and management remain in Security & Devices."
+                    status="Control Room signal projection"
+                    freshness={`${stats.active_24h} active in the last 24 hours`}
                     actions={
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            asChild
-                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                        >
-                            <Link href="/control-room/map">Open live map</Link>
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {canonicalIndexUrl ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    asChild
+                                    className="frontline-tap border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Link href={canonicalIndexUrl}>
+                                        <ShieldCheck
+                                            className="h-4 w-4"
+                                            aria-hidden="true"
+                                        />
+                                        Open Device registry
+                                    </Link>
+                                </Button>
+                            ) : null}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                                className="frontline-tap border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
+                                <Link href="/control-room/map">
+                                    Open live map
+                                </Link>
+                            </Button>
+                        </div>
                     }
                 >
                     {/* Stats Cards */}
@@ -294,10 +307,10 @@ export default function DevicesIndex({
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                                            Total Devices
+                                            Signal sources
                                         </p>
                                         <p className="text-2xl font-bold">
-                                            {stats.total}
+                                            {stats.signal_sources}
                                         </p>
                                     </div>
                                     <Cpu className="h-8 w-8 text-muted-foreground/30" />
@@ -309,28 +322,38 @@ export default function DevicesIndex({
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="text-xs font-medium tracking-wider text-status-success uppercase">
-                                            Online
+                                            Active in 24h
                                         </p>
                                         <p className="text-2xl font-bold text-status-success">
-                                            {stats.online}
+                                            {stats.active_24h}
                                         </p>
                                     </div>
-                                    <Wifi className="h-8 w-8 text-status-success" />
+                                    <Activity className="h-8 w-8 text-status-success" />
                                 </div>
                             </CardContent>
                         </Card>
-                        <Card className="border-status-critical/50">
+                        <Card>
                             <CardContent className="pt-4 pb-3">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-xs font-medium tracking-wider text-status-critical uppercase">
-                                            Offline
+                                        <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                                            Linked Devices
                                         </p>
-                                        <p className="text-2xl font-bold text-status-critical">
-                                            {stats.offline}
-                                        </p>
+                                        {stats.canonical_linked === null ? (
+                                            <p className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground">
+                                                <LockKeyhole
+                                                    className="h-4 w-4"
+                                                    aria-hidden="true"
+                                                />
+                                                Restricted
+                                            </p>
+                                        ) : (
+                                            <p className="text-2xl font-bold">
+                                                {stats.canonical_linked}
+                                            </p>
+                                        )}
                                     </div>
-                                    <WifiOff className="h-8 w-8 text-status-critical" />
+                                    <Link2 className="h-8 w-8 text-muted-foreground/30" />
                                 </div>
                             </CardContent>
                         </Card>
@@ -339,13 +362,24 @@ export default function DevicesIndex({
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="text-xs font-medium tracking-wider text-status-warning uppercase">
-                                            Low Battery
+                                            Needs reconciliation
                                         </p>
-                                        <p className="text-2xl font-bold text-status-warning">
-                                            {stats.low_battery}
-                                        </p>
+                                        {stats.reconciliation_needed ===
+                                        null ? (
+                                            <p className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground">
+                                                <LockKeyhole
+                                                    className="h-4 w-4"
+                                                    aria-hidden="true"
+                                                />
+                                                Restricted
+                                            </p>
+                                        ) : (
+                                            <p className="text-2xl font-bold text-status-warning">
+                                                {stats.reconciliation_needed}
+                                            </p>
+                                        )}
                                     </div>
-                                    <BatteryLow className="h-8 w-8 text-status-warning" />
+                                    <Unlink className="h-8 w-8 text-status-warning" />
                                 </div>
                             </CardContent>
                         </Card>
@@ -360,7 +394,7 @@ export default function DevicesIndex({
                         className="w-full"
                     >
                         <TabsList className="flex h-auto flex-wrap gap-1">
-                            {typeTabMap.map((tab) => (
+                            {typeTabs.map((tab) => (
                                 <TabsTrigger
                                     key={tab.value}
                                     value={tab.value}
@@ -375,22 +409,30 @@ export default function DevicesIndex({
                     {/* Filters Row */}
                     <div className="flex flex-wrap items-center gap-3">
                         <Select
-                            value={filters.status || 'all'}
+                            value={filters.activity || 'all'}
                             onValueChange={(v) =>
-                                applyFilter('status', v === 'all' ? '' : v)
+                                applyFilter('activity', v === 'all' ? '' : v)
                             }
                         >
-                            <SelectTrigger className="w-40">
-                                <SelectValue placeholder="Status" />
+                            <SelectTrigger
+                                className="w-52"
+                                aria-label="Signal activity"
+                            >
+                                <SelectValue placeholder="Signal activity" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All Status</SelectItem>
-                                <SelectItem value="online">Online</SelectItem>
-                                <SelectItem value="offline">Offline</SelectItem>
-                                <SelectItem value="maintenance">
-                                    Maintenance
+                                <SelectItem value="all">
+                                    All signal activity
                                 </SelectItem>
-                                <SelectItem value="retired">Retired</SelectItem>
+                                <SelectItem value="recent">
+                                    Active in last 24 hours
+                                </SelectItem>
+                                <SelectItem value="quiet">
+                                    No signal in last 24 hours
+                                </SelectItem>
+                                <SelectItem value="never">
+                                    No signal recorded
+                                </SelectItem>
                             </SelectContent>
                         </Select>
 
@@ -400,7 +442,10 @@ export default function DevicesIndex({
                                 applyFilter('site_id', v === 'all' ? '' : v)
                             }
                         >
-                            <SelectTrigger className="w-48">
+                            <SelectTrigger
+                                className="w-48"
+                                aria-label="Signal Site"
+                            >
                                 <SelectValue placeholder="Site" />
                             </SelectTrigger>
                             <SelectContent>
@@ -416,19 +461,32 @@ export default function DevicesIndex({
                             </SelectContent>
                         </Select>
 
-                        <Button
-                            variant={
-                                filters.low_battery ? 'default' : 'outline'
-                            }
-                            size="sm"
-                            onClick={() =>
-                                applyFilter('low_battery', !filters.low_battery)
-                            }
-                            className="flex items-center gap-1.5"
-                        >
-                            <AlertTriangle className="h-3.5 w-3.5" />
-                            Low Battery
-                        </Button>
+                        {can.view_canonical_devices ? (
+                            <Select
+                                value={filters.linkage || 'all'}
+                                onValueChange={(v) =>
+                                    applyFilter('linkage', v === 'all' ? '' : v)
+                                }
+                            >
+                                <SelectTrigger
+                                    className="w-52"
+                                    aria-label="Device reconciliation"
+                                >
+                                    <SelectValue placeholder="Device reconciliation" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">
+                                        All reconciliation states
+                                    </SelectItem>
+                                    <SelectItem value="linked">
+                                        Linked managed Devices
+                                    </SelectItem>
+                                    <SelectItem value="unlinked">
+                                        Needs reconciliation
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        ) : null}
                     </div>
 
                     {/* Device Grid */}
@@ -438,7 +496,7 @@ export default function DevicesIndex({
                                 <div className="py-12 text-center text-sm text-muted-foreground">
                                     <Cpu className="mx-auto mb-3 h-12 w-12 opacity-40" />
                                     <p>
-                                        No devices found matching your filters.
+                                        No signal sources match these filters.
                                     </p>
                                 </div>
                             </CardContent>

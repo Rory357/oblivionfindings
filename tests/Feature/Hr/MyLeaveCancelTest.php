@@ -5,21 +5,20 @@ use App\Models\User;
 
 beforeEach(function () {
     $this->worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
     $this->other = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
+    $this->site = ensureCanonicalHrStaffProfile($this->worker);
+    ensureCanonicalHrStaffProfile($this->other, $this->site);
 });
 
 function makeLeaveRequest(int $userId, string $status): HrLeaveRequest
 {
     return HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $userId,
         'leave_type' => 'annual',
         'period' => 'full_day',

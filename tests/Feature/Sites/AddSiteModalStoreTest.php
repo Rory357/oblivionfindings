@@ -200,7 +200,6 @@ class AddSiteModalStoreTest extends TestCase
         // A source site with coverage + a credential, to prove copy-from clone.
         $source = Site::factory()->create(['type' => 'house', 'name' => 'Source House']);
         SiteCoverageRequirement::create([
-            'organization_id' => $this->admin->organization_id,
             'site_id' => $source->id,
             'name' => 'Day cover',
             'coverage_type' => 'day',
@@ -213,7 +212,6 @@ class AddSiteModalStoreTest extends TestCase
             'is_active' => true,
         ]);
         SiteStaffRequirement::create([
-            'organization_id' => $this->admin->organization_id,
             'site_id' => $source->id,
             'requirement_name' => 'First Aid Certificate',
             'category' => 'mandatory',

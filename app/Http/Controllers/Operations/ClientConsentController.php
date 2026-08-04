@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Operations;
 
+use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientConsent;
@@ -14,6 +15,10 @@ use Illuminate\Validation\ValidationException;
 
 class ClientConsentController extends Controller
 {
+    public function __construct(
+        private readonly PersonalTrackingPrivacyService $trackingPrivacy,
+    ) {}
+
     public function index(Request $request, Client $client)
     {
         $this->authorize('view', $client);
@@ -157,6 +162,7 @@ class ClientConsentController extends Controller
                 'withdrawal_reason' => $data['withdrawal_reason'],
                 'updated_by' => $auth->id,
             ]);
+            $this->trackingPrivacy->stopForConsent($lockedConsent, $auth->id);
 
             return true;
         });
@@ -165,6 +171,11 @@ class ClientConsentController extends Controller
             app(OpsNotificationService::class)->notifyCrud($auth, 'withdrawn', 'consent', $consent->fresh(), $client);
         }
 
-        return redirect()->back()->with('success', 'Consent withdrawn.');
+        return redirect()->back()
+            ->with('success', 'Consent withdrawn. Tracking collection and live location access stopped.')
+            ->withHeaders([
+                'Cache-Control' => 'private, no-store, max-age=0',
+                'Pragma' => 'no-cache',
+            ]);
     }
 }

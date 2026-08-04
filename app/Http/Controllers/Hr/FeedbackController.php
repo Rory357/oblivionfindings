@@ -2,103 +2,86 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrFeedbackRequest;
 use App\Domain\Hr\Models\HrFeedbackTemplate;
 use App\Domain\Hr\Services\FeedbackService;
+use App\Domain\Hr\Services\HrPerformanceAccessService;
+use App\Http\Controllers\Controller;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class FeedbackController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         private readonly FeedbackService $feedbackService,
+        private readonly HrPerformanceAccessService $access,
     ) {}
-
-    /* ------------------------------------------------------------------ */
-    /*  Index — list feedback requests                                     */
-    /* ------------------------------------------------------------------ */
 
     public function index(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.view'), 403);
-
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->viewer($request);
         $canManage = $user->canDo('hr.performance.manage');
+        $scope = $canManage
+            ? $this->access->applyFeedbackSubjectScope(HrFeedbackRequest::query(), $user)
+            : HrFeedbackRequest::query()->where('reviewer_user_id', $user->id);
 
-        $allRequests = HrFeedbackRequest::forTenant($tenantId)
-            ->when(! $canManage, fn ($q) => $q->where('reviewer_user_id', $user->id))
+        $allRequests = (clone $scope)
             ->with(['subject:id,name', 'requester:id,name', 'reviewer:id,name'])
             ->orderByDesc('created_at')
             ->paginate(20)
             ->withQueryString();
-
-        $allRequests->through(fn ($req) => [
-            'id' => $req->id,
-            'subject' => $req->subject ? ['id' => $req->subject->id, 'name' => $req->subject->name] : null,
-            'requester' => $req->requester ? ['id' => $req->requester->id, 'name' => $req->requester->name] : null,
-            'reviewer' => $req->reviewer ? ['id' => $req->reviewer->id, 'name' => $req->reviewer->name] : null,
-            'review_type' => $req->review_type,
-            'status' => $req->status,
-            'due_date' => $req->due_date?->toDateString(),
-            'completed_at' => $req->completed_at?->toDateString(),
-            'created_at' => $req->created_at?->toDateString(),
+        $allRequests->through(fn (HrFeedbackRequest $feedbackRequest): array => [
+            'id' => $feedbackRequest->id,
+            'subject' => $feedbackRequest->subject
+                ? ['id' => $feedbackRequest->subject->id, 'name' => $feedbackRequest->subject->name]
+                : null,
+            'requester' => $feedbackRequest->requester
+                ? ['id' => $feedbackRequest->requester->id, 'name' => $feedbackRequest->requester->name]
+                : null,
+            'reviewer' => $feedbackRequest->reviewer
+                ? ['id' => $feedbackRequest->reviewer->id, 'name' => $feedbackRequest->reviewer->name]
+                : null,
+            'review_type' => $feedbackRequest->review_type,
+            'status' => $feedbackRequest->status,
+            'due_date' => $feedbackRequest->due_date?->toDateString(),
+            'completed_at' => $feedbackRequest->completed_at?->toDateString(),
+            'created_at' => $feedbackRequest->created_at?->toDateString(),
         ]);
 
-        $pendingCount = HrFeedbackRequest::where('reviewer_user_id', $user->id)
+        $pendingCount = HrFeedbackRequest::query()
+            ->where('reviewer_user_id', $user->id)
             ->pending()
             ->count();
-
-        // Stats
-        $statusCounts = HrFeedbackRequest::forTenant($tenantId)
-            ->when(! $canManage, fn ($q) => $q->where('reviewer_user_id', $user->id))
+        $statusCounts = (clone $scope)
             ->selectRaw('status, COUNT(*) as cnt')
             ->groupBy('status')
             ->pluck('cnt', 'status');
-
-        $overdueCount = HrFeedbackRequest::forTenant($tenantId)
-            ->when(! $canManage, fn ($q) => $q->where('reviewer_user_id', $user->id))
-            ->where('status', 'pending')
-            ->where('due_date', '<', now())
+        $overdueCount = (clone $scope)
+            ->pending()
+            ->whereDate('due_date', '<', today())
             ->count();
 
-        $stats = [
-            'total' => (int) $statusCounts->sum(),
-            'pending' => (int) ($statusCounts['pending'] ?? 0),
-            'completed' => (int) ($statusCounts['completed'] ?? 0),
-            'overdue' => $overdueCount,
-        ];
-
-        // Request-wizard data (modal on the index) — managers only.
         $wizard = null;
         if ($canManage) {
             $wizard = [
-                // Exclude former staff (inactive employee profile) from the
-                // reviewer/employee pickers. Users without a profile at all
-                // (e.g. admins) remain selectable.
-                'employees' => User::select('id', 'name')
-                    ->whereDoesntHave('hrEmployeeProfile', fn ($p) => $p->where('is_active', false))
+                'employees' => $this->access
+                    ->currentUserIds($user)
                     ->orderBy('name')
-                    ->get(),
+                    ->get(['users.id', 'users.name']),
                 'reviewTypes' => FeedbackService::REVIEW_TYPES,
-                'templates' => HrFeedbackTemplate::forTenant($tenantId)
+                'templates' => HrFeedbackTemplate::query()
                     ->active()
                     ->orderByDesc('is_default')
                     ->orderBy('name')
                     ->get()
-                    ->map(fn ($t) => [
-                        'id' => $t->id,
-                        'name' => $t->name,
-                        'description' => $t->description,
-                        'questions' => $t->questions,
-                        'is_default' => $t->is_default,
-                    ])
+                    ->map(fn (HrFeedbackTemplate $template): array => $this->serializeTemplate($template))
                     ->values(),
                 'defaultQuestions' => FeedbackService::FEEDBACK_QUESTIONS,
             ];
@@ -107,80 +90,46 @@ class FeedbackController extends Controller
         return Inertia::render('hr/feedback/index', [
             'requests' => $allRequests,
             'pendingCount' => $pendingCount,
-            'stats' => $stats,
+            'stats' => [
+                'total' => (int) $statusCounts->sum(),
+                'pending' => (int) ($statusCounts['pending'] ?? 0),
+                'completed' => (int) ($statusCounts['completed'] ?? 0),
+                'overdue' => $overdueCount,
+            ],
             'can' => ['manage' => $canManage],
             'wizard' => $wizard,
         ]);
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Request — legacy full-page form, now the index wizard              */
-    /* ------------------------------------------------------------------ */
-
     public function request(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $this->manager($request);
 
-        // The full-page request form was replaced by the Request-feedback
-        // wizard modal on the index; old links land there with it open. Deep
-        // links carrying ?employee= (employee profile page) preselect the
-        // subject inside the wizard.
         return redirect()->route('hr.feedback.index', array_filter([
             'new' => 1,
             'employee' => $request->query('employee'),
         ]));
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Store Request — create feedback requests                           */
-    /* ------------------------------------------------------------------ */
-
     public function storeRequest(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $this->createRequests($request, acceptsDueDate: false);
 
-        $validated = $request->validate([
-            'subject_user_id' => ['required', 'integer', 'exists:users,id'],
-            'reviewer_user_ids' => ['required', 'array', 'min:1'],
-            'reviewer_user_ids.*' => ['integer', 'exists:users,id'],
-            'review_type' => ['required', 'string', Rule::in(FeedbackService::REVIEW_TYPES)],
-            'performance_review_id' => ['nullable', 'integer', 'exists:hr_performance_reviews,id'],
-            'template_id' => ['nullable', 'integer', 'exists:hr_feedback_templates,id'],
-        ]);
-
-        try {
-            $this->feedbackService->request360Feedback(
-                $validated['subject_user_id'],
-                $validated['reviewer_user_ids'],
-                $validated['review_type'],
-                $validated['performance_review_id'] ?? null,
-                $user,
-                $validated['template_id'] ?? null,
-            );
-        } catch (\Exception $e) {
-            return redirect()->back()->with('error', $e->getMessage());
-        }
-
-        return redirect('/hr/feedback')->with('success', '360-degree feedback requests sent.');
+        return redirect('/hr/feedback')->with('success', '360-degree feedback requests are ready.');
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Respond — show feedback form                                       */
-    /* ------------------------------------------------------------------ */
+    public function bulkRequest(Request $request)
+    {
+        $count = $this->createRequests($request, acceptsDueDate: true);
+
+        return redirect()->back()->with('success', "360 feedback requests are ready for {$count} reviewers.");
+    }
 
     public function respond(Request $request, HrFeedbackRequest $feedbackRequest)
     {
-        $user = $request->user();
-        abort_unless($user, 403);
-        abort_unless($feedbackRequest->reviewer_user_id === $user->id, 403);
-        abort_unless($feedbackRequest->status === 'pending', 404);
-
-        $feedbackRequest->load('subject:id,name');
-
-        // Use questions from the snapshot, or fall back to defaults
-        $questions = $feedbackRequest->getQuestionsMap();
+        $user = $this->viewer($request);
+        $feedbackRequest = $this->reviewerRequest($user, $feedbackRequest, pending: true)
+            ->load('subject:id,name');
 
         return Inertia::render('hr/feedback/respond', [
             'feedbackRequest' => [
@@ -192,166 +141,84 @@ class FeedbackController extends Controller
                 'review_type' => $feedbackRequest->review_type,
                 'due_date' => $feedbackRequest->due_date?->toDateString(),
             ],
-            'questions' => $questions,
+            'questions' => $feedbackRequest->getQuestionsMap(),
         ]);
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Submit Response — save feedback responses                          */
-    /* ------------------------------------------------------------------ */
-
     public function submitResponse(Request $request, HrFeedbackRequest $feedbackRequest)
     {
-        $user = $request->user();
-        abort_unless($user, 403);
-        abort_unless($feedbackRequest->reviewer_user_id === $user->id, 403);
-        abort_unless($feedbackRequest->status === 'pending', 404);
-
-        // Accept any question key from the snapshot (not just hardcoded ones)
+        $user = $this->viewer($request);
+        $feedbackRequest = $this->reviewerRequest($user, $feedbackRequest, pending: true);
         $validKeys = array_keys($feedbackRequest->getQuestionsMap());
 
         $validated = $request->validate([
-            'responses' => ['required', 'array'],
-            'responses.*.question_key' => ['required', 'string', Rule::in($validKeys)],
-            'responses.*.rating' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'responses' => ['required', 'array', 'size:'.count($validKeys)],
+            'responses.*.question_key' => ['required', 'string', 'distinct', Rule::in($validKeys)],
+            'responses.*.rating' => ['required', 'integer', 'min:1', 'max:5'],
             'responses.*.comment' => ['nullable', 'string', 'max:2000'],
         ]);
+        $responses = collect($validated['responses'])
+            ->mapWithKeys(fn (array $response): array => [$response['question_key'] => $response])
+            ->all();
 
-        $responses = collect($validated['responses'])->keyBy('question_key')->all();
-
-        try {
-            $this->feedbackService->submitFeedback($feedbackRequest, $responses);
-        } catch (\Exception $e) {
-            return redirect()->back()->with('error', $e->getMessage());
-        }
+        $this->feedbackService->submitFeedback($feedbackRequest, $responses, $user);
 
         return redirect('/hr/feedback')->with('success', 'Feedback submitted. Thank you!');
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Summary — aggregated feedback view                                 */
-    /* ------------------------------------------------------------------ */
-
     public function summary(Request $request, int $user)
     {
-        $currentUser = $request->user();
-        abort_unless($currentUser && $currentUser->canDo('hr.performance.view'), 403);
-
-        $subjectUser = User::findOrFail($user);
-        $summary = $this->feedbackService->getFeedbackSummary($user);
-
-        // Build questions map from summary data (dynamic, not hardcoded)
-        $questions = collect($summary['questions'] ?? [])->mapWithKeys(fn ($q, $key) => [$key => $q['question']])->all();
-        if (empty($questions)) {
+        $viewer = $this->viewer($request);
+        $subject = $this->access->historicalUserIds($viewer)->findOrFail($user);
+        $summary = $this->feedbackService->getFeedbackSummary($subject);
+        $questions = collect($summary['questions'] ?? [])
+            ->mapWithKeys(fn (array $question, string $key): array => [$key => $question['question']])
+            ->all();
+        if ($questions === []) {
             $questions = FeedbackService::FEEDBACK_QUESTIONS;
         }
 
         return Inertia::render('hr/feedback/summary', [
-            'subjectUser' => ['id' => $subjectUser->id, 'name' => $subjectUser->name],
+            'subjectUser' => ['id' => $subject->id, 'name' => $subject->name],
             'summary' => $summary,
             'questions' => $questions,
         ]);
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Lifecycle — decline / remind / cancel / bulk request               */
-    /* ------------------------------------------------------------------ */
-
-    /** Reviewer (or manager on their behalf) declines a pending request. */
     public function decline(Request $request, HrFeedbackRequest $feedbackRequest)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $feedbackRequest->tenant_id);
-        abort_unless($feedbackRequest->status === 'pending', 422, 'Only pending requests can be declined.');
-
-        $feedbackRequest->update(['status' => 'declined']);
+        $manager = $this->manager($request);
+        $feedbackRequest = $this->access->feedbackRequest($manager, $feedbackRequest);
+        $this->feedbackService->transition($feedbackRequest, $manager, 'declined');
 
         return redirect()->back()->with('success', 'Feedback request declined.');
     }
 
-    /** Nudge the reviewer of a still-pending request. */
     public function remind(Request $request, HrFeedbackRequest $feedbackRequest)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $feedbackRequest->tenant_id);
-        abort_unless($feedbackRequest->status === 'pending', 422, 'Only pending requests can be reminded.');
-
-        $this->feedbackService->remind($feedbackRequest);
+        $manager = $this->manager($request);
+        $feedbackRequest = $this->access->feedbackRequest($manager, $feedbackRequest);
+        $this->feedbackService->remind($feedbackRequest, $manager);
 
         return redirect()->back()->with('success', 'Reminder sent to the reviewer.');
     }
 
-    /** Cancel (soft-expire) a pending request that is no longer needed. */
     public function cancel(Request $request, HrFeedbackRequest $feedbackRequest)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $feedbackRequest->tenant_id);
-        abort_unless($feedbackRequest->status === 'pending', 422, 'Only pending requests can be cancelled.');
-
-        $feedbackRequest->update(['status' => 'expired']);
+        $manager = $this->manager($request);
+        $feedbackRequest = $this->access->feedbackRequest($manager, $feedbackRequest);
+        $this->feedbackService->transition($feedbackRequest, $manager, 'expired');
 
         return redirect()->back()->with('success', 'Feedback request cancelled.');
     }
 
-    /** Fan a single subject out to many reviewers in one shot (bulk 360). */
-    public function bulkRequest(Request $request)
-    {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-
-        $validated = $request->validate([
-            'subject_user_id' => ['required', 'integer', 'exists:users,id'],
-            'reviewer_user_ids' => ['required', 'array', 'min:1'],
-            'reviewer_user_ids.*' => ['integer', 'exists:users,id'],
-            'review_type' => ['required', 'string', Rule::in(FeedbackService::REVIEW_TYPES)],
-            'template_id' => ['nullable', 'integer', 'exists:hr_feedback_templates,id'],
-            'due_date' => ['nullable', 'date'],
-        ]);
-
-        try {
-            $this->feedbackService->request360Feedback(
-                $validated['subject_user_id'],
-                $validated['reviewer_user_ids'],
-                $validated['review_type'],
-                null,
-                $user,
-                $validated['template_id'] ?? null,
-                $validated['due_date'] ?? null,
-            );
-        } catch (\Exception $e) {
-            return redirect()->back()->with('error', $e->getMessage());
-        }
-
-        return redirect()->back()->with('success', '360 feedback requests sent to '.count($validated['reviewer_user_ids']).' reviewers.');
-    }
-
-    /* ------------------------------------------------------------------ */
-    /*  Template CRUD                                                       */
-    /* ------------------------------------------------------------------ */
-
     public function storeTemplate(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $user = $this->manager($request);
+        $validated = $this->validateTemplate($request);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:2000'],
-            'questions' => ['required', 'array', 'min:1'],
-            'questions.*.key' => ['required', 'string', 'max:100'],
-            'questions.*.question' => ['required', 'string', 'max:500'],
-        ]);
-
-        HrFeedbackTemplate::create([
-            'tenant_id' => $tenantId,
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'questions' => $validated['questions'],
+        HrFeedbackTemplate::query()->create([
+            ...$validated,
             'is_default' => false,
             'is_active' => true,
             'created_by' => $user->id,
@@ -362,30 +229,157 @@ class FeedbackController extends Controller
 
     public function updateTemplate(Request $request, HrFeedbackTemplate $template)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $this->manager($request);
+        $validated = $this->validateTemplate($request, $template);
 
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:2000'],
-            'questions' => ['required', 'array', 'min:1'],
-            'questions.*.key' => ['required', 'string', 'max:100'],
-            'questions.*.question' => ['required', 'string', 'max:500'],
-        ]);
-
-        $template->update($validated);
+        DB::transaction(function () use ($template, $validated): void {
+            HrFeedbackTemplate::query()
+                ->lockForUpdate()
+                ->findOrFail($template->getKey())
+                ->update($validated);
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Template updated.');
     }
 
     public function deleteTemplate(Request $request, HrFeedbackTemplate $template)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        abort_if($template->is_default, 422, 'Cannot delete the default template.');
+        $this->manager($request);
 
-        $template->delete();
+        DB::transaction(function () use ($template): void {
+            $locked = HrFeedbackTemplate::query()
+                ->lockForUpdate()
+                ->findOrFail($template->getKey());
+            abort_if($locked->is_default, 422, 'Cannot delete the default template.');
+            $locked->delete();
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Template deleted.');
+    }
+
+    private function createRequests(Request $request, bool $acceptsDueDate): int
+    {
+        $manager = $this->manager($request);
+        $rules = [
+            'subject_user_id' => ['required', 'integer'],
+            'reviewer_user_ids' => ['required', 'array', 'min:1', 'max:100'],
+            'reviewer_user_ids.*' => ['integer', 'distinct'],
+            'review_type' => ['required', 'string', Rule::in(FeedbackService::REVIEW_TYPES)],
+            'performance_review_id' => ['nullable', 'integer'],
+            'template_id' => ['nullable', 'integer'],
+        ];
+        if ($acceptsDueDate) {
+            $rules['due_date'] = ['nullable', 'date', 'after_or_equal:today'];
+        }
+        $validated = $request->validate($rules);
+
+        $subject = $this->access->currentStaff($manager, (int) $validated['subject_user_id']);
+        $reviewers = $this->reviewers($manager, $validated['reviewer_user_ids']);
+        $performanceReview = isset($validated['performance_review_id'])
+            ? $this->access->performanceReview($manager, (int) $validated['performance_review_id'])
+            : null;
+        if ($performanceReview && (int) $performanceReview->employee_user_id !== (int) $subject->id) {
+            throw ValidationException::withMessages([
+                'performance_review_id' => 'The performance review must belong to the feedback subject.',
+            ]);
+        }
+        $template = isset($validated['template_id'])
+            ? HrFeedbackTemplate::query()->active()->findOrFail((int) $validated['template_id'])
+            : null;
+
+        $this->feedbackService->request360Feedback(
+            $subject,
+            $reviewers,
+            $validated['review_type'],
+            $performanceReview,
+            $manager,
+            $template,
+            $acceptsDueDate ? ($validated['due_date'] ?? null) : null,
+        );
+
+        return $reviewers->count();
+    }
+
+    /** @return Collection<int, User> */
+    private function reviewers(User $manager, array $reviewerIds): Collection
+    {
+        $ids = collect($reviewerIds)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values();
+        $reviewers = $this->access
+            ->currentUserIds($manager)
+            ->whereIn('users.id', $ids)
+            ->get();
+        if ($reviewers->count() !== $ids->count()) {
+            throw (new ModelNotFoundException)->setModel(User::class);
+        }
+
+        return $reviewers;
+    }
+
+    private function reviewerRequest(
+        User $reviewer,
+        HrFeedbackRequest $feedbackRequest,
+        bool $pending = false,
+    ): HrFeedbackRequest {
+        return HrFeedbackRequest::query()
+            ->where('reviewer_user_id', $reviewer->id)
+            ->when($pending, fn (Builder $query) => $query->pending())
+            ->findOrFail($feedbackRequest->getKey());
+    }
+
+    private function validateTemplate(
+        Request $request,
+        ?HrFeedbackTemplate $template = null,
+    ): array {
+        $validated = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('hr_feedback_templates', 'name')->ignore($template?->getKey()),
+            ],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'questions' => ['required', 'array', 'min:1', 'max:100'],
+            'questions.*.key' => ['required', 'string', 'max:100', 'regex:/^[a-z0-9_]+$/', 'distinct'],
+            'questions.*.question' => ['required', 'string', 'max:500'],
+        ]);
+        $validated['questions'] = collect($validated['questions'])
+            ->map(fn (array $question): array => [
+                'key' => trim($question['key']),
+                'question' => trim($question['question']),
+            ])
+            ->values()
+            ->all();
+
+        return $validated;
+    }
+
+    private function serializeTemplate(HrFeedbackTemplate $template): array
+    {
+        return [
+            'id' => $template->id,
+            'name' => $template->name,
+            'description' => $template->description,
+            'questions' => $template->questions,
+            'is_default' => $template->is_default,
+        ];
+    }
+
+    private function viewer(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.view'), 403);
+
+        return $this->access->currentStaff($user, $user);
+    }
+
+    private function manager(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+
+        return $this->access->currentStaff($user, $user);
     }
 }

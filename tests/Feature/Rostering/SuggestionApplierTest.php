@@ -22,12 +22,15 @@ it('does not bulk apply when accepted suggestions target the same shift', functi
     $actor = User::factory()->create(['organization_id' => 1]);
     $firstCandidate = User::factory()->create(['organization_id' => 1]);
     $secondCandidate = User::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
     $run = RosterSuggestionRun::factory()->create([
         'organization_id' => 1,
+        'site_id' => $site->id,
         'requested_by' => $actor->id,
     ]);
     $shift = Shift::factory()->unassigned()->create([
         'organization_id' => 1,
+        'site_id' => $site->id,
         'starts_at' => Carbon::parse('2026-05-04 09:00:00', 'Pacific/Auckland')->utc(),
         'ends_at' => Carbon::parse('2026-05-04 13:00:00', 'Pacific/Auckland')->utc(),
         'status' => 'scheduled',
@@ -124,14 +127,21 @@ it('rejects a single stale suggestion when the shift was assigned before apply',
     $actor = User::factory()->create(['organization_id' => 1]);
     $candidate = User::factory()->create(['organization_id' => 1]);
     $alreadyAssigned = User::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $run = RosterSuggestionRun::factory()->create([
+        'site_id' => $site->id,
+        'requested_by' => $actor->id,
+    ]);
     $shift = Shift::factory()->create([
         'organization_id' => 1,
+        'site_id' => $site->id,
         'user_id' => $alreadyAssigned->id,
         'starts_at' => Carbon::parse('2026-05-04 09:00:00', 'Pacific/Auckland')->utc(),
         'ends_at' => Carbon::parse('2026-05-04 13:00:00', 'Pacific/Auckland')->utc(),
         'status' => 'scheduled',
     ]);
     $suggestion = RosterSuggestion::factory()->create([
+        'roster_suggestion_run_id' => $run->id,
         'shift_id' => $shift->id,
         'candidate_user_id' => $candidate->id,
         'status' => RosterSuggestion::STATUS_ACCEPTED,

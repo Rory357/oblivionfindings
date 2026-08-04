@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Jobs;
 
+use App\Domain\Hr\Models\HrReportExport;
 use App\Domain\Hr\Models\HrReportSubscription;
 use App\Domain\Hr\Notifications\HrScheduledReportReadyNotification;
 use App\Domain\Hr\Services\HrReportingService;
@@ -17,15 +18,10 @@ class RunHrScheduledReportsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(
-        public ?int $tenantId = null
-    ) {}
-
     public function handle(HrReportingService $reportingService): void
     {
         $query = HrReportSubscription::query()
             ->due()
-            ->when($this->tenantId !== null, fn ($builder) => $builder->where('tenant_id', $this->tenantId))
             ->orderBy('next_run_at');
 
         $processed = 0;
@@ -35,7 +31,6 @@ class RunHrScheduledReportsJob implements ShouldQueue
                 try {
                     $export = $reportingService->createExport(
                         reportType: $subscription->report_type,
-                        tenantId: $subscription->tenant_id,
                         filters: (array) ($subscription->filters ?? []),
                         generatedBy: null,
                         subscription: $subscription,
@@ -54,7 +49,7 @@ class RunHrScheduledReportsJob implements ShouldQueue
                     $subscription->update([
                         'last_run_at' => now(),
                         'last_status' => 'failed',
-                        'last_error' => $exception->getMessage(),
+                        'last_error' => 'Report generation failed. Review the application logs.',
                         'next_run_at' => $reportingService->calculateNextRunAt($subscription, now()),
                     ]);
 
@@ -68,12 +63,11 @@ class RunHrScheduledReportsJob implements ShouldQueue
         });
 
         Log::info('Scheduled HR report processing completed.', [
-            'tenant_id' => $this->tenantId,
             'processed' => $processed,
         ]);
     }
 
-    protected function notifyRecipients(HrReportSubscription $subscription, \App\Domain\Hr\Models\HrReportExport $export): void
+    protected function notifyRecipients(HrReportSubscription $subscription, HrReportExport $export): void
     {
         $recipientIds = collect($subscription->recipient_user_ids ?? [])
             ->filter(fn ($id) => is_numeric($id))
@@ -87,8 +81,14 @@ class RunHrScheduledReportsJob implements ShouldQueue
 
         User::query()
             ->whereIn('id', $recipientIds->all())
+            ->whereNotNull('approved_at')
+            ->with(['roles.permissions', 'permissionOverrides'])
             ->chunkById(100, function ($users) use ($export) {
                 foreach ($users as $user) {
+                    if (! $user->canDo('hr.reports.view')) {
+                        continue;
+                    }
+
                     try {
                         $user->notify(new HrScheduledReportReadyNotification($export));
                     } catch (\Throwable $exception) {
@@ -102,4 +102,3 @@ class RunHrScheduledReportsJob implements ShouldQueue
             });
     }
 }
-

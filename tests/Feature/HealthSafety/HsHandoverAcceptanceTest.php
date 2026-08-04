@@ -320,7 +320,11 @@ class HsHandoverAcceptanceTest extends TestCase
             'mime_type' => 'text/plain',
             'size' => 17,
         ]);
-        $otherIncident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create());
+        $otherSite = Site::factory()->create();
+        $otherClient = Client::factory()->create(['site_id' => $otherSite->id]);
+        $otherIncident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()
+            ->atSite($otherSite)
+            ->create(['client_id' => $otherClient->id]));
         $otherAttachment = ClientIncidentAttachment::query()->create([
             'incident_id' => $otherIncident->id,
             'uploaded_by' => $viewer->id,
@@ -498,8 +502,14 @@ class HsHandoverAcceptanceTest extends TestCase
         ));
         HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,
+            'position_role' => in_array('hazards.manage', $permissionKeys, true)
+                ? 'coordinator'
+                : 'support_worker',
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+            'is_active' => true,
         ]);
 
         return $user;

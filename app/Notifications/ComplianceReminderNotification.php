@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -11,15 +12,19 @@ use Illuminate\Notifications\Notification;
  * compliance requirement from the Compliance hub (row menu, renewals sheet or the
  * bulk "Send reminders" action). Real database + mail delivery — no stubbed toast.
  */
-class ComplianceReminderNotification extends Notification
+class ComplianceReminderNotification extends Notification implements ShouldQueue
 {
     use Queueable;
+
+    public int $tries = 3;
 
     public function __construct(
         public string $requirementName,
         public ?string $expiryDate = null,
         public ?string $senderName = null,
-    ) {}
+    ) {
+        $this->afterCommit();
+    }
 
     public function via(object $notifiable): array
     {
@@ -30,7 +35,7 @@ class ComplianceReminderNotification extends Notification
     {
         $mail = (new MailMessage)
             ->subject("Compliance reminder: {$this->requirementName}")
-            ->greeting('Hello ' . ($notifiable->name ?? 'there') . ',')
+            ->greeting('Hello '.($notifiable->name ?? 'there').',')
             ->line("This is a reminder about your **{$this->requirementName}** compliance requirement.");
 
         if ($this->expiryDate) {
@@ -47,8 +52,8 @@ class ComplianceReminderNotification extends Notification
         return [
             'title' => 'Compliance reminder',
             'message' => "Reminder: {$this->requirementName}"
-                . ($this->expiryDate ? " — due {$this->expiryDate}" : '')
-                . '.',
+                .($this->expiryDate ? " — due {$this->expiryDate}" : '')
+                .'.',
             'requirement_name' => $this->requirementName,
             'expiry_date' => $this->expiryDate,
             'sender_name' => $this->senderName,

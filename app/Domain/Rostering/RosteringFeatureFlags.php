@@ -12,35 +12,32 @@ class RosteringFeatureFlags
      */
     private array $cache = [];
 
-    public function publishEnabled(?int $organizationId = null): bool
+    public function publishEnabled(): bool
     {
-        return $this->enabled('publish', $organizationId);
+        return $this->enabled('publish');
     }
 
-    public function autoScheduleEnabled(?int $organizationId = null): bool
+    public function autoScheduleEnabled(): bool
     {
-        return $this->enabled('auto_schedule', $organizationId);
+        return $this->enabled('auto_schedule');
     }
 
-    private function enabled(string $feature, ?int $organizationId = null): bool
+    private function enabled(string $feature): bool
     {
-        $cacheKey = $feature.':'.($organizationId ?? 'global');
+        $settingKey = "features.rostering.{$feature}";
 
-        if (array_key_exists($cacheKey, $this->cache)) {
-            return $this->cache[$cacheKey];
+        if (array_key_exists($settingKey, $this->cache)) {
+            return $this->cache[$settingKey];
         }
 
         $default = (bool) config("features.rostering.{$feature}", false);
 
         try {
-            $orgValue = $organizationId
-                ? $this->setting("features.rostering.{$feature}.organization.{$organizationId}")
-                : null;
-            $globalValue = $this->setting("features.rostering.{$feature}");
+            $applicationValue = $this->setting($settingKey);
 
-            return $this->cache[$cacheKey] = $this->toBool($orgValue ?? $globalValue ?? $default);
+            return $this->cache[$settingKey] = $this->toBool($applicationValue ?? $default);
         } catch (Throwable) {
-            return $this->cache[$cacheKey] = $default;
+            return $this->cache[$settingKey] = $default;
         }
     }
 

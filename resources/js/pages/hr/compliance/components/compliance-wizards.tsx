@@ -1,6 +1,7 @@
 /* The six Compliance hub wizards (Record · Requirement · Vetting · Driver ·
  * Waive · Assign), built on the shared Add-Client wizard kit. Each posts to a
  * real, permission-gated route — no dead steps. */
+import { PeoplePicker, type PersonOption } from '@/components/hr/people-picker';
 import {
     Field,
     Segmented,
@@ -11,8 +12,6 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/hr/wizard';
-import { ChipMulti } from '@/components/wizard/primitives';
-import { PeoplePicker, type PersonOption } from '@/components/hr/people-picker';
 import { Button } from '@/components/ui/button';
 import {
     Select,
@@ -21,6 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { ChipMulti } from '@/components/wizard/primitives';
 import { router } from '@inertiajs/react';
 import {
     Ban,
@@ -40,7 +40,14 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-import { FileField, LabeledChipMulti, TextAreaField, TextField, Toggle, WizardGrid } from './wizard-fields';
+import {
+    FileField,
+    LabeledChipMulti,
+    TextAreaField,
+    TextField,
+    Toggle,
+    WizardGrid,
+} from './wizard-fields';
 
 export type RoleOption = { value: string; label: string };
 
@@ -54,7 +61,13 @@ export type ReqOption = {
     hard_stop: boolean;
 };
 
-export type WizardType = 'record' | 'requirement' | 'vetting' | 'driver' | 'waive' | 'assign';
+export type WizardType =
+    | 'record'
+    | 'requirement'
+    | 'vetting'
+    | 'driver'
+    | 'waive'
+    | 'assign';
 
 export type WizardState = {
     type: WizardType;
@@ -70,9 +83,27 @@ type WizardCtx = {
     siteTypes: string[];
 };
 
-const CATEGORIES = ['Health & Safety', 'Safety check', 'Clinical', 'Compliance', 'Policy', 'Eligibility'];
-const EVIDENCE_CATEGORIES = ['Certificate', 'Letter', 'System record', 'Photo', 'Other'];
-const PROVIDERS = ['NZ Police', 'Ministry of Justice', 'Ministry of Social Development', 'Internal'];
+const CATEGORIES = [
+    'Health & Safety',
+    'Safety check',
+    'Clinical',
+    'Compliance',
+    'Policy',
+    'Eligibility',
+];
+const EVIDENCE_CATEGORIES = [
+    'Certificate',
+    'Letter',
+    'System record',
+    'Photo',
+    'Other',
+];
+const PROVIDERS = [
+    'NZ Police',
+    'Ministry of Justice',
+    'Ministry of Social Development',
+    'Internal',
+];
 const LICENCE_CLASSES = ['1', '2', '3', '4', '5', '6'];
 const ENDORSEMENTS = [
     'P · Passenger',
@@ -87,18 +118,46 @@ const ENDORSEMENTS = [
 ];
 
 const CHECK_TYPE_TILES = [
-    { key: 'training_course', label: 'Training course', description: 'Completed via LMS' },
-    { key: 'credential', label: 'Credential', description: 'Held qualification' },
-    { key: 'background_check', label: 'Background check', description: 'Police / MOJ' },
-    { key: 'policy_attestation', label: 'Attestation', description: 'Signed policy' },
-    { key: 'driver_licence', label: 'Driver licence', description: 'From the driver register' },
+    {
+        key: 'training_course',
+        label: 'Training course',
+        description: 'Completed via LMS',
+    },
+    {
+        key: 'credential',
+        label: 'Credential',
+        description: 'Held qualification',
+    },
+    {
+        key: 'background_check',
+        label: 'Background check',
+        description: 'Police / MOJ',
+    },
+    {
+        key: 'policy_attestation',
+        label: 'Attestation',
+        description: 'Signed policy',
+    },
+    {
+        key: 'driver_licence',
+        label: 'Driver licence',
+        description: 'From the driver register',
+    },
     { key: 'manual', label: 'Manual', description: 'Recorded by hand' },
 ];
 
 const VETTING_TYPE_TILES = [
     { key: 'police_check', label: 'Police vetting', description: 'NZ Police' },
-    { key: 'ministry_of_justice', label: 'MOJ criminal record', description: 'Ministry of Justice' },
-    { key: 'vulnerable_children_act', label: "Children's Act check", description: 'Safety check' },
+    {
+        key: 'ministry_of_justice',
+        label: 'MOJ criminal record',
+        description: 'Ministry of Justice',
+    },
+    {
+        key: 'vulnerable_children_act',
+        label: "Children's Act check",
+        description: 'Safety check',
+    },
     { key: 'other', label: 'Referee check', description: 'Manual' },
 ];
 
@@ -185,7 +244,12 @@ function WizardScaffold({
             pct={pct}
             success={success}
             footerStart={
-                <Button variant="ghost" size="sm" disabled={isFirst} onClick={onBack}>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isFirst}
+                    onClick={onBack}
+                >
                     <ChevronLeft className="h-4 w-4" /> Back
                 </Button>
             }
@@ -194,7 +258,10 @@ function WizardScaffold({
                     <Button variant="ghost" size="sm" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button disabled={processing} onClick={isLast ? onSubmit : onNext}>
+                    <Button
+                        disabled={processing}
+                        onClick={isLast ? onSubmit : onNext}
+                    >
                         {isLast ? submitLabel : 'Next'}
                     </Button>
                 </>
@@ -231,7 +298,11 @@ function submitWith(
     });
 }
 
-function ReviewList({ rows }: { rows: { label: string; value: React.ReactNode }[] }) {
+function ReviewList({
+    rows,
+}: {
+    rows: { label: string; value: React.ReactNode }[];
+}) {
     return (
         <div className="grid gap-2">
             {rows.map((r) => (
@@ -239,9 +310,15 @@ function ReviewList({ rows }: { rows: { label: string; value: React.ReactNode }[
                     key={r.label}
                     className="flex justify-between gap-4 border-b border-border py-2 last:border-0"
                 >
-                    <span className="text-[13px] text-muted-foreground">{r.label}</span>
+                    <span className="text-[13px] text-muted-foreground">
+                        {r.label}
+                    </span>
                     <span className="text-right text-[13px] font-semibold">
-                        {r.value || <span className="font-normal text-muted-foreground">—</span>}
+                        {r.value || (
+                            <span className="font-normal text-muted-foreground">
+                                —
+                            </span>
+                        )}
                     </span>
                 </div>
             ))}
@@ -262,19 +339,57 @@ function WarnBanner({ children }: { children: React.ReactNode }) {
 /*  1 · Record / update compliance                                     */
 /* ================================================================== */
 
-function RecordWizard({ state, onClose, ctx }: { state: WizardState; onClose: () => void; ctx: WizardCtx }) {
+function RecordWizard({
+    state,
+    onClose,
+    ctx,
+}: {
+    state: WizardState;
+    onClose: () => void;
+    ctx: WizardCtx;
+}) {
     const cohort = (state?.userIds?.length ?? 0) > 0;
     const steps: WizardStep[] = [
         { key: 'who', label: 'Who', blurb: 'Staff member', icon: Users },
-        { key: 'req', label: 'Requirement', blurb: 'What to record', icon: ListChecks },
-        { key: 'outcome', label: 'Outcome', blurb: 'Status & dates', icon: ClipboardCheck },
-        ...(cohort ? [] : [{ key: 'evidence', label: 'Evidence', blurb: 'Upload & notes', icon: FileText }]),
-        { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: CheckCircle2 },
+        {
+            key: 'req',
+            label: 'Requirement',
+            blurb: 'What to record',
+            icon: ListChecks,
+        },
+        {
+            key: 'outcome',
+            label: 'Outcome',
+            blurb: 'Status & dates',
+            icon: ClipboardCheck,
+        },
+        ...(cohort
+            ? []
+            : [
+                  {
+                      key: 'evidence',
+                      label: 'Evidence',
+                      blurb: 'Upload & notes',
+                      icon: FileText,
+                  },
+              ]),
+        {
+            key: 'review',
+            label: 'Review',
+            blurb: 'Confirm & save',
+            icon: CheckCircle2,
+        },
     ];
     const wiz = useWizard(steps.length);
-    const [person, setPerson] = useState<string>((state?.preset?.person as string) ?? '');
-    const [requirementId, setRequirementId] = useState<string>((state?.preset?.requirement as string) ?? '');
-    const [status, setStatus] = useState<string>((state?.preset?.status as string) ?? 'compliant');
+    const [person, setPerson] = useState<string>(
+        (state?.preset?.person as string) ?? '',
+    );
+    const [requirementId, setRequirementId] = useState<string>(
+        (state?.preset?.requirement as string) ?? '',
+    );
+    const [status, setStatus] = useState<string>(
+        (state?.preset?.status as string) ?? 'compliant',
+    );
     const [validFrom, setValidFrom] = useState('');
     const [expiresAt, setExpiresAt] = useState('');
     const [evidenceCategory, setEvidenceCategory] = useState('');
@@ -313,8 +428,10 @@ function RecordWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
     const stepKey = steps[wiz.index].key;
     const validate = () => {
         const e: Record<string, string> = {};
-        if (stepKey === 'who' && !cohort && !person) e.person = 'Select a staff member.';
-        if (stepKey === 'req' && !requirementId) e.req = 'Choose a requirement.';
+        if (stepKey === 'who' && !cohort && !person)
+            e.person = 'Select a staff member.';
+        if (stepKey === 'req' && !requirementId)
+            e.req = 'Choose a requirement.';
         setErr(e);
         return Object.keys(e).length === 0;
     };
@@ -327,31 +444,45 @@ function RecordWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
         setSaving(true);
         const onOk = () => {
             setSaving(false);
-            toast.success(cohort ? 'Compliance recorded for selected staff.' : 'Compliance recorded.');
+            toast.success(
+                cohort
+                    ? 'Compliance recorded for selected staff.'
+                    : 'Compliance recorded.',
+            );
             if (addAnother) reset();
             else setDone(true);
         };
         const onFail = () => setSaving(false);
 
         if (cohort) {
-            submitWith('post', '/hr/compliance/bulk-record', {
-                user_ids: state?.userIds,
-                requirement_id: Number(requirementId),
-                status,
-                valid_from: validFrom || null,
-                expires_at: expiresAt || null,
-                notes: notes || null,
-            }, { onOk, onFail });
+            submitWith(
+                'post',
+                '/hr/compliance/bulk-record',
+                {
+                    user_ids: state?.userIds,
+                    requirement_id: Number(requirementId),
+                    status,
+                    valid_from: validFrom || null,
+                    expires_at: expiresAt || null,
+                    notes: notes || null,
+                },
+                { onOk, onFail },
+            );
         } else {
-            submitWith('post', `/hr/compliance/staff/${person}/status`, {
-                requirement_id: Number(requirementId),
-                status,
-                valid_from: validFrom || null,
-                expires_at: expiresAt || null,
-                evidence_category: evidenceCategory || null,
-                notes: notes || null,
-                evidence_file: file,
-            }, { forceFormData: true, onOk, onFail });
+            submitWith(
+                'post',
+                `/hr/compliance/staff/${person}/status`,
+                {
+                    requirement_id: Number(requirementId),
+                    status,
+                    valid_from: validFrom || null,
+                    expires_at: expiresAt || null,
+                    evidence_category: evidenceCategory || null,
+                    notes: notes || null,
+                    evidence_file: file,
+                },
+                { forceFormData: true, onOk, onFail },
+            );
         }
     };
 
@@ -379,17 +510,28 @@ function RecordWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
         >
             {stepKey === 'who' && (
                 <>
-                    <StepHead icon={Users} title="Who" blurb="Pick the staff member to record against." />
+                    <StepHead
+                        icon={Users}
+                        title="Who"
+                        blurb="Pick the staff member to record against."
+                    />
                     {cohort ? (
                         <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm">
-                            <span className="font-semibold text-primary">{state?.userIds?.length} staff selected</span>
+                            <span className="font-semibold text-primary">
+                                {state?.userIds?.length} staff selected
+                            </span>
                             <p className="mt-1 text-muted-foreground">
-                                This records the same outcome for everyone selected on the Overview tab.
+                                This records the same outcome for everyone
+                                selected on the Overview tab.
                             </p>
                         </div>
                     ) : (
                         <Field label="Staff member" required error={err.person}>
-                            <PeoplePicker value={person} onChange={setPerson} people={ctx.people} />
+                            <PeoplePicker
+                                value={person}
+                                onChange={setPerson}
+                                people={ctx.people}
+                            />
                         </Field>
                     )}
                 </>
@@ -397,7 +539,11 @@ function RecordWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
 
             {stepKey === 'req' && (
                 <>
-                    <StepHead icon={ListChecks} title="Requirement" blurb="Which requirement are you recording?" />
+                    <StepHead
+                        icon={ListChecks}
+                        title="Requirement"
+                        blurb="Which requirement are you recording?"
+                    />
                     <Field label="Requirement" required error={err.req}>
                         <TilePicker
                             value={requirementId}
@@ -414,7 +560,11 @@ function RecordWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
 
             {stepKey === 'outcome' && (
                 <>
-                    <StepHead icon={ClipboardCheck} title="Outcome" blurb="Set the status and validity dates." />
+                    <StepHead
+                        icon={ClipboardCheck}
+                        title="Outcome"
+                        blurb="Set the status and validity dates."
+                    />
                     <WizardGrid>
                         <Field label="Status" span>
                             <Segmented
@@ -422,17 +572,34 @@ function RecordWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
                                 onChange={setStatus}
                                 options={[
                                     { value: 'compliant', label: 'Compliant' },
-                                    { value: 'expiring_soon', label: 'Expiring' },
+                                    {
+                                        value: 'expiring_soon',
+                                        label: 'Expiring',
+                                    },
                                     { value: 'expired', label: 'Expired' },
-                                    { value: 'not_started', label: 'Not started' },
+                                    {
+                                        value: 'not_started',
+                                        label: 'Not started',
+                                    },
                                 ]}
                             />
                         </Field>
                         <Field label="Valid from">
-                            <TextField type="date" value={validFrom} onChange={setValidFrom} />
+                            <TextField
+                                type="date"
+                                value={validFrom}
+                                onChange={setValidFrom}
+                            />
                         </Field>
-                        <Field label="Expires" hint="Auto-suggested from validity period">
-                            <TextField type="date" value={expiresAt} onChange={setExpiresAt} />
+                        <Field
+                            label="Expires"
+                            hint="Auto-suggested from validity period"
+                        >
+                            <TextField
+                                type="date"
+                                value={expiresAt}
+                                onChange={setExpiresAt}
+                            />
                         </Field>
                     </WizardGrid>
                 </>
@@ -440,13 +607,23 @@ function RecordWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
 
             {stepKey === 'evidence' && (
                 <>
-                    <StepHead icon={FileText} title="Evidence" blurb="Attach a certificate and add notes (optional)." />
+                    <StepHead
+                        icon={FileText}
+                        title="Evidence"
+                        blurb="Attach a certificate and add notes (optional)."
+                    />
                     <WizardGrid>
                         <Field label="Evidence file" span>
-                            <FileField fileName={file?.name ?? null} onPick={setFile} />
+                            <FileField
+                                fileName={file?.name ?? null}
+                                onPick={setFile}
+                            />
                         </Field>
                         <Field label="Evidence type">
-                            <Select value={evidenceCategory || undefined} onValueChange={setEvidenceCategory}>
+                            <Select
+                                value={evidenceCategory || undefined}
+                                onValueChange={setEvidenceCategory}
+                            >
                                 <SelectTrigger aria-label="Evidence type">
                                     <SelectValue placeholder="Select…" />
                                 </SelectTrigger>
@@ -472,19 +649,36 @@ function RecordWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
 
             {stepKey === 'review' && (
                 <>
-                    <h3 className="mb-1 text-lg font-bold">Review &amp; confirm</h3>
-                    <p className="mb-4 text-sm text-muted-foreground">Double-check the details below, then save.</p>
+                    <h3 className="mb-1 text-lg font-bold">
+                        Review &amp; confirm
+                    </h3>
+                    <p className="mb-4 text-sm text-muted-foreground">
+                        Double-check the details below, then save.
+                    </p>
                     {status === 'expired' && (
-                        <WarnBanner>Recording this as Expired may block the staff member from upcoming shifts.</WarnBanner>
+                        <WarnBanner>
+                            Recording this as Expired may block the staff member
+                            from upcoming shifts.
+                        </WarnBanner>
                     )}
                     <ReviewList
                         rows={[
-                            { label: cohort ? 'Staff' : 'Staff member', value: cohort ? `${state?.userIds?.length} selected` : personName },
+                            {
+                                label: cohort ? 'Staff' : 'Staff member',
+                                value: cohort
+                                    ? `${state?.userIds?.length} selected`
+                                    : personName,
+                            },
                             { label: 'Requirement', value: req?.name },
-                            { label: 'Status', value: status.replace('_', ' ') },
+                            {
+                                label: 'Status',
+                                value: status.replace('_', ' '),
+                            },
                             { label: 'Valid from', value: validFrom },
                             { label: 'Expires', value: expiresAt },
-                            ...(cohort ? [] : [{ label: 'Evidence', value: file?.name }]),
+                            ...(cohort
+                                ? []
+                                : [{ label: 'Evidence', value: file?.name }]),
                             { label: 'Notes', value: notes },
                         ]}
                     />
@@ -498,24 +692,62 @@ function RecordWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
 /*  2 · Create / edit requirement                                      */
 /* ================================================================== */
 
-function RequirementWizard({ state, onClose, ctx }: { state: WizardState; onClose: () => void; ctx: WizardCtx }) {
+function RequirementWizard({
+    state,
+    onClose,
+    ctx,
+}: {
+    state: WizardState;
+    onClose: () => void;
+    ctx: WizardCtx;
+}) {
     const editId = state?.preset?.id as number | undefined;
     const steps: WizardStep[] = [
-        { key: 'basics', label: 'Basics', blurb: 'Code, name, type', icon: ScrollText },
-        { key: 'rules', label: 'Rules', blurb: 'Validity & hard-stop', icon: ShieldCheck },
-        { key: 'assign', label: 'Assignment', blurb: 'Roles & sites', icon: Users },
-        { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: CheckCircle2 },
+        {
+            key: 'basics',
+            label: 'Basics',
+            blurb: 'Code, name, type',
+            icon: ScrollText,
+        },
+        {
+            key: 'rules',
+            label: 'Rules',
+            blurb: 'Validity & hard-stop',
+            icon: ShieldCheck,
+        },
+        {
+            key: 'assign',
+            label: 'Assignment',
+            blurb: 'Roles & sites',
+            icon: Users,
+        },
+        {
+            key: 'review',
+            label: 'Review',
+            blurb: 'Confirm & save',
+            icon: CheckCircle2,
+        },
     ];
     const wiz = useWizard(steps.length);
     const p = state?.preset ?? {};
     const [code, setCode] = useState<string>((p.code as string) ?? '');
     const [name, setName] = useState<string>((p.name as string) ?? '');
-    const [category, setCategory] = useState<string>((p.category as string) ?? '');
-    const [checkType, setCheckType] = useState<string>((p.check_type as string) ?? '');
-    const [validity, setValidity] = useState<string>(p.validity_months ? String(p.validity_months) : '');
-    const [reminder, setReminder] = useState<string>(p.renewal_reminder_days ? String(p.renewal_reminder_days) : '');
+    const [category, setCategory] = useState<string>(
+        (p.category as string) ?? '',
+    );
+    const [checkType, setCheckType] = useState<string>(
+        (p.check_type as string) ?? '',
+    );
+    const [validity, setValidity] = useState<string>(
+        p.validity_months ? String(p.validity_months) : '',
+    );
+    const [reminder, setReminder] = useState<string>(
+        p.renewal_reminder_days ? String(p.renewal_reminder_days) : '',
+    );
     const [hardStop, setHardStop] = useState<boolean>(Boolean(p.hard_stop));
-    const [isActive, setIsActive] = useState<boolean>(p.is_active === undefined ? true : Boolean(p.is_active));
+    const [isActive, setIsActive] = useState<boolean>(
+        p.is_active === undefined ? true : Boolean(p.is_active),
+    );
     const [rolesSel, setRolesSel] = useState<string[]>([]);
     const [siteTypesSel, setSiteTypesSel] = useState<string[]>([]);
     const [err, setErr] = useState<Record<string, string>>({});
@@ -557,7 +789,9 @@ function RequirementWizard({ state, onClose, ctx }: { state: WizardState; onClos
         setSaving(true);
         const onOk = () => {
             setSaving(false);
-            toast.success(editId ? 'Requirement updated.' : 'Requirement created.');
+            toast.success(
+                editId ? 'Requirement updated.' : 'Requirement created.',
+            );
             if (addAnother) reset();
             else setDone(true);
         };
@@ -575,7 +809,9 @@ function RequirementWizard({ state, onClose, ctx }: { state: WizardState; onClos
         };
         submitWith(
             editId ? 'put' : 'post',
-            editId ? `/hr/compliance/requirements/${editId}` : '/hr/compliance/requirements',
+            editId
+                ? `/hr/compliance/requirements/${editId}`
+                : '/hr/compliance/requirements',
             payload,
             { onOk, onFail: () => setSaving(false) },
         );
@@ -605,16 +841,36 @@ function RequirementWizard({ state, onClose, ctx }: { state: WizardState; onClos
         >
             {stepKey === 'basics' && (
                 <>
-                    <StepHead icon={ScrollText} title="Basics" blurb="Name the requirement and pick how it's checked." />
+                    <StepHead
+                        icon={ScrollText}
+                        title="Basics"
+                        blurb="Name the requirement and pick how it's checked."
+                    />
                     <WizardGrid>
                         <Field label="Code" required error={err.code}>
-                            <TextField value={code} onChange={setCode} placeholder="e.g. FA-02" />
+                            <TextField
+                                value={code}
+                                onChange={setCode}
+                                placeholder="e.g. FA-02"
+                            />
                         </Field>
                         <Field label="Name" required error={err.name}>
-                            <TextField value={name} onChange={setName} placeholder="First Aid Refresher" />
+                            <TextField
+                                value={name}
+                                onChange={setName}
+                                placeholder="First Aid Refresher"
+                            />
                         </Field>
-                        <Field label="Category" required error={err.category} span>
-                            <Select value={category || undefined} onValueChange={setCategory}>
+                        <Field
+                            label="Category"
+                            required
+                            error={err.category}
+                            span
+                        >
+                            <Select
+                                value={category || undefined}
+                                onValueChange={setCategory}
+                            >
                                 <SelectTrigger aria-label="Category">
                                     <SelectValue placeholder="Select…" />
                                 </SelectTrigger>
@@ -627,8 +883,17 @@ function RequirementWizard({ state, onClose, ctx }: { state: WizardState; onClos
                                 </SelectContent>
                             </Select>
                         </Field>
-                        <Field label="Check type" required error={err.checkType} span>
-                            <TilePicker value={checkType} onChange={setCheckType} options={CHECK_TYPE_TILES} />
+                        <Field
+                            label="Check type"
+                            required
+                            error={err.checkType}
+                            span
+                        >
+                            <TilePicker
+                                value={checkType}
+                                onChange={setCheckType}
+                                options={CHECK_TYPE_TILES}
+                            />
                         </Field>
                     </WizardGrid>
                 </>
@@ -636,13 +901,27 @@ function RequirementWizard({ state, onClose, ctx }: { state: WizardState; onClos
 
             {stepKey === 'rules' && (
                 <>
-                    <StepHead icon={ShieldCheck} title="Rules" blurb="How long is it valid, and does it block shifts?" />
+                    <StepHead
+                        icon={ShieldCheck}
+                        title="Rules"
+                        blurb="How long is it valid, and does it block shifts?"
+                    />
                     <WizardGrid>
                         <Field label="Validity (months)">
-                            <TextField type="number" value={validity} onChange={setValidity} placeholder="12" />
+                            <TextField
+                                type="number"
+                                value={validity}
+                                onChange={setValidity}
+                                placeholder="12"
+                            />
                         </Field>
                         <Field label="Reminder (days before)">
-                            <TextField type="number" value={reminder} onChange={setReminder} placeholder="30" />
+                            <TextField
+                                type="number"
+                                value={reminder}
+                                onChange={setReminder}
+                                placeholder="30"
+                            />
                         </Field>
                         <Field span>
                             <Toggle
@@ -652,7 +931,11 @@ function RequirementWizard({ state, onClose, ctx }: { state: WizardState; onClos
                             />
                         </Field>
                         <Field span>
-                            <Toggle checked={isActive} onChange={setIsActive} label="Active" />
+                            <Toggle
+                                checked={isActive}
+                                onChange={setIsActive}
+                                label="Active"
+                            />
                         </Field>
                     </WizardGrid>
                 </>
@@ -660,17 +943,29 @@ function RequirementWizard({ state, onClose, ctx }: { state: WizardState; onClos
 
             {stepKey === 'assign' && (
                 <>
-                    <StepHead icon={Users} title="Assignment" blurb="Which roles and site types must hold this?" />
+                    <StepHead
+                        icon={Users}
+                        title="Assignment"
+                        blurb="Which roles and site types must hold this?"
+                    />
                     <WizardGrid>
                         <Field label="Applies to roles" span>
-                            <LabeledChipMulti values={rolesSel} onChange={setRolesSel} options={ctx.roles} />
+                            <LabeledChipMulti
+                                values={rolesSel}
+                                onChange={setRolesSel}
+                                options={ctx.roles}
+                            />
                         </Field>
                         <Field label="Site types" span>
                             <ChipMulti
                                 values={siteTypesSel}
                                 onChange={setSiteTypesSel}
-                                options={ctx.siteTypes.length ? ctx.siteTypes : ['residential', 'respite', 'community', 'day']}
+                                options={ctx.siteTypes}
                             />
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Leave empty to apply to all Sites. Choices come
+                                from the active Sites register.
+                            </p>
                         </Field>
                     </WizardGrid>
                 </>
@@ -678,18 +973,34 @@ function RequirementWizard({ state, onClose, ctx }: { state: WizardState; onClos
 
             {stepKey === 'review' && (
                 <>
-                    <h3 className="mb-1 text-lg font-bold">Review &amp; confirm</h3>
-                    <p className="mb-4 text-sm text-muted-foreground">Double-check the details below, then save.</p>
+                    <h3 className="mb-1 text-lg font-bold">
+                        Review &amp; confirm
+                    </h3>
+                    <p className="mb-4 text-sm text-muted-foreground">
+                        Double-check the details below, then save.
+                    </p>
                     <ReviewList
                         rows={[
                             { label: 'Code', value: code },
                             { label: 'Name', value: name },
                             { label: 'Category', value: category },
-                            { label: 'Check type', value: checkType.replace('_', ' ') },
-                            { label: 'Validity', value: validity ? `${validity} months` : '' },
-                            { label: 'Hard-stop', value: hardStop ? 'Yes' : 'No' },
+                            {
+                                label: 'Check type',
+                                value: checkType.replace('_', ' '),
+                            },
+                            {
+                                label: 'Validity',
+                                value: validity ? `${validity} months` : '',
+                            },
+                            {
+                                label: 'Hard-stop',
+                                value: hardStop ? 'Yes' : 'No',
+                            },
                             { label: 'Roles', value: rolesSel.join(', ') },
-                            { label: 'Site types', value: siteTypesSel.join(', ') },
+                            {
+                                label: 'Site types',
+                                value: siteTypesSel.join(', '),
+                            },
                         ]}
                     />
                 </>
@@ -702,16 +1013,46 @@ function RequirementWizard({ state, onClose, ctx }: { state: WizardState; onClos
 /*  3 · Add / edit vetting check                                       */
 /* ================================================================== */
 
-function VettingWizard({ state, onClose, ctx }: { state: WizardState; onClose: () => void; ctx: WizardCtx }) {
+function VettingWizard({
+    state,
+    onClose,
+    ctx,
+}: {
+    state: WizardState;
+    onClose: () => void;
+    ctx: WizardCtx;
+}) {
     const steps: WizardStep[] = [
-        { key: 'person', label: 'Person & type', blurb: 'Who & what check', icon: Users },
-        { key: 'provider', label: 'Provider', blurb: 'Reference & dates', icon: Building2 },
-        { key: 'risk', label: 'Risk', blurb: 'Outcome & disclosures', icon: ShieldCheck },
+        {
+            key: 'person',
+            label: 'Person & type',
+            blurb: 'Who & what check',
+            icon: Users,
+        },
+        {
+            key: 'provider',
+            label: 'Provider',
+            blurb: 'Reference & dates',
+            icon: Building2,
+        },
+        {
+            key: 'risk',
+            label: 'Risk',
+            blurb: 'Outcome & disclosures',
+            icon: ShieldCheck,
+        },
         { key: 'consent', label: 'Consent', blurb: 'Capture', icon: FileText },
-        { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: CheckCircle2 },
+        {
+            key: 'review',
+            label: 'Review',
+            blurb: 'Confirm & save',
+            icon: CheckCircle2,
+        },
     ];
     const wiz = useWizard(steps.length);
-    const [person, setPerson] = useState<string>((state?.preset?.person as string) ?? '');
+    const [person, setPerson] = useState<string>(
+        (state?.preset?.person as string) ?? '',
+    );
     const [checkType, setCheckType] = useState('police_check');
     const [provider, setProvider] = useState('');
     const [reference, setReference] = useState('');
@@ -742,12 +1083,14 @@ function VettingWizard({ state, onClose, ctx }: { state: WizardState; onClose: (
     const stepKey = steps[wiz.index].key;
     const validate = () => {
         const e: Record<string, string> = {};
-        if (stepKey === 'person' && !person) e.person = 'Select a staff member.';
+        if (stepKey === 'person' && !person)
+            e.person = 'Select a staff member.';
         setErr(e);
         return Object.keys(e).length === 0;
     };
     const next = () => validate() && wiz.next();
-    const personName = ctx.people.find((pp) => pp.value === person)?.label ?? '—';
+    const personName =
+        ctx.people.find((pp) => pp.value === person)?.label ?? '—';
 
     const submit = (addAnother = false) => {
         if (!person) {
@@ -759,24 +1102,31 @@ function VettingWizard({ state, onClose, ctx }: { state: WizardState; onClose: (
         const noteParts = [
             `Outcome: ${outcome}.`,
             disclosures ? `Disclosures: ${disclosures}` : '',
-            consent ? `Consent captured${consentMethod ? ` (${consentMethod})` : ''}.` : '',
+            consent
+                ? `Consent captured${consentMethod ? ` (${consentMethod})` : ''}.`
+                : '',
         ].filter(Boolean);
-        submitWith('post', '/hr/compliance/vetting', {
-            user_id: Number(person),
-            check_type: checkType,
-            provider: provider || null,
-            reference_number: reference || null,
-            check_date: checkDate || null,
-            notes: noteParts.join(' '),
-        }, {
-            onOk: () => {
-                setSaving(false);
-                toast.success('Vetting check logged.');
-                if (addAnother) reset();
-                else setDone(true);
+        submitWith(
+            'post',
+            '/hr/compliance/vetting',
+            {
+                user_id: Number(person),
+                check_type: checkType,
+                provider: provider || null,
+                reference_number: reference || null,
+                check_date: checkDate || null,
+                notes: noteParts.join(' '),
             },
-            onFail: () => setSaving(false),
-        });
+            {
+                onOk: () => {
+                    setSaving(false);
+                    toast.success('Vetting check logged.');
+                    if (addAnother) reset();
+                    else setDone(true);
+                },
+                onFail: () => setSaving(false),
+            },
+        );
     };
 
     return (
@@ -803,13 +1153,25 @@ function VettingWizard({ state, onClose, ctx }: { state: WizardState; onClose: (
         >
             {stepKey === 'person' && (
                 <>
-                    <StepHead icon={Users} title="Person & type" blurb="Who is being vetted, and which check?" />
+                    <StepHead
+                        icon={Users}
+                        title="Person & type"
+                        blurb="Who is being vetted, and which check?"
+                    />
                     <Field label="Staff member" required error={err.person}>
-                        <PeoplePicker value={person} onChange={setPerson} people={ctx.people} />
+                        <PeoplePicker
+                            value={person}
+                            onChange={setPerson}
+                            people={ctx.people}
+                        />
                     </Field>
                     <div className="mt-4">
                         <Field label="Check type">
-                            <TilePicker value={checkType} onChange={setCheckType} options={VETTING_TYPE_TILES} />
+                            <TilePicker
+                                value={checkType}
+                                onChange={setCheckType}
+                                options={VETTING_TYPE_TILES}
+                            />
                         </Field>
                     </div>
                 </>
@@ -817,10 +1179,17 @@ function VettingWizard({ state, onClose, ctx }: { state: WizardState; onClose: (
 
             {stepKey === 'provider' && (
                 <>
-                    <StepHead icon={Building2} title="Provider" blurb="Where was it requested, and the reference." />
+                    <StepHead
+                        icon={Building2}
+                        title="Provider"
+                        blurb="Where was it requested, and the reference."
+                    />
                     <WizardGrid>
                         <Field label="Provider" span>
-                            <Select value={provider || undefined} onValueChange={setProvider}>
+                            <Select
+                                value={provider || undefined}
+                                onValueChange={setProvider}
+                            >
                                 <SelectTrigger aria-label="Provider">
                                     <SelectValue placeholder="Select…" />
                                 </SelectTrigger>
@@ -834,10 +1203,18 @@ function VettingWizard({ state, onClose, ctx }: { state: WizardState; onClose: (
                             </Select>
                         </Field>
                         <Field label="Reference no.">
-                            <TextField value={reference} onChange={setReference} placeholder="NZP-2026-…" />
+                            <TextField
+                                value={reference}
+                                onChange={setReference}
+                                placeholder="NZP-2026-…"
+                            />
                         </Field>
                         <Field label="Check date">
-                            <TextField type="date" value={checkDate} onChange={setCheckDate} />
+                            <TextField
+                                type="date"
+                                value={checkDate}
+                                onChange={setCheckDate}
+                            />
                         </Field>
                     </WizardGrid>
                 </>
@@ -845,7 +1222,11 @@ function VettingWizard({ state, onClose, ctx }: { state: WizardState; onClose: (
 
             {stepKey === 'risk' && (
                 <>
-                    <StepHead icon={ShieldCheck} title="Risk" blurb="Outcome and any disclosed matters." />
+                    <StepHead
+                        icon={ShieldCheck}
+                        title="Risk"
+                        blurb="Outcome and any disclosed matters."
+                    />
                     <WizardGrid>
                         <Field label="Outcome" span>
                             <Segmented
@@ -853,13 +1234,20 @@ function VettingWizard({ state, onClose, ctx }: { state: WizardState; onClose: (
                                 onChange={setOutcome}
                                 options={[
                                     { value: 'clear', label: 'Clear' },
-                                    { value: 'considerations', label: 'Considerations' },
+                                    {
+                                        value: 'considerations',
+                                        label: 'Considerations',
+                                    },
                                     { value: 'adverse', label: 'Adverse' },
                                 ]}
                             />
                         </Field>
                         <Field label="Disclosures" span>
-                            <TextAreaField value={disclosures} onChange={setDisclosures} placeholder="Any disclosed matters…" />
+                            <TextAreaField
+                                value={disclosures}
+                                onChange={setDisclosures}
+                                placeholder="Any disclosed matters…"
+                            />
                         </Field>
                     </WizardGrid>
                 </>
@@ -867,18 +1255,33 @@ function VettingWizard({ state, onClose, ctx }: { state: WizardState; onClose: (
 
             {stepKey === 'consent' && (
                 <>
-                    <StepHead icon={FileText} title="Consent" blurb="Record that the staff member consented." />
+                    <StepHead
+                        icon={FileText}
+                        title="Consent"
+                        blurb="Record that the staff member consented."
+                    />
                     <WizardGrid>
                         <Field span>
-                            <Toggle checked={consent} onChange={setConsent} label="Consent captured from staff member" />
+                            <Toggle
+                                checked={consent}
+                                onChange={setConsent}
+                                label="Consent captured from staff member"
+                            />
                         </Field>
                         <Field label="Method">
-                            <Select value={consentMethod || undefined} onValueChange={setConsentMethod}>
+                            <Select
+                                value={consentMethod || undefined}
+                                onValueChange={setConsentMethod}
+                            >
                                 <SelectTrigger aria-label="Consent method">
                                     <SelectValue placeholder="Select…" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {['Signed form', 'Digital signature', 'Verbal (witnessed)'].map((c) => (
+                                    {[
+                                        'Signed form',
+                                        'Digital signature',
+                                        'Verbal (witnessed)',
+                                    ].map((c) => (
                                         <SelectItem key={c} value={c}>
                                             {c}
                                         </SelectItem>
@@ -892,16 +1295,33 @@ function VettingWizard({ state, onClose, ctx }: { state: WizardState; onClose: (
 
             {stepKey === 'review' && (
                 <>
-                    <h3 className="mb-1 text-lg font-bold">Review &amp; confirm</h3>
-                    {outcome === 'adverse' && <WarnBanner>Marking an adverse outcome triggers a risk-assessment workflow.</WarnBanner>}
+                    <h3 className="mb-1 text-lg font-bold">
+                        Review &amp; confirm
+                    </h3>
+                    {outcome === 'adverse' && (
+                        <WarnBanner>
+                            Marking an adverse outcome triggers a
+                            risk-assessment workflow.
+                        </WarnBanner>
+                    )}
                     <ReviewList
                         rows={[
                             { label: 'Staff member', value: personName },
-                            { label: 'Check type', value: VETTING_TYPE_TILES.find((t) => t.key === checkType)?.label },
+                            {
+                                label: 'Check type',
+                                value: VETTING_TYPE_TILES.find(
+                                    (t) => t.key === checkType,
+                                )?.label,
+                            },
                             { label: 'Provider', value: provider },
                             { label: 'Reference', value: reference },
                             { label: 'Outcome', value: outcome },
-                            { label: 'Consent', value: consent ? consentMethod || 'Captured' : 'Not captured' },
+                            {
+                                label: 'Consent',
+                                value: consent
+                                    ? consentMethod || 'Captured'
+                                    : 'Not captured',
+                            },
                         ]}
                     />
                 </>
@@ -914,15 +1334,40 @@ function VettingWizard({ state, onClose, ctx }: { state: WizardState; onClose: (
 /*  4 · Add / edit driver                                              */
 /* ================================================================== */
 
-function DriverWizard({ state, onClose, ctx }: { state: WizardState; onClose: () => void; ctx: WizardCtx }) {
+function DriverWizard({
+    state,
+    onClose,
+    ctx,
+}: {
+    state: WizardState;
+    onClose: () => void;
+    ctx: WizardCtx;
+}) {
     const steps: WizardStep[] = [
         { key: 'person', label: 'Person', blurb: 'Staff member', icon: Users },
-        { key: 'licence', label: 'Licence', blurb: 'Class & endorsements', icon: IdCard },
-        { key: 'history', label: 'History', blurb: 'Incidents', icon: ScrollText },
-        { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: CheckCircle2 },
+        {
+            key: 'licence',
+            label: 'Licence',
+            blurb: 'Class & endorsements',
+            icon: IdCard,
+        },
+        {
+            key: 'history',
+            label: 'History',
+            blurb: 'Incidents',
+            icon: ScrollText,
+        },
+        {
+            key: 'review',
+            label: 'Review',
+            blurb: 'Confirm & save',
+            icon: CheckCircle2,
+        },
     ];
     const wiz = useWizard(steps.length);
-    const [person, setPerson] = useState<string>((state?.preset?.person as string) ?? '');
+    const [person, setPerson] = useState<string>(
+        (state?.preset?.person as string) ?? '',
+    );
     const [number, setNumber] = useState('');
     const [licenceClass, setLicenceClass] = useState('1');
     const [endorsements, setEndorsements] = useState<string[]>([]);
@@ -949,7 +1394,8 @@ function DriverWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
     const stepKey = steps[wiz.index].key;
     const validate = () => {
         const e: Record<string, string> = {};
-        if (stepKey === 'person' && !person) e.person = 'Select a staff member.';
+        if (stepKey === 'person' && !person)
+            e.person = 'Select a staff member.';
         if (stepKey === 'licence') {
             if (!number.trim()) e.number = 'Required.';
             if (!expiry) e.expiry = 'Required.';
@@ -958,7 +1404,8 @@ function DriverWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
         return Object.keys(e).length === 0;
     };
     const next = () => validate() && wiz.next();
-    const personName = ctx.people.find((pp) => pp.value === person)?.label ?? '—';
+    const personName =
+        ctx.people.find((pp) => pp.value === person)?.label ?? '—';
 
     const submit = (addAnother = false) => {
         if (!person || !number || !expiry) {
@@ -967,23 +1414,30 @@ function DriverWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
             return;
         }
         setSaving(true);
-        submitWith('post', '/hr/compliance/drivers', {
-            user_id: Number(person),
-            licence_number: number,
-            licence_class: licenceClass,
-            licence_endorsements: endorsements.map((e) => e.split(' · ')[0]),
-            licence_expires_at: expiry,
-            incident_free_since: incidentFree || null,
-            notes: notes || null,
-        }, {
-            onOk: () => {
-                setSaving(false);
-                toast.success('Driver added.');
-                if (addAnother) reset();
-                else setDone(true);
+        submitWith(
+            'post',
+            '/hr/compliance/drivers',
+            {
+                user_id: Number(person),
+                licence_number: number,
+                licence_class: licenceClass,
+                licence_endorsements: endorsements.map(
+                    (e) => e.split(' · ')[0],
+                ),
+                licence_expires_at: expiry,
+                incident_free_since: incidentFree || null,
+                notes: notes || null,
             },
-            onFail: () => setSaving(false),
-        });
+            {
+                onOk: () => {
+                    setSaving(false);
+                    toast.success('Driver added.');
+                    if (addAnother) reset();
+                    else setDone(true);
+                },
+                onFail: () => setSaving(false),
+            },
+        );
     };
 
     return (
@@ -1010,22 +1464,45 @@ function DriverWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
         >
             {stepKey === 'person' && (
                 <>
-                    <StepHead icon={Users} title="Person" blurb="Who holds this licence?" />
+                    <StepHead
+                        icon={Users}
+                        title="Person"
+                        blurb="Who holds this licence?"
+                    />
                     <Field label="Staff member" required error={err.person}>
-                        <PeoplePicker value={person} onChange={setPerson} people={ctx.people} />
+                        <PeoplePicker
+                            value={person}
+                            onChange={setPerson}
+                            people={ctx.people}
+                        />
                     </Field>
                 </>
             )}
 
             {stepKey === 'licence' && (
                 <>
-                    <StepHead icon={IdCard} title="Licence" blurb="Class, number, endorsements and expiry." />
+                    <StepHead
+                        icon={IdCard}
+                        title="Licence"
+                        blurb="Class, number, endorsements and expiry."
+                    />
                     <WizardGrid>
-                        <Field label="Licence number" required error={err.number}>
-                            <TextField value={number} onChange={setNumber} placeholder="AB123456" />
+                        <Field
+                            label="Licence number"
+                            required
+                            error={err.number}
+                        >
+                            <TextField
+                                value={number}
+                                onChange={setNumber}
+                                placeholder="AB123456"
+                            />
                         </Field>
                         <Field label="Class">
-                            <Select value={licenceClass} onValueChange={setLicenceClass}>
+                            <Select
+                                value={licenceClass}
+                                onValueChange={setLicenceClass}
+                            >
                                 <SelectTrigger aria-label="Licence class">
                                     <SelectValue />
                                 </SelectTrigger>
@@ -1039,10 +1516,22 @@ function DriverWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
                             </Select>
                         </Field>
                         <Field label="Endorsements (NZTA)" span>
-                            <ChipMulti values={endorsements} onChange={setEndorsements} options={ENDORSEMENTS} />
+                            <ChipMulti
+                                values={endorsements}
+                                onChange={setEndorsements}
+                                options={ENDORSEMENTS}
+                            />
                         </Field>
-                        <Field label="Licence expiry" required error={err.expiry}>
-                            <TextField type="date" value={expiry} onChange={setExpiry} />
+                        <Field
+                            label="Licence expiry"
+                            required
+                            error={err.expiry}
+                        >
+                            <TextField
+                                type="date"
+                                value={expiry}
+                                onChange={setExpiry}
+                            />
                         </Field>
                     </WizardGrid>
                 </>
@@ -1050,13 +1539,25 @@ function DriverWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
 
             {stepKey === 'history' && (
                 <>
-                    <StepHead icon={ScrollText} title="History" blurb="Incident-free record and any suspensions." />
+                    <StepHead
+                        icon={ScrollText}
+                        title="History"
+                        blurb="Incident-free record and any suspensions."
+                    />
                     <WizardGrid>
                         <Field label="Incident-free since">
-                            <TextField type="date" value={incidentFree} onChange={setIncidentFree} />
+                            <TextField
+                                type="date"
+                                value={incidentFree}
+                                onChange={setIncidentFree}
+                            />
                         </Field>
                         <Field label="Suspension history" span>
-                            <TextAreaField value={notes} onChange={setNotes} placeholder="None recorded." />
+                            <TextAreaField
+                                value={notes}
+                                onChange={setNotes}
+                                placeholder="None recorded."
+                            />
                         </Field>
                     </WizardGrid>
                 </>
@@ -1064,14 +1565,23 @@ function DriverWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
 
             {stepKey === 'review' && (
                 <>
-                    <h3 className="mb-1 text-lg font-bold">Review &amp; confirm</h3>
-                    <p className="mb-4 text-sm text-muted-foreground">Double-check the details below, then save.</p>
+                    <h3 className="mb-1 text-lg font-bold">
+                        Review &amp; confirm
+                    </h3>
+                    <p className="mb-4 text-sm text-muted-foreground">
+                        Double-check the details below, then save.
+                    </p>
                     <ReviewList
                         rows={[
                             { label: 'Staff member', value: personName },
                             { label: 'Licence number', value: number },
                             { label: 'Class', value: `Class ${licenceClass}` },
-                            { label: 'Endorsements', value: endorsements.map((e) => e.split(' · ')[0]).join(', ') },
+                            {
+                                label: 'Endorsements',
+                                value: endorsements
+                                    .map((e) => e.split(' · ')[0])
+                                    .join(', '),
+                            },
                             { label: 'Expiry', value: expiry },
                         ]}
                     />
@@ -1085,16 +1595,41 @@ function DriverWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
 /*  5 · Waive / exempt                                                 */
 /* ================================================================== */
 
-function WaiveWizard({ state, onClose, ctx }: { state: WizardState; onClose: () => void; ctx: WizardCtx }) {
+function WaiveWizard({
+    state,
+    onClose,
+    ctx,
+}: {
+    state: WizardState;
+    onClose: () => void;
+    ctx: WizardCtx;
+}) {
     const presetUsers = state?.userIds;
     const steps: WizardStep[] = [
         { key: 'scope', label: 'Scope', blurb: 'Who & what', icon: Users },
-        { key: 'reason', label: 'Reason', blurb: 'Justification', icon: ScrollText },
-        { key: 'approval', label: 'Approval', blurb: 'Approver & ack.', icon: ShieldCheck },
-        { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: CheckCircle2 },
+        {
+            key: 'reason',
+            label: 'Reason',
+            blurb: 'Justification',
+            icon: ScrollText,
+        },
+        {
+            key: 'approval',
+            label: 'Approval',
+            blurb: 'Approver & ack.',
+            icon: ShieldCheck,
+        },
+        {
+            key: 'review',
+            label: 'Review',
+            blurb: 'Confirm & save',
+            icon: CheckCircle2,
+        },
     ];
     const wiz = useWizard(steps.length);
-    const [person, setPerson] = useState<string>((state?.preset?.person as string) ?? '');
+    const [person, setPerson] = useState<string>(
+        (state?.preset?.person as string) ?? '',
+    );
     const [requirementId, setRequirementId] = useState<string>(
         state?.preset?.requirement ? String(state?.preset?.requirement) : '',
     );
@@ -1131,38 +1666,48 @@ function WaiveWizard({ state, onClose, ctx }: { state: WizardState; onClose: () 
             if (!reason.trim()) e.reason = 'A reason is required.';
             if (duration === 'until' && !until) e.until = 'Set an end date.';
         }
-        if (stepKey === 'approval' && !acknowledge) e.ack = 'You must acknowledge the risk.';
+        if (stepKey === 'approval' && !acknowledge)
+            e.ack = 'You must acknowledge the risk.';
         setErr(e);
         return Object.keys(e).length === 0;
     };
     const next = () => validate() && wiz.next();
-    const personName = ctx.people.find((pp) => pp.value === person)?.label ?? '—';
+    const personName =
+        ctx.people.find((pp) => pp.value === person)?.label ?? '—';
     const req = ctx.requirements.find((r) => String(r.id) === requirementId);
 
     const submit = (addAnother = false) => {
         if (!validate()) {
             // jump to first invalid step
             if ((!presetUsers && !person) || !requirementId) wiz.goTo(0);
-            else if (!reason.trim() || (duration === 'until' && !until)) wiz.goTo(1);
+            else if (!reason.trim() || (duration === 'until' && !until))
+                wiz.goTo(1);
             else wiz.goTo(2);
             return;
         }
         setSaving(true);
-        submitWith('post', '/hr/compliance/bulk-exempt', {
-            user_ids: presetUsers ?? [Number(person)],
-            requirement_id: Number(requirementId),
-            exemption_reason: approver ? `${reason} (approved by ${approver})` : reason,
-            exempted_until: duration === 'until' ? until : null,
-            acknowledge: true,
-        }, {
-            onOk: () => {
-                setSaving(false);
-                toast.success('Exemption recorded and hard-stop lifted.');
-                if (addAnother) reset();
-                else setDone(true);
+        submitWith(
+            'post',
+            '/hr/compliance/bulk-exempt',
+            {
+                user_ids: presetUsers ?? [Number(person)],
+                requirement_id: Number(requirementId),
+                exemption_reason: approver
+                    ? `${reason} (approved by ${approver})`
+                    : reason,
+                exempted_until: duration === 'until' ? until : null,
+                acknowledge: true,
             },
-            onFail: () => setSaving(false),
-        });
+            {
+                onOk: () => {
+                    setSaving(false);
+                    toast.success('Exemption recorded and hard-stop lifted.');
+                    if (addAnother) reset();
+                    else setDone(true);
+                },
+                onFail: () => setSaving(false),
+            },
+        );
     };
 
     return (
@@ -1189,10 +1734,18 @@ function WaiveWizard({ state, onClose, ctx }: { state: WizardState; onClose: () 
         >
             {stepKey === 'scope' && (
                 <>
-                    <StepHead icon={Users} title="Scope" blurb="Who and which requirement is being waived." />
+                    <StepHead
+                        icon={Users}
+                        title="Scope"
+                        blurb="Who and which requirement is being waived."
+                    />
                     {!presetUsers && (
                         <Field label="Staff member" required error={err.person}>
-                            <PeoplePicker value={person} onChange={setPerson} people={ctx.people} />
+                            <PeoplePicker
+                                value={person}
+                                onChange={setPerson}
+                                people={ctx.people}
+                            />
                         </Field>
                     )}
                     {presetUsers && (
@@ -1202,13 +1755,19 @@ function WaiveWizard({ state, onClose, ctx }: { state: WizardState; onClose: () 
                     )}
                     <div className="mt-4">
                         <Field label="Requirement" required error={err.req}>
-                            <Select value={requirementId || undefined} onValueChange={setRequirementId}>
+                            <Select
+                                value={requirementId || undefined}
+                                onValueChange={setRequirementId}
+                            >
                                 <SelectTrigger aria-label="Requirement">
                                     <SelectValue placeholder="Select…" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {ctx.requirements.map((r) => (
-                                        <SelectItem key={r.id} value={String(r.id)}>
+                                        <SelectItem
+                                            key={r.id}
+                                            value={String(r.id)}
+                                        >
                                             {r.name}
                                         </SelectItem>
                                     ))}
@@ -1221,10 +1780,18 @@ function WaiveWizard({ state, onClose, ctx }: { state: WizardState; onClose: () 
 
             {stepKey === 'reason' && (
                 <>
-                    <StepHead icon={ScrollText} title="Reason" blurb="Why is this exemption being granted?" />
+                    <StepHead
+                        icon={ScrollText}
+                        title="Reason"
+                        blurb="Why is this exemption being granted?"
+                    />
                     <WizardGrid>
                         <Field label="Reason" required error={err.reason} span>
-                            <TextAreaField value={reason} onChange={setReason} placeholder="Why is this exemption being granted?" />
+                            <TextAreaField
+                                value={reason}
+                                onChange={setReason}
+                                placeholder="Why is this exemption being granted?"
+                            />
                         </Field>
                         <Field label="Duration">
                             <Segmented
@@ -1238,7 +1805,11 @@ function WaiveWizard({ state, onClose, ctx }: { state: WizardState; onClose: () 
                         </Field>
                         {duration === 'until' && (
                             <Field label="Expires" required error={err.until}>
-                                <TextField type="date" value={until} onChange={setUntil} />
+                                <TextField
+                                    type="date"
+                                    value={until}
+                                    onChange={setUntil}
+                                />
                             </Field>
                         )}
                     </WizardGrid>
@@ -1247,15 +1818,26 @@ function WaiveWizard({ state, onClose, ctx }: { state: WizardState; onClose: () 
 
             {stepKey === 'approval' && (
                 <>
-                    <StepHead icon={ShieldCheck} title="Approval" blurb="Who approved it, and acknowledge the risk." />
+                    <StepHead
+                        icon={ShieldCheck}
+                        title="Approval"
+                        blurb="Who approved it, and acknowledge the risk."
+                    />
                     <WizardGrid>
                         <Field label="Approver" span>
-                            <Select value={approver || undefined} onValueChange={setApprover}>
+                            <Select
+                                value={approver || undefined}
+                                onValueChange={setApprover}
+                            >
                                 <SelectTrigger aria-label="Approver">
                                     <SelectValue placeholder="Select…" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {['Service Manager', 'HR Manager', 'Clinical Lead'].map((c) => (
+                                    {[
+                                        'Service Manager',
+                                        'HR Manager',
+                                        'Clinical Lead',
+                                    ].map((c) => (
                                         <SelectItem key={c} value={c}>
                                             {c}
                                         </SelectItem>
@@ -1276,14 +1858,30 @@ function WaiveWizard({ state, onClose, ctx }: { state: WizardState; onClose: () 
 
             {stepKey === 'review' && (
                 <>
-                    <h3 className="mb-1 text-lg font-bold">Review &amp; confirm</h3>
-                    <WarnBanner>Waiving a hard-stop requirement allows shift assignment despite non-compliance.</WarnBanner>
+                    <h3 className="mb-1 text-lg font-bold">
+                        Review &amp; confirm
+                    </h3>
+                    <WarnBanner>
+                        Waiving a hard-stop requirement allows shift assignment
+                        despite non-compliance.
+                    </WarnBanner>
                     <ReviewList
                         rows={[
-                            { label: 'Staff', value: presetUsers ? `${presetUsers.length} selected` : personName },
+                            {
+                                label: 'Staff',
+                                value: presetUsers
+                                    ? `${presetUsers.length} selected`
+                                    : personName,
+                            },
                             { label: 'Requirement', value: req?.name },
                             { label: 'Reason', value: reason },
-                            { label: 'Duration', value: duration === 'until' ? `Until ${until}` : 'Permanent' },
+                            {
+                                label: 'Duration',
+                                value:
+                                    duration === 'until'
+                                        ? `Until ${until}`
+                                        : 'Permanent',
+                            },
                             { label: 'Approver', value: approver },
                         ]}
                     />
@@ -1297,15 +1895,40 @@ function WaiveWizard({ state, onClose, ctx }: { state: WizardState; onClose: () 
 /*  6 · Bulk assign                                                    */
 /* ================================================================== */
 
-function AssignWizard({ state, onClose, ctx }: { state: WizardState; onClose: () => void; ctx: WizardCtx }) {
+function AssignWizard({
+    state,
+    onClose,
+    ctx,
+}: {
+    state: WizardState;
+    onClose: () => void;
+    ctx: WizardCtx;
+}) {
     const steps: WizardStep[] = [
-        { key: 'reqs', label: 'Requirements', blurb: 'What to assign', icon: ListChecks },
-        { key: 'audience', label: 'Audience', blurb: 'Roles & sites', icon: Users },
-        { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: CheckCircle2 },
+        {
+            key: 'reqs',
+            label: 'Requirements',
+            blurb: 'What to assign',
+            icon: ListChecks,
+        },
+        {
+            key: 'audience',
+            label: 'Audience',
+            blurb: 'Roles & sites',
+            icon: Users,
+        },
+        {
+            key: 'review',
+            label: 'Review',
+            blurb: 'Confirm & save',
+            icon: CheckCircle2,
+        },
     ];
     const wiz = useWizard(steps.length);
     const [reqIds, setReqIds] = useState<string[]>(
-        state?.preset?.requirement_id ? [String(state?.preset?.requirement_id)] : [],
+        state?.preset?.requirement_id
+            ? [String(state?.preset?.requirement_id)]
+            : [],
     );
     const [rolesSel, setRolesSel] = useState<string[]>([]);
     const [siteTypesSel, setSiteTypesSel] = useState<string[]>([]);
@@ -1315,7 +1938,11 @@ function AssignWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
     const [done, setDone] = useState(false);
 
     const reqOptions = useMemo(
-        () => ctx.requirements.map((r) => ({ value: String(r.id), label: r.name })),
+        () =>
+            ctx.requirements.map((r) => ({
+                value: String(r.id),
+                label: r.name,
+            })),
         [ctx.requirements],
     );
     const selectedNames = reqIds
@@ -1335,8 +1962,10 @@ function AssignWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
     const stepKey = steps[wiz.index].key;
     const validate = () => {
         const e: Record<string, string> = {};
-        if (stepKey === 'reqs' && reqIds.length === 0) e.reqs = 'Choose at least one requirement.';
-        if (stepKey === 'audience' && rolesSel.length === 0) e.roles = 'Choose at least one role.';
+        if (stepKey === 'reqs' && reqIds.length === 0)
+            e.reqs = 'Choose at least one requirement.';
+        if (stepKey === 'audience' && rolesSel.length === 0)
+            e.roles = 'Choose at least one role.';
         setErr(e);
         return Object.keys(e).length === 0;
     };
@@ -1354,22 +1983,26 @@ function AssignWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
             return;
         }
         setSaving(true);
-        submitWith('post', '/hr/compliance/assign', {
-            requirement_ids: reqIds.map(Number),
-            roles: rolesSel,
-            site_types: siteTypesSel,
-            is_mandatory: mandatory,
-        }, {
-            onOk: () => {
-                setSaving(false);
-                toast.success('Requirements assigned.');
-                if (addAnother) reset();
-                else setDone(true);
+        submitWith(
+            'post',
+            '/hr/compliance/assign',
+            {
+                requirement_ids: reqIds.map(Number),
+                roles: rolesSel,
+                site_types: siteTypesSel,
+                is_mandatory: mandatory,
             },
-            onFail: () => setSaving(false),
-        });
+            {
+                onOk: () => {
+                    setSaving(false);
+                    toast.success('Requirements assigned.');
+                    if (addAnother) reset();
+                    else setDone(true);
+                },
+                onFail: () => setSaving(false),
+            },
+        );
     };
-
 
     return (
         <WizardScaffold
@@ -1395,29 +2028,53 @@ function AssignWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
         >
             {stepKey === 'reqs' && (
                 <>
-                    <StepHead icon={ListChecks} title="Requirements" blurb="Which requirements do you want to assign?" />
+                    <StepHead
+                        icon={ListChecks}
+                        title="Requirements"
+                        blurb="Which requirements do you want to assign?"
+                    />
                     <Field label="Requirements" required error={err.reqs}>
-                        <LabeledChipMulti values={reqIds} onChange={setReqIds} options={reqOptions} />
+                        <LabeledChipMulti
+                            values={reqIds}
+                            onChange={setReqIds}
+                            options={reqOptions}
+                        />
                     </Field>
                 </>
             )}
 
             {stepKey === 'audience' && (
                 <>
-                    <StepHead icon={Users} title="Audience" blurb="Which roles and site types must hold these?" />
+                    <StepHead
+                        icon={Users}
+                        title="Audience"
+                        blurb="Which roles and site types must hold these?"
+                    />
                     <WizardGrid>
                         <Field label="Roles" required error={err.roles} span>
-                            <LabeledChipMulti values={rolesSel} onChange={setRolesSel} options={ctx.roles} />
+                            <LabeledChipMulti
+                                values={rolesSel}
+                                onChange={setRolesSel}
+                                options={ctx.roles}
+                            />
                         </Field>
                         <Field label="Site types" span>
                             <ChipMulti
                                 values={siteTypesSel}
                                 onChange={setSiteTypesSel}
-                                options={ctx.siteTypes.length ? ctx.siteTypes : ['residential', 'respite', 'community', 'day']}
+                                options={ctx.siteTypes}
                             />
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Leave empty to apply to all Sites. Choices come
+                                from the active Sites register.
+                            </p>
                         </Field>
                         <Field span>
-                            <Toggle checked={mandatory} onChange={setMandatory} label="Mandatory for these roles" />
+                            <Toggle
+                                checked={mandatory}
+                                onChange={setMandatory}
+                                label="Mandatory for these roles"
+                            />
                         </Field>
                     </WizardGrid>
                 </>
@@ -1425,17 +2082,32 @@ function AssignWizard({ state, onClose, ctx }: { state: WizardState; onClose: ()
 
             {stepKey === 'review' && (
                 <>
-                    <h3 className="mb-1 text-lg font-bold">Review &amp; confirm</h3>
+                    <h3 className="mb-1 text-lg font-bold">
+                        Review &amp; confirm
+                    </h3>
                     <p className="mb-4 text-sm text-muted-foreground">
-                        This creates {reqIds.length * rolesSel.length * Math.max(siteTypesSel.length, 1)} matrix
-                        assignment{reqIds.length * rolesSel.length === 1 ? '' : 's'}.
+                        This creates{' '}
+                        {reqIds.length *
+                            rolesSel.length *
+                            Math.max(siteTypesSel.length, 1)}{' '}
+                        matrix assignment
+                        {reqIds.length * rolesSel.length === 1 ? '' : 's'}.
                     </p>
                     <ReviewList
                         rows={[
-                            { label: 'Requirements', value: selectedNames.join(', ') },
+                            {
+                                label: 'Requirements',
+                                value: selectedNames.join(', '),
+                            },
                             { label: 'Roles', value: rolesSel.join(', ') },
-                            { label: 'Site types', value: siteTypesSel.join(', ') || 'All' },
-                            { label: 'Mandatory', value: mandatory ? 'Yes' : 'No' },
+                            {
+                                label: 'Site types',
+                                value: siteTypesSel.join(', ') || 'All',
+                            },
+                            {
+                                label: 'Mandatory',
+                                value: mandatory ? 'Yes' : 'No',
+                            },
                         ]}
                     />
                 </>
@@ -1461,7 +2133,9 @@ export function ComplianceWizards({
         case 'record':
             return <RecordWizard state={state} onClose={onClose} ctx={ctx} />;
         case 'requirement':
-            return <RequirementWizard state={state} onClose={onClose} ctx={ctx} />;
+            return (
+                <RequirementWizard state={state} onClose={onClose} ctx={ctx} />
+            );
         case 'vetting':
             return <VettingWizard state={state} onClose={onClose} ctx={ctx} />;
         case 'driver':

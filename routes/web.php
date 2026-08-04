@@ -202,7 +202,7 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         ->name('it.reports.export');
 
     // Knowledge base browse — anyone who can reach /it (it.request or it.view)
-    // reads published articles and votes; the controller guards published + tenant.
+    // reads published articles and votes; the controller guards published + access rules.
     Route::post('/it/kb/{article}/view', [ItKbController::class, 'view'])->name('it.kb.view');
     Route::post('/it/kb/{article}/helpful', [ItKbController::class, 'helpful'])->name('it.kb.helpful');
 
@@ -214,6 +214,10 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::patch('/it/setup/queues/{queue}', [ItServiceManagementSetupController::class, 'updateQueue'])->name('it.setup.queues.update');
         Route::post('/it/setup/services', [ItServiceManagementSetupController::class, 'storeService'])->name('it.setup.services.store');
         Route::patch('/it/setup/services/{service}', [ItServiceManagementSetupController::class, 'updateService'])->name('it.setup.services.update');
+        Route::post('/it/setup/catalogue-items', [ItServiceManagementSetupController::class, 'storeCatalogItem'])->name('it.setup.catalogue-items.store');
+        Route::patch('/it/setup/catalogue-items/{catalogItem}', [ItServiceManagementSetupController::class, 'updateCatalogItem'])->name('it.setup.catalogue-items.update');
+        Route::post('/it/setup/catalogue-items/{catalogItem}/publish', [ItServiceManagementSetupController::class, 'publishCatalogItem'])->name('it.setup.catalogue-items.publish');
+        Route::post('/it/setup/catalogue-items/{catalogItem}/unpublish', [ItServiceManagementSetupController::class, 'unpublishCatalogItem'])->name('it.setup.catalogue-items.unpublish');
         Route::post('/it/setup/api-identities', [ItServiceManagementSetupController::class, 'storeIdentity'])->name('it.setup.api-identities.store');
         Route::post('/it/setup/api-identities/{identity}/revoke', [ItServiceManagementSetupController::class, 'revokeIdentity'])->name('it.setup.api-identities.revoke');
         Route::post('/it/setup/provisioning-templates', [ItServiceManagementSetupController::class, 'storeProvisioningTemplate'])->name('it.setup.provisioning-templates.store');
@@ -240,6 +244,8 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         Route::post('/it/provisioning/{provisioning}/cancel', [ItProvisioningController::class, 'cancel'])->name('it.provisioning.cancel');
         Route::post('/it/tickets/bulk', [ItTicketController::class, 'bulk'])->name('it.tickets.bulk');
         Route::patch('/it/tickets/{ticket}', [ItProvisioningController::class, 'updateTicket'])->name('it.tickets.update');
+        Route::post('/it/tickets/{ticket}/devices', [ItTicketController::class, 'linkDevice'])->name('it.tickets.devices.store');
+        Route::delete('/it/tickets/{ticket}/devices/{device}', [ItTicketController::class, 'unlinkDevice'])->name('it.tickets.devices.destroy');
         Route::post('/it/tickets/{ticket}/resolve', [ItProvisioningController::class, 'resolveTicket'])->name('it.tickets.resolve');
         Route::post('/it/tickets/{ticket}/close', [ItTicketController::class, 'close'])->name('it.tickets.close');
         Route::post('/it/tickets/{ticket}/transitions', [ItTicketController::class, 'transition'])->name('it.tickets.transitions.store');

@@ -11,11 +11,12 @@ use App\Domain\Hr\Models\HrFeedReply;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Notifications\AnnouncementReplyNotification;
 use App\Domain\Hr\Services\FeedService;
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\AuditLog;
 use App\Models\Site;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -25,10 +26,11 @@ use Inertia\Inertia;
 
 class FeedController extends Controller
 {
-    use ResolvesHrTenant, ServesPrivateAttachments;
+    use ServesPrivateAttachments;
 
     public function __construct(
         private readonly FeedService $feedService,
+        private readonly HrCurrentStaffService $currentStaff,
     ) {}
 
     /* ------------------------------------------------------------------ */
@@ -39,13 +41,13 @@ class FeedController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
+        abort_unless($this->currentStaff->isCurrent($user), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $type = $request->query('type');
         $search = trim((string) $request->query('search', ''));
         $search = $search !== '' ? $search : null;
 
-        $posts = $this->feedService->getFeed($tenantId, $type, $search, $user->id, $this->viewerSiteIds($tenantId, $user->id));
+        $posts = $this->feedService->getFeed($type, $search, $user->id, $this->viewerSiteIds($user->id));
         // Polymorphic reactions/replies for the non-kudos posts on this page
         // (kudos carry their own kudos-keyed reactions). Loaded in two queries.
         $nonKudosIds = $posts->getCollection()
@@ -58,12 +60,12 @@ class FeedController extends Controller
 
         return Inertia::render('hr/feed/index', [
             'posts' => $posts,
-            'announcements' => $this->feedService->getFeedAnnouncements($tenantId, $user->id, $search),
-            'metrics' => $this->feedService->getMetrics($tenantId),
-            'valueBreakdown' => $this->feedService->getValueBreakdown($tenantId),
-            'kudosTrend' => $this->feedService->getKudosTrend($tenantId),
-            'milestones' => $this->feedService->getMilestones($tenantId),
-            'leaderboard' => $this->feedService->getKudosLeaderboard($tenantId),
+            'announcements' => $this->feedService->getFeedAnnouncements($user->id, $search),
+            'metrics' => $this->feedService->getMetrics(),
+            'valueBreakdown' => $this->feedService->getValueBreakdown(),
+            'kudosTrend' => $this->feedService->getKudosTrend(),
+            'milestones' => $this->feedService->getMilestones(),
+            'leaderboard' => $this->feedService->getKudosLeaderboard(),
             'filters' => [
                 'type' => $type,
                 'search' => $search,
@@ -72,8 +74,8 @@ class FeedController extends Controller
             'kudosImpacts' => FeedService::KUDOS_IMPACTS,
             'postTypes' => FeedService::POST_TYPES,
             'reactionEmojis' => FeedService::REACTION_EMOJIS,
-            'employees' => $this->tenantEmployees($tenantId),
-            'sites' => $this->tenantSites($tenantId),
+            'employees' => $this->applicationEmployees(),
+            'sites' => $this->operationalSites(),
             'currentUserId' => $user->id,
             'can' => [
                 'manageAnnouncements' => (bool) $user->canDo('hr.announcements.manage'),
@@ -93,20 +95,19 @@ class FeedController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        abort_unless($this->currentStaff->isCurrent($user), 403);
 
         $validated = $request->validate([
             'content' => ['required', 'string', 'max:5000'],
             'post_type' => ['required', 'string', Rule::in(['update', 'announcement'])],
             'kind' => ['nullable', 'string', Rule::in(FeedService::POST_KINDS)],
             'target_audience' => ['nullable', 'string', Rule::in(['all', 'site'])],
-            'target_value' => ['nullable', 'string', 'required_if:target_audience,site', Rule::exists('sites', 'id')->where('tenant_id', $tenantId)],
+            'target_value' => ['nullable', 'string', 'required_if:target_audience,site', $this->operationalSiteRule()],
             'attachment' => ['nullable', 'file', 'image', 'mimes:'.implode(',', FeedService::ATTACHMENT_MIMES), 'max:'.FeedService::ATTACHMENT_MAX_KB],
         ]);
 
         try {
-            $post = $this->feedService->createPost($user, $validated, $tenantId);
+            $post = $this->feedService->createPost($user, $validated);
             if ($request->hasFile('attachment')) {
                 $this->feedService->attachToPost($post, $request->file('attachment'), $user->id);
             }
@@ -125,14 +126,14 @@ class FeedController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
+        abort_unless($this->currentStaff->isCurrent($user), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $notForeignTenant = $this->rejectForeignTenantRecipient($tenantId);
+        $currentStaffRecipientRule = $this->currentStaff->recipientRule();
 
         $validated = $request->validate([
-            'to_user_id' => ['required_without:to_user_ids', 'integer', 'exists:users,id', $notForeignTenant],
+            'to_user_id' => ['required_without:to_user_ids', 'integer', 'exists:users,id', $currentStaffRecipientRule],
             'to_user_ids' => ['required_without:to_user_id', 'array', 'min:1'],
-            'to_user_ids.*' => ['integer', 'exists:users,id', $notForeignTenant],
+            'to_user_ids.*' => ['integer', 'exists:users,id', $currentStaffRecipientRule],
             'category' => ['required', 'string', Rule::in(array_keys(FeedService::KUDOS_CATEGORIES))],
             'impact' => ['nullable', 'string', Rule::in(array_keys(FeedService::KUDOS_IMPACTS))],
             'message' => ['required', 'string', 'max:2000'],
@@ -146,7 +147,6 @@ class FeedController extends Controller
                 $recipientIds,
                 $validated['category'],
                 $validated['message'],
-                $tenantId,
                 $validated['impact'] ?? null,
             );
         } catch (\Throwable $e) {
@@ -166,9 +166,9 @@ class FeedController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
+        abort_unless($this->currentStaff->isCurrent($user), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $kudos->tenant_id);
+        $this->assertKudosVisibleTo($kudos, $user);
 
         $validated = $request->validate([
             'emoji' => ['required', 'string', Rule::in(FeedService::REACTION_EMOJIS)],
@@ -183,9 +183,9 @@ class FeedController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
+        abort_unless($this->currentStaff->isCurrent($user), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $kudos->tenant_id);
+        $this->assertKudosVisibleTo($kudos, $user);
         abort_unless(in_array($user->id, [$kudos->from_user_id, $kudos->to_user_id], true), 403);
 
         $validated = $request->validate([
@@ -205,19 +205,18 @@ class FeedController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
+        abort_unless($this->currentStaff->isCurrent($user), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $validated = $request->validate([
             'subject_type' => ['required', 'string', Rule::in(FeedService::FEED_SUBJECTS)],
             'subject_id' => ['required', 'integer'],
             'emoji' => ['required', 'string', Rule::in(FeedService::REACTION_EMOJIS)],
         ]);
 
-        $this->assertFeedSubjectInTenant($validated['subject_type'], (int) $validated['subject_id'], $tenantId);
+        $this->assertFeedSubjectVisibleTo($validated['subject_type'], (int) $validated['subject_id'], $user);
         $this->feedService->toggleFeedReaction(
             $validated['subject_type'],
             (int) $validated['subject_id'],
-            $tenantId,
             $user->id,
             $validated['emoji'],
         );
@@ -229,31 +228,31 @@ class FeedController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
+        abort_unless($this->currentStaff->isCurrent($user), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $validated = $request->validate([
             'subject_type' => ['required', 'string', Rule::in(FeedService::FEED_SUBJECTS)],
             'subject_id' => ['required', 'integer'],
             'body' => ['required', 'string', 'max:2000'],
         ]);
 
-        $this->assertFeedSubjectInTenant($validated['subject_type'], (int) $validated['subject_id'], $tenantId);
+        $subject = $this->assertFeedSubjectVisibleTo(
+            $validated['subject_type'],
+            (int) $validated['subject_id'],
+            $user,
+        );
         $this->feedService->addFeedReply(
             $validated['subject_type'],
             (int) $validated['subject_id'],
-            $tenantId,
             $user->id,
             $validated['body'],
         );
 
-        if ($validated['subject_type'] === 'announcement') {
-            $announcement = HrAnnouncement::query()
-                ->with('creator:id,name,organization_id')
-                ->findOrFail((int) $validated['subject_id']);
+        if ($subject instanceof HrAnnouncement) {
+            $announcement = $subject->loadMissing('creator:id,name');
             $author = $announcement->creator;
-            $authorTenantId = $author?->organization_id;
 
-            if ($author && $author->id !== $user->id && (int) $authorTenantId === $tenantId) {
+            if ($author && $author->id !== $user->id) {
                 $author->notify(new AnnouncementReplyNotification($announcement, $user, $validated['body']));
             }
         }
@@ -274,10 +273,7 @@ class FeedController extends Controller
     public function destroyPost(Request $request, HrFeedPost $post)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.employees.manage'), 403);
-
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $post->tenant_id);
+        abort_unless($user && $this->currentStaff->isCurrent($user) && $user->canDo('hr.employees.manage'), 403);
 
         $this->removeFeedPost($request, $post);
 
@@ -291,10 +287,7 @@ class FeedController extends Controller
     public function destroyKudos(Request $request, HrKudos $kudos)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.employees.manage'), 403);
-
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $kudos->tenant_id);
+        abort_unless($user && $this->currentStaff->isCurrent($user) && $user->canDo('hr.employees.manage'), 403);
 
         $post = $kudos->feedPost;
         if ($post) {
@@ -388,9 +381,11 @@ class FeedController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
+        abort_unless($this->currentStaff->isCurrent($user), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $attachment->tenant_id);
+        $post = $attachment->post()->first();
+        abort_unless($post instanceof HrFeedPost, 404);
+        $this->assertPostVisibleTo($post, $user);
 
         return $this->streamPrivateAttachment(
             $attachment->disk,
@@ -401,14 +396,85 @@ class FeedController extends Controller
         );
     }
 
-    /** Guard a polymorphic wall reaction/reply against cross-tenant subjects. */
-    private function assertFeedSubjectInTenant(string $type, int $id, int $tenantId): void
+    private function assertFeedSubjectVisibleTo(string $type, int $id, User $viewer): HrAnnouncement|HrFeedPost
     {
-        $model = $type === 'announcement'
-            ? HrAnnouncement::find($id)
-            : HrFeedPost::find($id);
+        if ($type === 'announcement') {
+            $announcement = HrAnnouncement::query()->active()->with('targets')->find($id);
+            abort_unless($announcement instanceof HrAnnouncement, 404);
+            $this->assertAnnouncementVisibleTo($announcement, $viewer);
 
-        abort_unless($model && (int) $model->tenant_id === $tenantId, 404);
+            return $announcement;
+        }
+
+        $post = HrFeedPost::query()->find($id);
+        abort_unless($post instanceof HrFeedPost, 404);
+        $this->assertPostVisibleTo($post, $viewer);
+
+        return $post;
+    }
+
+    private function assertKudosVisibleTo(HrKudos $kudos, User $viewer): void
+    {
+        abort_unless($this->feedService->canViewKudos($kudos, $viewer), 404);
+    }
+
+    private function assertPostVisibleTo(HrFeedPost $post, User $viewer): void
+    {
+        abort_unless($this->currentStaff->isCurrent($viewer), 404);
+
+        $audience = $post->target_audience ?: 'all';
+        $visible = (int) $post->user_id === (int) $viewer->id
+            || $audience === 'all'
+            || ($audience === 'site'
+                && is_numeric($post->target_value)
+                && in_array((int) $post->target_value, $this->viewerSiteIds((int) $viewer->id), true));
+
+        abort_unless($visible, 404);
+    }
+
+    private function assertAnnouncementVisibleTo(HrAnnouncement $announcement, User $viewer): void
+    {
+        abort_unless($this->currentStaff->isCurrent($viewer), 404);
+
+        if ((int) $announcement->created_by === (int) $viewer->id) {
+            return;
+        }
+
+        $profile = $this->currentStaffProfile((int) $viewer->id);
+        $targets = $announcement->targets->isNotEmpty()
+            ? $announcement->targets->map(fn ($target): array => [
+                'type' => $target->type,
+                'value' => $target->value,
+            ])
+            : collect([[
+                'type' => $announcement->target_audience ?: 'all',
+                'value' => $announcement->target_value,
+            ]]);
+
+        $roleNames = collect([$viewer->role, ...$viewer->roles()->pluck('name')->all()])
+            ->filter()
+            ->map(fn ($role): string => (string) $role)
+            ->all();
+        $siteIds = $this->viewerSiteIds((int) $viewer->id);
+        $visible = $targets->contains(function (array $target) use ($viewer, $profile, $roleNames, $siteIds): bool {
+            $type = $target['type'] ?? null;
+            $value = trim((string) ($target['value'] ?? ''));
+
+            return match ($type) {
+                'all' => true,
+                'user' => is_numeric($value) && (int) $value === (int) $viewer->id,
+                'site' => is_numeric($value) && in_array((int) $value, $siteIds, true),
+                'department' => $profile !== null && (
+                    $value === (string) $profile->department
+                    || (is_numeric($value) && (int) $value === (int) $profile->department_id)
+                ),
+                'role' => ($profile !== null && $value === (string) $profile->position_role)
+                    || in_array($value, $roleNames, true),
+                default => false,
+            };
+        });
+
+        abort_unless($visible, 404);
     }
 
     /* ------------------------------------------------------------------ */
@@ -501,24 +567,21 @@ class FeedController extends Controller
     }
 
     /**
-     * Tenant-scoped employee picker source (fixes the cross-tenant user leak).
+     * Current staff picker for this application.
      *
      * @return array<int, array<string, mixed>>
      */
-    private function tenantEmployees(int $tenantId): array
+    private function applicationEmployees(): array
     {
-        return HrEmployeeProfile::forTenant($tenantId)
-            ->active()
-            ->whereNotNull('user_id')
-            ->with(['user:id,name', 'primarySite:id,name'])
+        return $this->currentStaff->currentUsersQuery()
+            ->with(['hrEmployeeProfile.primarySite:id,name'])
             ->get()
-            ->map(fn ($profile) => [
-                'id' => $profile->user_id,
-                'name' => $profile->user?->name ?? 'Unknown',
-                'role' => $profile->position_title,
-                'site' => $profile->primarySite?->name,
+            ->map(fn (User $employee) => [
+                'id' => $employee->id,
+                'name' => $employee->name,
+                'role' => $employee->hrEmployeeProfile?->position_title,
+                'site' => $employee->hrEmployeeProfile?->primarySite?->name,
             ])
-            ->filter(fn ($e) => $e['name'] !== 'Unknown')
             ->sortBy('name')
             ->values()
             ->all();
@@ -527,10 +590,12 @@ class FeedController extends Controller
     /**
      * @return array<int, array{id:int, name:string}>
      */
-    private function tenantSites(int $tenantId): array
+    private function operationalSites(): array
     {
         return Site::query()
-            ->where('tenant_id', $tenantId)
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn ($site) => [
@@ -546,11 +611,9 @@ class FeedController extends Controller
      *
      * @return array<int, int>
      */
-    private function viewerSiteIds(int $tenantId, int $userId): array
+    private function viewerSiteIds(int $userId): array
     {
-        $profile = HrEmployeeProfile::forTenant($tenantId)
-            ->where('user_id', $userId)
-            ->first(['primary_site_id', 'secondary_site_ids']);
+        $profile = $this->currentStaffProfile($userId);
 
         if (! $profile) {
             return [];
@@ -567,5 +630,29 @@ class FeedController extends Controller
         }
 
         return array_values(array_unique($ids));
+    }
+
+    private function currentStaffProfile(int $userId): ?HrEmployeeProfile
+    {
+        return HrEmployeeProfile::query()
+            ->where('user_id', $userId)
+            ->active()
+            ->where(fn ($dates) => $dates->whereNull('start_date')->orWhereDate('start_date', '<=', today()))
+            ->where(fn ($dates) => $dates->whereNull('end_date')->orWhereDate('end_date', '>=', today()))
+            ->first();
+    }
+
+    private function operationalSiteRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            if (! is_numeric($value) || ! Site::query()
+                ->active()
+                ->notArchived()
+                ->whereNull('archived_at')
+                ->whereKey((int) $value)
+                ->exists()) {
+                $fail('The selected Site must be active and available.');
+            }
+        };
     }
 }

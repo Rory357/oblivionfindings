@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Finance\FinGstReturnFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,14 +12,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FinGstReturn extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Finance\FinGstReturnFactory::new();
+        return FinGstReturnFactory::new();
     }
 
     protected $table = 'fin_gst_returns';
+
+    protected $hidden = [
+        'organization_id',
+    ];
 
     protected $fillable = [
         'organization_id',
@@ -73,7 +78,7 @@ class FinGstReturn extends Model
 
     public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->when($orgId, fn($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
+        return $query->when($orgId, fn ($q) => $q->where($query->qualifyColumn('organization_id'), $orgId));
     }
 
     public function scopeDraft($query)

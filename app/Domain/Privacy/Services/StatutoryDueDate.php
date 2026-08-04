@@ -27,15 +27,15 @@ class StatutoryDueDate
     /**
      * The statutory due date: {received} + 20 working days.
      */
-    public function dueFrom(CarbonInterface|string $receivedAt, ?int $tenantId = null, ?string $region = null): Carbon
+    public function dueFrom(CarbonInterface|string $receivedAt, ?string $region = null): Carbon
     {
-        return $this->addWorkingDays($receivedAt, self::WORKING_DAYS, $tenantId, $region);
+        return $this->addWorkingDays($receivedAt, self::WORKING_DAYS, $region);
     }
 
     /**
      * Add N working days to a date, skipping weekends and NZ public holidays.
      */
-    public function addWorkingDays(CarbonInterface|string $from, int $workingDays, ?int $tenantId = null, ?string $region = null): Carbon
+    public function addWorkingDays(CarbonInterface|string $from, int $workingDays, ?string $region = null): Carbon
     {
         $date = Carbon::parse($from instanceof CarbonInterface ? $from->toDateString() : $from)->startOfDay();
 
@@ -47,7 +47,7 @@ class StatutoryDueDate
                 continue;
             }
 
-            if ($this->holidays->isPublicHoliday($date, $tenantId, $region)) {
+            if ($this->holidays->isPublicHoliday($date, $region)) {
                 continue;
             }
 

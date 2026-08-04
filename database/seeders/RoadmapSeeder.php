@@ -21,7 +21,7 @@ class RoadmapSeeder extends Seeder
 
         foreach ($categories as $category) {
             InitiativeCategory::firstOrCreate(
-                ['tenant_id' => null, 'key' => $category['key']],
+                ['key' => $category['key']],
                 [
                     'name' => $category['name'],
                     'sort_order' => $category['sort_order'],
@@ -57,7 +57,6 @@ class RoadmapSeeder extends Seeder
         foreach ($rules as $rule) {
             DelegationOfAuthorityRule::firstOrCreate(
                 [
-                    'tenant_id' => null,
                     'scope' => $rule['scope'],
                     'amount_min' => $rule['amount_min'],
                     'amount_max' => $rule['amount_max'],

@@ -17,7 +17,6 @@ class StoreQuarterlyPlanRequest extends FormRequest
             'fiscal_year' => ['required', 'integer', 'min:2000', 'max:3000'],
             'quarter' => ['required', 'integer', 'min:1', 'max:4'],
             'preset' => ['nullable', 'string', 'max:32'],
-            'tenant_id' => ['nullable', 'integer'],
         ];
     }
 }

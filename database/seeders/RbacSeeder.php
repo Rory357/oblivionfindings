@@ -121,6 +121,7 @@ class RbacSeeder extends Seeder
 
             // Sites
             ['key' => 'sites.viewAny', 'description' => 'View sites', 'group' => 'sites', 'module' => 'Operations'],
+            ['key' => 'sites.viewAll', 'description' => 'View and manage Sites across the application', 'group' => 'sites', 'module' => 'Operations'],
             ['key' => 'sites.create', 'description' => 'Create sites', 'group' => 'sites', 'module' => 'Operations'],
             ['key' => 'sites.update', 'description' => 'Update sites', 'group' => 'sites', 'module' => 'Operations'],
             ['key' => 'sites.archive', 'description' => 'Archive/soft-delete sites', 'group' => 'sites', 'module' => 'Operations'],
@@ -143,6 +144,7 @@ class RbacSeeder extends Seeder
             ['key' => 'assets.trackers.manage', 'description' => 'Manage asset trackers', 'group' => 'assets', 'module' => 'Resources'],
             ['key' => 'assets.telemetry.ingest', 'description' => 'Ingest asset telemetry', 'group' => 'assets', 'module' => 'Resources'],
             ['key' => 'assets.telemetry.view', 'description' => 'View asset telemetry', 'group' => 'assets', 'module' => 'Resources'],
+            ['key' => 'assets.telemetry.export', 'description' => 'Export authorised personal location telemetry with a recorded purpose', 'group' => 'assets', 'module' => 'Resources'],
             ['key' => 'assets.alerts.view', 'description' => 'View asset alerts', 'group' => 'assets', 'module' => 'Resources'],
             ['key' => 'assets.alerts.manage', 'description' => 'Manage asset alerts', 'group' => 'assets', 'module' => 'Resources'],
             ['key' => 'assets.scan.record', 'description' => 'Record asset scans', 'group' => 'assets', 'module' => 'Resources'],
@@ -352,7 +354,7 @@ class RbacSeeder extends Seeder
 
             // Integrations
             ['key' => 'integrations.view', 'description' => 'View integrations hub', 'group' => 'integrations', 'module' => 'System'],
-            ['key' => 'integrations.manage_tenant_secrets', 'description' => 'Manage tenant integration API keys', 'group' => 'integrations', 'module' => 'System'],
+            ['key' => 'integrations.manage_secrets', 'description' => 'Manage application integration API keys', 'group' => 'integrations', 'module' => 'System'],
             ['key' => 'integrations.manage_site_secrets', 'description' => 'Manage site integration credentials', 'group' => 'integrations', 'module' => 'System'],
             ['key' => 'integrations.view_face_tags', 'description' => 'View face recognition tags', 'group' => 'integrations', 'module' => 'System'],
             ['key' => 'integrations.view_person_links', 'description' => 'View tracker-person links', 'group' => 'integrations', 'module' => 'System'],
@@ -568,7 +570,7 @@ class RbacSeeder extends Seeder
 
         // Provider Manager
         $syncPermissions($providerManager, [
-            'sites.viewAny', 'sites.create', 'sites.update',
+            'sites.viewAny', 'sites.viewAll', 'sites.create', 'sites.update',
             'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'staff.viewAny', 'staff.create', 'staff.update', 'staff.invite', 'staff.assignments.update',
             'staff.credentials.viewAny', 'staff.credentials.updateAny', 'staff.availability.updateAny',
@@ -607,7 +609,7 @@ class RbacSeeder extends Seeder
             'assets.viewAny', 'assets.create', 'assets.update', 'assets.delete',
             'assets.inspections.record', 'assets.maintenance.record', 'assets.documents.manage',
             'assets.qr.download', 'assets.ownership.manage', 'assets.assignments.manage',
-            'assets.trackers.manage', 'assets.telemetry.ingest', 'assets.telemetry.view',
+            'assets.trackers.manage', 'assets.telemetry.ingest', 'assets.telemetry.view', 'assets.telemetry.export',
             'assets.alerts.view', 'assets.alerts.manage', 'assets.scan.record', 'assets.geofences.manage',
             'safeguarding.viewAny', 'safeguarding.create', 'safeguarding.update',
             'safeguarding.investigate', 'safeguarding.report.external', 'safeguarding.viewSensitive',
@@ -616,7 +618,7 @@ class RbacSeeder extends Seeder
             'staff.vetting.view', 'staff.vetting.manage', 'staff.induction.manage',
             'privacy.viewRequests', 'privacy.processRequests', 'privacy.manageRetention',
             'privacy.manageLegalHolds', 'privacy.reportBreaches', 'privacy.conductDPIA',
-            'integrations.view', 'integrations.manage_tenant_secrets', 'integrations.manage_site_secrets',
+            'integrations.view', 'integrations.manage_secrets', 'integrations.manage_site_secrets',
             'siteHardware.view', 'siteHardware.manage', 'controlRoom.alerts.view',
             'llm.generate_client_narrative', 'llm.generate_staff_summary',
             'hr.recruitment.view', 'hr.recruitment.manage', 'hr.employees.viewAny', 'hr.employees.manage',
@@ -673,7 +675,7 @@ class RbacSeeder extends Seeder
             'assets.viewAny', 'assets.create', 'assets.update',
             'assets.inspections.record', 'assets.maintenance.record', 'assets.documents.manage',
             'assets.qr.download', 'assets.ownership.manage', 'assets.assignments.manage',
-            'assets.trackers.manage', 'assets.telemetry.ingest', 'assets.telemetry.view',
+            'assets.trackers.manage', 'assets.telemetry.ingest', 'assets.telemetry.view', 'assets.telemetry.export',
             'assets.alerts.view', 'assets.alerts.manage', 'assets.scan.record', 'assets.geofences.manage',
             'safeguarding.viewAny', 'safeguarding.create', 'safeguarding.update', 'safeguarding.investigate',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
@@ -772,6 +774,18 @@ class RbacSeeder extends Seeder
             'hr.wellbeing.view', 'hr.onboarding.view', 'hr.onboarding.manage',
             'it.view', 'it.manage',
         ]);
+
+        // IT Manager is extended by specialised module seeders, so retain
+        // those grants while ensuring the role can work the IT Changes that
+        // govern Security & Devices management actions. Sensitive and
+        // organisation-wide IT access remain explicit separate permissions.
+        if ($itManager) {
+            $itManager->permissions()->syncWithoutDetaching(
+                Permission::query()
+                    ->whereIn('key', ['it.view', 'it.manage'])
+                    ->pluck('id'),
+            );
+        }
 
         // Auditor
         $syncPermissions($auditor, [

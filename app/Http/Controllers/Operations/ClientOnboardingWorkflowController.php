@@ -6,15 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientOnboardingStep;
 use App\Models\ClientOnboardingWorkflow;
+use App\Models\User;
 use App\Services\Clients\ClientOnboardingAccess;
 use App\Services\Clients\ClientWorkerEligibility;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ClientOnboardingWorkflowController extends Controller
 {
     public function __construct(
         private readonly ClientOnboardingAccess $access,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     public function index(Request $request)
@@ -28,16 +33,20 @@ class ClientOnboardingWorkflowController extends Controller
         ]);
         $search = trim((string) ($filters['q'] ?? ''));
 
-        $workflows = ClientOnboardingWorkflow::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $scopedWorkflows = fn () => $this->workflowQueryFor(
+            $auth,
+            ['onboarding.viewAny'],
+        );
+
+        $workflows = $scopedWorkflows()
             ->with(['client:id,first_name,last_name'])
             ->withCount(['steps', 'steps as completed_steps_count' => fn ($q) => $q->where('status', 'completed')])
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($search !== '', function ($query) use ($search) {
                 $query->whereHas('client', function ($clientQuery) use ($search) {
-                    $clientQuery
+                    $clientQuery->where(fn ($nameQuery) => $nameQuery
                         ->where('first_name', 'like', '%'.$search.'%')
-                        ->orWhere('last_name', 'like', '%'.$search.'%');
+                        ->orWhere('last_name', 'like', '%'.$search.'%'));
                 });
             })
             ->orderByDesc('created_at')
@@ -45,10 +54,24 @@ class ClientOnboardingWorkflowController extends Controller
             ->withQueryString();
 
         $stats = [
-            'active' => ClientOnboardingWorkflow::where('organization_id', $auth->organization_id)->where('status', 'in_progress')->count(),
-            'completed_this_month' => ClientOnboardingWorkflow::where('organization_id', $auth->organization_id)->where('status', 'completed')->where('completed_at', '>=', now()->startOfMonth())->count(),
-            'overdue_steps' => ClientOnboardingStep::whereHas('workflow', fn ($q) => $q->where('organization_id', $auth->organization_id)->where('status', 'in_progress'))->where('status', 'pending')->where('due_date', '<', now())->count(),
-            'avg_days' => (int) (ClientOnboardingWorkflow::where('organization_id', $auth->organization_id)->where('status', 'completed')->whereNotNull('completed_at')->selectRaw('AVG(DATEDIFF(completed_at, started_at)) as avg_days')->value('avg_days') ?? 0),
+            'active' => $scopedWorkflows()->where('status', 'in_progress')->count(),
+            'completed_this_month' => $scopedWorkflows()->where('status', 'completed')->where('completed_at', '>=', now()->startOfMonth())->count(),
+            'overdue_steps' => ClientOnboardingStep::query()
+                ->whereHas('workflow', fn ($workflowQuery) => $workflowQuery
+                    ->where('status', 'in_progress')
+                    ->whereHas('client', fn ($clientQuery) => $this->siteAccess->applyClientScope(
+                        $clientQuery,
+                        $auth,
+                        ['onboarding.viewAny'],
+                    )))
+                ->where('status', 'pending')
+                ->where('due_date', '<', now())
+                ->count(),
+            'avg_days' => (int) ($scopedWorkflows()
+                ->where('status', 'completed')
+                ->whereNotNull('completed_at')
+                ->selectRaw('AVG(DATEDIFF(completed_at, started_at)) as avg_days')
+                ->value('avg_days') ?? 0),
         ];
 
         return inertia('operations/onboarding/Index', [
@@ -66,8 +89,7 @@ class ClientOnboardingWorkflowController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->access->canViewWorkflows($auth), 403);
 
-        $workflow = ClientOnboardingWorkflow::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $workflow = $this->workflowQueryFor($auth, ['onboarding.viewAny'])
             ->with(['client:id,first_name,last_name', 'steps' => fn ($q) => $q->orderBy('step_order')])
             ->findOrFail($workflow);
 
@@ -81,8 +103,11 @@ class ClientOnboardingWorkflowController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->access->canCreateWorkflows($auth), 403);
 
-        $clients = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $clients = $this->siteAccess->applyClientScope(
+            Client::query(),
+            $auth,
+            ['clients.viewAny', 'clients.update'],
+        )
             ->select('id', 'first_name', 'last_name')
             ->orderBy('last_name')
             ->get();
@@ -96,43 +121,31 @@ class ClientOnboardingWorkflowController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $this->access->canCreateWorkflows($auth), 403);
+        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(
+            $auth,
+            ['clients.viewAny', 'clients.update'],
+        );
 
         $data = $request->validate([
             'client_id' => [
                 'required',
                 'integer',
                 Rule::exists('clients', 'id')->where(
-                    fn ($query) => $auth->organization_id !== null
-                        ? $query->where('organization_id', $auth->organization_id)
-                        : $query,
+                    fn ($query) => $query
+                        ->whereNotNull('site_id')
+                        ->whereIn('site_id', $accessibleSiteIds),
                 ),
             ],
         ]);
 
-        $workflow = ClientOnboardingWorkflow::create([
-            'organization_id' => $auth->organization_id,
-            'client_id' => $data['client_id'],
-            'status' => 'in_progress',
-            'started_at' => now(),
-            'created_by' => $auth->id,
-        ]);
+        $client = $this->siteAccess->applyClientScope(
+            Client::query(),
+            $auth,
+            ['clients.viewAny', 'clients.update'],
+        )->findOrFail($data['client_id']);
 
-        $defaultSteps = [
-            'Referral Received',
-            'Needs Assessment',
-            'Consent Forms',
-            'Care Plan Created',
-            'Service Agreement Signed',
-            'Staff Assigned',
-            'Orientation Complete',
-        ];
-
-        foreach ($defaultSteps as $order => $stepName) {
-            $workflow->steps()->create([
-                'step_name' => $stepName,
-                'step_order' => $order + 1,
-                'status' => 'pending',
-            ]);
+        if (! $this->createWorkflowForClient($client, (int) $auth->id)) {
+            return redirect()->back()->with('error', 'Client already has an active onboarding workflow.');
         }
 
         return redirect()->back()->with('success', 'Onboarding workflow created.');
@@ -143,8 +156,7 @@ class ClientOnboardingWorkflowController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->access->canManageWorkflows($auth), 403);
 
-        $workflowModel = ClientOnboardingWorkflow::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $workflowModel = $this->workflowQueryFor($auth, ['clients.update'])
             ->with('client')
             ->findOrFail($workflow);
 
@@ -157,7 +169,7 @@ class ClientOnboardingWorkflowController extends Controller
                 'integer',
                 function (string $attribute, mixed $value, \Closure $fail) use ($workflowModel): void {
                     if (! app(ClientWorkerEligibility::class)->contains($workflowModel->client, (int) $value)) {
-                        $fail('Choose an eligible assignee from this organisation.');
+                        $fail('Choose a current eligible assignee from this Client Site.');
                     }
                 },
             ],
@@ -166,13 +178,18 @@ class ClientOnboardingWorkflowController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $workflowModel->steps()->create([
-            ...$data,
-            'organization_id' => $workflowModel->organization_id,
-            'step_order' => ((int) $workflowModel->steps()->max('step_order')) + 1,
-            'is_required' => $data['is_required'] ?? true,
-            'status' => 'pending',
-        ]);
+        DB::transaction(function () use ($auth, $data, $workflow): void {
+            $lockedWorkflow = $this->workflowQueryFor($auth, ['clients.update'])
+                ->lockForUpdate()
+                ->findOrFail($workflow);
+
+            $lockedWorkflow->steps()->create([
+                ...$data,
+                'step_order' => ((int) $lockedWorkflow->steps()->max('step_order')) + 1,
+                'is_required' => $data['is_required'] ?? true,
+                'status' => 'pending',
+            ]);
+        });
 
         return redirect()->back()->with('success', 'Onboarding step added.');
     }
@@ -182,23 +199,29 @@ class ClientOnboardingWorkflowController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->access->canManageWorkflows($auth), 403);
 
-        ClientOnboardingWorkflow::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($workflow);
-
-        $step = ClientOnboardingStep::where('workflow_id', $workflow)->findOrFail($step);
-
         $data = $request->validate([
             'status' => ['required', 'string', 'in:pending,completed,skipped'],
             'notes' => ['nullable', 'string'],
         ]);
 
-        $step->update([
-            'status' => $data['status'],
-            'notes' => $data['notes'] ?? $step->notes,
-            'completed_at' => $data['status'] === 'completed' ? now() : $step->completed_at,
-            'completed_by' => $data['status'] === 'completed' ? $auth->id : $step->completed_by,
-        ]);
+        DB::transaction(function () use ($auth, $data, $step, $workflow): void {
+            $this->workflowQueryFor($auth, ['clients.update'])
+                ->lockForUpdate()
+                ->findOrFail($workflow);
+
+            $stepModel = ClientOnboardingStep::query()
+                ->where('workflow_id', $workflow)
+                ->lockForUpdate()
+                ->findOrFail($step);
+
+            $isCompleted = $data['status'] === 'completed';
+            $stepModel->update([
+                'status' => $data['status'],
+                'notes' => $data['notes'] ?? $stepModel->notes,
+                'completed_at' => $isCompleted ? now() : null,
+                'completed_by' => $isCompleted ? $auth->id : null,
+            ]);
+        });
 
         return redirect()->back()->with('success', 'Step updated.');
     }
@@ -208,23 +231,10 @@ class ClientOnboardingWorkflowController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->access->canCreateWorkflows($auth), 403);
         $this->authorize('view', $client);
-        abort_if(
-            $auth->organization_id !== null
-                && $client->organization_id !== null
-                && (int) $auth->organization_id !== (int) $client->organization_id,
-            403,
-        );
 
-        // Check if client already has an active workflow
-        $existing = $client->onboardingWorkflows()
-            ->where('status', 'in_progress')
-            ->exists();
-
-        if ($existing) {
+        if (! $this->createWorkflowForClient($client, (int) $auth->id)) {
             return redirect()->back()->with('error', 'Client already has an active onboarding workflow.');
         }
-
-        ClientOnboardingWorkflow::createForClient($client, $auth->id);
 
         return redirect()->back()->with('success', 'Onboarding workflow created successfully.');
     }
@@ -234,23 +244,61 @@ class ClientOnboardingWorkflowController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->access->canManageWorkflows($auth), 403);
 
-        $workflow = ClientOnboardingWorkflow::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($workflow);
+        $completed = DB::transaction(function () use ($auth, $workflow): bool {
+            $workflowModel = $this->workflowQueryFor($auth, ['clients.update'])
+                ->with('client')
+                ->lockForUpdate()
+                ->findOrFail($workflow);
 
-        if ($workflow->steps()->where('is_required', true)->where('status', 'pending')->exists()) {
+            if ($workflowModel->steps()->where('is_required', true)->where('status', 'pending')->exists()) {
+                return false;
+            }
+
+            $workflowModel->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+                'completed_by' => $auth->id,
+            ]);
+            $workflowModel->client->update(['status' => 'active']);
+
+            return true;
+        });
+
+        if (! $completed) {
             return back()->withErrors([
                 'workflow' => 'Complete or explicitly skip every required onboarding step first.',
             ]);
         }
 
-        $workflow->update([
-            'status' => 'completed',
-            'completed_at' => now(),
-        ]);
-
-        $workflow->client->update(['status' => 'active']);
-
         return redirect()->back()->with('success', 'Onboarding workflow completed.');
+    }
+
+    /**
+     * @param  array<int, string>  $bypassPermissions
+     * @return Builder<ClientOnboardingWorkflow>
+     */
+    private function workflowQueryFor(User $user, array $bypassPermissions = []): Builder
+    {
+        return ClientOnboardingWorkflow::query()
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+                $clientQuery,
+                $user,
+                $bypassPermissions,
+            ));
+    }
+
+    private function createWorkflowForClient(Client $client, int $createdBy): ?ClientOnboardingWorkflow
+    {
+        return DB::transaction(function () use ($client, $createdBy): ?ClientOnboardingWorkflow {
+            $lockedClient = Client::query()
+                ->lockForUpdate()
+                ->findOrFail($client->getKey());
+
+            if ($lockedClient->onboardingWorkflows()->where('status', 'in_progress')->exists()) {
+                return null;
+            }
+
+            return ClientOnboardingWorkflow::createForClient($lockedClient, $createdBy);
+        });
     }
 }

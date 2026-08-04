@@ -1,11 +1,14 @@
 <?php
 
 use App\Domain\Hr\Models\HrDevelopmentGoal;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -32,7 +35,24 @@ beforeEach(function () {
         $this->staff->roles()->syncWithoutDetaching([$supportRole->id]);
         $this->other->roles()->syncWithoutDetaching([$supportRole->id]);
     }
+
+    $this->site = Site::factory()->create(['name' => 'Development workflow Site']);
+    developmentWorkflowProfile($this->hr, $this->site);
+    developmentWorkflowProfile($this->staff, $this->site);
+    developmentWorkflowProfile($this->other, $this->site);
 });
+
+function developmentWorkflowProfile(User $user, Site $site): HrEmployeeProfile
+{
+    return HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+}
 
 test('hr can assign development goal and employee can update own progress', function () {
     $this->actingAs($this->hr)
@@ -72,7 +92,6 @@ test('hr can assign development goal and employee can update own progress', func
 
 test('employee cannot update another employees development goal', function () {
     $goal = HrDevelopmentGoal::query()->create([
-        'tenant_id' => null,
         'employee_user_id' => $this->staff->id,
         'manager_user_id' => $this->hr->id,
         'title' => 'Goal owned by another user',
@@ -88,5 +107,5 @@ test('employee cannot update another employees development goal', function () {
             'status' => 'completed',
             'progress_percent' => 100,
         ])
-        ->assertStatus(403);
+        ->assertNotFound();
 });

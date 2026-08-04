@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -41,7 +42,6 @@ import {
     UserPlus,
 } from 'lucide-react';
 import { useMemo, useState, type ComponentType } from 'react';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -85,7 +85,11 @@ export function getClientDisplayName(c: {
     preferred_name?: string | null;
 }): string {
     const full = `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim();
-    if (c.preferred_name && c.preferred_name.trim() && c.preferred_name !== c.first_name) {
+    if (
+        c.preferred_name &&
+        c.preferred_name.trim() &&
+        c.preferred_name !== c.first_name
+    ) {
         return `${c.preferred_name} (${full})`;
     }
     return full;
@@ -97,10 +101,13 @@ export function getClientInitials(c: {
 }): string {
     const f = (c.first_name?.[0] ?? '').toUpperCase();
     const l = (c.last_name?.[0] ?? '').toUpperCase();
-    return (f + l) || '?';
+    return f + l || '?';
 }
 
-const STATUS_STYLES: Record<string, { label: string; cls: string; ring: string }> = {
+const STATUS_STYLES: Record<
+    string,
+    { label: string; cls: string; ring: string }
+> = {
     active: {
         label: 'Active',
         cls: 'border-status-success/30 bg-status-success-bg text-status-success',
@@ -171,7 +178,8 @@ function QuickAddFields({
             <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                     <Label htmlFor="qc-first">
-                        First name <span className="text-status-critical">*</span>
+                        First name{' '}
+                        <span className="text-status-critical">*</span>
                     </Label>
                     <Input
                         id="qc-first"
@@ -185,7 +193,8 @@ function QuickAddFields({
                 </div>
                 <div>
                     <Label htmlFor="qc-last">
-                        Last name <span className="text-status-critical">*</span>
+                        Last name{' '}
+                        <span className="text-status-critical">*</span>
                     </Label>
                     <Input
                         id="qc-last"
@@ -266,9 +275,7 @@ function QuickAddFields({
                     <Input
                         id="qc-gender"
                         value={form.data.gender}
-                        onChange={(e) =>
-                            form.setData('gender', e.target.value)
-                        }
+                        onChange={(e) => form.setData('gender', e.target.value)}
                         placeholder="e.g. Male, Female, Non-binary"
                     />
                     <FieldError message={form.errors.gender} />
@@ -294,9 +301,7 @@ function QuickAddFields({
                     <Input
                         id="qc-phone"
                         value={form.data.phone}
-                        onChange={(e) =>
-                            form.setData('phone', e.target.value)
-                        }
+                        onChange={(e) => form.setData('phone', e.target.value)}
                         placeholder="+64 21 …"
                     />
                     <FieldError message={form.errors.phone} />
@@ -307,9 +312,7 @@ function QuickAddFields({
                         id="qc-email"
                         type="email"
                         value={form.data.email}
-                        onChange={(e) =>
-                            form.setData('email', e.target.value)
-                        }
+                        onChange={(e) => form.setData('email', e.target.value)}
                     />
                     <FieldError message={form.errors.email} />
                 </div>
@@ -327,11 +330,15 @@ function QuickAddFields({
 export function AddClientDialog({
     siteId,
     availableClients,
+    canLinkExisting,
+    canCreateClient,
     isOpen,
     onClose,
 }: {
     siteId: number;
     availableClients: AvailableClient[];
+    canLinkExisting: boolean;
+    canCreateClient: boolean;
     isOpen: boolean;
     onClose: () => void;
 }) {
@@ -342,6 +349,8 @@ export function AddClientDialog({
                     <AddClientBody
                         siteId={siteId}
                         availableClients={availableClients}
+                        canLinkExisting={canLinkExisting}
+                        canCreateClient={canCreateClient}
                         onClose={onClose}
                     />
                 )}
@@ -353,15 +362,22 @@ export function AddClientDialog({
 function AddClientBody({
     siteId,
     availableClients,
+    canLinkExisting,
+    canCreateClient,
     onClose,
 }: {
     siteId: number;
     availableClients: AvailableClient[];
+    canLinkExisting: boolean;
+    canCreateClient: boolean;
     onClose: () => void;
 }) {
     const [tab, setTab] = useState<'link' | 'create'>(
-        availableClients.length > 0 ? 'link' : 'create',
+        canLinkExisting && (!canCreateClient || availableClients.length > 0)
+            ? 'link'
+            : 'create',
     );
+    const hasBothModes = canLinkExisting && canCreateClient;
 
     return (
         <>
@@ -371,8 +387,11 @@ function AddClientBody({
                     Add a client to this site
                 </DialogTitle>
                 <DialogDescription>
-                    Link an existing client, or quick-create a new one. Full
-                    profile details can be added later.
+                    {hasBothModes
+                        ? 'Link an unassigned client or create a new Client Profile.'
+                        : canLinkExisting
+                          ? 'Link an unassigned client to this Site.'
+                          : 'Create a new Client Profile for this Site.'}
                 </DialogDescription>
             </DialogHeader>
 
@@ -381,29 +400,39 @@ function AddClientBody({
                 onValueChange={(v) => setTab(v as 'link' | 'create')}
                 className="mt-3"
             >
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="link">
-                        <Link2 className="mr-1.5 h-3.5 w-3.5" />
-                        Link existing
-                    </TabsTrigger>
-                    <TabsTrigger value="create">
-                        <UserPlus className="mr-1.5 h-3.5 w-3.5" />
-                        Create new
-                    </TabsTrigger>
-                </TabsList>
+                {hasBothModes && (
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="link">
+                            <Link2 className="mr-1.5 h-3.5 w-3.5" />
+                            Link existing
+                        </TabsTrigger>
+                        <TabsTrigger value="create">
+                            <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+                            Create new
+                        </TabsTrigger>
+                    </TabsList>
+                )}
 
-                <TabsContent value="link" className="mt-4">
-                    <LinkExistingForm
-                        siteId={siteId}
-                        availableClients={availableClients}
-                        onClose={onClose}
-                        onSwitchToCreate={() => setTab('create')}
-                    />
-                </TabsContent>
+                {canLinkExisting && (
+                    <TabsContent value="link" className="mt-4">
+                        <LinkExistingForm
+                            siteId={siteId}
+                            availableClients={availableClients}
+                            onClose={onClose}
+                            onSwitchToCreate={
+                                canCreateClient
+                                    ? () => setTab('create')
+                                    : undefined
+                            }
+                        />
+                    </TabsContent>
+                )}
 
-                <TabsContent value="create" className="mt-4">
-                    <QuickCreateForm siteId={siteId} onClose={onClose} />
-                </TabsContent>
+                {canCreateClient && (
+                    <TabsContent value="create" className="mt-4">
+                        <QuickCreateForm siteId={siteId} onClose={onClose} />
+                    </TabsContent>
+                )}
             </Tabs>
         </>
     );
@@ -418,7 +447,7 @@ function LinkExistingForm({
     siteId: number;
     availableClients: AvailableClient[];
     onClose: () => void;
-    onSwitchToCreate: () => void;
+    onSwitchToCreate?: () => void;
 }) {
     const [query, setQuery] = useState('');
     const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -428,7 +457,8 @@ function LinkExistingForm({
         const q = query.trim().toLowerCase();
         if (!q) return availableClients;
         return availableClients.filter((c) => {
-            const hay = `${c.first_name} ${c.last_name} ${c.preferred_name ?? ''}`.toLowerCase();
+            const hay =
+                `${c.first_name} ${c.last_name} ${c.preferred_name ?? ''}`.toLowerCase();
             return hay.includes(q);
         });
     }, [availableClients, query]);
@@ -440,22 +470,23 @@ function LinkExistingForm({
                     <User className="h-6 w-6 text-muted-foreground" />
                 </div>
                 <p className="mt-3 text-sm font-medium">
-                    No unassigned clients in your organisation
+                    No unassigned clients available
                 </p>
                 <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-                    Every client is already linked to a site. To move a client
-                    to this site, open their profile and update their site, or
-                    create a brand-new client.
+                    Every visible client is already linked to a Site. Move a
+                    client from Client Profile if needed.
                 </p>
-                <Button
-                    type="button"
-                    size="sm"
-                    className="mt-4"
-                    onClick={onSwitchToCreate}
-                >
-                    <UserPlus className="mr-1 h-4 w-4" />
-                    Create a new client
-                </Button>
+                {onSwitchToCreate && (
+                    <Button
+                        type="button"
+                        size="sm"
+                        className="mt-4"
+                        onClick={onSwitchToCreate}
+                    >
+                        <UserPlus className="mr-1 h-4 w-4" />
+                        Create a new client
+                    </Button>
+                )}
             </div>
         );
     }
@@ -487,7 +518,10 @@ function LinkExistingForm({
                 />
             </div>
 
-            <GuardrailCard unstyled className="max-h-72 overflow-y-auto rounded-xl border bg-card/40">
+            <GuardrailCard
+                unstyled
+                className="max-h-72 overflow-y-auto rounded-xl border bg-card/40"
+            >
                 {filtered.length === 0 ? (
                     <p className="px-4 py-6 text-center text-xs text-muted-foreground">
                         No clients match "{query}".
@@ -499,7 +533,8 @@ function LinkExistingForm({
                             const status = getClientStatusStyle(c.status);
                             return (
                                 <li key={c.id}>
-                                    <Button unstyled
+                                    <Button
+                                        unstyled
                                         type="button"
                                         onClick={() => setSelectedId(c.id)}
                                         className={cn(
@@ -676,10 +711,7 @@ export function ShowClientDialog({
                                 {client.risk_level && (
                                     <Badge
                                         variant="outline"
-                                        className={cn(
-                                            'text-[10px]',
-                                            risk.cls,
-                                        )}
+                                        className={cn('text-[10px]', risk.cls)}
                                     >
                                         <Shield className="mr-1 h-3 w-3" />
                                         {risk.label}
@@ -710,7 +742,7 @@ export function ShowClientDialog({
                                           ? ` · ${client.date_of_birth}`
                                           : ''
                                   }`
-                                : client.date_of_birth ?? null
+                                : (client.date_of_birth ?? null)
                         }
                     />
                     <RoomRow
@@ -777,7 +809,10 @@ function DetailRow({
     value?: string | null;
 }) {
     return (
-        <GuardrailCard unstyled className="flex items-center gap-3 rounded-lg border bg-background/40 px-3 py-2">
+        <GuardrailCard
+            unstyled
+            className="flex items-center gap-3 rounded-lg border bg-background/40 px-3 py-2"
+        >
             <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
                 <p className="text-xs text-muted-foreground">{label}</p>
@@ -801,7 +836,10 @@ function RoomRow({
     onAssign?: () => void;
 }) {
     return (
-        <GuardrailCard unstyled className="flex items-center gap-3 rounded-lg border bg-background/40 px-3 py-2">
+        <GuardrailCard
+            unstyled
+            className="flex items-center gap-3 rounded-lg border bg-background/40 px-3 py-2"
+        >
             <DoorOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
                 <p className="text-xs text-muted-foreground">Room</p>
@@ -893,4 +931,3 @@ export function UnlinkClientDialog({
         </Dialog>
     );
 }
-

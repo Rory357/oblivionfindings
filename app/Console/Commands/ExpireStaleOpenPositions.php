@@ -4,7 +4,9 @@ namespace App\Console\Commands;
 
 use App\Models\ShiftOpenPosition;
 use App\Models\TimelineEvent;
+use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Console\Command;
 
 class ExpireStaleOpenPositions extends Command
@@ -28,6 +30,7 @@ class ExpireStaleOpenPositions extends Command
         $expired = 0;
 
         ShiftOpenPosition::query()
+            ->tap(fn ($query) => app(UserSiteAccessService::class)->applyShiftOpenPositionIntegrityScope($query))
             ->with(['shift.client:id,first_name,last_name,site_id'])
             ->where('status', 'open')
             ->whereNotNull('expires_at')
@@ -36,6 +39,7 @@ class ExpireStaleOpenPositions extends Command
             ->chunkById(100, function ($positions) use (&$expired) {
                 foreach ($positions as $position) {
                     $updated = ShiftOpenPosition::query()
+                        ->tap(fn ($query) => app(UserSiteAccessService::class)->applyShiftOpenPositionIntegrityScope($query))
                         ->whereKey($position->id)
                         ->where('status', 'open')
                         ->update(['status' => 'cancelled']);
@@ -63,6 +67,7 @@ class ExpireStaleOpenPositions extends Command
         $threshold = now()->subHours(48);
 
         ShiftOpenPosition::query()
+            ->tap(fn ($query) => app(UserSiteAccessService::class)->applyShiftOpenPositionIntegrityScope($query))
             ->with([
                 'shift.client:id,first_name,last_name,site_id',
                 'claimer:id,name',
@@ -85,9 +90,10 @@ class ExpireStaleOpenPositions extends Command
                             ? $position->claimer->name.' claimed a replacement shift more than 48 hours ago.'
                             : 'A replacement shift claim has been waiting for approval for more than 48 hours.',
                         'url' => url('/operations/job-board?status=claimed'),
-                        'include_managers' => true,
+                        'include_managers' => false,
                         'include_assigned_workers' => false,
                         'include_entity_user' => false,
+                        'target_user_ids' => $this->managerRecipientIds($position),
                     ]);
 
                     $this->recordTimeline(
@@ -112,6 +118,24 @@ class ExpireStaleOpenPositions extends Command
             ->where('type', 'shift_replacement_claim_pending_nudged')
             ->where('occurred_at', '>=', now()->subDay())
             ->exists();
+    }
+
+    /** @return array<int, int> */
+    private function managerRecipientIds(ShiftOpenPosition $position): array
+    {
+        $siteAccess = app(UserSiteAccessService::class);
+        $siteId = $position->shift ? $siteAccess->shiftSiteId($position->shift) : null;
+        if (! $siteId) {
+            return [];
+        }
+
+        $managers = User::query()
+            ->whereHas('roles', fn ($query) => $query->whereIn('name', NotificationService::MANAGER_ROLES));
+
+        return $siteAccess->applyFleetRecipientEligibility($managers, $siteId)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 
     private function recordTimeline(ShiftOpenPosition $position, string $type, string $subject, string $body): void

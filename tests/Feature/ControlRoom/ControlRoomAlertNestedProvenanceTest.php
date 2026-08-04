@@ -366,17 +366,16 @@ class ControlRoomAlertNestedProvenanceTest extends TestCase
         ], $actor);
     }
 
-    public function test_tenant_admin_cannot_create_an_unattributed_site_less_alert(): void
+    public function test_application_admin_cannot_create_an_unattributed_site_less_alert(): void
     {
-        Site::factory()->create(['tenant_id' => 1]);
-        $tenantAdmin = User::factory()->create([
-            'organization_id' => 1,
+        Site::factory()->create();
+        $applicationAdmin = User::factory()->create([
             'role' => 'admin',
             'approved_at' => now(),
         ]);
-        $tenantAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+        $applicationAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
 
-        $this->actingAs($tenantAdmin)
+        $this->actingAs($applicationAdmin)
             ->postJson('/control-room/alerts', [
                 'source' => 'manual',
                 'alert_type' => 'Unattributed welfare concern',
@@ -389,26 +388,27 @@ class ControlRoomAlertNestedProvenanceTest extends TestCase
         ]);
     }
 
-    public function test_explicit_platform_admin_can_create_an_installation_level_alert(): void
+    public function test_application_admin_can_create_a_site_attributed_installation_alert(): void
     {
-        $platformAdmin = User::factory()->create([
-            'organization_id' => null,
+        $site = Site::factory()->create();
+        $applicationAdmin = User::factory()->create([
             'role' => 'admin',
             'approved_at' => now(),
         ]);
-        $platformAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+        $applicationAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
 
-        $this->actingAs($platformAdmin)
+        $this->actingAs($applicationAdmin)
             ->postJson('/control-room/alerts', [
                 'source' => 'manual',
                 'alert_type' => 'Installation service interruption',
                 'severity' => 'high',
+                'site_id' => $site->id,
             ])
             ->assertCreated();
 
         $this->assertDatabaseHas('control_room_alerts', [
             'alert_type' => 'Installation service interruption',
-            'site_id' => null,
+            'site_id' => $site->id,
             'client_id' => null,
         ]);
     }

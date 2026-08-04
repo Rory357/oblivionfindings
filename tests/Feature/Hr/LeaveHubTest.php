@@ -16,6 +16,7 @@ beforeEach(function () {
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
     ]);
+    $this->site = ensureCanonicalHrStaffProfile($this->hr);
 });
 
 test('a plain approver sees sensitive leave reasons redacted in the requests list', function () {
@@ -24,13 +25,13 @@ test('a plain approver sees sensitive leave reasons redacted in the requests lis
     $coordinator->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'coordinator')->first()->id,
     ]);
-    $coordinator->setAttribute('tenant_id', 1);
+    ensureCanonicalHrStaffProfile($coordinator, $this->site);
 
     $staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
-    $staff->setAttribute('tenant_id', 1);
+    ensureCanonicalHrStaffProfile($staff, $this->site);
 
     $sick = HrLeaveRequest::query()->create([
-        'tenant_id' => 1, 'user_id' => $staff->id, 'leave_type' => 'sick', 'period' => 'full_day',
+        'user_id' => $staff->id, 'leave_type' => 'sick', 'period' => 'full_day',
         'starts_at' => now()->addWeek(), 'ends_at' => now()->addWeek(),
         'hours_requested' => 8, 'status' => 'pending', 'submitted_at' => now(), 'escalation_level' => 1,
         'reason' => 'Specialist appointment', 'supporting_doc_path' => 'leave/x/note.pdf',
@@ -60,7 +61,7 @@ test('the approver leave-request email redacts a sensitive reason for non-HR app
 
     $staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $leave = HrLeaveRequest::query()->create([
-        'tenant_id' => 1, 'user_id' => $staff->id, 'leave_type' => 'sick', 'period' => 'full_day',
+        'user_id' => $staff->id, 'leave_type' => 'sick', 'period' => 'full_day',
         'starts_at' => now()->addWeek(), 'ends_at' => now()->addWeek(), 'hours_requested' => 8,
         'status' => 'pending', 'submitted_at' => now(), 'escalation_level' => 1,
         'reason' => 'Counselling session',
@@ -114,7 +115,6 @@ test('a leave request can be submitted via the store endpoint', function () {
 
 test('the balances view pivots per staff member with remaining = balance − used − pending', function () {
     HrLeaveBalance::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->hr->id,
         'leave_type' => 'annual',
         'year' => now()->year,

@@ -2,22 +2,21 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
-// AssetTracker import removed — retired. Using canonical Device model.
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetFuelLog;
+use App\Models\FleetOuting;
 use App\Models\FleetResidentTransport;
 use App\Models\FleetServiceSchedule;
 use App\Models\FleetSignal;
 use App\Models\FleetTrip;
-use App\Models\FleetOuting;
 use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Models\FleetWorkOrder;
-use App\Domain\SecurityDevices\Models\Device;
-use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Site;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -29,7 +28,10 @@ class DashboardController extends Controller
 {
     private const SITE_BYPASS_PERMISSIONS = ['fleet.manage'];
 
-    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly SecurityDevicesAccessService $deviceAccess,
+    ) {}
 
     public function __invoke(Request $request)
     {
@@ -38,20 +40,8 @@ class DashboardController extends Controller
         // Resolve the user's site once — powers the "Vehicles at Your Site" widget
         // and the hero's ?scope=mine cluster lens.
         $user = $request->user();
-        $organizationId = $this->organizationId($user);
-        $tenantSiteIds = $organizationId === null
-            ? []
-            : Site::query()
-                ->where('tenant_id', $organizationId)
-                ->pluck('id')
-                ->map(fn ($siteId) => (int) $siteId)
-                ->all();
-        $profileSiteIds = array_values(array_intersect(
-            $this->siteAccess->accessibleSiteIds($user),
-            $tenantSiteIds,
-        ));
-        $hasTenantFleetAccess = $this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS);
-        $accessibleSiteIds = $hasTenantFleetAccess ? $tenantSiteIds : $profileSiteIds;
+        $profileSiteIds = $this->siteAccess->accessibleSiteIds($user);
+        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);
         $applyAssetSiteScope = function ($query) use ($accessibleSiteIds, $hasFleetFields) {
             if ($accessibleSiteIds === []) {
                 return $query->whereRaw('1 = 0');
@@ -71,10 +61,9 @@ class DashboardController extends Controller
             ->pluck('id')
             ->map(fn ($assetId) => (int) $assetId)
             ->all();
-        $accessibleClientIds = $organizationId === null || $accessibleSiteIds === []
+        $accessibleClientIds = $accessibleSiteIds === []
             ? []
             : Client::query()
-                ->where('organization_id', $organizationId)
                 ->whereIn('site_id', $accessibleSiteIds)
                 ->pluck('id')
                 ->map(fn ($clientId) => (int) $clientId)
@@ -113,14 +102,11 @@ class DashboardController extends Controller
         $scope = $request->query('scope') === 'mine' && $hasSite ? 'mine' : 'all';
         $scoped = $scope === 'mine';
 
-        // Vehicles with state.
-        // Note: 'trackers' eager-load is legacy (AssetTracker). Dashboard only uses
-        // tracker count for stats — actual device data comes from canonical Device model.
+        // Vehicles with state. Device details are projected only by the
+        // canonical Security & Devices presenter on the vehicle profile.
         $eagerLoads = ['fleetState'];
         if ($hasFleetFields) {
-            $eagerLoads['homeSite'] = fn ($query) => $organizationId === null
-                ? $query->whereRaw('1 = 0')
-                : $query->where('tenant_id', $organizationId);
+            $eagerLoads[] = 'homeSite';
         }
 
         $vehiclesQuery = $applyAssetSiteScope(Asset::vehicles()->with($eagerLoads));
@@ -142,17 +128,6 @@ class DashboardController extends Controller
             ->whereIn($column, $vehicleIds);
         $applyClusterScope = fn ($query, string $column = 'asset_id') => $query
             ->whereIn($column, $clusterVehicleIds);
-        $applyOutingTenantScope = function ($query) use ($organizationId) {
-            if ($organizationId === null) {
-                return $query->whereRaw('1 = 0');
-            }
-
-            return $query->where(function ($tenant) use ($organizationId) {
-                $tenant->where('tenant_id', $organizationId)
-                    ->orWhereNull('tenant_id');
-            });
-        };
-
         $totalVehicles = $vehicles->count();
         $onlineVehicles = $clusterVehicles->filter(fn ($v) => $v->fleetState?->status === 'online')->count();
         $offlineVehicles = $clusterVehicles->count() - $onlineVehicles;
@@ -245,8 +220,7 @@ class DashboardController extends Controller
         $criticalAlerts = $criticalAlertsQuery->count();
 
         // Booking status counts — cluster tiles honour the lens. The attention
-        // strip covers every site the current user may access, never the whole
-        // current organisation when fleet.manage explicitly grants that bypass.
+        // strip covers every Site the current user may access.
         $hasBookingsTable = Schema::hasTable('fleet_vehicle_bookings');
         $recentBookingsCount = $hasBookingsTable
             ? $applyClusterScope(FleetVehicleBooking::query()->whereIn('status', ['pending', 'approved']))
@@ -276,7 +250,7 @@ class DashboardController extends Controller
         // Today's outings
         $hasOutingsTable = Schema::hasTable('fleet_outings');
         $todayOutings = $hasOutingsTable
-            ? $applyClusterScope($applyOutingTenantScope(FleetOuting::query()))
+            ? $applyClusterScope(FleetOuting::query())
                 ->whereIn('status', ['planned', 'active'])
                 ->where(function ($q) {
                     $q->whereDate('planned_departure', today())
@@ -284,9 +258,14 @@ class DashboardController extends Controller
                 })
                 ->with([
                     'asset:id,name',
-                    'driver' => fn ($query) => $organizationId === null
-                        ? $query->whereRaw('1 = 0')
-                        : $query->where('organization_id', $organizationId)->select(['id', 'name']),
+                    'driver' => function ($relation) use ($user): void {
+                        $this->siteAccess->applyHistoricalStaffSiteScope(
+                            $relation->getQuery(),
+                            $user,
+                            self::SITE_BYPASS_PERMISSIONS,
+                        );
+                        $relation->select(['id', 'name']);
+                    },
                 ])
                 ->withCount(['residents as accessible_resident_count' => fn ($query) => $query
                     ->whereIn('client_id', $accessibleClientIds)])
@@ -353,7 +332,6 @@ class DashboardController extends Controller
                         'id' => $s->asset->id,
                         'name' => $s->asset->name,
                     ] : null,
-                    'payload' => $s->payload,
                 ])
                 ->values()
             : collect();
@@ -427,9 +405,14 @@ class DashboardController extends Controller
                 ->afterHours()
                 ->with([
                     'asset:id,name',
-                    'driverSession.user' => fn ($query) => $organizationId === null
-                        ? $query->whereRaw('1 = 0')
-                        : $query->where('organization_id', $organizationId)->select(['id', 'name']),
+                    'driverSession.user' => function ($relation) use ($user): void {
+                        $this->siteAccess->applyHistoricalStaffSiteScope(
+                            $relation->getQuery(),
+                            $user,
+                            self::SITE_BYPASS_PERMISSIONS,
+                        );
+                        $relation->select(['id', 'name']);
+                    },
                 ])
                 ->latest('started_at')
                 ->limit(10)->get()
@@ -458,90 +441,42 @@ class DashboardController extends Controller
                 'longitude' => $h->longitude,
             ])->values();
 
-        // Device health — canonical tracking devices. A site-scoped user only
-        // sees devices with current provenance through an accessible asset,
-        // client, site, or vehicle assignment. Unattributed devices fail closed.
-        $scopeTrackingDevices = function ($query) use (
-            $organizationId,
-            $hasTenantFleetAccess,
-            $accessibleSiteIds,
-            $accessibleAssetIds,
-            $accessibleClientIds,
-        ) {
-            if ($organizationId === null) {
-                return $query->whereRaw('1 = 0');
-            }
-
-            $query->where('tenant_id', $organizationId);
-
-            if ($hasTenantFleetAccess) {
-                return $query;
-            }
-
-            if ($accessibleSiteIds === []) {
-                return $query->whereRaw('1 = 0');
-            }
-
-            return $query->where(function ($deviceQuery) use (
-                $accessibleSiteIds,
-                $accessibleAssetIds,
-                $accessibleClientIds,
-            ) {
-                $deviceQuery->whereHas('activeAssetLinks', fn ($links) => $links
-                    ->whereIn('asset_id', $accessibleAssetIds ?? []))
-                    ->orWhereHas('assignments', function ($assignments) use (
-                        $accessibleSiteIds,
-                        $accessibleAssetIds,
-                        $accessibleClientIds,
-                    ) {
-                        $assignments->active()
-                            ->where(function ($targets) use (
-                                $accessibleSiteIds,
-                                $accessibleAssetIds,
-                                $accessibleClientIds,
-                            ) {
-                                $targets->where(function ($sites) use ($accessibleSiteIds) {
-                                    $sites->where('assignable_type', DeviceAssignment::TARGET_SITE)
-                                        ->whereIn('assignable_id', $accessibleSiteIds);
-                                })->orWhere(function ($clients) use ($accessibleClientIds) {
-                                    $clients->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
-                                        ->whereIn('assignable_id', $accessibleClientIds ?? []);
-                                })->orWhere(function ($vehicles) use ($accessibleAssetIds) {
-                                    $vehicles->where('assignable_type', DeviceAssignment::TARGET_VEHICLE)
-                                        ->whereIn('assignable_id', $accessibleAssetIds ?? []);
-                                });
-                            });
-                    });
-            });
-        };
-
-        $totalDevices = $scopeTrackingDevices(Device::where('domain', 'tracking'))
-            ->whereIn('status', ['active', 'degraded'])
-            ->count();
-        $onlineDevices = $scopeTrackingDevices(Device::where('domain', 'tracking'))
-            ->where('status', 'active')
-            ->where('last_seen_at', '>', now()->subHours(2))
-            ->count();
+        // Device health is a permission-aware projection from Security &
+        // Devices. A Fleet permission never grants implicit device visibility.
+        $canViewTechnology = $user->canDo('securityDevices.devices.view');
+        $visibleTrackingDevices = $canViewTechnology
+            ? $this->deviceAccess->visibleDevices($user)->where('domain', 'tracking')
+            : null;
+        $totalDevices = $visibleTrackingDevices
+            ? (clone $visibleTrackingDevices)->whereIn('status', ['active', 'degraded'])->count()
+            : null;
+        $onlineDevices = $visibleTrackingDevices
+            ? (clone $visibleTrackingDevices)
+                ->where('status', 'active')
+                ->where('last_seen_at', '>', now()->subHours(2))
+                ->count()
+            : null;
 
         // Resident movement cluster — all three tiles honour the lens. Site
         // attribution for residents goes through the client's site.
         $siteClientIds = $scoped
             ? Client::query()
-                ->where('organization_id', $organizationId)
                 ->where('site_id', $userSiteId)
                 ->pluck('id')
                 ->all()
             : $accessibleClientIds;
 
-        // Tracked residents — canonical device assignments (client-assigned tracking devices).
-        $trackedResidentsQuery = DeviceAssignment::query()
-            ->active()
-            ->where('assignable_type', 'client')
-            ->whereHas('device', fn ($q) => $q
-                ->where('tenant_id', $organizationId)
-                ->where('domain', 'tracking'));
-        $trackedResidentsQuery->whereIn('assignable_id', $siteClientIds);
-        $trackedResidents = $trackedResidentsQuery->count();
+        // Count each resident once and intersect with the same governed device
+        // projection used by the health summary.
+        $trackedResidents = $visibleTrackingDevices
+            ? DeviceAssignment::query()
+                ->active()
+                ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+                ->whereIn('assignable_id', $siteClientIds)
+                ->whereIn('device_id', (clone $visibleTrackingDevices)->select('devices.id'))
+                ->distinct('assignable_id')
+                ->count('assignable_id')
+            : null;
 
         // Open wandering alerts — same base filter as the resident-tracking
         // wandering tab (tracker-sourced, client-linked Control Room alerts).
@@ -561,7 +496,7 @@ class DashboardController extends Controller
 
         // Active outings (cluster tile — honours the lens)
         $activeOutings = $hasOutingsTable
-            ? $applyClusterScope($applyOutingTenantScope(FleetOuting::query())
+            ? $applyClusterScope(FleetOuting::query()
                 ->where(function ($q) {
                     $q->where('status', 'active')
                       ->orWhere(function ($q2) {
@@ -575,14 +510,14 @@ class DashboardController extends Controller
         // Outings past their planned return — accessible sites for the
         // attention strip, with a further cluster-lens variant for the tile.
         $outingsPastReturn = $hasOutingsTable
-            ? $applyAccessibleVehicleScope($applyOutingTenantScope(FleetOuting::query()))
+            ? $applyAccessibleVehicleScope(FleetOuting::query())
                 ->where('status', 'active')
                 ->where('planned_return', '<', now())
                 ->count()
             : 0;
         $outingsPastReturnScoped = $hasOutingsTable
             ? $applyClusterScope(
-                $applyOutingTenantScope(FleetOuting::query())
+                FleetOuting::query()
                     ->where('status', 'active')
                     ->where('planned_return', '<', now())
             )->count()
@@ -625,21 +560,6 @@ class DashboardController extends Controller
                     'heading_deg' => $v->fleetState->heading_deg,
                     'battery_pct' => $v->fleetState->battery_pct,
                 ] : null,
-                'trackers' => \App\Domain\SecurityDevices\Models\DeviceAssetLink::query()
-                    ->active()
-                    ->forAsset($v->id)
-                    ->with(['device' => fn ($query) => $organizationId === null
-                        ? $query->whereRaw('1 = 0')
-                        : $query->where('tenant_id', $organizationId)
-                            ->select(['id', 'device_uid', 'name', 'provider', 'status'])])
-                    ->get()
-                    ->map(fn ($link) => [
-                        'id' => $link->device?->id,
-                        'vendor' => $link->device?->provider,
-                        'device_uid' => $link->device?->device_uid,
-                    ])
-                    ->filter(fn ($t) => $t['id'] !== null)
-                    ->values(),
             ])->values(),
             'stats' => [
                 'total_vehicles' => $totalVehicles,
@@ -674,6 +594,9 @@ class DashboardController extends Controller
                 'tracked_residents' => $trackedResidents,
                 'active_outings' => $activeOutings,
             ],
+            'can' => [
+                'view_technology' => $canViewTechnology,
+            ],
             'scope' => $scope,
             'has_site' => $hasSite,
             'vehicle_status_breakdown' => $vehicleStatusBreakdown,
@@ -691,14 +614,5 @@ class DashboardController extends Controller
             'my_site_vehicles' => $mySiteVehicles,
             'today_outings' => $todayOutings,
         ]);
-    }
-
-    private function organizationId(?\App\Models\User $user): ?int
-    {
-        $organizationId = $user?->organization_id;
-
-        return is_numeric($organizationId) && (int) $organizationId > 0
-            ? (int) $organizationId
-            : null;
     }
 }

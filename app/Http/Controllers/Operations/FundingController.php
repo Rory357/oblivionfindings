@@ -5,21 +5,28 @@ namespace App\Http\Controllers\Operations;
 use App\Http\Controllers\Controller;
 use App\Models\FundingClaim;
 use App\Models\ServiceAgreement;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class FundingController extends Controller
 {
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     public function index(Request $request)
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('funding.viewAny'), 403);
 
-        $orgId = $auth->organization_id;
+        $agreementQuery = $this->accessibleAgreements($auth);
+        $claimQuery = $this->accessibleClaims($auth);
 
         // Budget stats across active service agreements
-        $budgetStats = ServiceAgreement::query()
-            ->where('organization_id', $orgId)
+        $budgetStats = (clone $agreementQuery)
             ->active()
             ->selectRaw('
                 COALESCE(SUM(total_budget), 0) as total_budget,
@@ -33,16 +40,14 @@ class FundingController extends Controller
             : 0;
 
         // Claims grouped by status
-        $claimsByStatus = FundingClaim::query()
-            ->where('organization_id', $orgId)
+        $claimsByStatus = (clone $claimQuery)
             ->select('status', DB::raw('COUNT(*) as count'), DB::raw('COALESCE(SUM(total_amount), 0) as total_amount'))
             ->groupBy('status')
             ->get()
             ->keyBy('status');
 
         // Top 10 agreements by utilisation
-        $topAgreements = ServiceAgreement::query()
-            ->where('organization_id', $orgId)
+        $topAgreements = (clone $agreementQuery)
             ->active()
             ->where('total_budget', '>', 0)
             ->with(['client:id,first_name,last_name'])
@@ -58,19 +63,41 @@ class FundingController extends Controller
                 'total_used' => (float) $budgetStats->total_used,
                 'total_remaining' => (float) $budgetStats->total_remaining,
                 'utilisation_percent' => $utilisationPercent,
-                'active_agreements' => ServiceAgreement::where('status', 'active')->count(),
-                'pending_claims' => FundingClaim::where('status', 'submitted')->count(),
-                'expiring_soon' => ServiceAgreement::active()->expiringSoon()->count(),
+                'active_agreements' => (clone $agreementQuery)->where('status', 'active')->count(),
+                'pending_claims' => (clone $claimQuery)->where('status', 'submitted')->count(),
+                'expiring_soon' => (clone $agreementQuery)->active()->expiringSoon()->count(),
             ],
             'claims_by_status' => $claimsByStatus,
             'top_agreements' => $topAgreements->map(fn ($a) => [
                 'id' => $a->id,
                 'title' => $a->title,
-                'client_name' => $a->client ? $a->client->first_name . ' ' . $a->client->last_name : '',
+                'client_name' => $a->client ? $a->client->first_name.' '.$a->client->last_name : '',
                 'total_budget' => $a->total_budget,
                 'budget_used' => $a->budget_used,
                 'utilisation_percent' => $a->budget_utilisation_percent,
             ]),
         ]);
+    }
+
+    private function accessibleAgreements(User $user): Builder
+    {
+        return ServiceAgreement::query()
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+                $clientQuery,
+                $user,
+                ['reports.viewAny'],
+            ));
+    }
+
+    private function accessibleClaims(User $user): Builder
+    {
+        return FundingClaim::query()
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+                $clientQuery,
+                $user,
+                ['reports.viewAny'],
+            ))
+            ->whereHas('serviceAgreement', fn (Builder $agreementQuery) => $agreementQuery
+                ->whereColumn('service_agreements.client_id', 'funding_claims.client_id'));
     }
 }

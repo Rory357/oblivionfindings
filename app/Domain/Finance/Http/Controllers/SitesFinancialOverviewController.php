@@ -38,16 +38,16 @@ class SitesFinancialOverviewController extends Controller
         }
 
         $user = $request->user();
-        $tenantId = $user?->organization_id;
-        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds($user);
-
-        $sites = Site::query()
-            ->active()
-            ->forTenant($tenantId)
-            ->whereIn('type', ['house', 'residential', 'facility'])
-            ->when($accessibleSiteIds !== [], fn ($query) => $query->whereIn('id', $accessibleSiteIds))
+        $sites = $this->siteAccess->applySiteScope(
+            Site::query()
+                ->active()
+                ->notArchived()
+                ->whereIn('type', ['house', 'residential', 'facility']),
+            $user,
+            ['reports.viewAny'],
+        )
             ->orderBy('name')
-            ->get(['id', 'name', 'type', 'region', 'tenant_id']);
+            ->get(['id', 'name', 'type', 'region']);
 
         $siteIds = $sites->pluck('id')->all();
         $comparison = $siteIds === []

@@ -36,7 +36,7 @@ class HsGovernanceReportController extends Controller
         $to = $request->input('to') ? Carbon::parse($request->input('to')) : null;
 
         return response()->json(
-            $this->governanceService->getBoardSummary($from, $to)
+            $this->governanceService->getBoardSummary($from, $to, $request->user())
         );
     }
 
@@ -86,10 +86,10 @@ class HsGovernanceReportController extends Controller
     /**
      * Risk assessment register.
      */
-    public function riskAssessmentRegister(): JsonResponse
+    public function riskAssessmentRegister(Request $request): JsonResponse
     {
         return response()->json(
-            $this->complianceService->riskAssessmentRegister()
+            $this->complianceService->riskAssessmentRegister($request->user())
         );
     }
 }

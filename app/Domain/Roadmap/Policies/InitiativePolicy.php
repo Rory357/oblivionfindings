@@ -14,7 +14,7 @@ class InitiativePolicy
 
     public function view(User $user, Initiative $initiative): bool
     {
-        return $user->canDo('roadmap.view') && $this->sameTenant($user, $initiative->tenant_id);
+        return $user->canDo('roadmap.view');
     }
 
     public function create(User $user): bool
@@ -24,30 +24,21 @@ class InitiativePolicy
 
     public function update(User $user, Initiative $initiative): bool
     {
-        return $user->canDo('roadmap.manage') && $this->sameTenant($user, $initiative->tenant_id);
+        return $user->canDo('roadmap.manage');
     }
 
     public function delete(User $user, Initiative $initiative): bool
     {
-        return $user->canDo('roadmap.manage') && $this->sameTenant($user, $initiative->tenant_id);
+        return $user->canDo('roadmap.manage');
     }
 
     public function approve(User $user, Initiative $initiative): bool
     {
-        return $user->canDo('roadmap.approve') && $this->sameTenant($user, $initiative->tenant_id);
+        return $user->canDo('roadmap.approve');
     }
 
     public function score(User $user, Initiative $initiative): bool
     {
-        return $user->canDo('roadmap.manage') && $this->sameTenant($user, $initiative->tenant_id);
-    }
-
-    protected function sameTenant(User $user, ?int $tenantId): bool
-    {
-        if ($tenantId === null || $user->organization_id === null) {
-            return false;
-        }
-
-        return (int) $user->organization_id === (int) $tenantId;
+        return $user->canDo('roadmap.manage');
     }
 }

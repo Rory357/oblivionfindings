@@ -2,6 +2,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -14,7 +15,14 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { CheckCircle2, Clock, FileText, FolderPlus, Paperclip, XCircle } from 'lucide-react';
+import {
+    CheckCircle2,
+    Clock,
+    FileText,
+    FolderPlus,
+    Paperclip,
+    XCircle,
+} from 'lucide-react';
 import { useRef, useState } from 'react';
 
 interface Milestone {
@@ -83,9 +91,17 @@ const formatDate = (value?: string | null) => {
           });
 };
 
-export default function PipShow({ pip, viewer_is_subject = false, can }: Props) {
+export default function PipShow({
+    pip,
+    viewer_is_subject = false,
+    can,
+}: Props) {
     const [completing, setCompleting] = useState(false);
-    const completeForm = useForm({ outcome: '', outcome_notes: '' });
+    const completeForm = useForm({
+        outcome: '',
+        outcome_notes: '',
+        new_end_date: '',
+    });
     const acknowledgeForm = useForm({});
 
     // A subject employee without the manage permission gets a read-only view
@@ -140,9 +156,12 @@ export default function PipShow({ pip, viewer_is_subject = false, can }: Props) 
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         variant="compact"
-                        backHref={subjectOnly ? '/hr/my' : '/hr/performance/pips'}
+                        backHref={
+                            subjectOnly ? '/hr/my' : '/hr/performance/pips'
+                        }
                         title={pip.title}
                         description={
                             <span className="flex items-center gap-2">
@@ -163,13 +182,14 @@ export default function PipShow({ pip, viewer_is_subject = false, can }: Props) 
                             </span>
                         }
                         actions={
-                            can.manage && pip.status !== 'completed' ? (
+                            can.manage &&
+                            ['active', 'in_progress'].includes(pip.status) ? (
                                 <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => setCompleting(!completing)}
                                 >
-                                    Complete PIP
+                                    Complete or extend PIP
                                 </Button>
                             ) : undefined
                         }
@@ -177,16 +197,27 @@ export default function PipShow({ pip, viewer_is_subject = false, can }: Props) 
                 }
             >
                 {/* Subject acknowledgement banner */}
-                {viewer_is_subject && !pip.employee_acknowledged && pip.status !== 'cancelled' ? (
+                {viewer_is_subject &&
+                !pip.employee_acknowledged &&
+                ['active', 'in_progress'].includes(pip.status) ? (
                     <Card className="border-status-warning/40 bg-status-warning-bg">
                         <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
                             <div className="text-sm">
-                                <div className="font-semibold">Please review and acknowledge this plan</div>
+                                <div className="font-semibold">
+                                    Please review and acknowledge this plan
+                                </div>
                                 <div className="text-muted-foreground">
-                                    Acknowledging confirms you have read the plan — not that you agree with everything in it. You are welcome to involve a support person or representative at any stage.
+                                    Acknowledging confirms you have read the
+                                    plan — not that you agree with everything in
+                                    it. You are welcome to involve a support
+                                    person or representative at any stage.
                                 </div>
                             </div>
-                            <Button size="sm" onClick={acknowledge} disabled={acknowledgeForm.processing}>
+                            <Button
+                                size="sm"
+                                onClick={acknowledge}
+                                disabled={acknowledgeForm.processing}
+                            >
                                 <CheckCircle2 className="mr-1.5 h-4 w-4" />
                                 Acknowledge plan
                             </Button>
@@ -199,7 +230,10 @@ export default function PipShow({ pip, viewer_is_subject = false, can }: Props) 
                             <CheckCircle2 className="h-4 w-4 text-status-success" />
                             <span>
                                 You acknowledged this plan
-                                {pip.employee_acknowledged_at ? ` on ${formatDate(pip.employee_acknowledged_at)}` : ''}.
+                                {pip.employee_acknowledged_at
+                                    ? ` on ${formatDate(pip.employee_acknowledged_at)}`
+                                    : ''}
+                                .
                             </span>
                         </CardContent>
                     </Card>
@@ -300,26 +334,30 @@ export default function PipShow({ pip, viewer_is_subject = false, can }: Props) 
                                             {pip.outcome_notes}
                                         </p>
                                     )}
-                                    {pip.outcome === 'unsuccessful' && can.manage && (
-                                        <div className="mt-3 border-t pt-3">
-                                            <p className="text-xs text-muted-foreground">
-                                                If formal action is the considered next step, open a disciplinary case — it is never created automatically.
-                                            </p>
-                                            <Button
-                                                asChild
-                                                size="sm"
-                                                variant="outline"
-                                                className="mt-2 text-status-critical"
-                                            >
-                                                <Link
-                                                    href={`/hr/cases?new=1&employee=${pip.employee.id}&source_pip=${pip.id}`}
+                                    {pip.outcome === 'unsuccessful' &&
+                                        can.manage && (
+                                            <div className="mt-3 border-t pt-3">
+                                                <p className="text-xs text-muted-foreground">
+                                                    If formal action is the
+                                                    considered next step, open a
+                                                    disciplinary case — it is
+                                                    never created automatically.
+                                                </p>
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="mt-2 text-status-critical"
                                                 >
-                                                    <FolderPlus className="mr-1.5 h-4 w-4" />
-                                                    Open disciplinary case
-                                                </Link>
-                                            </Button>
-                                        </div>
-                                    )}
+                                                    <Link
+                                                        href={`/hr/cases?new=1&employee=${pip.employee.id}&source_pip=${pip.id}`}
+                                                    >
+                                                        <FolderPlus className="mr-1.5 h-4 w-4" />
+                                                        Open disciplinary case
+                                                    </Link>
+                                                </Button>
+                                            </div>
+                                        )}
                                 </div>
                             )}
                         </CardContent>
@@ -331,7 +369,7 @@ export default function PipShow({ pip, viewer_is_subject = false, can }: Props) 
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">
-                                Complete PIP
+                                Complete or extend PIP
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
@@ -363,6 +401,36 @@ export default function PipShow({ pip, viewer_is_subject = false, can }: Props) 
                                         </SelectContent>
                                     </Select>
                                 </div>
+                                {completeForm.data.outcome === 'extended' && (
+                                    <div>
+                                        <Label htmlFor="new_end_date">
+                                            New end date
+                                        </Label>
+                                        <Input
+                                            id="new_end_date"
+                                            type="date"
+                                            min={pip.end_date}
+                                            value={
+                                                completeForm.data.new_end_date
+                                            }
+                                            onChange={(e) =>
+                                                completeForm.setData(
+                                                    'new_end_date',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            required
+                                        />
+                                        {completeForm.errors.new_end_date && (
+                                            <p className="mt-1 text-sm text-destructive">
+                                                {
+                                                    completeForm.errors
+                                                        .new_end_date
+                                                }
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
                                 <div>
                                     <Label>Notes</Label>
                                     <Textarea
@@ -381,7 +449,10 @@ export default function PipShow({ pip, viewer_is_subject = false, can }: Props) 
                                         type="submit"
                                         disabled={completeForm.processing}
                                     >
-                                        Save Outcome
+                                        {completeForm.data.outcome ===
+                                        'extended'
+                                            ? 'Extend plan'
+                                            : 'Complete plan'}
                                     </Button>
                                     <Button
                                         type="button"
@@ -563,7 +634,9 @@ function MilestoneEvidence({
             ) : milestone.evidence_path ? (
                 <span className="text-muted-foreground">Evidence on file</span>
             ) : (
-                <span className="text-muted-foreground">No evidence attached</span>
+                <span className="text-muted-foreground">
+                    No evidence attached
+                </span>
             )}
             {canManage && (
                 <>

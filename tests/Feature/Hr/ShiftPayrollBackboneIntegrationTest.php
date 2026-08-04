@@ -11,12 +11,13 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 });
 
 function payrollRoleUser(string $roleName): User
@@ -51,7 +52,6 @@ test('attendance generated shift timesheet flows into payroll run with shift and
     ]);
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $worker->id,
         'employee_number' => 'EMP-PAYROLL-'.$worker->id,
         'work_email' => $worker->email,
@@ -139,7 +139,6 @@ test('attendance generated shift timesheet flows into payroll run with shift and
     $workerNow = now()->setTimezone(config('app.worker_timezone', config('app.timezone', 'UTC')));
 
     $run = app(PayrollExportService::class)->createRun(
-        tenantId: 1,
         periodStart: $workerNow->copy()->subWeek()->startOfDay(),
         periodEnd: $workerNow->copy()->endOfDay(),
         createdBy: $finance->id,
@@ -169,7 +168,6 @@ test('returned shift timesheet keeps special pay flags intact when resubmitted i
     ]);
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $worker->id,
         'employee_number' => 'EMP-SPECIAL-'.$worker->id,
         'work_email' => $worker->email,
@@ -185,7 +183,6 @@ test('returned shift timesheet keeps special pay flags intact when resubmitted i
     ]);
 
     HrPayRateRule::query()->create([
-        'tenant_id' => 1,
         'name' => 'Special Shift Premium',
         'is_active' => true,
         'priority' => 10,
@@ -272,7 +269,6 @@ test('returned shift timesheet keeps special pay flags intact when resubmitted i
         ->and($timesheet->on_call)->toBeTrue();
 
     $run = app(PayrollExportService::class)->createRun(
-        tenantId: 1,
         periodStart: now()->subWeek()->startOfDay(),
         periodEnd: now()->endOfDay(),
         createdBy: $finance->id,

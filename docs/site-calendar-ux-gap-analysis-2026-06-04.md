@@ -36,7 +36,7 @@ the fallback.
 ### G-2 (S) Hero overflow missing the "Calendar sync settings" deep-link
 HANDOFF §5 mandates a deep-link from the calendar hero overflow to Settings → Calendar sync.
 **Fixed:** a `DropdownMenuItem` → `/settings/calendar-sync` was added under the hero overflow's
-"Admin" group, gated on `canManageIntegrations` (`auth.can.integrations.manageTenantSecrets`).
+"Admin" group, gated on `canManageIntegrations` (`auth.can.integrations.manageSecrets`).
 
 ---
 
