@@ -13,10 +13,12 @@
 #   5. php artisan storage:link
 #   6. php artisan optimize:clear
 #   7. optional Nominatim install or geocoder health check
-#   8. php artisan queclink:install   (refreshes + restarts listener)
-#   9. php artisan queue:restart
+#   8. install the eight monitoring workers and three UDP listeners in Supervisor
+#   9. php artisan queclink:install   (refreshes + restarts listener)
+#  10. php artisan queue:restart
 #
-# Requires: bash, php, composer, node + npm, MySQL credentials in .env.
+# Requires: bash, php, composer, node + npm, MySQL credentials in .env,
+# and Supervisor for the native monitoring runtime unless explicitly skipped.
 # If running on a server with sudo available the queclink:install step
 # will write to /etc/systemd/system — invoke this script with sudo or
 # pass --skip-queclink to defer.
@@ -27,13 +29,15 @@ SKIP_QUECLINK=0
 INSTALL_NOMINATIM=0
 SKIP_NOMINATIM=0
 SKIP_GIT_UPDATE=0
+SKIP_MONITORING_SUPERVISOR=0
 for arg in "$@"; do
     case "$arg" in
         --skip-git-update) SKIP_GIT_UPDATE=1 ;;
         --skip-queclink) SKIP_QUECLINK=1 ;;
+        --skip-monitoring-supervisor) SKIP_MONITORING_SUPERVISOR=1 ;;
         --install-nominatim) INSTALL_NOMINATIM=1 ;;
         --skip-nominatim) SKIP_NOMINATIM=1 ;;
-        --help|-h) echo "Usage: $0 [--skip-git-update] [--skip-queclink] [--install-nominatim] [--skip-nominatim]"; exit 0 ;;
+        --help|-h) echo "Usage: $0 [--skip-git-update] [--skip-monitoring-supervisor] [--skip-queclink] [--install-nominatim] [--skip-nominatim]"; exit 0 ;;
         *) echo "Unknown option: $arg"; exit 1 ;;
     esac
 done
@@ -115,6 +119,33 @@ elif [ "$INSTALL_NOMINATIM" -eq 1 ]; then
 else
     echo "▶ php artisan fleet:geocoder:status --fail-if-enabled"
     run_app php artisan fleet:geocoder:status --fail-if-enabled
+fi
+
+if [ "$SKIP_MONITORING_SUPERVISOR" -eq 1 ]; then
+    echo "▶ skipping monitoring Supervisor install (--skip-monitoring-supervisor)"
+else
+    echo "▶ scripts/monitoring/install-supervisor.sh"
+    monitoring_supervisor_args=(
+        "--application-path=$(pwd -P)"
+        "--run-user=${MONITORING_RUNTIME_USER:-www-data}"
+        "--log-directory=${MONITORING_LOG_DIRECTORY:-/var/log/oblivion}"
+    )
+    if [ -n "${MONITORING_SUPERVISOR_INCLUDE_DIR:-}" ]; then
+        monitoring_supervisor_args+=("--include-directory=$MONITORING_SUPERVISOR_INCLUDE_DIR")
+    fi
+    if [ -n "${MONITORING_SUPERVISORD_CONFIG:-}" ]; then
+        monitoring_supervisor_args+=("--supervisord-config=$MONITORING_SUPERVISORD_CONFIG")
+    fi
+
+    if [ "$(id -u)" -eq 0 ]; then
+        bash scripts/monitoring/install-supervisor.sh "${monitoring_supervisor_args[@]}"
+    elif command -v sudo >/dev/null; then
+        sudo bash scripts/monitoring/install-supervisor.sh "${monitoring_supervisor_args[@]}"
+    else
+        echo "✗ monitoring Supervisor install requires root or sudo."
+        echo "  Re-run with privilege or explicitly pass --skip-monitoring-supervisor."
+        exit 1
+    fi
 fi
 
 if [ "$SKIP_QUECLINK" -eq 0 ]; then
