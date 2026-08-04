@@ -46,17 +46,16 @@ class DeviceMutationAccessBoundaryTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->seed(SecurityDevicesPermissionsSeeder::class);
 
-        $this->allowedSite = Site::factory()->create(['tenant_id' => 42]);
-        $this->hiddenSite = Site::factory()->create(['tenant_id' => 42]);
-        $this->manager = User::factory()->create(['organization_id' => 42]);
+        $this->allowedSite = Site::factory()->create([]);
+        $this->hiddenSite = Site::factory()->create([]);
+        $this->manager = User::factory()->create();
         $this->manager->roles()->attach(Role::query()->where('name', 'facilities_manager')->firstOrFail());
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42,
             'user_id' => $this->manager->id,
             'primary_site_id' => $this->allowedSite->id,
             'secondary_site_ids' => [],
         ]);
-        $this->admin = User::factory()->create(['organization_id' => 42]);
+        $this->admin = User::factory()->create();
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
 
         $this->allowedDevice = $this->deviceAt($this->allowedSite, 'Allowed device');
@@ -116,21 +115,19 @@ class DeviceMutationAccessBoundaryTest extends TestCase
         $this->assertDatabaseHas('device_documents', ['id' => $document->id]);
     }
 
-    public function test_assignment_rejects_hidden_and_cross_tenant_targets(): void
+    public function test_assignment_rejects_hidden_and_unrelated_site_targets(): void
     {
-        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
+        $unrelatedSite = Site::factory()->create([]);
         $hiddenRoom = SiteRoom::query()->create([
-            'tenant_id' => 42,
             'site_id' => $this->hiddenSite->id,
             'name' => 'Hidden comms room',
         ]);
         $hiddenClient = Client::factory()->create([
-            'organization_id' => 42,
+
             'site_id' => $this->hiddenSite->id,
         ]);
-        $hiddenStaff = User::factory()->create(['organization_id' => 42]);
+        $hiddenStaff = User::factory()->create();
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42,
             'user_id' => $hiddenStaff->id,
             'primary_site_id' => $this->hiddenSite->id,
             'secondary_site_ids' => [],
@@ -140,12 +137,11 @@ class DeviceMutationAccessBoundaryTest extends TestCase
             'category' => 'Vehicle',
         ]);
         $sameSiteClient = Client::factory()->create([
-            'organization_id' => 42,
+
             'site_id' => $this->allowedSite->id,
         ]);
-        $sameSiteStaff = User::factory()->create(['organization_id' => 42]);
+        $sameSiteStaff = User::factory()->create();
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42,
             'user_id' => $sameSiteStaff->id,
             'primary_site_id' => $this->allowedSite->id,
             'secondary_site_ids' => [],
@@ -169,7 +165,7 @@ class DeviceMutationAccessBoundaryTest extends TestCase
 
         foreach ([
             [DeviceAssignment::TARGET_SITE, $this->hiddenSite->id],
-            [DeviceAssignment::TARGET_SITE, $foreignSite->id],
+            [DeviceAssignment::TARGET_SITE, $unrelatedSite->id],
             [DeviceAssignment::TARGET_ROOM, $hiddenRoom->id],
             [DeviceAssignment::TARGET_CLIENT, $hiddenClient->id],
             [DeviceAssignment::TARGET_STAFF, $hiddenStaff->id],
@@ -193,7 +189,7 @@ class DeviceMutationAccessBoundaryTest extends TestCase
         ]);
         $this->assertDatabaseMissing('device_assignments', [
             'device_id' => $this->allowedDevice->id,
-            'assignable_id' => $foreignSite->id,
+            'assignable_id' => $unrelatedSite->id,
         ]);
     }
 
@@ -203,7 +199,6 @@ class DeviceMutationAccessBoundaryTest extends TestCase
             Permission::query()->where('key', 'fleet.viewAny')->value('id') => ['allowed' => true],
         ]);
         $device = Device::factory()->create([
-            'tenant_id' => 42,
             'name' => 'Mixed provenance device',
             'domain' => 'it_infrastructure',
             'category' => 'networking',
@@ -258,12 +253,11 @@ class DeviceMutationAccessBoundaryTest extends TestCase
             Permission::query()->where('key', 'fleet.viewAny')->value('id') => ['allowed' => true],
         ]);
         $client = Client::factory()->create([
-            'organization_id' => 42,
+
             'site_id' => $this->allowedSite->id,
         ]);
-        $staff = User::factory()->create(['organization_id' => 42]);
+        $staff = User::factory()->create();
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42,
             'user_id' => $staff->id,
             'primary_site_id' => $this->allowedSite->id,
             'secondary_site_ids' => [],
@@ -304,12 +298,12 @@ class DeviceMutationAccessBoundaryTest extends TestCase
         }
     }
 
-    public function test_legacy_partition_mismatches_do_not_hide_a_vehicle_with_valid_site_access(): void
+    public function test_vehicle_with_valid_site_access_remains_visible(): void
     {
-        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
+        $unrelatedSite = Site::factory()->create([]);
         $mismatchedClient = Client::factory()->create([
-            'organization_id' => 42,
-            'site_id' => $foreignSite->id,
+
+            'site_id' => $unrelatedSite->id,
         ]);
         $vehicle = Asset::factory()->create([
             'category' => 'Vehicle',
@@ -317,7 +311,7 @@ class DeviceMutationAccessBoundaryTest extends TestCase
             'home_site_id' => null,
             'client_id' => $mismatchedClient->id,
         ]);
-        $platformAdmin = User::factory()->create(['organization_id' => null]);
+        $platformAdmin = User::factory()->create();
         $platformAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
         $access = app(SecurityDevicesAccessService::class);
 
@@ -350,8 +344,8 @@ class DeviceMutationAccessBoundaryTest extends TestCase
 
     public function test_vehicle_assignment_requires_canonical_site_or_client_site_evidence(): void
     {
-        $siteLessClient = Client::factory()->create(['organization_id' => 42, 'site_id' => null]);
-        $siteClient = Client::factory()->create(['organization_id' => 42, 'site_id' => $this->allowedSite->id]);
+        $siteLessClient = Client::factory()->create(['site_id' => null]);
+        $siteClient = Client::factory()->create(['site_id' => $this->allowedSite->id]);
         $vehicles = [
             Asset::factory()->create([
                 'category' => 'Vehicle', 'site_id' => null, 'home_site_id' => null, 'client_id' => $siteLessClient->id,
@@ -366,7 +360,7 @@ class DeviceMutationAccessBoundaryTest extends TestCase
                 'category' => 'Vehicle', 'site_id' => null, 'home_site_id' => $this->allowedSite->id, 'client_id' => null,
             ]),
         ];
-        $platformAdmin = User::factory()->create(['organization_id' => null]);
+        $platformAdmin = User::factory()->create();
         $platformAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
         $access = app(SecurityDevicesAccessService::class);
         $assignableIds = $access->assignableVehicles($this->admin)->pluck('id')->map(fn ($id): int => (int) $id)->all();
@@ -473,19 +467,19 @@ class DeviceMutationAccessBoundaryTest extends TestCase
         $this->assertDatabaseHas('device_relationships', ['id' => $relationship->id]);
     }
 
-    public function test_admin_can_manage_unassigned_stock_regardless_of_legacy_partition_value(): void
+    public function test_admin_can_manage_unassigned_stock_with_all_sites_access(): void
     {
-        $foreign = Device::factory()->create(['tenant_id' => 77, 'name' => 'Foreign device']);
+        $unrelated = Device::factory()->create(['name' => 'Unrelated device']);
 
         $this->actingAs($this->admin)
-            ->patch("/security-devices/devices/{$foreign->id}/fields", ['asset_tag' => 'FORBIDDEN'])
+            ->patch("/security-devices/devices/{$unrelated->id}/fields", ['asset_tag' => 'FORBIDDEN'])
             ->assertRedirect();
         $this->actingAs($this->admin)
-            ->delete("/security-devices/devices/{$foreign->id}")
+            ->delete("/security-devices/devices/{$unrelated->id}")
             ->assertRedirect();
 
-        $this->assertSame('FORBIDDEN', $foreign->fresh()->asset_tag);
-        $this->assertNotNull($foreign->fresh()->deleted_at);
+        $this->assertSame('FORBIDDEN', $unrelated->fresh()->asset_tag);
+        $this->assertNotNull($unrelated->fresh()->deleted_at);
     }
 
     public function test_allowed_inline_service_date_update_round_trips(): void
@@ -530,7 +524,6 @@ class DeviceMutationAccessBoundaryTest extends TestCase
     private function deviceAt(Site $site, string $name): Device
     {
         $device = Device::factory()->create([
-            'tenant_id' => $site->tenant_id,
             'name' => $name,
             'domain' => 'it_infrastructure',
             'category' => 'networking',

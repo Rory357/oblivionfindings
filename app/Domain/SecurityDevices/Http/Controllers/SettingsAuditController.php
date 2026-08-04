@@ -16,6 +16,7 @@ class SettingsAuditController extends Controller
         abort_unless($user && (
             $user->canDo('securityDevices.groups.manage')
             || $user->canDo('securityDevices.reports.view')
+            || $user->canDo('securityDevices.commands.admin')
         ), 403);
 
         return Inertia::render('security-devices/settings', $presenter->present($user));

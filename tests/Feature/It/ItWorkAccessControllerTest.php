@@ -1,7 +1,10 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
+use App\Models\AuditLog;
 use App\Models\ItAttachment;
 use App\Models\ItChange;
 use App\Models\ItMajorIncident;
@@ -186,6 +189,13 @@ test('ticket creation derives a self service site and rejects forged staff scope
     $requester = itControllerAccessActor(['it.request'], $approvedSite);
     $agent = itControllerAccessActor(['it.view', 'it.manage'], $approvedSite);
 
+    $this->actingAs($agent)
+        ->get(route('it.index'))
+        ->assertInertia(fn ($page) => $page
+            ->has('siteOptions', 1)
+            ->where('siteOptions.0.id', $approvedSite->id)
+            ->where('siteOptions.0.name', $approvedSite->name));
+
     $this->actingAs($requester)
         ->post(route('it.tickets.store'), [
             'title' => 'Self-service scoped ticket',
@@ -196,7 +206,12 @@ test('ticket creation derives a self service site and rejects forged staff scope
 
     $created = ItTicket::query()->where('title', 'Self-service scoped ticket')->firstOrFail();
     expect((int) $created->site_id)->toBe($approvedSite->id)
-        ->and($created->is_organisation_wide)->toBeFalse();
+        ->and($created->is_organisation_wide)->toBeFalse()
+        ->and(AuditLog::query()
+            ->where('action', 'it.ticket.created')
+            ->where('auditable_type', $created->getMorphClass())
+            ->where('auditable_id', $created->id)
+            ->count())->toBe(1);
 
     $this->actingAs($agent)
         ->post(route('it.tickets.store'), [
@@ -208,6 +223,145 @@ test('ticket creation derives a self service site and rejects forged staff scope
         ->assertForbidden();
 
     expect(ItTicket::query()->where('title', 'Forged staff scope ticket')->exists())->toBeFalse();
+});
+
+test('ticket intake exposes and links only canonical visible Security and Devices records', function () {
+    $approvedSite = Site::factory()->create();
+    $otherSite = Site::factory()->create();
+    $agent = itControllerAccessActor([
+        'it.view',
+        'it.manage',
+        'securityDevices.devices.view',
+    ], $approvedSite);
+    $visible = Device::factory()->itInfrastructure()->create(['name' => 'Sunnyside core switch']);
+    $hidden = Device::factory()->itInfrastructure()->create(['name' => 'Other Site switch']);
+
+    foreach ([[$visible, $approvedSite], [$hidden, $otherSite]] as [$device, $site]) {
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assignment_type' => 'permanent',
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $agent->id,
+        ]);
+    }
+
+    $this->actingAs($agent)
+        ->get(route('it.index'))
+        ->assertInertia(fn ($page) => $page
+            ->has('deviceOptions', 1)
+            ->where('deviceOptions.0.id', $visible->id)
+            ->where('deviceOptions.0.name', 'Sunnyside core switch')
+            ->where('deviceOptions.0.site_id', $approvedSite->id));
+
+    $this->actingAs($agent)
+        ->post(route('it.tickets.store'), [
+            'title' => 'Core switch is dropping traffic',
+            'category' => 'network',
+            'priority' => 'urgent',
+            'site_id' => $approvedSite->id,
+            'device_id' => $visible->id,
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $ticket = ItTicket::query()->where('title', 'Core switch is dropping traffic')->firstOrFail();
+    expect($ticket->links()
+        ->where('relationship', 'affected_device')
+        ->where('linkable_type', $visible->getMorphClass())
+        ->where('linkable_id', $visible->id)
+        ->exists())->toBeTrue()
+        ->and(AuditLog::query()
+            ->where('action', 'it.ticket.created')
+            ->where('auditable_id', $ticket->id)
+            ->where('meta->device_id', $visible->id)
+            ->exists())->toBeTrue();
+
+    $this->actingAs($agent)
+        ->post(route('it.tickets.store'), [
+            'title' => 'Forged hidden Device link',
+            'category' => 'network',
+            'priority' => 'high',
+            'site_id' => $approvedSite->id,
+            'device_id' => $hidden->id,
+        ])
+        ->assertForbidden();
+
+    expect(ItTicket::query()->where('title', 'Forged hidden Device link')->exists())->toBeFalse();
+
+    $requester = itControllerAccessActor(['it.request'], $approvedSite);
+    $this->actingAs($requester)
+        ->post(route('it.tickets.store'), [
+            'title' => 'Self-service ticket with forged Device context',
+            'category' => 'network',
+            'priority' => 'normal',
+            'device_id' => $visible->id,
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $selfServiceTicket = ItTicket::query()
+        ->where('title', 'Self-service ticket with forged Device context')
+        ->firstOrFail();
+    $creationAudit = AuditLog::query()
+        ->where('action', 'it.ticket.created')
+        ->where('auditable_id', $selfServiceTicket->id)
+        ->firstOrFail();
+    expect($selfServiceTicket->links()->exists())->toBeFalse()
+        ->and($creationAudit->meta['device_id'] ?? null)->toBeNull();
+});
+
+test('ticket intake refuses a visible Device from a different approved Site', function () {
+    $ticketSite = Site::factory()->create();
+    $otherApprovedSite = Site::factory()->create();
+    $agent = itControllerAccessActor([
+        'it.view',
+        'it.manage',
+        'securityDevices.devices.view',
+    ], $ticketSite);
+    $agent->hrEmployeeProfile()->update([
+        'secondary_site_ids' => [$otherApprovedSite->id],
+    ]);
+
+    $localDevice = Device::factory()->itInfrastructure()->create(['name' => 'Local switch']);
+    $otherDevice = Device::factory()->itInfrastructure()->create(['name' => 'Other approved Site switch']);
+    foreach ([[$localDevice, $ticketSite], [$otherDevice, $otherApprovedSite]] as [$device, $site]) {
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assignment_type' => 'permanent',
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $agent->id,
+        ]);
+    }
+
+    $this->actingAs($agent)
+        ->get(route('it.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('deviceOptions', 2)
+            ->where('deviceOptions', fn ($devices) => collect($devices)
+                ->pluck('site_id', 'id')
+                ->all() === [
+                    $localDevice->id => $ticketSite->id,
+                    $otherDevice->id => $otherApprovedSite->id,
+                ]));
+
+    $this->actingAs($agent)
+        ->from(route('it.index'))
+        ->post(route('it.tickets.store'), [
+            'title' => 'Mismatched visible Device',
+            'category' => 'network',
+            'priority' => 'high',
+            'site_id' => $ticketSite->id,
+            'device_id' => $otherDevice->id,
+        ])
+        ->assertRedirect(route('it.index'))
+        ->assertSessionHas('error', 'Choose a Device in the ticket Site.');
+
+    expect(ItTicket::query()->where('title', 'Mismatched visible Device')->exists())->toBeFalse();
 });
 
 test('ticket updates reject unapproved and conflicting scope changes', function () {

@@ -331,23 +331,22 @@ class AlertsEventsControllerTest extends TestCase
 
     public function test_events_stats_and_filter_options_cover_the_single_application_registry_for_all_sites_users(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
 
-        $tenantDevice = Device::factory()->create(['tenant_id' => 42, 'name' => 'Tenant sensor']);
-        $foreignDevice = Device::factory()->create(['tenant_id' => 77, 'name' => 'Foreign sensor']);
+        $primaryDevice = Device::factory()->create(['name' => 'Primary sensor']);
+        $unrelatedDevice = Device::factory()->create(['name' => 'Unrelated sensor']);
 
         DeviceEvent::create([
-            'device_id' => $tenantDevice->id,
-            'event_type' => 'tenant_event',
+            'device_id' => $primaryDevice->id,
+            'event_type' => 'primary_event',
             'severity' => 'critical',
-            'source' => 'tenant-source',
+            'source' => 'primary-source',
             'occurred_at' => now(),
         ]);
         DeviceEvent::create([
-            'device_id' => $foreignDevice->id,
-            'event_type' => 'foreign_event',
+            'device_id' => $unrelatedDevice->id,
+            'event_type' => 'unrelated_event',
             'severity' => 'critical',
-            'source' => 'foreign-source',
+            'source' => 'unrelated-source',
             'occurred_at' => now(),
         ]);
 
@@ -359,11 +358,11 @@ class AlertsEventsControllerTest extends TestCase
             $this->assertSame(2, $props['stats']['total24h']);
             $this->assertSame(2, $props['stats']['critical24h']);
             $this->assertEqualsCanonicalizing(
-                ['Tenant sensor', 'Foreign sensor'],
+                ['Primary sensor', 'Unrelated sensor'],
                 collect($props['events']['data'])->pluck('device_name')->all(),
             );
-            $this->assertSame(['foreign_event', 'tenant_event'], $props['filterOptions']['eventTypes']);
-            $this->assertSame(['foreign-source', 'tenant-source'], $props['filterOptions']['sources']);
+            $this->assertSame(['primary_event', 'unrelated_event'], $props['filterOptions']['eventTypes']);
+            $this->assertSame(['primary-source', 'unrelated-source'], $props['filterOptions']['sources']);
         });
     }
 

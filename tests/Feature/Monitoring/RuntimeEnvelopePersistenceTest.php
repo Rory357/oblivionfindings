@@ -8,6 +8,7 @@ use App\Domain\Monitoring\Models\MonitoringInbox;
 use App\Domain\Monitoring\Models\MonitoringOutbox;
 use App\Domain\Monitoring\Services\RuntimeEnvelopeCodec;
 use App\Models\Site;
+use App\Support\LegacyStorageContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
@@ -44,7 +45,7 @@ beforeEach(function () {
     ]);
 });
 
-it('provides single-tenant durable delivery controls', function () {
+it('provides application-wide durable delivery controls', function () {
     $deadLetterIndexes = collect(Schema::getIndexes('monitoring_dead_letters'))->keyBy('name');
 
     expect(Schema::hasColumns('monitoring_outbox', [
@@ -95,16 +96,16 @@ it('provides single-tenant durable delivery controls', function () {
         ->and(Schema::hasColumn('monitoring_outbox', 'envelope'))->toBeFalse()
         ->and(Schema::hasColumn('monitoring_inbox', 'envelope'))->toBeFalse()
         ->and(Schema::hasColumn('monitoring_dead_letters', 'envelope'))->toBeFalse()
-        ->and(Schema::hasColumn('monitoring_outbox', 'tenant_id'))->toBeFalse()
-        ->and(Schema::hasColumn('monitoring_inbox', 'tenant_id'))->toBeFalse()
-        ->and(Schema::hasColumn('monitoring_consumer_checkpoints', 'tenant_id'))->toBeFalse()
-        ->and(Schema::hasColumn('monitoring_dead_letters', 'tenant_id'))->toBeFalse()
+        ->and(Schema::hasColumn('monitoring_outbox', LegacyStorageContext::column()))->toBeFalse()
+        ->and(Schema::hasColumn('monitoring_inbox', LegacyStorageContext::column()))->toBeFalse()
+        ->and(Schema::hasColumn('monitoring_consumer_checkpoints', LegacyStorageContext::column()))->toBeFalse()
+        ->and(Schema::hasColumn('monitoring_dead_letters', LegacyStorageContext::column()))->toBeFalse()
         ->and($deadLetterIndexes->get('monitoring_dead_letters_consumer_resolved_idx')['columns'])->toBe(['consumer', 'resolved_at'])
         ->and($deadLetterIndexes->get('monitoring_dead_letters_created_idx')['columns'])->toBe(['created_at'])
         ->and($deadLetterIndexes->get('monitoring_dead_letters_site_id_index')['columns'])->toBe(['site_id']);
 });
 
-it('round trips and persists a signed v1 envelope without signing material', function () {
+it('round trips and persists a signed v2 envelope without signing material', function () {
     $envelope = RuntimeEnvelope::new(
         type: RuntimeMessageType::Observation,
         source: 'central:checks',
@@ -152,7 +153,8 @@ it('round trips and persists a signed v1 envelope without signing material', fun
         'envelope_bytes' => $encoded,
     ]);
 
-    expect($decoded->schemaVersion)->toBe(1)
+    expect($decoded->schemaVersion)->toBe(2)
+        ->and($decoded->payloadVersion)->toBe(2)
         ->and($decoded->sequence)->toBe(7)
         ->and($decoded->traceId)->not->toBeEmpty()
         ->and($decoded->keyId)->toBe('runtime-test-key')
@@ -399,6 +401,38 @@ it('canonicalises nested payload keys before signing', function () {
         ->toBe(app(RuntimeEnvelopeCodec::class)->encode($second));
 });
 
+it('accepts the previous v1 envelope while emitting explicit v2 payload versions', function () {
+    $codec = app(RuntimeEnvelopeCodec::class);
+    $at = CarbonImmutable::parse('2026-07-21T01:02:03.456789Z');
+    $legacy = new RuntimeEnvelope(
+        schemaVersion: 1,
+        messageId: '018f0000-0000-7000-8000-000000000101',
+        type: RuntimeMessageType::Observation,
+        source: 'collector:legacy-runtime',
+        sequence: 1,
+        occurredAt: $at,
+        ingestedAt: $at,
+        idempotencyKey: 'legacy-observation:1',
+        traceId: '018f0000-0000-7000-8000-000000000102',
+        payload: ['monitor_id' => 9, 'state' => 'healthy'],
+    );
+
+    $legacyDocument = json_decode($codec->encode($legacy), true, flags: JSON_THROW_ON_ERROR);
+    $current = $codec->decode($codec->encode(RuntimeEnvelope::new(
+        RuntimeMessageType::Observation,
+        'central:checks',
+        2,
+        'current-observation:2',
+        ['monitor_id' => 9, 'state' => 'healthy'],
+    )));
+
+    expect($legacyDocument)->not->toHaveKey('payload_version')
+        ->and($codec->decode($codec->encode($legacy))->schemaVersion)->toBe(1)
+        ->and($codec->decode($codec->encode($legacy))->payloadVersion)->toBe(1)
+        ->and($current->schemaVersion)->toBe(2)
+        ->and($current->payloadVersion)->toBe(2);
+});
+
 it('accepts only the exact canonical transport bytes', function () {
     $codec = app(RuntimeEnvelopeCodec::class);
     $encoded = $codec->encode(RuntimeEnvelope::new(
@@ -622,7 +656,7 @@ it('rejects malformed unsupported or unauthenticated envelopes with specific rea
         unset($document['trace_id']);
     }, 'Monitoring envelope fields are invalid.'],
     'unexpected field' => [fn (array &$document) => $document['extra'] = true, 'Monitoring envelope fields are invalid.'],
-    'unknown version' => [fn (array &$document) => $document['schema_version'] = 2, 'Monitoring envelope version is unsupported.'],
+    'unknown version' => [fn (array &$document) => $document['schema_version'] = 99, 'Monitoring envelope version is unsupported.'],
     'unknown key' => [fn (array &$document) => $document['key_id'] = 'retired-key', 'Monitoring envelope signing key is unknown.'],
     'invalid message id' => [fn (array &$document) => $document['message_id'] = 'not-a-uuid', 'Monitoring envelope fields are invalid.'],
     'tampered payload' => [fn (array &$document) => $document['payload']['severity'] = 'critical', 'Monitoring envelope signature is invalid.'],

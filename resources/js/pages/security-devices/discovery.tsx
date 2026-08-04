@@ -35,6 +35,65 @@ export type Collector = {
     affected_monitors: number;
     affected_devices: number;
     impact_note: string;
+    runtime_state?: string | null;
+    backlog_items?: number;
+    spool_bytes?: number;
+    gap_count?: number;
+    corrupted_frames?: number;
+    clock_drift_seconds?: number | null;
+    revoked_at?: string | null;
+};
+
+export type DiscoveryScopeRow = {
+    id: number;
+    name: string;
+    status: string;
+    site: { id: number; name: string; href: string } | null;
+    collection_mode: string;
+    collector: { id: number; name: string; state: string } | null;
+    protocols: string[];
+    network_ranges: number;
+    seed_hosts: number;
+    exclusions: number;
+    port_bounds: number;
+    max_targets_per_run: number;
+    packets_per_second: number;
+    schedule: string | null;
+};
+
+export type DiscoveryRunRow = {
+    id: number;
+    run_uuid: string;
+    scope_id: number;
+    scope_name: string | null;
+    status: string;
+    collection_mode: 'central' | 'remote_collector';
+    collector: { id: number; name: string; state: string } | null;
+    trigger: string;
+    planned: number;
+    returned: number;
+    pending: number;
+    found: number;
+    matched: number;
+    proposed: number;
+    changed: number;
+    excluded: number;
+    failed: number;
+    unresolved: number;
+    started_at: string | null;
+    completed_at: string | null;
+};
+
+export type DiscoveryCandidateRow = {
+    id: number;
+    candidate_uuid: string;
+    run_id: number;
+    scope_id: number | null;
+    decision: string;
+    confidence: number;
+    reasons: string[];
+    canonical_device: { id: number; name: string; href: string } | null;
+    review: { action: string | null; reviewed_at: string | null };
 };
 
 export type DiscoveryWorkspace = {
@@ -49,6 +108,14 @@ export type DiscoveryWorkspace = {
         online_collectors: number;
         collection_paths_unavailable: number;
         affected_devices: number;
+        scopes: number;
+        runs: number;
+        runs_shown: number;
+        runs_truncated: boolean;
+        candidates: number;
+        candidates_shown: number;
+        candidates_truncated: boolean;
+        candidates_requiring_review: number;
     };
     direct_coverage: {
         path_label: string;
@@ -57,6 +124,9 @@ export type DiscoveryWorkspace = {
         description: string;
     };
     collectors: Collector[];
+    scopes: DiscoveryScopeRow[];
+    runs: DiscoveryRunRow[];
+    candidates: DiscoveryCandidateRow[];
     collection_paths: Array<{
         collector_id: number;
         collector_name: string;
@@ -69,7 +139,6 @@ export type DiscoveryWorkspace = {
     limitations: {
         unsupported_state: string;
         unsupported_note: string;
-        not_configured_monitors: number;
         not_configured_note: string;
         capacity_note: string;
     };
@@ -83,8 +152,10 @@ function title(value: string): string {
 
 function tone(value: string): StatusVariant {
     if (['available', 'online'].includes(value)) return 'success';
-    if (['unavailable', 'offline', 'failed'].includes(value)) return 'critical';
-    if (['pending', 'stale'].includes(value)) return 'warning';
+    if (['unavailable', 'offline', 'failed', 'revoked'].includes(value))
+        return 'critical';
+    if (['pending', 'queued', 'running', 'stale'].includes(value))
+        return 'warning';
     return 'neutral';
 }
 
@@ -118,9 +189,73 @@ function Metric({
     );
 }
 
+export function DiscoveryRunCard({ run }: { run: DiscoveryRunRow }) {
+    const active = ['queued', 'running'].includes(run.status);
+    const pendingLabel =
+        run.pending === 1
+            ? '1 target remains'
+            : `${run.pending} targets remain`;
+    const path =
+        run.collection_mode === 'remote_collector'
+            ? `Remote path${run.collector ? ` · ${run.collector.name}` : ''}`
+            : 'Main application';
+
+    return (
+        <article className="rounded-xl border p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                    <strong>{run.scope_name ?? 'Discovery scope'}</strong>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                        {path}
+                    </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    {run.collector ? (
+                        <StatusBadge variant={tone(run.collector.state)}>
+                            Collector {title(run.collector.state)}
+                        </StatusBadge>
+                    ) : null}
+                    <StatusBadge variant={tone(run.status)}>
+                        {title(run.status)}
+                    </StatusBadge>
+                </div>
+            </div>
+
+            {active ? (
+                <div className="mt-3 rounded-lg bg-muted/45 p-3">
+                    <p className="text-sm font-medium">
+                        {run.returned} of {run.planned} results returned
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        {run.collection_mode === 'remote_collector'
+                            ? run.collector?.state === 'available'
+                                ? `${pendingLabel}. The collector returns evidence through the ordered encrypted buffer.`
+                                : `${pendingLabel}. Discovery will resume when this collector is available.`
+                            : `${pendingLabel} on the central discovery worker.`}
+                    </p>
+                </div>
+            ) : (
+                <>
+                    <p className="mt-3 text-sm">
+                        {run.found} found · {run.matched} matched ·{' '}
+                        {run.proposed} proposed · {run.unresolved} unresolved
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        {run.excluded} excluded · {run.failed} failed ·
+                        completed {when(run.completed_at)}
+                    </p>
+                </>
+            )}
+        </article>
+    );
+}
+
 export function CollectorCard({ collector }: { collector: Collector }) {
     return (
-        <div className="rounded-xl border p-4">
+        <article
+            aria-label={`Collector ${collector.name}`}
+            className="rounded-xl border p-4"
+        >
             <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
                 <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -150,6 +285,15 @@ export function CollectorCard({ collector }: { collector: Collector }) {
                     <p className="mt-2 text-xs text-muted-foreground">
                         {collector.impact_note}
                     </p>
+                    {(collector.backlog_items ?? 0) > 0 ||
+                    (collector.gap_count ?? 0) > 0 ||
+                    (collector.corrupted_frames ?? 0) > 0 ? (
+                        <p className="mt-2 text-xs font-medium text-status-warning">
+                            {collector.backlog_items ?? 0} buffered ·{' '}
+                            {collector.gap_count ?? 0} sequence gaps ·{' '}
+                            {collector.corrupted_frames ?? 0} corrupt frames
+                        </p>
+                    ) : null}
                 </div>
                 <div className="text-xs text-muted-foreground lg:text-right">
                     <p>Last heartbeat {when(collector.last_seen_at)}</p>
@@ -161,7 +305,7 @@ export function CollectorCard({ collector }: { collector: Collector }) {
                     ) : null}
                 </div>
             </div>
-        </div>
+        </article>
     );
 }
 
@@ -196,7 +340,7 @@ export default function DiscoveryCollectors({
                     variant="compact"
                     icon={Radar}
                     title="Discovery & collectors"
-                    description="Understand how Oblivion Findings reaches every site: directly over site connectivity, or through an explicit collector for a difficult remote path."
+                    description="Understand how Oblivion Findings is configured to reach each Site: without a collector where the main connection is suitable, or through an explicit collector for a difficult remote path."
                     stats={[
                         {
                             label: 'Direct checks',
@@ -272,7 +416,7 @@ export default function DiscoveryCollectors({
                             <Card>
                                 <CardHeader>
                                     <CardTitle>
-                                        Main application coverage
+                                        Collector-free configuration
                                     </CardTitle>
                                     <CardDescription>
                                         {workspace.direct_coverage.path_label}
@@ -294,7 +438,7 @@ export default function DiscoveryCollectors({
                                                 workspace.direct_coverage
                                                     .devices
                                             }
-                                            note="Reached directly"
+                                            note="Configured without collector"
                                         />
                                     </div>
                                     <p className="mt-4 text-sm text-muted-foreground">
@@ -366,6 +510,188 @@ export default function DiscoveryCollectors({
                     </Card>
                 ) : null}
 
+                {activeTab === 'scopes' ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Governed discovery scopes</CardTitle>
+                            <CardDescription>
+                                Site, collection path, protocol coverage,
+                                bounds, exclusions, and schedule without
+                                exposing target addresses or credentials.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {workspace.scopes.length ? (
+                                workspace.scopes.map((scope) => (
+                                    <article
+                                        key={scope.id}
+                                        aria-label={`Discovery scope ${scope.name}`}
+                                        className="rounded-xl border p-4"
+                                    >
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div>
+                                                <strong>{scope.name}</strong>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {scope.site ? (
+                                                        <Link
+                                                            href={
+                                                                scope.site.href
+                                                            }
+                                                        >
+                                                            {scope.site.name}
+                                                        </Link>
+                                                    ) : (
+                                                        'Site unavailable'
+                                                    )}{' '}
+                                                    ·{' '}
+                                                    {title(
+                                                        scope.collection_mode,
+                                                    )}
+                                                </p>
+                                            </div>
+                                            <StatusBadge
+                                                variant={tone(scope.status)}
+                                            >
+                                                {title(scope.status)}
+                                            </StatusBadge>
+                                        </div>
+                                        <p className="mt-3 text-sm">
+                                            {scope.protocols
+                                                .map(title)
+                                                .join(', ') || 'No protocols'}
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            {scope.network_ranges} network
+                                            ranges · {scope.exclusions}{' '}
+                                            exclusions · maximum{' '}
+                                            {scope.max_targets_per_run} targets
+                                            at {scope.packets_per_second}/s
+                                        </p>
+                                    </article>
+                                ))
+                            ) : (
+                                <EmptyState
+                                    variant="compact"
+                                    icon={Radar}
+                                    title="No discovery scopes in this Site view"
+                                />
+                            )}
+                        </CardContent>
+                    </Card>
+                ) : null}
+
+                {activeTab === 'runs' ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Immutable discovery runs</CardTitle>
+                            <CardDescription>
+                                Recent immutable run summaries from the native
+                                discovery runtime. Candidate decisions are
+                                listed separately below.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {workspace.summary.runs_truncated ? (
+                                <p className="rounded-lg bg-status-warning-bg p-3 text-sm text-status-warning">
+                                    Showing the latest{' '}
+                                    {workspace.summary.runs_shown} of{' '}
+                                    {workspace.summary.runs} runs.
+                                </p>
+                            ) : null}
+                            {workspace.runs.length ? (
+                                workspace.runs.map((run) => (
+                                    <DiscoveryRunCard key={run.id} run={run} />
+                                ))
+                            ) : (
+                                <EmptyState
+                                    variant="compact"
+                                    icon={Activity}
+                                    title="No discovery runs in this Site view"
+                                />
+                            )}
+                        </CardContent>
+                    </Card>
+                ) : null}
+
+                {activeTab === 'candidates' ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Discovery candidates</CardTitle>
+                            <CardDescription>
+                                Confidence and bounded decision reasons remain
+                                reviewable before canonical Device changes.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {workspace.summary.candidates_truncated ? (
+                                <p className="rounded-lg bg-status-warning-bg p-3 text-sm text-status-warning">
+                                    Showing {workspace.summary.candidates_shown}{' '}
+                                    of {workspace.summary.candidates}{' '}
+                                    candidates. Candidates requiring review are
+                                    prioritised.
+                                </p>
+                            ) : null}
+                            {workspace.candidates.length ? (
+                                workspace.candidates.map((candidate) => (
+                                    <article
+                                        key={candidate.id}
+                                        className="rounded-xl border p-4"
+                                    >
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div>
+                                                {candidate.canonical_device ? (
+                                                    <Link
+                                                        href={
+                                                            candidate
+                                                                .canonical_device
+                                                                .href
+                                                        }
+                                                        className="font-semibold hover:underline"
+                                                    >
+                                                        {
+                                                            candidate
+                                                                .canonical_device
+                                                                .name
+                                                        }
+                                                    </Link>
+                                                ) : (
+                                                    <strong>
+                                                        Proposed Device
+                                                    </strong>
+                                                )}
+                                                <p className="text-xs text-muted-foreground">
+                                                    {candidate.reasons
+                                                        .map(title)
+                                                        .join(', ') ||
+                                                        'No decision reason recorded'}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <StatusBadge
+                                                    variant={tone(
+                                                        candidate.decision,
+                                                    )}
+                                                >
+                                                    {title(candidate.decision)}
+                                                </StatusBadge>
+                                                <span className="text-sm font-medium tabular-nums">
+                                                    {candidate.confidence}%
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </article>
+                                ))
+                            ) : (
+                                <EmptyState
+                                    variant="compact"
+                                    icon={CircleHelp}
+                                    title="No discovery candidates in this Site view"
+                                />
+                            )}
+                        </CardContent>
+                    </Card>
+                ) : null}
+
                 {activeTab === 'paths' ? (
                     <div className="grid gap-4 lg:grid-cols-2">
                         <Card>
@@ -379,7 +705,7 @@ export default function DiscoveryCollectors({
                                         {workspace.direct_coverage.path_label}
                                     </p>
                                     <StatusBadge variant="success">
-                                        Expected
+                                        Configured
                                     </StatusBadge>
                                 </div>
                                 <p className="mt-2 text-sm text-muted-foreground">
@@ -411,8 +737,16 @@ export default function DiscoveryCollectors({
                                             </StatusBadge>
                                         </div>
                                         <p className="mt-2 text-sm text-muted-foreground">
-                                            {path.site?.name ??
-                                                'No site assigned'}{' '}
+                                            {path.site ? (
+                                                <Link
+                                                    href={path.site.href}
+                                                    className="frontline-focus rounded-sm hover:text-primary hover:underline"
+                                                >
+                                                    {path.site.name}
+                                                </Link>
+                                            ) : (
+                                                'No site assigned'
+                                            )}{' '}
                                             · {path.device_load} devices ·{' '}
                                             {path.monitor_load} checks
                                         </p>
@@ -437,7 +771,10 @@ export default function DiscoveryCollectors({
                                 <div className="flex items-center gap-2">
                                     <CircleHelp className="h-5 w-5" />
                                     <StatusBadge variant="neutral">
-                                        Not assessed
+                                        {title(
+                                            workspace.limitations
+                                                .unsupported_state,
+                                        )}
                                     </StatusBadge>
                                 </div>
                                 <p className="mt-3 text-sm text-muted-foreground">

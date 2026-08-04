@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -14,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  */
 class ItAttachment extends Model
 {
+    use WritesLegacyStorageContext;
+
     /** Everything lives on the private disk — no per-row disk column. */
     public const DISK = 'private';
 
@@ -24,7 +27,6 @@ class ItAttachment extends Model
     public const MAX_SIZE_KB = 10240;
 
     protected $fillable = [
-        'tenant_id',
         'attachable_type',
         'attachable_id',
         'path',

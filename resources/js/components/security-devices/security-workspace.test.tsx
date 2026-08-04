@@ -114,6 +114,7 @@ describe('SecurityWorkspacePanels', () => {
                                 assignment: {
                                     type: 'site',
                                     label: 'Harbour House',
+                                    href: null,
                                 },
                                 monitoring: { state: 'configured', count: 2 },
                                 observed: {
@@ -206,6 +207,92 @@ describe('SecurityWorkspacePanels', () => {
         ).toBeInTheDocument();
         expect(screen.getByText('Media access restricted')).toBeInTheDocument();
         expect(screen.queryByText(/stream healthy/i)).not.toBeInTheDocument();
+    });
+
+    it('links a person assignment only when the permission-filtered presenter supplies a canonical href', () => {
+        const assignedDevice = {
+            id: 13,
+            name: 'Aroha safety panel',
+            category: 'alarm',
+            subcategory: 'personal_alarm',
+            provider: null,
+            status: 'active',
+            health: 'healthy',
+            lastSeenAt: null,
+            deviceHref: '/security-devices/devices/13',
+            site: null,
+            assignment: {
+                type: 'client',
+                label: 'Aroha',
+                href: '/operations/clients/21',
+            },
+            monitoring: { state: 'configured', count: 1 },
+            observed: { alarm_state: 'ready' },
+            maintenance: null,
+        };
+        const { rerender } = render(
+            <SecurityWorkspacePanels
+                data={{
+                    ...base,
+                    activeTab: {
+                        ...base.activeTab,
+                        key: 'alarms',
+                        label: 'Alarms',
+                        inventoryTotal: 1,
+                        inventoryShown: 1,
+                        devices: [assignedDevice],
+                    },
+                }}
+            />,
+        );
+
+        const clientDevice = screen.getByRole('article', {
+            name: assignedDevice.name,
+        });
+        expect(
+            within(clientDevice).getByText('Assigned person'),
+        ).toBeInTheDocument();
+        expect(
+            within(clientDevice).getByRole('link', { name: 'Aroha' }),
+        ).toHaveAttribute('href', '/operations/clients/21');
+
+        rerender(
+            <SecurityWorkspacePanels
+                data={{
+                    ...base,
+                    activeTab: {
+                        ...base.activeTab,
+                        key: 'alarms',
+                        label: 'Alarms',
+                        inventoryTotal: 1,
+                        inventoryShown: 1,
+                        devices: [
+                            {
+                                ...assignedDevice,
+                                name: 'Worker safety panel',
+                                assignment: {
+                                    type: 'staff',
+                                    label: 'Taylor Worker',
+                                    href: null,
+                                },
+                            },
+                        ],
+                    },
+                }}
+            />,
+        );
+
+        const staffDevice = screen.getByRole('article', {
+            name: 'Worker safety panel',
+        });
+        expect(
+            within(staffDevice).getByText('Taylor Worker'),
+        ).toBeInTheDocument();
+        expect(
+            within(staffDevice).queryByRole('link', {
+                name: 'Taylor Worker',
+            }),
+        ).not.toBeInTheDocument();
     });
 
     it('does not describe restricted security-event history as empty', () => {

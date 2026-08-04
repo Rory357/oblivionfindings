@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\AuditLog;
 use App\Models\ControlRoomAlert;
 use App\Models\ItChange;
 use App\Models\ItService;
@@ -85,7 +86,12 @@ test('agents create and find canonical standard normal and emergency changes', f
         ->and($change->ticket->status)->toBe('open')
         ->and($change->ticket->requires_approval)->toBe($requiresApproval)
         ->and($change->change_type)->toBe($type)
-        ->and($change->ticket->events()->where('type', 'created')->count())->toBe(1);
+        ->and($change->ticket->events()->where('type', 'created')->count())->toBe(1)
+        ->and(AuditLog::query()
+            ->where('action', 'it.change.created')
+            ->where('auditable_id', $change->ticket_id)
+            ->where('meta->change_id', $change->id)
+            ->exists())->toBeTrue();
 
     $this->actingAs($this->agent)
         ->get('/it/changes?type='.$type.'&state=draft&q=gateway')
@@ -113,6 +119,10 @@ test('a standard change follows assessed scheduled implemented validated reviewe
             'next_action' => 'Complete technical assessment.',
         ])
         ->assertRedirect();
+    expect(AuditLog::query()
+        ->where('action', 'it.change.updated')
+        ->where('auditable_id', $change->ticket_id)
+        ->exists())->toBeTrue();
 
     foreach (['assessment', 'approved', 'scheduled', 'implementing'] as $state) {
         $this->actingAs($this->agent)
@@ -256,7 +266,6 @@ test('emergency changes still need approval and failed implementations can be ba
         'impact_summary' => 'Active exploitation threatens all sites.',
     ]);
     ItTicketApproval::query()->create([
-        'tenant_id' => 1,
         'it_ticket_id' => $change->ticket_id,
         'requested_by' => $this->agent->id,
         'approver_id' => $this->approver->id,
@@ -361,12 +370,11 @@ test('affected services Sites devices alerts incidents and problems use canonica
 test('the change workspace reuses shared ticket work and is agent only site concealed', function () {
     $change = changeAtSite('normal', $this->site);
     $change->ticket->comments()->create([
-        'tenant_id' => 1,
         'author_user_id' => $this->agent->id,
         'body' => 'Assessment started.',
         'is_internal' => true,
     ]);
-    ItWorkTask::factory()->create(['tenant_id' => 1, 'ticket_id' => $change->ticket_id]);
+    ItWorkTask::factory()->create(['ticket_id' => $change->ticket_id]);
 
     $this->actingAs($this->agent)
         ->get("/it/changes/{$change->id}")

@@ -224,9 +224,9 @@ class ReportsController extends Controller
             $out = fopen('php://output', 'w');
             // BOM so Excel opens UTF-8 CSVs cleanly.
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, $header);
+            $this->putCsv($out, $header);
             foreach ($source as $row) {
-                fputcsv($out, $rowMapper($row));
+                $this->putCsv($out, $rowMapper($row));
             }
             fclose($out);
         }, $filename, $headers);

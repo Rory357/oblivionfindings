@@ -24,6 +24,8 @@ class HealthcareWorkspaceTest extends TestCase
 
     private User $admin;
 
+    private Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -31,14 +33,27 @@ class HealthcareWorkspaceTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->seed(SecurityDevicesPermissionsSeeder::class);
 
+        $this->site = Site::factory()->create(['name' => 'Healthcare workspace Site']);
         $this->admin = $this->viewerWithRole('admin');
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'employee_number' => 'SEC-HEALTHCARE-ADMIN',
+            'position_role' => 'admin',
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
     }
 
     public function test_overview_reconciles_authorised_client_shared_and_unassigned_healthcare_devices(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42, 'name' => 'Kauri House']);
+        $site = Site::factory()->create(['name' => 'Kauri House']);
         $client = Client::factory()->create([
-            'organization_id' => 42,
+
             'site_id' => $site->id,
             'preferred_name' => 'Mere',
         ]);
@@ -48,7 +63,7 @@ class HealthcareWorkspaceTest extends TestCase
         ]);
         $sharedDevice = $this->healthcareDevice('Shared nurse call');
         $unassignedDevice = $this->healthcareDevice('Spare bed sensor');
-        $foreignDevice = $this->healthcareDevice('Foreign monitor', ['tenant_id' => 77]);
+        $unrelatedDevice = $this->healthcareDevice('Unrelated monitor', []);
 
         $this->assign($clientDevice, DeviceAssignment::TARGET_CLIENT, $client->id);
         $this->assign($sharedDevice, DeviceAssignment::TARGET_SITE, $site->id, 'shared');
@@ -56,7 +71,7 @@ class HealthcareWorkspaceTest extends TestCase
         $this->actingAs($this->admin)
             ->get('/security-devices/healthcare')
             ->assertOk()
-            ->assertInertia(function ($page) use ($foreignDevice): void {
+            ->assertInertia(function ($page) use ($unrelatedDevice): void {
                 $healthcare = $page->toArray()['props']['healthcareWorkspace'];
 
                 $this->assertSame([
@@ -69,7 +84,7 @@ class HealthcareWorkspaceTest extends TestCase
                 $this->assertSame(3, $healthcare['overview']['attention']['data_flow_issues']);
                 $this->assertSame(4, $healthcare['activeTab']['inventoryTotal']);
                 $this->assertContains(
-                    $foreignDevice->id,
+                    $unrelatedDevice->id,
                     collect($healthcare['activeTab']['devices'])->pluck('id')->all(),
                 );
                 $this->assertSame(
@@ -81,14 +96,14 @@ class HealthcareWorkspaceTest extends TestCase
 
     public function test_client_devices_expose_minimum_identity_and_allowlisted_technical_support_context_only(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42]);
+        $site = $this->site;
         $keyWorker = User::factory()->create([
-            'organization_id' => 42,
+
             'approved_at' => now(),
             'name' => 'Aroha Support',
         ]);
         $client = Client::factory()->create([
-            'organization_id' => 42,
+
             'preferred_name' => 'Mere',
             'first_name' => 'Mererangi',
             'last_name' => 'Taonga',
@@ -117,19 +132,19 @@ class HealthcareWorkspaceTest extends TestCase
         $this->assign($device, DeviceAssignment::TARGET_CLIENT, $client->id);
 
         $ticket = ItTicket::factory()->create([
-            'tenant_id' => 42,
             'requester_user_id' => $this->admin->id,
             'title' => 'Restore device delivery',
             'status' => 'open',
         ]);
         ItTicketLink::create([
-            'tenant_id' => 42,
             'ticket_id' => $ticket->id,
             'relationship' => 'affected_device',
             'linkable_type' => Device::class,
             'linkable_id' => $device->id,
             'created_by_user_id' => $this->admin->id,
         ]);
+
+        $this->assertTrue($this->admin->canDo('clients.viewAny'));
 
         $this->actingAs($this->admin)
             ->get('/security-devices/healthcare?tab=client-devices')
@@ -215,7 +230,7 @@ class HealthcareWorkspaceTest extends TestCase
     public function test_assigned_support_worker_sees_only_their_clients_healthcare_devices_and_direct_urls(): void
     {
         $viewer = $this->viewerWithRole('support_worker');
-        $site = Site::factory()->create(['tenant_id' => 42]);
+        $site = Site::factory()->create([]);
         HrEmployeeProfile::factory()->create([
             'user_id' => $viewer->id,
             'primary_site_id' => $site->id,
@@ -223,27 +238,27 @@ class HealthcareWorkspaceTest extends TestCase
             'is_active' => true,
         ]);
         $assignedClient = Client::factory()->create([
-            'organization_id' => 42,
+
             'site_id' => $site->id,
             'preferred_name' => 'Assigned person',
         ]);
         $otherClient = Client::factory()->create([
-            'organization_id' => 42,
+
             'site_id' => $site->id,
             'preferred_name' => 'Other person',
         ]);
-        $foreignClient = Client::factory()->create([
-            'organization_id' => 77,
-            'preferred_name' => 'Foreign person',
+        $unrelatedClient = Client::factory()->create([
+
+            'preferred_name' => 'Unrelated person',
         ]);
         $viewer->assignedClients()->attach($assignedClient->id);
 
         $assignedDevice = $this->healthcareDevice('Assigned detector');
         $otherDevice = $this->healthcareDevice('Other detector');
-        $foreignDevice = $this->healthcareDevice('Foreign detector', ['tenant_id' => 77]);
+        $unrelatedDevice = $this->healthcareDevice('Unrelated detector', []);
         $this->assign($assignedDevice, DeviceAssignment::TARGET_CLIENT, $assignedClient->id);
         $this->assign($otherDevice, DeviceAssignment::TARGET_CLIENT, $otherClient->id);
-        $this->assign($foreignDevice, DeviceAssignment::TARGET_CLIENT, $foreignClient->id);
+        $this->assign($unrelatedDevice, DeviceAssignment::TARGET_CLIENT, $unrelatedClient->id);
 
         $this->actingAs($viewer)
             ->get('/security-devices/healthcare?tab=client-devices')
@@ -267,14 +282,14 @@ class HealthcareWorkspaceTest extends TestCase
             ->get("/security-devices/devices/{$otherDevice->id}")
             ->assertNotFound();
         $this->actingAs($viewer)
-            ->get("/security-devices/devices/{$foreignDevice->id}")
+            ->get("/security-devices/devices/{$unrelatedDevice->id}")
             ->assertNotFound();
     }
 
     public function test_client_tab_is_restricted_without_client_context_permission_and_leaks_no_counts(): void
     {
         $viewer = $this->viewerWithRole('team_lead');
-        $client = Client::factory()->create(['organization_id' => 42]);
+        $client = Client::factory()->create();
         $device = $this->healthcareDevice('Restricted client device');
         $this->assign($device, DeviceAssignment::TARGET_CLIENT, $client->id);
 
@@ -294,8 +309,8 @@ class HealthcareWorkspaceTest extends TestCase
     public function test_integration_management_does_not_bypass_client_context_permission(): void
     {
         $viewer = $this->viewerWithRole('it_manager');
-        $client = Client::factory()->create(['organization_id' => 42]);
-        $site = Site::factory()->create(['tenant_id' => 42]);
+        $client = Client::factory()->create();
+        $site = Site::factory()->create([]);
         $clientDevice = $this->healthcareDevice('Client device hidden from IT');
         $siteDevice = $this->healthcareDevice('Site device visible to IT');
         $this->assign($clientDevice, DeviceAssignment::TARGET_CLIENT, $client->id);
@@ -336,12 +351,11 @@ class HealthcareWorkspaceTest extends TestCase
     public function test_shared_site_devices_show_service_responsibility_without_implying_client_assignment(): void
     {
         $siteLead = User::factory()->create([
-            'organization_id' => 42,
+
             'approved_at' => now(),
             'name' => 'Kauri Site Lead',
         ]);
         $site = Site::factory()->create([
-            'tenant_id' => 42,
             'name' => 'Kauri House',
             'primary_contact_user_id' => $siteLead->id,
         ]);
@@ -466,10 +480,12 @@ class HealthcareWorkspaceTest extends TestCase
     private function viewerWithRole(string $role): User
     {
         $viewer = User::factory()->create([
-            'organization_id' => 42,
+            'role' => $role,
             'approved_at' => now(),
         ]);
-        $viewer->roles()->attach(Role::query()->where('name', $role)->firstOrFail());
+        $viewer->roles()->syncWithoutDetaching([
+            Role::query()->where('name', $role)->firstOrFail()->id,
+        ]);
 
         return $viewer;
     }
@@ -477,7 +493,6 @@ class HealthcareWorkspaceTest extends TestCase
     private function healthcareDevice(string $name, array $attributes = []): Device
     {
         return Device::factory()->iotHealthcare()->create([
-            'tenant_id' => 42,
             'name' => $name,
             ...$attributes,
         ]);
@@ -495,6 +510,7 @@ class HealthcareWorkspaceTest extends TestCase
             'assignable_id' => $id,
             'assignment_type' => $assignmentType,
             'assigned_at' => now(),
+            'assigned_by_user_id' => $this->admin->id,
         ]);
     }
 }

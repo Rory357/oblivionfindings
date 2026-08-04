@@ -14,7 +14,7 @@ use App\Models\ItTicketEvent;
 use App\Models\Site;
 use App\Models\User;
 use App\Notifications\It\MajorIncidentUpdateNotification;
-use App\Support\LegacyStorageContext;
+use App\Services\AuditLogger;
 use DomainException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
@@ -41,9 +41,7 @@ final class ItMajorIncidentService
                 throw new DomainException('Choose an approved Site or authorised organisation-wide scope.');
             }
 
-            $storageContextId = LegacyStorageContext::id();
             $ticket = ItTicket::createWithReference([
-                'tenant_id' => $storageContextId,
                 'title' => $data['title'],
                 'description' => $data['description'] ?? null,
                 'requester_user_id' => $actor->id,
@@ -67,7 +65,6 @@ final class ItMajorIncidentService
             $this->guardCommandUser($ticket, $data['communications_lead_user_id'] ?? null, 'communications lead');
 
             $majorIncident = ItMajorIncident::query()->create([
-                'tenant_id' => $storageContextId,
                 'ticket_id' => $ticket->id,
                 'severity' => $data['severity'],
                 'impact_summary' => $data['impact_summary'],
@@ -80,6 +77,15 @@ final class ItMajorIncidentService
                 'updated_by_user_id' => $actor->id,
             ]);
             $this->syncLinks($majorIncident, $actor, $data);
+            AuditLogger::logOrFail('it.major_incident.created', $ticket, [
+                'actor_id' => $actor->id,
+                'major_incident_id' => $majorIncident->id,
+                'site_id' => $ticket->site_id,
+                'is_organisation_wide' => (bool) $ticket->is_organisation_wide,
+                'severity' => $majorIncident->severity,
+                'target_update_minutes' => $majorIncident->target_update_minutes,
+                'application_scope' => 'single_application',
+            ]);
 
             return $majorIncident->fresh(['ticket', 'commander', 'communicationsLead']);
         });
@@ -126,6 +132,14 @@ final class ItMajorIncidentService
                 'major_incident_fields' => $profileFields,
                 'links_updated' => $this->linksWereSupplied($data),
             ]);
+            AuditLogger::logOrFail('it.major_incident.updated', $ticket, [
+                'actor_id' => $actor->id,
+                'major_incident_id' => $majorIncident->id,
+                'ticket_fields' => $ticketFields,
+                'major_incident_fields' => $profileFields,
+                'links_updated' => $this->linksWereSupplied($data),
+                'application_scope' => 'single_application',
+            ]);
 
             return $majorIncident->fresh(['ticket', 'commander', 'communicationsLead']);
         });
@@ -137,7 +151,6 @@ final class ItMajorIncidentService
         return DB::transaction(function () use ($majorIncident, $actor, $data): ItMajorIncidentUpdate {
             $majorIncident = $this->lockedMajorIncident($majorIncident, $actor);
             $update = $majorIncident->updates()->create([
-                'tenant_id' => LegacyStorageContext::id(),
                 ...Arr::only($data, ['update_kind', 'audience', 'summary', 'service_status']),
                 'published_at' => now(),
                 'author_user_id' => $actor->id,
@@ -153,6 +166,15 @@ final class ItMajorIncidentService
                 'update_id' => $update->id,
                 'audience' => $update->audience,
                 'update_kind' => $update->update_kind,
+            ]);
+            AuditLogger::logOrFail('it.major_incident.update.published', $majorIncident->ticket, [
+                'actor_id' => $actor->id,
+                'major_incident_id' => $majorIncident->id,
+                'update_id' => $update->id,
+                'audience' => $update->audience,
+                'update_kind' => $update->update_kind,
+                'service_status' => $update->service_status,
+                'application_scope' => 'single_application',
             ]);
 
             if (in_array($update->audience, ['staff', 'public'], true)) {

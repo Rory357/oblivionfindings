@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Domain\It\Services\ItTicketMergeService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Models\ItTicket;
 use App\Models\User;
@@ -13,7 +14,10 @@ use App\Models\User;
  */
 class ItTicketPolicy
 {
-    public function __construct(private readonly ItWorkAccessService $access) {}
+    public function __construct(
+        private readonly ItWorkAccessService $access,
+        private readonly ItTicketMergeService $mergeService,
+    ) {}
 
     /** Raise a ticket (self-service or agent log-and-triage). */
     public function create(User $user): bool
@@ -79,7 +83,8 @@ class ItTicketPolicy
             && $ticket->merged_into_ticket_id === null
             && $target->merged_into_ticket_id === null
             && $ticket->status !== 'closed'
-            && $target->status !== 'closed';
+            && $target->status !== 'closed'
+            && $this->mergeService->sharesConversationAudience($ticket, $target);
     }
 
     /**

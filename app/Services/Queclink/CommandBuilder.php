@@ -75,20 +75,23 @@ class CommandBuilder
     /**
      * Pre-canned commands for the debug console one-click buttons.
      */
-    public function requestLocation(string $family): array
+    public function requestLocation(string $family, #[\SensitiveParameter] ?string $password = null): array
     {
         // AT+GTRTO=password,1,,,,,serial$ — sub-command 1 = "request location".
-        return $this->build($family, 'RTO', [1, '', '', '', '', '']);
+        return $this->build($family, 'RTO', [1, '', '', '', '', ''], $password);
     }
 
-    public function reboot(string $family): array
+    public function reboot(string $family, #[\SensitiveParameter] ?string $password = null): array
     {
         // AT+GTRTO=password,3,,,,,serial$ — sub-command 3 = "reboot device".
-        return $this->build($family, 'RTO', [3, '', '', '', '', '']);
+        return $this->build($family, 'RTO', [3, '', '', '', '', ''], $password);
     }
 
-    public function readConfiguration(string $family, ?string $section = null): array
-    {
+    public function readConfiguration(
+        string $family,
+        ?string $section = null,
+        #[\SensitiveParameter] ?string $password = null,
+    ): array {
         $section = strtoupper(trim((string) $section));
         if ($section === '' || $section === 'ALL') {
             $section = '';
@@ -99,7 +102,7 @@ class CommandBuilder
         }
 
         // AT+GTRTO=password,2,<section>,,,,,serial$ — sub-command 2 = READ.
-        return $this->build($family, 'RTO', [2, $section, '', '', '', '']);
+        return $this->build($family, 'RTO', [2, $section, '', '', '', ''], $password);
     }
 
     /**

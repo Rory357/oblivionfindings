@@ -3,6 +3,7 @@
 namespace App\Models\Queclink;
 
 use App\Domain\SecurityDevices\Models\Device;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Site;
 use App\Models\User;
@@ -11,12 +12,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class QueclinkAuditEvent extends Model
 {
+    use WritesLegacyStorageContext;
+
     protected $table = 'queclink_audit_events';
 
     public const UPDATED_AT = null;
 
     protected $fillable = [
-        'tenant_id',
         'provider_connection_id',
         'site_id',
         'canonical_device_id',

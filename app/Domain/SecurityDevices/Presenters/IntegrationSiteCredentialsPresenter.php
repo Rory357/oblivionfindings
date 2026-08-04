@@ -27,7 +27,7 @@ class IntegrationSiteCredentialsPresenter
             ->where('provider', $provider)
             ->whereIn('site_id', $siteIds)
             ->whereHas('site')
-            ->with('site:id,name,tenant_id')
+            ->with('site:id,name')
             ->orderBy('site_id')
             ->orderBy('capability')
             ->get()

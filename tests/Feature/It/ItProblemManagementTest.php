@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\ItProblem;
 use App\Models\ItTicket;
 use App\Models\ItTicketApproval;
@@ -71,7 +72,12 @@ test('an agent creates and finds a canonical investigating problem record', func
         ->and($problem->ticket->first_response_due_at)->not->toBeNull()
         ->and($problem->impact_summary)->toContain('remote access')
         ->and($problem->ticket->events()->where('type', 'created')->count())->toBe(1)
-        ->and($problem->ticket->events()->where('type', 'workflow_transitioned')->count())->toBe(1);
+        ->and($problem->ticket->events()->where('type', 'workflow_transitioned')->count())->toBe(1)
+        ->and(AuditLog::query()
+            ->where('action', 'it.problem.created')
+            ->where('auditable_id', $problem->ticket_id)
+            ->where('meta->problem_id', $problem->id)
+            ->exists())->toBeTrue();
 
     $this->actingAs($this->agent)
         ->get('/it/problems?state=investigating&q=VPN')
@@ -100,6 +106,10 @@ test('root cause workaround and corrective action govern known error resolution 
             'next_action' => 'Schedule the permanent-fix change.',
         ])
         ->assertRedirect();
+    expect(AuditLog::query()
+        ->where('action', 'it.problem.updated')
+        ->where('auditable_id', $problem->ticket_id)
+        ->exists())->toBeTrue();
     $this->actingAs($this->agent)
         ->post("/it/problems/{$problem->id}/transitions", [
             'workflow_state' => 'known_error',
@@ -170,14 +180,12 @@ test('affected incidents and the permanent fix change receive reciprocal typed l
 test('the problem workspace projects the shared ticket conversation tasks approvals and timeline', function () {
     $problem = problemAtSite($this->site);
     $problem->ticket->comments()->create([
-        'tenant_id' => 1,
         'author_user_id' => $this->agent->id,
         'body' => 'Investigation started.',
         'is_internal' => true,
     ]);
-    ItWorkTask::factory()->create(['tenant_id' => 1, 'ticket_id' => $problem->ticket_id]);
+    ItWorkTask::factory()->create(['ticket_id' => $problem->ticket_id]);
     ItTicketApproval::query()->create([
-        'tenant_id' => 1,
         'it_ticket_id' => $problem->ticket_id,
         'requested_by' => $this->agent->id,
         'status' => 'pending',

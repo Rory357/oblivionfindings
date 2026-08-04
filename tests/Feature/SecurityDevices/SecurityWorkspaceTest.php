@@ -2,11 +2,14 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
+use App\Models\Asset;
+use App\Models\Client;
 use App\Models\ControlRoom\Device as ControlRoomDevice;
 use App\Models\ControlRoomAlert;
 use App\Models\Permission;
@@ -32,7 +35,7 @@ class SecurityWorkspaceTest extends TestCase
         $this->seed(SecurityDevicesPermissionsSeeder::class);
 
         $this->admin = User::factory()->create([
-            'organization_id' => 42,
+
             'approved_at' => now(),
         ]);
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
@@ -40,40 +43,36 @@ class SecurityWorkspaceTest extends TestCase
 
     public function test_overview_reconciles_security_inventory_site_impact_and_required_actions(): void
     {
-        $entrance = Site::factory()->create(['tenant_id' => 42, 'name' => 'Harbour Entrance']);
-        $office = Site::factory()->create(['tenant_id' => 42, 'name' => 'Harbour Office']);
-        $foreignSite = Site::factory()->create(['tenant_id' => 77, 'name' => 'Foreign Site']);
+        $entrance = Site::factory()->create(['name' => 'Harbour Entrance']);
+        $office = Site::factory()->create(['name' => 'Harbour Office']);
+        $unrelatedSite = Site::factory()->create(['name' => 'Unrelated Site']);
 
         $camera = Device::factory()->offline()->create([
-            'tenant_id' => 42,
             'domain' => 'security',
             'category' => 'cctv',
             'name' => 'Front camera',
             'health_status' => HealthStatus::Critical,
         ]);
         $alarm = Device::factory()->create([
-            'tenant_id' => 42,
             'domain' => 'security',
             'category' => 'alarm',
             'name' => 'Main alarm panel',
         ]);
         $door = Device::factory()->create([
-            'tenant_id' => 42,
             'domain' => 'security',
             'category' => 'access_control',
             'name' => 'Front door reader',
         ]);
-        $foreign = Device::factory()->offline()->create([
-            'tenant_id' => 77,
+        $unrelated = Device::factory()->offline()->create([
             'domain' => 'security',
             'category' => 'cctv',
-            'name' => 'Foreign camera',
+            'name' => 'Unrelated camera',
         ]);
 
         $this->assignToSite($camera, $entrance);
         $this->assignToSite($alarm, $office);
         $this->assignToSite($door, $office);
-        $this->assignToSite($foreign, $foreignSite);
+        $this->assignToSite($unrelated, $unrelatedSite);
 
         DeviceEvent::create([
             'device_id' => $alarm->id,
@@ -114,7 +113,7 @@ class SecurityWorkspaceTest extends TestCase
                     collect($security['overview']['requiredActions'])->pluck('key')->all(),
                 );
                 $this->assertContains(
-                    'Foreign camera',
+                    'Unrelated camera',
                     collect($security['activeTab']['devices'])->pluck('name')->all(),
                 );
                 $this->assertArrayNotHasKey('commands', $security);
@@ -124,9 +123,8 @@ class SecurityWorkspaceTest extends TestCase
 
     public function test_cctv_tab_exposes_only_observed_health_assignment_maintenance_and_authorised_media_links(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42, 'name' => 'Camera Site']);
+        $site = Site::factory()->create(['name' => 'Camera Site']);
         $camera = Device::factory()->create([
-            'tenant_id' => 42,
             'domain' => 'security',
             'category' => 'cctv',
             'subcategory' => 'dome_camera',
@@ -168,6 +166,12 @@ class SecurityWorkspaceTest extends TestCase
             });
 
         $viewer = $this->viewerWithRole('provider_manager');
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
         $this->assignToStaff($camera, $viewer);
 
         $this->actingAs($viewer)
@@ -184,7 +188,6 @@ class SecurityWorkspaceTest extends TestCase
     public function test_cctv_media_link_must_be_an_internal_path_even_for_an_authorised_viewer(): void
     {
         Device::factory()->create([
-            'tenant_id' => 42,
             'domain' => 'security',
             'category' => 'cctv',
             'config' => ['media_href' => 'https://camera-admin.example.test/live?token=secret'],
@@ -203,9 +206,8 @@ class SecurityWorkspaceTest extends TestCase
 
     public function test_alarm_tab_combines_panels_sensors_events_maintenance_and_control_room_context(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42, 'name' => 'Alarm Site']);
+        $site = Site::factory()->create(['name' => 'Alarm Site']);
         $panel = Device::factory()->create([
-            'tenant_id' => 42,
             'domain' => 'security',
             'category' => 'alarm',
             'subcategory' => 'panel',
@@ -216,7 +218,6 @@ class SecurityWorkspaceTest extends TestCase
             ],
         ]);
         $sensor = Device::factory()->create([
-            'tenant_id' => 42,
             'domain' => 'security',
             'category' => 'perimeter',
             'subcategory' => 'beam_sensor',
@@ -263,7 +264,6 @@ class SecurityWorkspaceTest extends TestCase
     public function test_access_control_is_physical_hardware_with_provider_capabilities_and_history_not_software_rbac(): void
     {
         $door = Device::factory()->create([
-            'tenant_id' => 42,
             'domain' => 'security',
             'category' => 'access_control',
             'subcategory' => 'card_reader',
@@ -275,7 +275,6 @@ class SecurityWorkspaceTest extends TestCase
             ],
         ]);
         Device::factory()->create([
-            'tenant_id' => 42,
             'domain' => 'it_infrastructure',
             'category' => 'endpoint',
             'name' => 'RBAC administration workstation',
@@ -308,7 +307,6 @@ class SecurityWorkspaceTest extends TestCase
     public function test_security_events_tab_reuses_canonical_events_and_is_restricted_without_event_permission(): void
     {
         $device = Device::factory()->create([
-            'tenant_id' => 42,
             'domain' => 'security',
             'category' => 'alarm',
             'name' => 'Restricted panel',
@@ -357,10 +355,149 @@ class SecurityWorkspaceTest extends TestCase
         $this->assertTrue($this->viewerWithRole('it_manager')->canDo('securityDevices.cctv.media.view'));
     }
 
+    public function test_person_assignment_links_follow_canonical_client_and_hr_profile_access(): void
+    {
+        $site = Site::factory()->create(['name' => 'Person Assignment Site']);
+        $manager = $this->viewerWithRole('provider_manager');
+        $managerProfile = HrEmployeeProfile::factory()->create([
+            'user_id' => $manager->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
+        $client = Client::factory()->create([
+            'site_id' => $site->id,
+            'first_name' => 'Aroha',
+            'last_name' => 'Rangi',
+            'preferred_name' => 'Aroha',
+        ]);
+        $clientPanel = Device::factory()->create([
+            'domain' => 'security',
+            'category' => 'alarm',
+            'name' => 'Aroha safety panel',
+        ]);
+        $managerPanel = Device::factory()->create([
+            'domain' => 'security',
+            'category' => 'alarm',
+            'name' => 'Manager lone-work panel',
+        ]);
+        $this->assignToClient($clientPanel, $client);
+        $this->assignToStaff($managerPanel, $manager);
+
+        $this->actingAs($manager)
+            ->get('/security-devices/security?tab=alarms')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($client, $manager, $managerProfile): void {
+                $devices = collect($page->toArray()['props']['securityWorkspace']['activeTab']['devices'])
+                    ->keyBy('name');
+
+                $this->assertSame('Aroha', $devices['Aroha safety panel']['assignment']['label']);
+                $this->assertSame(
+                    "/operations/clients/{$client->id}",
+                    $devices['Aroha safety panel']['assignment']['href'],
+                );
+                $this->assertArrayNotHasKey('id', $devices['Aroha safety panel']['assignment']);
+                $this->assertSame($manager->name, $devices['Manager lone-work panel']['assignment']['label']);
+                $this->assertSame(
+                    "/hr/people/{$managerProfile->id}",
+                    $devices['Manager lone-work panel']['assignment']['href'],
+                );
+                $this->assertArrayNotHasKey('id', $devices['Manager lone-work panel']['assignment']);
+            });
+
+        $worker = $this->viewerWithRole('support_worker');
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $worker->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
+        $client->supportWorkers()->attach($worker->id);
+        $workerPanel = Device::factory()->create([
+            'domain' => 'security',
+            'category' => 'alarm',
+            'name' => 'Worker lone-work panel',
+        ]);
+        $this->assignToStaff($workerPanel, $worker);
+
+        $this->actingAs($worker)
+            ->get('/security-devices/security?tab=alarms')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($client, $worker): void {
+                $devices = collect($page->toArray()['props']['securityWorkspace']['activeTab']['devices'])
+                    ->keyBy('name');
+
+                $this->assertSame(
+                    "/operations/clients/{$client->id}",
+                    $devices['Aroha safety panel']['assignment']['href'],
+                );
+                $this->assertSame($worker->name, $devices['Worker lone-work panel']['assignment']['label']);
+                $this->assertNull($devices['Worker lone-work panel']['assignment']['href']);
+                $this->assertArrayNotHasKey('Manager lone-work panel', $devices->all());
+            });
+    }
+
+    public function test_person_and_vehicle_assignments_project_one_canonical_accessible_site(): void
+    {
+        $site = Site::factory()->create(['name' => 'Integrated Security Site']);
+        $client = Client::factory()->create([
+            'site_id' => $site->id,
+            'status' => 'active',
+        ]);
+        $staff = User::factory()->create(['approved_at' => now()]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $staff->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
+        $vehicle = Asset::factory()->vehicle()->forSite($site)->create([
+            'home_site_id' => $site->id,
+            'status' => 'active',
+        ]);
+        $devices = collect([
+            [$client, DeviceAssignment::TARGET_CLIENT, 'Client alarm panel'],
+            [$staff, DeviceAssignment::TARGET_STAFF, 'Staff alarm panel'],
+            [$vehicle, DeviceAssignment::TARGET_VEHICLE, 'Vehicle alarm panel'],
+        ])->map(function (array $assignment): Device {
+            [$target, $type, $name] = $assignment;
+            $device = Device::factory()->offline()->create([
+                'domain' => 'security',
+                'category' => 'alarm',
+                'name' => $name,
+            ]);
+            DeviceAssignment::query()->create([
+                'device_id' => $device->id,
+                'assignable_type' => $type,
+                'assignable_id' => $target->id,
+                'assignment_type' => 'permanent',
+                'assigned_at' => now(),
+            ]);
+
+            return $device;
+        });
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/security?tab=alarms')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($devices, $site): void {
+                $workspace = $page->toArray()['props']['securityWorkspace'];
+                $projected = collect($workspace['activeTab']['devices'])
+                    ->whereIn('id', $devices->pluck('id')->all());
+
+                $this->assertCount(3, $projected);
+                $this->assertSame(
+                    [$site->id],
+                    $projected->pluck('site.id')->unique()->values()->all(),
+                );
+                $this->assertSame(1, $workspace['overview']['attention']['sites']);
+            });
+    }
+
     private function viewerWithRole(string $role): User
     {
         $viewer = User::factory()->create([
-            'organization_id' => 42,
+
             'approved_at' => now(),
         ]);
         $viewer->roles()->attach(Role::query()->where('name', $role)->firstOrFail());
@@ -385,6 +522,17 @@ class SecurityWorkspaceTest extends TestCase
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_STAFF,
             'assignable_id' => $viewer->id,
+            'assignment_type' => 'permanent',
+            'assigned_at' => now(),
+        ]);
+    }
+
+    private function assignToClient(Device $device, Client $client): void
+    {
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_CLIENT,
+            'assignable_id' => $client->id,
             'assignment_type' => 'permanent',
             'assigned_at' => now(),
         ]);

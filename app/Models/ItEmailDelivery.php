@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,12 +10,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ItEmailDelivery extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     public const STATUSES = ['queued', 'sending', 'accepted', 'delivered', 'failed', 'bounced', 'retried'];
 
     protected $fillable = [
-        'tenant_id', 'notification_uuid', 'retry_of_delivery_id', 'it_ticket_id', 'it_provisioning_request_id',
+        'notification_uuid', 'retry_of_delivery_id', 'it_ticket_id', 'it_provisioning_request_id',
         'it_ticket_comment_id',
         'recipient_user_id', 'recipient_email', 'notification_type', 'audience',
         'notification_context', 'subject', 'provider', 'provider_message_id', 'status', 'attempt_count',
@@ -64,10 +64,5 @@ class ItEmailDelivery extends Model
     public function retryAttempt(): HasOne
     {
         return $this->hasOne(self::class, 'retry_of_delivery_id');
-    }
-
-    public function scopeForTenant(Builder $query, int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 }

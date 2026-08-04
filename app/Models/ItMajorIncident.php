@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,12 +10,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ItMajorIncident extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     public const SEVERITIES = ['sev1', 'sev2', 'sev3', 'sev4'];
 
     protected $fillable = [
-        'tenant_id', 'ticket_id', 'severity', 'impact_summary', 'commander_user_id',
+        'ticket_id', 'severity', 'impact_summary', 'commander_user_id',
         'communications_lead_user_id', 'target_update_minutes', 'declared_at',
         'next_update_due_at', 'restoration_summary', 'restored_at', 'root_cause_summary',
         'review_summary', 'reviewed_at', 'created_by_user_id', 'updated_by_user_id',
@@ -47,11 +47,6 @@ class ItMajorIncident extends Model
     public function updates(): HasMany
     {
         return $this->hasMany(ItMajorIncidentUpdate::class, 'major_incident_id')->latest('published_at')->latest('id');
-    }
-
-    public function scopeForTenant(Builder $query, int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 
     public function updateState(): string

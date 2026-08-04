@@ -446,10 +446,27 @@ describe('IT & Support grouped navigation', () => {
                                     type: 'textarea',
                                     required: true,
                                 },
+                                {
+                                    key: 'employee_profile_id',
+                                    label: 'Who needs this?',
+                                    type: 'employee',
+                                    required: true,
+                                },
                             ],
                         },
                     },
                 ]}
+                fieldOptions={{
+                    employee: [
+                        {
+                            id: 42,
+                            name: 'Aroha Worker',
+                            detail: 'Harbour House',
+                        },
+                    ],
+                    user: [],
+                    asset: [],
+                }}
             />,
         );
 
@@ -466,5 +483,9 @@ describe('IT & Support grouped navigation', () => {
             screen.getByRole('heading', { name: 'Request VPN access' }),
         ).toBeVisible();
         expect(screen.getByLabelText(/What do you need/)).toBeVisible();
+        expect(screen.getByLabelText(/Who needs this/)).toHaveValue('');
+        expect(
+            screen.getByRole('option', { name: /Aroha Worker.*Harbour House/ }),
+        ).toBeVisible();
     });
 });

@@ -13,7 +13,6 @@ use App\Models\ItProvisioningTemplateTask;
 use App\Models\ItProvisioningWorkflow;
 use App\Models\User;
 use App\Services\AuditLogger;
-use App\Support\LegacyStorageContext;
 use Carbon\CarbonInterface;
 use DomainException;
 use Illuminate\Support\Carbon;
@@ -109,7 +108,6 @@ final class ItProvisioningWorkflowService
             $safeChanges = array_intersect_key($changes, array_flip(ItProvisioningTemplateTask::TRIGGER_FIELDS));
 
             $workflow = ItProvisioningWorkflow::query()->create([
-                'tenant_id' => LegacyStorageContext::id(),
                 'employee_profile_id' => $profile->id,
                 'provisioning_template_id' => $template->id,
                 'lifecycle_type' => $lifecycleType,
@@ -296,7 +294,6 @@ final class ItProvisioningWorkflowService
         array $changes,
     ): ItProvisioningRequest {
         return ItProvisioningRequest::query()->create([
-            'tenant_id' => LegacyStorageContext::id(),
             'employee_profile_id' => $profile->id,
             'provisioning_workflow_id' => $workflow->id,
             'provisioning_template_task_id' => $task->id,
@@ -352,7 +349,6 @@ final class ItProvisioningWorkflowService
                 $workflow, $profile, $actorId, $effectiveAt, $stage, $sourceTaskId, $baseContext,
             ): void {
                 ItProvisioningRequest::query()->create([
-                    'tenant_id' => LegacyStorageContext::id(),
                     'employee_profile_id' => $profile->id,
                     'provisioning_workflow_id' => $workflow->id,
                     'offboarding_task_id' => $sourceTaskId,
@@ -394,7 +390,6 @@ final class ItProvisioningWorkflowService
                 $workflow, $profile, $actorId, $effectiveAt, $stage, $sourceTaskId, $baseContext,
             ): void {
                 ItProvisioningRequest::query()->create([
-                    'tenant_id' => LegacyStorageContext::id(),
                     'employee_profile_id' => $profile->id,
                     'provisioning_workflow_id' => $workflow->id,
                     'offboarding_task_id' => $sourceTaskId,

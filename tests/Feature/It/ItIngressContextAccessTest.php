@@ -73,7 +73,6 @@ function assignIngressDeviceToSite(Device $device, Site $site, User $actor): voi
 function linkIngressContext(ItTicket $ticket, object $target, string $relationship): void
 {
     $ticket->links()->create([
-        'tenant_id' => $ticket->tenant_id,
         'relationship' => $relationship,
         'linkable_type' => $target->getMorphClass(),
         'linkable_id' => $target->getKey(),
@@ -194,7 +193,6 @@ test('inbound replies accept participants responsible staff watcher and explicit
         'is_sensitive' => true,
     ]);
     ItMailboxConnection::query()->create([
-        'tenant_id' => 0,
         'provider' => ItMailboxConnection::PROVIDER_MICROSOFT,
         'status' => ItMailboxConnection::STATUS_CONNECTED,
         'access_token' => 'connected-mailbox-token',
@@ -480,7 +478,6 @@ test('email delivery retry rechecks current ticket scope and fails closed for un
         'updated_by' => $actor->id,
     ]);
     $provisioning = ItProvisioningRequest::query()->create([
-        'tenant_id' => 0,
         'employee_profile_id' => $profile->id,
         'type' => 'account',
         'item' => 'Create mailbox',

@@ -55,7 +55,7 @@ type TrackingDevice = {
     person: {
         id: number;
         displayName: string;
-        href: string;
+        href: string | null;
     } | null;
     asset: {
         id: number;
@@ -404,12 +404,18 @@ function DeviceCard({ device }: { device: TrackingDevice }) {
                 {device.person ? (
                     <div className="flex items-center gap-2">
                         <UserRound className="h-4 w-4 text-muted-foreground" />
-                        <Link
-                            href={device.person.href}
-                            className="font-medium text-primary hover:underline"
-                        >
-                            {device.person.displayName}
-                        </Link>
+                        {device.person.href ? (
+                            <Link
+                                href={device.person.href}
+                                className="font-medium text-primary hover:underline"
+                            >
+                                {device.person.displayName}
+                            </Link>
+                        ) : (
+                            <span className="font-medium">
+                                {device.person.displayName}
+                            </span>
+                        )}
                         <span className="text-muted-foreground">
                             • {headline(device.personalSafety?.personType)}
                         </span>

@@ -4,22 +4,30 @@ namespace App\Http\Controllers\It;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Notifications\ItProvisioningCancelledNotification;
-use App\Domain\Hr\Services\OnboardingService;
-use App\Domain\It\Data\ItTransitionInput;
-use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\ItStaffDirectory;
+use App\Domain\It\Presenters\ItTicketRoutingPresenter;
+use App\Domain\It\Services\ItCatalogFieldOptionService;
 use App\Domain\It\Services\ItEmailDeliveryService;
+use App\Domain\It\Services\ItLinkedContextOptions;
 use App\Domain\It\Services\ItProvisioningAccessService;
 use App\Domain\It\Services\ItProvisioningRequestLifecycleService;
-use App\Domain\It\Services\ItTicketRoutingService;
+use App\Domain\It\Services\ItTicketIntakeService;
+use App\Domain\It\Services\ItTicketInteractionService;
+use App\Domain\It\Services\ItTicketTriageService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\It\Services\ItWorkTransitionService;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\It\ApproveProvisioningRequestRequest;
+use App\Http\Requests\It\AssignProvisioningRequestRequest;
 use App\Http\Requests\It\BulkProvisioningActionRequest;
+use App\Http\Requests\It\CancelProvisioningRequestRequest;
+use App\Http\Requests\It\FailProvisioningRequestRequest;
+use App\Http\Requests\It\FulfilProvisioningRequestRequest;
 use App\Http\Requests\It\ResolveTicketRequest;
+use App\Http\Requests\It\StoreItTicketRequest;
 use App\Http\Requests\It\StoreProvisioningRequestRequest;
 use App\Http\Requests\It\UpdateSlaPoliciesRequest;
-use App\Models\Asset;
+use App\Http\Requests\It\UpdateTicketRequest;
 use App\Models\ItCatalogItem;
 use App\Models\ItKbArticle;
 use App\Models\ItProvisioningRequest;
@@ -30,18 +38,13 @@ use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\Site;
 use App\Models\User;
-use App\Notifications\It\TicketAssignedNotification;
 use App\Notifications\It\TicketCreatedNotification;
 use App\Notifications\It\TicketResolvedNotification;
 use App\Support\It\BusinessHours;
-use App\Support\LegacyStorageContext;
 use DomainException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 /**
@@ -52,16 +55,20 @@ use Inertia\Inertia;
  */
 class ItProvisioningController extends Controller
 {
-    use Concerns\BuildsItOptions, Concerns\StoresItAttachments;
+    use Concerns\BuildsItOptions;
 
     public function __construct(
-        private readonly OnboardingService $onboardingService,
         private readonly ItWorkTransitionService $transitionService,
-        private readonly ItTicketRoutingService $routingService,
+        private readonly ItTicketIntakeService $ticketIntake,
+        private readonly ItTicketInteractionService $ticketInteractions,
+        private readonly ItTicketTriageService $triageService,
         private readonly ItProvisioningRequestLifecycleService $provisioningLifecycle,
         private readonly ItEmailDeliveryService $emailDeliveries,
         private readonly ItWorkAccessService $workAccess,
         private readonly ItProvisioningAccessService $provisioningAccess,
+        private readonly ItCatalogFieldOptionService $catalogFieldOptions,
+        private readonly ItLinkedContextOptions $linkedContextOptions,
+        private readonly ItTicketRoutingPresenter $routingPresenter,
     ) {}
 
     /* ================================================================== */
@@ -114,6 +121,9 @@ class ItProvisioningController extends Controller
             'assignees' => $this->staffUserOptions($user),
             'employeeOptions' => $this->employeeOptions($user),
             'assetOptions' => $this->assetOptions($user),
+            'siteOptions' => $this->linkedContextOptions->sites($user),
+            'deviceOptions' => $this->linkedContextOptions->devices($user),
+            'serviceOptions' => $this->linkedContextOptions->services(),
             'filters' => $filters,
             // The effective SLA targets go to every agent — the Log & triage
             // wizard reads them for its live "resolution due …" preview. Only
@@ -140,18 +150,28 @@ class ItProvisioningController extends Controller
             ],
         ] : [];
 
+        $catalogItems = $canRequest ? ItCatalogItem::query()
+            ->published()
+            ->when(! $canManage, fn ($query) => $query->where('internal_only', false))
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (ItCatalogItem $item) => $item->discoveryPayload($canManage))
+            ->values() : collect();
+        $catalogEntityTypes = $catalogItems
+            ->flatMap(fn (array $item) => collect($item['form_schema']['fields'] ?? [])->pluck('type'))
+            ->filter(fn (mixed $type): bool => in_array($type, ItCatalogFieldOptionService::TYPES, true))
+            ->unique()
+            ->values()
+            ->all();
+
         return Inertia::render('it/index', [
             ...$agentProps,
             'myTickets' => $canRequest ? $this->myTicketRows($user) : [],
-            'catalogItems' => $canRequest ? ItCatalogItem::query()
-                ->published()
-                ->when(! $canManage, fn ($query) => $query->where('internal_only', false))
-                ->orderBy('sort_order')
-                ->orderBy('name')
-                ->get()
-                ->map(fn (ItCatalogItem $item) => $item->discoveryPayload($canManage))
-                ->values()
-                ->all() : [],
+            'catalogItems' => $catalogItems->all(),
+            'catalogFieldOptions' => $canRequest
+                ? $this->catalogFieldOptions->forTypes($user, $catalogEntityTypes)
+                : ['employee' => [], 'user' => [], 'asset' => []],
             // Requester KB browse (§I) — pure requesters only; agents browse the
             // full catalogue in their Knowledge tab.
             'kbPublished' => ($canRequest && ! $isAgent) ? $this->kbPublished($user) : [],
@@ -178,7 +198,7 @@ class ItProvisioningController extends Controller
 
         foreach (ItTicket::PRIORITIES as $priority) {
             ItSlaPolicy::query()->updateOrCreate(
-                ['tenant_id' => LegacyStorageContext::id(), 'priority' => $priority],
+                ['priority' => $priority],
                 [
                     'first_response_minutes' => (int) $request->validated("{$priority}.first_response_minutes"),
                     'resolution_minutes' => (int) $request->validated("{$priority}.resolution_minutes"),
@@ -295,49 +315,30 @@ class ItProvisioningController extends Controller
     /*  Provisioning requests */
     /* ================================================================== */
 
-    public function assign(Request $request, ItProvisioningRequest $provisioning)
+    public function assign(AssignProvisioningRequestRequest $request, ItProvisioningRequest $provisioning)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('it.manage'), 403);
         abort_unless($this->provisioningAccess->canManage($user, $provisioning), 404);
 
-        $validated = $request->validate([
-            'assigned_to_user_id' => ['required', 'integer', 'exists:users,id'],
-        ]);
+        $validated = $request->validated();
         $assignee = User::query()->whereNotNull('approved_at')->find((int) $validated['assigned_to_user_id']);
-        abort_unless($assignee && $this->provisioningAccess->canAssignAgentForRequest($assignee, $provisioning), 403);
+        abort_unless($assignee, 403);
 
-        if (in_array($provisioning->status, ['done', 'cancelled'], true)) {
-            return redirect()->back()->with('error', 'This request is closed — reopen it before reassigning.');
+        try {
+            $changed = $this->provisioningLifecycle->assign($provisioning, $user, $assignee);
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
         }
 
-        $provisioning->update([
-            'assigned_to_user_id' => (int) $validated['assigned_to_user_id'],
-            'status' => in_array($provisioning->status, ['pending', 'failed'], true)
-                ? 'in_progress'
-                : $provisioning->status,
-            'failure_reason' => null,
-            'failed_at' => null,
-        ]);
-
-        ItTicketEvent::record($provisioning, 'assigned', $user->id, [
-            'to' => (int) $validated['assigned_to_user_id'],
-        ]);
-
-        return redirect()->back()->with('success', 'Request assigned.');
+        return redirect()->back()->with('success', $changed ? 'Request assigned.' : 'Request already assigned.');
     }
 
-    public function fulfil(Request $request, ItProvisioningRequest $provisioning)
+    public function fulfil(FulfilProvisioningRequestRequest $request, ItProvisioningRequest $provisioning)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('it.manage'), 403);
         abort_unless($this->provisioningAccess->canManage($user, $provisioning), 404);
 
-        $validated = $request->validate([
-            'external_ref' => ['nullable', 'string', 'max:255'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-            'evidence_summary' => ['nullable', 'string', 'max:4000'],
-        ]);
+        $validated = $request->validated();
 
         try {
             $this->provisioningLifecycle->fulfil($provisioning, $user, $validated);
@@ -348,14 +349,11 @@ class ItProvisioningController extends Controller
         return redirect()->back()->with('success', "Fulfilled “{$provisioning->item}”.");
     }
 
-    public function approve(Request $request, ItProvisioningRequest $provisioning)
+    public function approve(ApproveProvisioningRequestRequest $request, ItProvisioningRequest $provisioning)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('it.manage'), 403);
         abort_unless($this->provisioningAccess->canManage($user, $provisioning), 404);
-        $validated = $request->validate([
-            'decision_note' => ['nullable', 'string', 'max:1000'],
-        ]);
+        $validated = $request->validated();
 
         try {
             $this->provisioningLifecycle->approve(
@@ -370,14 +368,11 @@ class ItProvisioningController extends Controller
         return redirect()->back()->with('success', 'Provisioning request approved.');
     }
 
-    public function fail(Request $request, ItProvisioningRequest $provisioning)
+    public function fail(FailProvisioningRequestRequest $request, ItProvisioningRequest $provisioning)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('it.manage'), 403);
         abort_unless($this->provisioningAccess->canManage($user, $provisioning), 404);
-        $validated = $request->validate([
-            'failure_reason' => ['required', 'string', 'max:2000'],
-        ]);
+        $validated = $request->validated();
 
         try {
             $this->provisioningLifecycle->fail($provisioning, $user, $validated['failure_reason']);
@@ -388,39 +383,27 @@ class ItProvisioningController extends Controller
         return redirect()->back()->with('success', 'Failure recorded; the workflow now shows partial completion.');
     }
 
-    public function cancel(Request $request, ItProvisioningRequest $provisioning)
+    public function cancel(CancelProvisioningRequestRequest $request, ItProvisioningRequest $provisioning)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('it.manage'), 403);
         abort_unless($this->provisioningAccess->canManage($user, $provisioning), 404);
 
-        $validated = $request->validate([
-            'reason' => ['nullable', 'string', 'max:500'],
-        ]);
-        $reason = trim((string) ($validated['reason'] ?? '')) ?: null;
+        $validated = $request->validated();
+        $reason = trim((string) $validated['reason']);
 
-        if ($provisioning->status === 'done') {
-            return redirect()->back()->with('error', 'A fulfilled request cannot be cancelled.');
+        try {
+            $provisioning = $this->provisioningLifecycle->cancel($provisioning, $user, $reason);
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
         }
 
-        $provisioning->update(['status' => 'cancelled']);
-        $this->provisioningLifecycle->reconcileWorkflow($provisioning->workflow);
-
-        ItTicketEvent::record($provisioning, 'cancelled', $user->id, array_filter([
-            'reason' => $reason,
-        ], fn ($v) => $v !== null));
-
-        // Cross-loop: a cancelled request must not orphan its source onboarding
-        // task — annotate the still-open task and tell the checklist creator so
-        // it gets resolved manually. Best-effort: never blocks the cancel.
+        // The lifecycle commits the cancellation and canonical HR task note
+        // together. Notification delivery is tracked separately and remains
+        // retryable from the operations workspace if the provider fails.
         if ($provisioning->onboarding_task_id) {
             try {
                 $task = $provisioning->onboardingTask()->with('checklist.employeeProfile.user:id,name')->first();
                 if ($task && $task->status !== 'completed') {
-                    $note = 'IT request cancelled'.($reason ? ": {$reason}" : '').' — resolve this task manually.';
-                    $existing = trim((string) $task->notes);
-                    $task->update(['notes' => $existing === '' ? $note : $existing."\n".$note]);
-
                     $creator = $task->checklist?->created_by
                         ? User::find($task->checklist->created_by)
                         : null;
@@ -432,7 +415,7 @@ class ItProvisioningController extends Controller
                     }
                 }
             } catch (\Throwable $exception) {
-                Log::warning('Failed to annotate/notify onboarding task after IT request cancellation', [
+                Log::warning('Failed to notify onboarding owner after IT request cancellation', [
                     'provisioning_request_id' => $provisioning->id,
                     'onboarding_task_id' => $provisioning->onboarding_task_id,
                     'error' => $exception->getMessage(),
@@ -446,40 +429,27 @@ class ItProvisioningController extends Controller
     /**
      * §H manual "New provisioning request" — the ad-hoc path agents raise
      * outside onboarding (a swapped device, a one-off access grant). Canonical
-     * Site access for the employee and any assignee is asserted here; a
-     * `created` event opens the activity trail.
+     * Site access, state, event and audit ownership live in the shared
+     * provisioning lifecycle rather than this transport controller.
      */
     public function storeProvisioning(StoreProvisioningRequestRequest $request)
     {
         $user = $request->user();
         $data = $request->validated();
 
-        $profile = HrEmployeeProfile::query()->find((int) $data['employee_profile_id']);
-        abort_unless($profile && $this->provisioningAccess->canSelectProfile($user, $profile), 403);
+        $profile = HrEmployeeProfile::query()->findOrFail((int) $data['employee_profile_id']);
 
         $assigneeId = ! empty($data['assigned_to_user_id']) ? (int) $data['assigned_to_user_id'] : null;
-        if ($assigneeId) {
-            $assignee = User::query()->whereNotNull('approved_at')->find($assigneeId);
-            abort_unless($assignee && $this->provisioningAccess->canAssignAgentForProfile($assignee, $profile), 403);
-        }
+        $assignee = $assigneeId
+            ? User::query()->findOrFail($assigneeId)
+            : null;
 
-        $provisioning = ItProvisioningRequest::query()->create([
-            'tenant_id' => LegacyStorageContext::id(),
-            'employee_profile_id' => (int) $data['employee_profile_id'],
-            'type' => $data['type'],
-            'item' => $data['item'],
-            'assigned_to_user_id' => $assigneeId,
-            'status' => $assigneeId ? 'in_progress' : 'pending',
-            'priority' => $data['priority'],
-            'due_date' => $data['due_date'] ?? null,
-            'notes' => $data['notes'] ?? null,
-            'created_by' => $user->id,
-        ]);
-
-        ItTicketEvent::record($provisioning, 'created', $user->id, array_filter([
-            'type' => $provisioning->type,
-            'assigned_to_user_id' => $assigneeId,
-        ]));
+        $provisioning = $this->provisioningLifecycle->createManual(
+            $user,
+            $profile,
+            $assignee,
+            $data,
+        );
 
         return redirect()->back()->with('success', "Provisioning request raised — {$provisioning->item}.");
     }
@@ -529,7 +499,6 @@ class ItProvisioningController extends Controller
         }
 
         $requests = $this->provisioningAccess->applyRequestScope(ItProvisioningRequest::query(), $user)
-            ->with('onboardingTask')
             ->whereIn('id', $validated['ids'])
             ->get();
 
@@ -537,11 +506,17 @@ class ItProvisioningController extends Controller
         $skipped = count($validated['ids']) - $requests->count();
 
         foreach ($requests as $provisioning) {
-            $changed = match ($action) {
-                'assign' => $this->bulkAssignProvisioning($provisioning, $assignee, $user),
-                'fulfil' => $this->bulkFulfilProvisioning($provisioning, $user),
-                default => false,
-            };
+            try {
+                $changed = match ($action) {
+                    'assign' => $assignee
+                        ? $this->provisioningLifecycle->assign($provisioning, $user, $assignee, 'bulk')
+                        : false,
+                    'fulfil' => (bool) $this->provisioningLifecycle->fulfil($provisioning, $user),
+                    default => false,
+                };
+            } catch (DomainException|\LogicException) {
+                $changed = false;
+            }
             $changed ? $updated++ : $skipped++;
         }
 
@@ -551,51 +526,6 @@ class ItProvisioningController extends Controller
             'success',
             "{$updated} request(s) {$label}".($skipped > 0 ? " · {$skipped} unchanged" : '').'.',
         );
-    }
-
-    private function bulkAssignProvisioning(ItProvisioningRequest $provisioning, ?User $assignee, User $actor): bool
-    {
-        if (! $assignee || ! $this->provisioningAccess->canAssignAgentForRequest($assignee, $provisioning)) {
-            return false;
-        }
-        if (in_array($provisioning->status, ['done', 'cancelled'], true)) {
-            return false; // settled requests keep their history
-        }
-        $newId = $assignee?->id;
-        if ((int) $provisioning->assigned_to_user_id === (int) $newId) {
-            return false;
-        }
-
-        $provisioning->update([
-            'assigned_to_user_id' => $newId,
-            'status' => in_array($provisioning->status, ['pending', 'failed'], true)
-                ? 'in_progress'
-                : $provisioning->status,
-            'failure_reason' => null,
-            'failed_at' => null,
-        ]);
-
-        ItTicketEvent::record($provisioning, 'assigned', $actor->id, [
-            'to' => $newId,
-            'via' => 'bulk',
-        ]);
-
-        return true;
-    }
-
-    private function bulkFulfilProvisioning(ItProvisioningRequest $provisioning, User $actor): bool
-    {
-        if (in_array($provisioning->status, ['done', 'cancelled'], true)) {
-            return false;
-        }
-
-        try {
-            $this->provisioningLifecycle->fulfil($provisioning, $actor);
-        } catch (DomainException|\LogicException) {
-            return false; // a blocked task can't complete — leave the request untouched
-        }
-
-        return true;
     }
 
     /**
@@ -661,141 +591,23 @@ class ItProvisioningController extends Controller
     /*  Helpdesk tickets */
     /* ================================================================== */
 
-    public function storeTicket(Request $request)
+    public function storeTicket(StoreItTicketRequest $request)
     {
         $user = $request->user();
-        abort_unless((bool) $user, 403);
-        $this->authorize('create', ItTicket::class);
-
-        $isAgent = $user->canDo('it.manage');
-
-        $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:5000'],
-            'category' => ['required', Rule::in(ItTicket::CATEGORIES)],
-            'priority' => ['required', Rule::in(ItTicket::PRIORITIES)],
-            'work_type' => ['nullable', Rule::in(['incident', 'service_request', 'security_request'])],
-            'it_service_id' => ['nullable', 'integer', 'exists:it_services,id'],
-            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
-            'is_organisation_wide' => ['nullable', 'boolean'],
-            // §N2 agent triage fields — dropped for self-service requesters below.
-            'subcategory' => ['nullable', 'string', 'max:255'],
-            // On-behalf-of: an agent logs a ticket for the person who actually
-            // hit the problem; the receipt then goes to them, not the agent.
-            'requester_user_id' => ['nullable', 'integer', 'exists:users,id'],
-            'assigned_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
-            'asset_id' => ['nullable', 'integer', 'exists:assets,id'],
-            'watchers' => ['nullable', 'array'],
-            'watchers.*' => ['integer', 'exists:users,id'],
-            // §H convert/link: an agent can raise a ticket straight off a
-            // provisioning request (the new laptop arrived broken).
-            'provisioning_request_id' => ['nullable', 'integer', 'exists:it_provisioning_requests,id'],
-            ...$this->itAttachmentRules(),
-        ]);
-
-        // Triage fields are agent-only: a self-service requester cannot log on
-        // behalf of someone else, pick an assignee, set a subcategory, link an
-        // asset/provisioning request or add watchers, whatever the body says.
-        $requesterId = $isAgent && ! empty($validated['requester_user_id'])
-            ? (int) $validated['requester_user_id']
-            : $user->id;
-        $assigneeId = $isAgent ? ($validated['assigned_to_user_id'] ?? null) : null;
-        $provisioningRequestId = $isAgent ? ($validated['provisioning_request_id'] ?? null) : null;
-        $subcategory = $isAgent ? ($validated['subcategory'] ?? null) : null;
-        $assetId = $isAgent ? ($validated['asset_id'] ?? null) : null;
-        $workType = $isAgent ? ($validated['work_type'] ?? 'incident') : 'incident';
-        $serviceId = $isAgent ? ($validated['it_service_id'] ?? null) : null;
-        $isOrganisationWide = $isAgent && (bool) ($validated['is_organisation_wide'] ?? false);
-        $siteId = $isAgent
-            ? (isset($validated['site_id']) ? (int) $validated['site_id'] : null)
-            : $this->workAccess->defaultSiteId($user);
-        if (! $this->workAccess->canAssignScope($user, $siteId, $isOrganisationWide)) {
-            if ($isAgent && (array_key_exists('site_id', $validated) || $isOrganisationWide)) {
-                abort(403);
-            }
-
-            throw ValidationException::withMessages([
-                'site_id' => 'Choose an active approved Site for this ticket.',
-            ]);
+        try {
+            $ticket = $this->ticketIntake->create(
+                $user,
+                $request->validated(),
+                $request->file('attachments', []),
+            );
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
         }
-        $requester = User::query()->whereNotNull('approved_at')->find($requesterId);
-        abort_unless($requester && $this->staffMemberMatchesScope($requester, $siteId, $isOrganisationWide), 403);
-
-        if ($assigneeId !== null) {
-            $assignee = User::query()->whereNotNull('approved_at')->find((int) $assigneeId);
-            abort_unless($assignee && $this->agentMatchesScope($assignee, $siteId, $isOrganisationWide), 403);
-        }
-        if ($serviceId !== null) {
-            abort_unless(ItService::query()->whereKey($serviceId)->where('is_active', true)->exists(), 403);
-        }
-        if ($assetId !== null) {
-            abort_unless($this->assetIsAvailable((int) $assetId, $siteId, $isOrganisationWide), 403);
-        }
-        if ($provisioningRequestId !== null) {
-            $provisioning = ItProvisioningRequest::query()->find((int) $provisioningRequestId);
-            abort_unless($provisioning
-                && $this->provisioningAccess->canView($user, $provisioning)
-                && $this->provisioningAccess->siteIdFor($provisioning) === $siteId,
-                403);
-        }
-        $watcherIds = $isAgent && ! empty($validated['watchers'])
-            ? array_values(array_unique(array_map('intval', $validated['watchers'])))
-            : [];
-        if ($watcherIds !== []) {
-            $validWatcherCount = User::query()
-                ->whereKey($watcherIds)
-                ->whereNotNull('approved_at')
-                ->get()
-                ->filter(fn (User $watcher): bool => $this->staffMemberMatchesScope($watcher, $siteId, $isOrganisationWide))
-                ->count();
-            abort_unless($validWatcherCount === count($watcherIds), 403);
-        }
-
-        $ticket = ItTicket::createWithReference([
-            'tenant_id' => LegacyStorageContext::id(),
-            'title' => $validated['title'],
-            'description' => $validated['description'] ?? null,
-            'requester_user_id' => $requesterId,
-            'requested_for_user_id' => $requesterId,
-            'assigned_to_user_id' => $assigneeId,
-            'asset_id' => $assetId,
-            'site_id' => $siteId,
-            'is_organisation_wide' => $isOrganisationWide,
-            'it_service_id' => $serviceId,
-            'provisioning_request_id' => $provisioningRequestId,
-            'category' => $validated['category'],
-            'requires_approval' => ItTicket::categoryNeedsApproval($validated['category']),
-            'subcategory' => $subcategory,
-            'priority' => $validated['priority'],
-            'work_type' => $workType,
-            'workflow_state' => 'submitted',
-            'source' => $isAgent ? 'agent' : 'portal',
-            'status' => $assigneeId ? 'in_progress' : 'open',
-        ]);
-
-        // Every ticket gets SLA targets from the application policy (or the §G
-        // defaults) the moment it exists — the clock starts at creation.
-        $ticket->stampSlaDueDates();
-        $ticket->save();
-
-        $this->storeItAttachments($ticket, $request->file('attachments'), $user);
-
-        if ($watcherIds) {
-            $ticket->watchers()->syncWithoutDetaching($watcherIds);
-        }
-
-        ItTicketEvent::record($ticket, 'created', $user->id, array_filter([
-            'source' => $ticket->source,
-            'assigned_to_user_id' => $assigneeId,
-            'provisioning_request_id' => $provisioningRequestId,
-            'on_behalf_of' => $requesterId !== $user->id ? $requesterId : null,
-        ]));
-        $ticket = $this->routingService->route($ticket, $user->id);
 
         // Receipt to the REQUESTER — the actor when self-raised, the
         // on-behalf-of colleague when an agent logs it. Plus an urgent alert
         // to the agents working the queue — never to the actor themselves.
-        $requester = $requesterId === $user->id ? $user : User::query()->find($requesterId);
+        $requester = $ticket->requester;
         if ($requester) {
             $this->emailDeliveries->send($requester, new TicketCreatedNotification($ticket, 'receipt'));
         }
@@ -810,149 +622,13 @@ class ItProvisioningController extends Controller
             ->with('it_ticket', ['id' => $ticket->id, 'reference' => $ticket->reference]);
     }
 
-    public function updateTicket(Request $request, ItTicket $ticket)
+    public function updateTicket(UpdateTicketRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('it.manage'), 403);
-        abort_unless($this->workAccess->canWork($user, $ticket), 404);
-        $this->authorize('update', $ticket);
-
-        $validated = $request->validate([
-            'status' => ['sometimes', Rule::in(ItTicket::STATUSES)],
-            'priority' => ['sometimes', Rule::in(ItTicket::PRIORITIES)],
-            'category' => ['sometimes', Rule::in(ItTicket::CATEGORIES)],
-            'subcategory' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'asset_id' => ['sometimes', 'nullable', 'integer', 'exists:assets,id'],
-            'site_id' => ['sometimes', 'nullable', 'integer', 'exists:sites,id'],
-            'is_organisation_wide' => ['sometimes', 'boolean'],
-            'assigned_to_user_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
-            'waiting_reason' => ['sometimes', 'nullable', 'string', 'max:1000'],
-            'waiting_party' => ['sometimes', 'nullable', Rule::in(['requester', 'vendor', 'approver', 'team', 'change', 'other'])],
-            'next_action' => ['sometimes', 'nullable', 'string', 'max:2000'],
-            'resolution_code' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'resolution_summary' => ['sometimes', 'nullable', 'string', 'max:5000'],
-        ]);
-
-        $siteWasSupplied = array_key_exists('site_id', $validated);
-        $wideWasSupplied = array_key_exists('is_organisation_wide', $validated);
-        $prospectiveSiteId = $ticket->site_id !== null ? (int) $ticket->site_id : null;
-        $prospectiveWide = (bool) $ticket->is_organisation_wide;
-        if ($siteWasSupplied || $wideWasSupplied) {
-            if ($validated['is_organisation_wide'] ?? false) {
-                if (! $siteWasSupplied || $validated['site_id'] !== null) {
-                    throw ValidationException::withMessages([
-                        'site_id' => 'Organisation-wide tickets cannot also have a Site.',
-                    ]);
-                }
-            }
-
-            $prospectiveSiteId = $siteWasSupplied
-                ? ($validated['site_id'] !== null ? (int) $validated['site_id'] : null)
-                : ($ticket->site_id !== null ? (int) $ticket->site_id : null);
-            $prospectiveWide = $wideWasSupplied
-                ? (bool) $validated['is_organisation_wide']
-                : (bool) $ticket->is_organisation_wide;
-
-            if ($siteWasSupplied && $prospectiveSiteId !== null && ! $wideWasSupplied) {
-                $prospectiveWide = false;
-                $validated['is_organisation_wide'] = false;
-            }
-
-            abort_unless(
-                $this->workAccess->canAssignScope($user, $prospectiveSiteId, $prospectiveWide),
-                403,
-            );
-        }
-
-        if (array_key_exists('assigned_to_user_id', $validated) && $validated['assigned_to_user_id'] !== null) {
-            $assignee = User::query()->whereNotNull('approved_at')->find((int) $validated['assigned_to_user_id']);
-            abort_unless($assignee && $this->agentMatchesScope($assignee, $prospectiveSiteId, $prospectiveWide), 403);
-        }
-        if (array_key_exists('asset_id', $validated) && $validated['asset_id'] !== null) {
-            abort_unless($this->assetIsAvailable(
-                (int) $validated['asset_id'],
-                $prospectiveSiteId,
-                $prospectiveWide,
-            ), 403);
-        }
-
-        $original = $ticket->only(['status', 'priority', 'assigned_to_user_id']);
-        $targetStatus = $validated['status'] ?? null;
-
-        if ($targetStatus !== null && $targetStatus !== $ticket->status) {
-            $targetState = match ($targetStatus) {
-                'open' => ItWorkflowState::Submitted,
-                'in_progress' => ItWorkflowState::InProgress,
-                'waiting' => ItWorkflowState::Waiting,
-                'resolved' => ItWorkflowState::Resolved,
-                'closed' => ItWorkflowState::Closed,
-            };
-            $source = match (true) {
-                $targetStatus === 'resolved' => 'legacy_resolve',
-                $targetStatus === 'closed' => 'legacy_close',
-                in_array($ticket->status, ['resolved', 'closed'], true) && $targetStatus === 'open' => 'legacy_reopen',
-                default => 'legacy_status',
-            };
-
-            try {
-                $ticket = $this->transitionService->transition(
-                    $ticket,
-                    new ItTransitionInput(
-                        actor: $user,
-                        to: $targetState,
-                        reason: $validated['waiting_reason']
-                            ?? ($targetStatus === 'waiting' ? 'Waiting on requester' : 'Ticket properties updated'),
-                        waitingParty: $targetStatus === 'waiting'
-                            ? ($validated['waiting_party'] ?? 'requester')
-                            : null,
-                        nextAction: $validated['next_action'] ?? null,
-                        resolutionCode: $targetStatus === 'resolved'
-                            ? ($validated['resolution_code'] ?? $ticket->resolution_code ?? 'resolved')
-                            : null,
-                        resolutionSummary: $targetStatus === 'resolved'
-                            ? ($validated['resolution_summary'] ?? $ticket->resolution_summary ?? 'Resolved from ticket properties.')
-                            : null,
-                        source: $source,
-                    ),
-                );
-            } catch (DomainException $exception) {
-                return redirect()->back()->with('error', $exception->getMessage());
-            }
-        }
-
-        $update = $validated;
-        unset(
-            $update['status'],
-            $update['waiting_reason'],
-            $update['waiting_party'],
-            $update['next_action'],
-            $update['resolution_code'],
-            $update['resolution_summary'],
-        );
-
-        $ticket->fill($update);
-        $ticket->save();
-        $ticket->refresh();
-
-        // Activity trail + assignee notification, once per actual change.
-        if ($ticket->priority !== $original['priority']) {
-            // Re-target the SLA clock for the new priority (same anchor).
-            $ticket->stampSlaDueDates();
-            $ticket->save();
-
-            ItTicketEvent::record($ticket, 'priority_changed', $user->id, [
-                'from' => $original['priority'],
-                'to' => $ticket->priority,
-            ]);
-        }
-        if ((int) $ticket->assigned_to_user_id !== (int) $original['assigned_to_user_id']) {
-            ItTicketEvent::record($ticket, 'assigned', $user->id, [
-                'from' => $original['assigned_to_user_id'],
-                'to' => $ticket->assigned_to_user_id,
-            ]);
-            if ($ticket->assignee && $ticket->assigned_to_user_id !== $user->id) {
-                $this->emailDeliveries->send($ticket->assignee, new TicketAssignedNotification($ticket));
-            }
+        try {
+            $this->triageService->update($ticket, $user, $request->validated());
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
         }
 
         return redirect()->back()->with('success', 'Ticket updated.');
@@ -961,38 +637,12 @@ class ItProvisioningController extends Controller
     public function resolveTicket(ResolveTicketRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
-        abort_unless($this->workAccess->canWork($user, $ticket), 404);
-        abort_unless($user->can('resolve', $ticket), 403);
-
-        if (in_array($ticket->status, ['resolved', 'closed'], true)) {
-            return redirect()->back()->with('error', 'This ticket is already resolved.');
-        }
-
         try {
-            $ticket = DB::transaction(function () use ($ticket, $request, $user): ItTicket {
-                $transitioned = $this->transitionService->transition(
-                    $ticket,
-                    new ItTransitionInput(
-                        actor: $user,
-                        to: ItWorkflowState::Resolved,
-                        reason: 'Technician resolution',
-                        resolutionCode: (string) ($ticket->resolution_code ?: 'restored'),
-                        resolutionSummary: (string) $request->validated('note'),
-                        source: 'legacy_resolve',
-                    ),
-                );
-
-                // The resolution note is the final PUBLIC reply — "what fixed
-                // it" always lands on the record, visible to the requester.
-                $transitioned->comments()->create([
-                    'tenant_id' => LegacyStorageContext::id(),
-                    'author_user_id' => $user->id,
-                    'body' => $request->validated('note'),
-                    'is_internal' => false,
-                ]);
-
-                return $transitioned;
-            });
+            $ticket = $this->ticketInteractions->resolveWithPublicNote(
+                $ticket,
+                $user,
+                (string) $request->validated('note'),
+            );
         } catch (DomainException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -1025,10 +675,12 @@ class ItProvisioningController extends Controller
         'all_open' => 'All open',
         'unassigned' => 'Unassigned',
         'mine' => 'Mine',
+        'owned_by_me' => 'Owned by me',
+        'my_team' => "My team's work",
         'breaching' => 'Breaching soon',
         'breached' => 'Breached',
         'awaiting_reply' => 'Awaiting reply',
-        'waiting' => 'Waiting on requester',
+        'waiting' => 'All waiting work',
         'recently_resolved' => 'Recently resolved',
     ];
 
@@ -1039,6 +691,13 @@ class ItProvisioningController extends Controller
             'all_open' => $query->whereIn('status', ItTicket::OPEN_STATUSES),
             'unassigned' => $query->whereIn('status', ItTicket::OPEN_STATUSES)->whereNull('assigned_to_user_id'),
             'mine' => $query->whereIn('status', ItTicket::OPEN_STATUSES)->where('assigned_to_user_id', $userId),
+            'owned_by_me' => $query->whereIn('status', ItTicket::OPEN_STATUSES)->where('owner_user_id', $userId),
+            'my_team' => $query->whereIn('status', ItTicket::OPEN_STATUSES)
+                ->whereHas('team', fn ($team) => $team
+                    ->where('is_active', true)
+                    ->where(fn ($responsibility) => $responsibility
+                        ->where('manager_user_id', $userId)
+                        ->orWhereHas('members', fn ($members) => $members->whereKey($userId)))),
             'breaching' => $query->whereIn('status', ItTicket::OPEN_STATUSES)->where('sla_state', 'at_risk'),
             'breached' => $query->whereIn('status', ItTicket::OPEN_STATUSES)->where('sla_state', 'breached'),
             'awaiting_reply' => $query->whereIn('status', ['open', 'in_progress'])->whereNull('first_responded_at'),
@@ -1206,7 +865,14 @@ class ItProvisioningController extends Controller
         }
 
         $query = $this->workAccess->applyViewScope(ItTicket::query(), $user)
-            ->with(['requester:id,name', 'assignee:id,name'])
+            ->with([
+                'requester:id,name',
+                'assignee:id,name',
+                'service:id,name',
+                'queue:id,name',
+                'team:id,name',
+                'owner:id,name',
+            ])
             ->when($filters['view'], fn ($q, $view) => $this->applyTicketView($q, $view, (int) $user->id))
             ->when($filters['q'], fn ($q, $term) => $this->applyTicketSearch($q, $term))
             ->when($filters['ticket_status'], fn ($q, $status) => $q->where('status', $status))
@@ -1245,15 +911,22 @@ class ItProvisioningController extends Controller
                 'reference' => $t->reference,
                 'title' => $t->title,
                 'description' => $t->description,
+                'work_type' => $t->work_type,
+                'service' => $t->service ? ['id' => $t->service->id, 'name' => $t->service->name] : null,
                 'category' => $t->category,
                 'priority' => $t->priority,
                 'status' => $t->status,
+                'waiting_party' => $t->waiting_party,
+                'waiting_reason' => $t->waiting_reason,
+                'next_action' => $t->next_action,
+                'waiting_since' => $t->waiting_since?->toIso8601String(),
                 'sla_state' => $t->sla_state,
                 'first_response_due_at' => $t->first_response_due_at?->toIso8601String(),
                 'resolution_due_at' => $t->resolution_due_at?->toIso8601String(),
                 'first_responded_at' => $t->first_responded_at?->toIso8601String(),
                 'requester' => $t->requester?->name ?? 'Unknown',
                 'assignee' => $t->assignee ? ['id' => $t->assignee->id, 'name' => $t->assignee->name] : null,
+                'routing' => $this->routingPresenter->present($t),
                 'age' => $t->created_at?->diffForHumans(short: true),
                 'updated' => $t->updated_at?->diffForHumans(short: true),
                 'resolved' => $t->resolved_at?->diffForHumans(short: true),
@@ -1303,6 +976,9 @@ class ItProvisioningController extends Controller
                 'category' => $t->category,
                 'priority' => $t->priority,
                 'status' => $t->status,
+                'waiting_party' => $t->status === 'waiting'
+                    ? ($t->waiting_party === 'requester' ? 'requester' : 'other')
+                    : null,
                 'assignee' => $t->assignee?->name,
                 'age' => $t->created_at?->diffForHumans(short: true),
                 'resolved' => $t->resolved_at?->diffForHumans(short: true),
@@ -1378,6 +1054,21 @@ class ItProvisioningController extends Controller
                 ->first()
             : null;
 
+        $ownedByMe = $ticketsReady
+            ? $this->applyTicketView(
+                $this->workAccess->applyViewScope(ItTicket::query(), $user),
+                'owned_by_me',
+                (int) $user->id,
+            )->count()
+            : 0;
+        $myTeam = $ticketsReady
+            ? $this->applyTicketView(
+                $this->workAccess->applyViewScope(ItTicket::query(), $user),
+                'my_team',
+                (int) $user->id,
+            )->count()
+            : 0;
+
         $requests = $requestsReady
             ? $this->provisioningAccess->applyRequestScope(ItProvisioningRequest::query(), $user)
                 ->selectRaw(
@@ -1416,6 +1107,8 @@ class ItProvisioningController extends Controller
                 'all_open' => (int) ($tickets->open_count ?? 0),
                 'unassigned' => (int) ($tickets->unassigned ?? 0),
                 'mine' => (int) ($tickets->mine ?? 0),
+                'owned_by_me' => $ownedByMe,
+                'my_team' => $myTeam,
                 'breaching' => (int) ($tickets->at_risk ?? 0),
                 'breached' => (int) ($tickets->breached ?? 0),
                 'awaiting_reply' => (int) ($tickets->awaiting_reply ?? 0),
@@ -1642,7 +1335,13 @@ class ItProvisioningController extends Controller
         return ItKbArticle::query()
             ->published()
             ->whereIn('audience', ['all_staff', 'specific_sites'])
-            ->with('service:id,name')
+            ->with([
+                'service:id,name',
+                'interactions' => fn ($query) => $query
+                    ->where('user_id', $user->id)
+                    ->whereIn('event_type', ['helpful', 'not_helpful'])
+                    ->oldest('id'),
+            ])
             ->orderByDesc('updated_at')
             ->limit(200)
             ->get()
@@ -1652,18 +1351,27 @@ class ItProvisioningController extends Controller
                     array_map('intval', $userSiteIds),
                 ) !== [])
             ->values()
-            ->map(fn (ItKbArticle $a) => [
-                'id' => $a->id,
-                'title' => $a->title,
-                'category' => $a->category,
-                'body' => $a->body,
-                'views' => (int) $a->view_count,
-                'helpful_yes' => (int) $a->helpful_yes,
-                'helpful_no' => (int) $a->helpful_no,
-                'helpful_percent' => $a->helpfulPercent(),
-                'related_service' => $a->service?->name,
-                'review_due_at' => $a->review_due_at?->toDateString(),
-            ])
+            ->map(function (ItKbArticle $a): array {
+                $vote = $a->interactions->first()?->event_type;
+
+                return [
+                    'id' => $a->id,
+                    'title' => $a->title,
+                    'category' => $a->category,
+                    'body' => $a->body,
+                    'views' => (int) $a->view_count,
+                    'helpful_yes' => (int) $a->helpful_yes,
+                    'helpful_no' => (int) $a->helpful_no,
+                    'helpful_percent' => $a->helpfulPercent(),
+                    'user_vote' => match ($vote) {
+                        'helpful' => true,
+                        'not_helpful' => false,
+                        default => null,
+                    },
+                    'related_service' => $a->service?->name,
+                    'review_due_at' => $a->review_due_at?->toDateString(),
+                ];
+            })
             ->all();
     }
 
@@ -1681,49 +1389,5 @@ class ItProvisioningController extends Controller
         }
 
         return checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1]) ? $value : null;
-    }
-
-    private function staffMemberMatchesScope(User $staff, ?int $siteId, bool $isOrganisationWide): bool
-    {
-        if ($staff->approved_at === null
-            || $staff->hasRole('client')
-            || $staff->hasRole('next_of_kin')
-            || in_array($staff->role, ['client', 'next_of_kin'], true)) {
-            return false;
-        }
-
-        if ($isOrganisationWide) {
-            return $siteId === null;
-        }
-
-        return $siteId !== null
-            && in_array($siteId, $this->workAccess->approvedSiteIds($staff), true);
-    }
-
-    private function agentMatchesScope(User $agent, ?int $siteId, bool $isOrganisationWide): bool
-    {
-        if (! ItStaffDirectory::agents()->contains('id', $agent->id)) {
-            return false;
-        }
-        if ($isOrganisationWide) {
-            return $siteId === null && $agent->canDo('it.organisationWide');
-        }
-
-        return $this->staffMemberMatchesScope($agent, $siteId, false);
-    }
-
-    private function assetIsAvailable(int $assetId, ?int $siteId, bool $isOrganisationWide): bool
-    {
-        $asset = Asset::query()
-            ->whereKey($assetId)
-            ->where('status', 'active')
-            ->first();
-        if (! $asset) {
-            return false;
-        }
-
-        return $isOrganisationWide
-            ? $siteId === null
-            : $siteId !== null && (int) $asset->site_id === $siteId;
     }
 }

@@ -40,7 +40,7 @@ class EstateSiteOperationsTest extends TestCase
         $this->seed(SecurityDevicesPermissionsSeeder::class);
 
         $this->admin = User::factory()->create([
-            'organization_id' => 42,
+
             'approved_at' => now(),
         ]);
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
@@ -48,29 +48,25 @@ class EstateSiteOperationsTest extends TestCase
 
     public function test_estate_overview_answers_coverage_change_site_impact_and_required_action(): void
     {
-        $siteA = Site::factory()->create(['tenant_id' => 42, 'name' => 'Harbour House']);
-        $siteB = Site::factory()->create(['tenant_id' => 42, 'name' => 'Kauri House']);
-        $foreignSite = Site::factory()->create(['tenant_id' => 77, 'name' => 'Foreign House']);
+        $siteA = Site::factory()->create(['name' => 'Harbour House']);
+        $siteB = Site::factory()->create(['name' => 'Kauri House']);
+        $unrelatedSite = Site::factory()->create(['name' => 'Unrelated House']);
 
         $failed = Device::factory()->offline()->create([
-            'tenant_id' => 42,
             'name' => 'Harbour edge gateway',
             'health_status' => HealthStatus::Critical,
             'updated_at' => now()->subMinutes(2),
         ]);
         $healthy = Device::factory()->create([
-            'tenant_id' => 42,
             'name' => 'Harbour switch',
             'updated_at' => now()->subMinutes(8),
         ]);
         $unmonitored = Device::factory()->create([
-            'tenant_id' => 42,
             'name' => 'Kauri camera',
             'updated_at' => now()->subMinutes(5),
         ]);
-        $foreign = Device::factory()->offline()->create([
-            'tenant_id' => 77,
-            'name' => 'Foreign gateway',
+        $unrelated = Device::factory()->offline()->create([
+            'name' => 'Unrelated gateway',
             'health_status' => HealthStatus::Critical,
             'updated_at' => now(),
         ]);
@@ -78,18 +74,16 @@ class EstateSiteOperationsTest extends TestCase
         $this->assignToSite($failed, $siteA);
         $this->assignToSite($healthy, $siteA);
         $this->assignToSite($unmonitored, $siteB);
-        $this->assignToSite($foreign, $foreignSite);
+        $this->assignToSite($unrelated, $unrelatedSite);
 
-        $profile = MonitoringProfile::factory()->create(['tenant_id' => 42]);
+        $profile = MonitoringProfile::factory()->create([]);
         Monitor::factory()->create([
-            'tenant_id' => 42,
             'profile_id' => $profile->id,
             'device_id' => $failed->id,
             'current_state' => MonitorState::Failed,
             'last_observation_at' => now()->subMinute(),
         ]);
         Monitor::factory()->create([
-            'tenant_id' => 42,
             'profile_id' => $profile->id,
             'device_id' => $healthy->id,
             'current_state' => MonitorState::Healthy,
@@ -110,17 +104,15 @@ class EstateSiteOperationsTest extends TestCase
             'scheduled_for' => now()->subDay(),
         ]);
         ItTicket::factory()->create([
-            'tenant_id' => 42,
             'site_id' => $siteA->id,
             'requester_user_id' => $this->admin->id,
             'title' => 'Harbour internet unavailable',
             'status' => 'open',
         ]);
         ItTicket::factory()->create([
-            'tenant_id' => 77,
-            'site_id' => $foreignSite->id,
+            'site_id' => $unrelatedSite->id,
             'requester_user_id' => $this->admin->id,
-            'title' => 'Foreign work',
+            'title' => 'Unrelated work',
             'status' => 'open',
         ]);
 
@@ -137,11 +129,11 @@ class EstateSiteOperationsTest extends TestCase
             $this->assertSame(1, $operations['summary']['active_findings']);
             $this->assertSame(2, $operations['summary']['open_it_work']);
             $this->assertSame(
-                ['Foreign House', 'Harbour House', 'Kauri House'],
+                ['Harbour House', 'Kauri House', 'Unrelated House'],
                 collect($operations['site_impact'])->pluck('name')->sort()->values()->all(),
             );
             $this->assertContains(
-                'Foreign gateway',
+                'Unrelated gateway',
                 collect($operations['recent_changes'])->pluck('device_name')->all(),
             );
             $this->assertSame(
@@ -153,12 +145,11 @@ class EstateSiteOperationsTest extends TestCase
 
     public function test_sites_reconcile_counts_and_never_present_empty_or_unmonitored_sites_as_healthy(): void
     {
-        $siteA = Site::factory()->create(['tenant_id' => 42, 'name' => 'Action Site']);
-        $siteB = Site::factory()->create(['tenant_id' => 42, 'name' => 'Empty Site']);
-        $legacyPartitionedSite = Site::factory()->create(['tenant_id' => 77, 'name' => 'Legacy Partitioned Site']);
+        $siteA = Site::factory()->create(['name' => 'Action Site']);
+        $siteB = Site::factory()->create(['name' => 'Empty Site']);
+        $unassignedDeviceSite = Site::factory()->create(['name' => 'Rimu House']);
 
         $device = Device::factory()->offline()->create([
-            'tenant_id' => 42,
             'health_status' => HealthStatus::Critical,
             'updated_at' => now()->subMinute(),
         ]);
@@ -177,13 +168,11 @@ class EstateSiteOperationsTest extends TestCase
             'scheduled_for' => now()->subDay(),
         ]);
         MonitoringCollector::factory()->create([
-            'tenant_id' => 42,
             'site_id' => $siteA->id,
             'status' => 'offline',
             'last_seen_at' => now()->subMinutes(10),
         ]);
         ItTicket::factory()->create([
-            'tenant_id' => 42,
             'site_id' => $siteA->id,
             'requester_user_id' => $this->admin->id,
             'status' => 'open',
@@ -191,12 +180,12 @@ class EstateSiteOperationsTest extends TestCase
 
         $response = $this->actingAs($this->admin)->get('/security-devices/sites');
 
-        $response->assertOk()->assertInertia(function ($page) use ($legacyPartitionedSite, $siteA, $siteB): void {
+        $response->assertOk()->assertInertia(function ($page) use ($unassignedDeviceSite, $siteA, $siteB): void {
             $props = $page->toArray()['props'];
             $sites = collect($props['sites'])->keyBy('id');
 
             $this->assertSame(
-                collect([$siteA->id, $siteB->id, $legacyPartitionedSite->id])->sort()->values()->all(),
+                collect([$siteA->id, $siteB->id, $unassignedDeviceSite->id])->sort()->values()->all(),
                 $sites->keys()->sort()->values()->all(),
             );
             $this->assertSame(3, $props['summary']['total']);
@@ -223,14 +212,12 @@ class EstateSiteOperationsTest extends TestCase
 
     public function test_site_technology_combines_canonical_context_without_duplicating_source_records(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42, 'name' => 'Technology House']);
+        $site = Site::factory()->create(['name' => 'Technology House']);
         $router = Device::factory()->itInfrastructure()->create([
-            'tenant_id' => 42,
             'name' => 'SD-WAN gateway',
             'subcategory' => 'edge_router',
         ]);
         $camera = Device::factory()->security()->create([
-            'tenant_id' => 42,
             'name' => 'Front camera',
         ]);
         $this->assignToSite($router, $site);
@@ -242,15 +229,13 @@ class EstateSiteOperationsTest extends TestCase
             'relationship_type' => 'connected_to',
         ]);
         $group = DeviceGroup::create([
-            'tenant_id' => 42,
             'name' => 'Front entrance',
             'type' => 'location',
         ]);
         $group->devices()->attach([$router->id, $camera->id]);
 
-        $profile = MonitoringProfile::factory()->create(['tenant_id' => 42]);
+        $profile = MonitoringProfile::factory()->create([]);
         Monitor::factory()->create([
-            'tenant_id' => 42,
             'profile_id' => $profile->id,
             'device_id' => $router->id,
             'current_state' => MonitorState::Healthy,
@@ -262,7 +247,6 @@ class EstateSiteOperationsTest extends TestCase
             'alert_type' => 'WAN path unavailable',
         ]);
         ItTicket::factory()->create([
-            'tenant_id' => 42,
             'site_id' => $site->id,
             'requester_user_id' => $this->admin->id,
             'title' => 'Review WAN failover',
@@ -276,7 +260,6 @@ class EstateSiteOperationsTest extends TestCase
             'scheduled_for' => now()->addDay(),
         ]);
         SiteContact::create([
-            'tenant_id' => 42,
             'site_id' => $site->id,
             'type' => 'technology',
             'name' => 'Alex Technician',
@@ -308,10 +291,10 @@ class EstateSiteOperationsTest extends TestCase
 
     public function test_site_access_and_cross_module_projections_require_their_own_permissions(): void
     {
-        $allowedSite = Site::factory()->create(['tenant_id' => 42, 'name' => 'Allowed Site']);
-        $hiddenSite = Site::factory()->create(['tenant_id' => 42, 'name' => 'Hidden Site']);
+        $allowedSite = Site::factory()->create(['name' => 'Allowed Site']);
+        $hiddenSite = Site::factory()->create(['name' => 'Hidden Site']);
         $viewer = User::factory()->create([
-            'organization_id' => 42,
+
             'approved_at' => now(),
         ]);
         $viewer->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
@@ -322,14 +305,13 @@ class EstateSiteOperationsTest extends TestCase
             ->all();
         $viewer->permissionOverrides()->syncWithoutDetaching($deniedCrossModulePermissions);
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42,
             'user_id' => $viewer->id,
             'primary_site_id' => $allowedSite->id,
             'secondary_site_ids' => [],
         ]);
 
         foreach ([$allowedSite, $hiddenSite] as $site) {
-            $device = Device::factory()->create(['tenant_id' => 42]);
+            $device = Device::factory()->create([]);
             $this->assignToSite($device, $site);
         }
         ControlRoomAlert::factory()->create([
@@ -337,7 +319,6 @@ class EstateSiteOperationsTest extends TestCase
             'status' => ControlRoomAlert::STATUS_OPEN,
         ]);
         ItTicket::factory()->create([
-            'tenant_id' => 42,
             'site_id' => $allowedSite->id,
             'requester_user_id' => $viewer->id,
             'status' => 'open',
@@ -366,12 +347,12 @@ class EstateSiteOperationsTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_all_sites_user_can_open_a_site_regardless_of_legacy_partition_value(): void
+    public function test_all_sites_user_can_open_any_site(): void
     {
-        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
+        $unrelatedSite = Site::factory()->create([]);
 
         $this->actingAs($this->admin)
-            ->get("/security-devices/sites/{$foreignSite->id}")
+            ->get("/security-devices/sites/{$unrelatedSite->id}")
             ->assertOk();
     }
 

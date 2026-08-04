@@ -1,6 +1,18 @@
+import {
+    MonitoringIncidentEvidenceCard,
+    type MonitoringIncidentEvidence,
+} from '@/components/monitoring/monitoring-incident-evidence-card';
+import { Button } from '@/components/ui/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { formatDateTime } from '@/lib/datetime';
-import { Link } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import type { LucideIcon } from 'lucide-react';
 import {
     Activity,
@@ -15,7 +27,10 @@ import {
     Megaphone,
     Server,
     ShieldAlert,
+    Unlink,
 } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 export interface TicketLinkedDevice {
     id: number;
@@ -27,6 +42,15 @@ export interface TicketLinkedDevice {
     health_status: string;
     last_seen_at: string | null;
     href: string;
+    is_monitoring_evidence: boolean;
+    can_unlink: boolean;
+}
+
+export interface TicketDeviceOption {
+    id: number;
+    name: string;
+    uid: string;
+    site_id: number | null;
 }
 
 export interface TicketLinkedAlert {
@@ -85,6 +109,10 @@ interface Props {
     problems?: TicketLinkedProblem[];
     changes?: TicketLinkedChange[];
     majorIncidents?: TicketLinkedMajorIncident[];
+    incidentEvidence?: MonitoringIncidentEvidence[];
+    canManage?: boolean;
+    deviceOptions?: TicketDeviceOption[];
+    ticketId?: number;
 }
 
 interface StatusPresentation {
@@ -148,8 +176,22 @@ export function TicketLinkedContext({
     problems = [],
     changes = [],
     majorIncidents = [],
+    incidentEvidence = [],
+    canManage = false,
+    deviceOptions = [],
+    ticketId,
 }: Props) {
+    const [selectedDevice, setSelectedDevice] = useState('none');
+    const [processingDevice, setProcessingDevice] = useState<number | null>(
+        null,
+    );
+    const linkedDeviceIds = new Set(devices.map((device) => device.id));
+    const availableDevices = deviceOptions.filter(
+        (device) => !linkedDeviceIds.has(device.id),
+    );
+    const canChangeDevices = canManage && ticketId !== undefined;
     const hasLinks =
+        incidentEvidence.length > 0 ||
         devices.length > 0 ||
         alerts.length > 0 ||
         problems.length > 0 ||
@@ -158,7 +200,7 @@ export function TicketLinkedContext({
 
     return (
         <section
-            aria-labelledby="ticket-monitoring-context"
+            aria-labelledby="ticket-linked-context"
             className="border-t border-border/60 pt-3"
         >
             <div className="flex items-center gap-2">
@@ -167,12 +209,92 @@ export function TicketLinkedContext({
                     className="h-3.5 w-3.5 text-muted-foreground"
                 />
                 <h2
-                    id="ticket-monitoring-context"
+                    id="ticket-linked-context"
                     className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase"
                 >
-                    Monitoring context
+                    Linked context
                 </h2>
             </div>
+
+            {canChangeDevices ? (
+                <div className="mt-3 rounded-xl border border-border/70 bg-muted/20 p-3">
+                    <label
+                        htmlFor="ticket-affected-device"
+                        className="text-[11.5px] font-semibold text-foreground"
+                    >
+                        Add affected Device
+                    </label>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        Choose a visible Security &amp; Devices record in this
+                        ticket&apos;s Site.
+                    </p>
+                    {availableDevices.length > 0 ? (
+                        <Select
+                            value={selectedDevice}
+                            onValueChange={(value) => {
+                                setSelectedDevice(value);
+                                if (value === 'none' || ticketId === undefined)
+                                    return;
+
+                                const deviceId = Number(value);
+                                setProcessingDevice(deviceId);
+                                router.post(
+                                    `/it/tickets/${ticketId}/devices`,
+                                    { device_id: deviceId },
+                                    {
+                                        preserveScroll: true,
+                                        onSuccess: (page) => {
+                                            const flash = page.props.flash as
+                                                | {
+                                                      error?: string;
+                                                      success?: string;
+                                                  }
+                                                | undefined;
+                                            if (flash?.error)
+                                                toast.error(flash.error);
+                                            else
+                                                toast.success(
+                                                    flash?.success ??
+                                                        'Device linked to ticket.',
+                                                );
+                                            setSelectedDevice('none');
+                                        },
+                                        onFinish: () =>
+                                            setProcessingDevice(null),
+                                    },
+                                );
+                            }}
+                            disabled={processingDevice !== null}
+                        >
+                            <SelectTrigger
+                                id="ticket-affected-device"
+                                className="frontline-focus mt-2 min-h-11 w-full"
+                                aria-label="Add affected Device"
+                            >
+                                <SelectValue placeholder="Choose a Device" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">
+                                    Choose a Device
+                                </SelectItem>
+                                {availableDevices.map((device) => (
+                                    <SelectItem
+                                        key={device.id}
+                                        value={String(device.id)}
+                                    >
+                                        {device.name} · {device.uid}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    ) : (
+                        <p className="mt-2 text-[11.5px] text-muted-foreground">
+                            All available Devices for this Site are already
+                            linked.
+                        </p>
+                    )}
+                </div>
+            ) : null}
 
             {recoveredAt ? (
                 <div className="mt-2 rounded-xl border border-status-success/30 bg-status-success-bg px-3 py-2.5">
@@ -192,6 +314,22 @@ export function TicketLinkedContext({
                 </div>
             ) : null}
 
+            {incidentEvidence.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                    {incidentEvidence.map((evidence) => (
+                        <MonitoringIncidentEvidenceCard
+                            key={evidence.id}
+                            evidence={evidence}
+                        />
+                    ))}
+                    <p className="rounded-lg border border-dashed border-border px-2.5 py-2 text-[11px] text-muted-foreground">
+                        The Device and Control Room records below are live now.
+                        IT owns this ticket; Control Room continues to own
+                        operational response.
+                    </p>
+                </div>
+            ) : null}
+
             {!hasLinks ? (
                 <div className="mt-2 rounded-xl border border-dashed border-border px-3 py-3 text-center">
                     <Link2
@@ -199,7 +337,7 @@ export function TicketLinkedContext({
                         className="mx-auto h-4 w-4 text-muted-foreground"
                     />
                     <p className="mt-1 text-[12px] text-muted-foreground">
-                        No linked monitoring records are visible.
+                        No linked operational records are visible.
                     </p>
                 </div>
             ) : null}
@@ -299,10 +437,69 @@ export function TicketLinkedContext({
                                         value={device.health_status}
                                     />
                                     <ContextStatus value={device.status} />
+                                    {device.is_monitoring_evidence ? (
+                                        <StatusBadge variant="info" size="sm">
+                                            <Link2
+                                                aria-hidden="true"
+                                                className="h-3 w-3"
+                                            />
+                                            Monitoring evidence
+                                        </StatusBadge>
+                                    ) : null}
                                     <span className="ml-auto text-[10.5px] text-muted-foreground">
                                         Last seen{' '}
                                         {formatDateTime(device.last_seen_at)}
                                     </span>
+                                    {canChangeDevices && device.can_unlink ? (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="frontline-focus min-h-11"
+                                            disabled={
+                                                processingDevice === device.id
+                                            }
+                                            onClick={() => {
+                                                if (ticketId === undefined)
+                                                    return;
+                                                setProcessingDevice(device.id);
+                                                router.delete(
+                                                    `/it/tickets/${ticketId}/devices/${device.id}`,
+                                                    {
+                                                        preserveScroll: true,
+                                                        onSuccess: (page) => {
+                                                            const flash = page
+                                                                .props.flash as
+                                                                | {
+                                                                      error?: string;
+                                                                      success?: string;
+                                                                  }
+                                                                | undefined;
+                                                            if (flash?.error)
+                                                                toast.error(
+                                                                    flash.error,
+                                                                );
+                                                            else
+                                                                toast.success(
+                                                                    flash?.success ??
+                                                                        'Device link removed.',
+                                                                );
+                                                        },
+                                                        onFinish: () =>
+                                                            setProcessingDevice(
+                                                                null,
+                                                            ),
+                                                    },
+                                                );
+                                            }}
+                                        >
+                                            <Unlink
+                                                aria-hidden="true"
+                                                className="h-3.5 w-3.5"
+                                            />
+                                            Remove link
+                                        </Button>
+                                    ) : null}
                                 </div>
                             </li>
                         ))}

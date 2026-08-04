@@ -2,11 +2,27 @@
 
 namespace App\Domain\SecurityDevices\Presenters;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorObservation;
+use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
+use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
+use App\Domain\SecurityDevices\Management\Enums\ManagementLevel;
+use App\Domain\SecurityDevices\Management\Models\DeviceCommandRequest;
+use App\Domain\SecurityDevices\Management\Services\CommandAssignmentFingerprint;
+use App\Domain\SecurityDevices\Management\Services\CommandCapabilityRegistry;
+use App\Domain\SecurityDevices\Management\Services\CommandChangeEligibilityService;
+use App\Domain\SecurityDevices\Management\Services\CommandExecutionRouteResolver;
+use App\Domain\SecurityDevices\Management\Services\CommandObservationFreshnessService;
+use App\Domain\SecurityDevices\Management\Services\CommandParameterValidator;
+use App\Domain\SecurityDevices\Management\Services\DeclaredDeviceCommandCapabilities;
+use App\Domain\SecurityDevices\Management\Services\DeviceCommandBreakGlassService;
+use App\Domain\SecurityDevices\Management\Services\DeviceCommandParameterPolicyService;
+use App\Domain\SecurityDevices\Management\Services\DeviceManagementAuthorizationService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -18,17 +34,34 @@ use App\Models\ItTicketLink;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
+use App\Services\Queclink\QueclinkConfigurationProfileService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Throwable;
+use UnexpectedValueException;
 
 class DeviceProfilePresenter
 {
     public function __construct(
         private readonly SecurityDevicesAccessService $deviceAccess,
+        private readonly DeviceManagementAuthorizationService $managementAuthorization,
+        private readonly CommandCapabilityRegistry $commandCapabilities,
+        private readonly CommandAssignmentFingerprint $commandAssignments,
+        private readonly DeclaredDeviceCommandCapabilities $declaredCommandCapabilities,
+        private readonly CommandExecutionRouteResolver $commandExecutionRoutes,
+        private readonly CommandObservationFreshnessService $commandFreshness,
+        private readonly CommandParameterValidator $commandParameters,
+        private readonly DeviceCommandParameterPolicyService $commandParameterPolicy,
+        private readonly CanonicalDeviceSiteResolver $siteResolver,
+        private readonly CommandChangeEligibilityService $changeEligibility,
+        private readonly DeviceCommandBreakGlassService $breakGlass,
+        private readonly ItWorkAccessService $itWorkAccess,
+        private readonly QueclinkConfigurationProfileService $configurationProfiles,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     /** @return array<string, mixed> */
@@ -50,6 +83,7 @@ class DeviceProfilePresenter
         $controlRoomAlerts = $canViewControlRoom
             ? $this->controlRoomAlerts($viewer, $device)
             : collect();
+        $management = $this->management($viewer, $device);
 
         return [
             'header' => $this->header(
@@ -71,6 +105,8 @@ class DeviceProfilePresenter
                 $tickets,
                 $audit,
                 $controlRoomAlerts,
+                (bool) $management['visible'],
+                count($management['history']),
             ),
             'health' => $this->health($device, $monitors, $canViewMonitoring),
             'monitors' => $canViewMonitoring
@@ -83,7 +119,8 @@ class DeviceProfilePresenter
             'tickets' => $tickets->values(),
             'controlRoomAlerts' => $controlRoomAlerts->values(),
             'audit' => $audit->values(),
-            'capabilities' => $this->capabilities($viewer, $device),
+            'management' => $management,
+            'capabilities' => $this->capabilities($viewer, $device, $management),
         ];
     }
 
@@ -180,7 +217,7 @@ class DeviceProfilePresenter
             DeviceAssignment::TARGET_ROOM => $this->roomLocation($device, $assignment),
             DeviceAssignment::TARGET_CLIENT => $this->clientLocation($device, $assignment),
             DeviceAssignment::TARGET_VEHICLE => $this->vehicleLocation($viewer, $assignment),
-            DeviceAssignment::TARGET_STAFF => $this->staffLocation($device, $assignment),
+            DeviceAssignment::TARGET_STAFF => $this->staffLocation($viewer, $assignment),
             default => null,
         };
     }
@@ -235,28 +272,66 @@ class DeviceProfilePresenter
             return null;
         }
 
-        $asset = Asset::query()->find($assignment->assignable_id, ['id', 'name', 'registration_number']);
+        $asset = Asset::query()
+            ->with('categoryRef:id,slug')
+            ->find($assignment->assignable_id, [
+                'id',
+                'name',
+                'registration_number',
+                'category',
+                'asset_category_id',
+                'site_id',
+                'client_id',
+            ]);
 
         return $asset ? [
             'id' => $asset->id,
             'type' => 'vehicle',
             'name' => $asset->name ?: $asset->registration_number,
-            'href' => null,
+            'href' => $this->assetHref($viewer, $asset),
         ] : null;
     }
 
     /** @return array<string, mixed>|null */
-    private function staffLocation(Device $device, DeviceAssignment $assignment): ?array
+    private function staffLocation(User $viewer, DeviceAssignment $assignment): ?array
     {
-        $staff = User::query()
-            ->find($assignment->assignable_id, ['id', 'name']);
+        $staff = User::query()->find($assignment->assignable_id, ['id', 'name']);
 
         return $staff ? [
             'id' => $staff->id,
             'type' => 'staff',
             'name' => $staff->name,
-            'href' => null,
+            'href' => $this->staffProfileHref($viewer, $staff->id),
         ] : null;
+    }
+
+    private function staffProfileHref(User $viewer, int $staffId): ?string
+    {
+        if (! $viewer->canDo('hr.employees.viewAny')) {
+            return null;
+        }
+
+        $visibleStaff = User::query()->whereKey($staffId)->select('users.id');
+        $this->siteAccess->applyStaffScope($visibleStaff, $viewer);
+        $profileId = HrEmployeeProfile::query()
+            ->whereIn('user_id', $visibleStaff)
+            ->value('id');
+
+        return $profileId ? "/hr/people/{$profileId}" : null;
+    }
+
+    private function assetHref(User $viewer, Asset $asset): ?string
+    {
+        $isVehicle = strtolower(trim((string) $asset->category)) === 'vehicle'
+            || $asset->categoryRef?->slug === 'vehicle';
+        if ($isVehicle && $viewer->canDo('fleet.viewAny')) {
+            return "/fleet-assets/vehicles/{$asset->id}";
+        }
+
+        $canUseAssetRoute = ($viewer->canDo('assets.viewAny') || $viewer->canDo('assets.viewAssigned'))
+            && Gate::forUser($viewer)->allows('view', $asset);
+
+        return $canUseAssetRoute ? "/fleet-assets/assets/{$asset->id}" : null;
     }
 
     /** @return array<string, mixed> */
@@ -348,6 +423,8 @@ class DeviceProfilePresenter
         Collection $tickets,
         Collection $audit,
         Collection $controlRoomAlerts,
+        bool $canViewManagement,
+        int $commandCount,
     ): array {
         return collect([
             ['key' => 'health', 'label' => 'Health', 'group' => 'status'],
@@ -355,6 +432,7 @@ class DeviceProfilePresenter
             ['key' => 'topology', 'label' => 'Topology', 'group' => 'technical'],
             $canViewMonitoring ? ['key' => 'interfaces-sensors', 'label' => 'Interfaces & sensors', 'group' => 'technical'] : null,
             ['key' => 'configuration', 'label' => 'Configuration', 'group' => 'technical'],
+            $canViewManagement ? ['key' => 'management', 'label' => 'Management', 'group' => 'technical', 'count' => $commandCount] : null,
             ['key' => 'assignments', 'label' => 'Assignments', 'group' => 'operations', 'count' => $device->assignments->count()],
             $canViewIt ? ['key' => 'tickets', 'label' => 'Tickets', 'group' => 'operations', 'count' => $tickets->count()] : null,
             $canViewMonitoring || $canViewControlRoom ? [
@@ -720,7 +798,7 @@ class DeviceProfilePresenter
     }
 
     /** @return array<string, mixed> */
-    private function capabilities(User $viewer, Device $device): array
+    private function capabilities(User $viewer, Device $device, array $management): array
     {
         $canUpdate = $viewer->canDo('securityDevices.devices.update');
         $canAssign = $viewer->canDo('securityDevices.devices.assign');
@@ -737,7 +815,10 @@ class DeviceProfilePresenter
         )) {
             $maintenanceEvidence = true;
         }
-        $controlEvidence = $this->capabilityEvidence($device, 'control');
+        $controlActions = collect($management['actions'])->where('level', 'control');
+        $controlSupported = $controlActions->isNotEmpty();
+        $controlAllowed = $controlActions->contains(fn (array $action): bool => $action['allowed']);
+        $controlAvailable = $controlActions->contains(fn (array $action): bool => $action['available']);
 
         return [
             'registry' => $this->capability(true, $canUpdate && $active, 'supported'),
@@ -746,17 +827,462 @@ class DeviceProfilePresenter
             'maintenance' => $this->capabilityFromEvidence($maintenanceEvidence, $canManageMaintenance && $active),
             'documents' => $this->capability(true, $canUpdate && $active, 'supported'),
             'control' => [
-                'supported' => $controlEvidence === true,
-                'allowed' => false,
-                'available' => false,
-                'state' => match ($controlEvidence) {
-                    true => 'supported_governance_unavailable',
-                    false => 'unsupported',
-                    default => 'unknown_not_configured',
-                },
-                'reason' => 'Remote control remains unavailable until governed command planning, approval, execution, and reconciliation are enabled for this device capability.',
+                'supported' => $controlSupported,
+                'allowed' => $controlAllowed,
+                'available' => $controlAvailable,
+                'state' => $controlAvailable
+                    ? 'governed_management_available'
+                    : ($controlSupported ? 'supported_but_blocked' : 'unknown_not_configured'),
+                'reason' => $controlAvailable
+                    ? 'Supported controls use reason, step-up, approval, signed dispatch, and fresh-state reconciliation.'
+                    : ($controlSupported
+                        ? 'This device declares management support, but your permission or an approved provider execution adapter is missing.'
+                        : 'No exact provider management capability has been declared for this device.'),
             ],
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function management(User $viewer, Device $device): array
+    {
+        $this->managementAuthorization->resetMemoizedState();
+        $canObserve = $this->managementAuthorization->allowsLevel($viewer, ManagementLevel::Observe);
+        $freshness = $this->commandFreshness->inspect($device);
+        $compatibleConfigurationProfiles = $this->configurationProfiles->compatibleProfiles($device);
+        try {
+            $siteId = $this->siteResolver->resolve((int) $device->id);
+            $assignmentFingerprint = $this->commandAssignments->forDevice($device);
+            $eligibleChanges = $this->changeEligibility->eligibleFor($viewer, $device, $siteId);
+        } catch (UnexpectedValueException) {
+            $siteId = null;
+            $assignmentFingerprint = null;
+            $eligibleChanges = collect();
+        }
+        $actions = $this->declaredCommandCapabilities->forDevice($device)
+            ->map(function (string $key) use ($viewer, $device, $eligibleChanges, $freshness, $siteId, $compatibleConfigurationProfiles): ?array {
+                try {
+                    $definition = $this->commandCapabilities->definition($key);
+                } catch (\DomainException) {
+                    return null;
+                }
+
+                $authorization = $this->managementAuthorization->evaluate(
+                    $viewer,
+                    $device,
+                    $definition,
+                );
+                if (! $authorization->allowed && $authorization->concealed) {
+                    return null;
+                }
+                $allowed = $authorization->allowed;
+                $route = $siteId === null
+                    ? null
+                    : $this->commandExecutionRoutes->resolve($device, $siteId, $key);
+                $adapterAvailable = $route?->available === true;
+                $deviceStateAllowed = in_array($device->status?->value, $definition->allowedCurrentStates, true);
+                $governanceAvailable = ! $definition->requiresChange || $eligibleChanges->isNotEmpty();
+                $observationCurrent = ! $definition->requiresFreshObservation || $freshness->isFresh();
+                $mfaCurrent = ! $definition->requiresMfa || $viewer->two_factor_confirmed_at !== null;
+                $parameterOptionsAvailable = $key !== 'configuration.apply' || $compatibleConfigurationProfiles->isNotEmpty();
+                $available = $deviceStateAllowed
+                    && $allowed
+                    && $adapterAvailable
+                    && $governanceAvailable
+                    && $observationCurrent
+                    && $mfaCurrent
+                    && $parameterOptionsAvailable;
+
+                return [
+                    'key' => $key,
+                    'label' => $definition->label,
+                    'domain' => $definition->domain,
+                    'group' => str_starts_with($key, 'diagnostics.')
+                        ? 'diagnostics'
+                        : ($definition->isHighRisk() ? 'high_risk_control' : 'standard_management'),
+                    'level' => $definition->level->value,
+                    'risk' => $definition->risk->value,
+                    'workspace' => $authorization->workspace,
+                    'sensitivity' => $authorization->sensitivity,
+                    'impact' => $definition->impact,
+                    'expectedResult' => $definition->expectedResult,
+                    'confirmationMode' => $definition->confirmationMode->value,
+                    'executionMode' => $route?->mode === 'collector'
+                        ? 'collector_runtime'
+                        : ($adapterAvailable ? 'central_runtime' : 'unavailable'),
+                    'executionGuidance' => $route?->reason
+                        ?? 'No approved central or remote collector execution route is available.',
+                    'allowed' => $allowed,
+                    'adapterAvailable' => $adapterAvailable,
+                    'available' => $available,
+                    'state' => $available
+                        ? 'available'
+                        : (! $allowed
+                            ? $authorization->code
+                            : (! $adapterAvailable
+                                ? 'provider_adapter_required'
+                                : (! $governanceAvailable
+                                    ? 'change_workflow_required'
+                                    : (! $deviceStateAllowed
+                                        ? 'device_state_blocked'
+                                        : (! $observationCurrent
+                                            ? ($freshness->state === 'never_observed' ? 'observation_required' : 'observation_stale')
+                                            : (! $mfaCurrent ? 'mfa_required' : 'configuration_profile_required')))))),
+                    'reason' => $available
+                        ? 'Governed request available.'
+                        : (! $allowed
+                            ? $authorization->reason
+                            : (! $adapterAvailable
+                                ? 'The provider has not registered an approved execution and reconciliation adapter for this action.'
+                                : (! $governanceAvailable
+                                    ? 'No current approved IT Change is linked to this Device and Site within its maintenance window.'
+                                    : (! $deviceStateAllowed
+                                        ? 'The action is blocked by the current Device state.'
+                                        : (! $observationCurrent
+                                            ? ($freshness->state === 'never_observed'
+                                                ? 'A current Device observation is required before this action can be requested.'
+                                                : 'The last confirmed Device observation is stale. Refresh monitoring evidence before requesting this action.')
+                                            : (! $mfaCurrent
+                                                ? 'Configured multi-factor authentication is required for this critical action.'
+                                                : 'No active desired configuration profile is approved for this provider and Device class.')))))),
+                    'requiresStepUp' => $definition->requiresStepUp,
+                    'requiresMfa' => $definition->requiresMfa,
+                    'requiresFreshObservation' => $definition->requiresFreshObservation,
+                    'freshness' => [
+                        'state' => $freshness->state,
+                        'observedAt' => $freshness->observedAt?->toISOString(),
+                        'staleAfterSeconds' => $freshness->staleAfterSeconds,
+                    ],
+                    'requiresApproval' => $definition->requiresApproval,
+                    'requiresChange' => $definition->requiresChange,
+                    'allowsBreakGlass' => $definition->allowsBreakGlass,
+                    'expiresAfterSeconds' => $definition->expiresAfterSeconds,
+                    'parameters' => collect($definition->parameters)
+                        ->map(function (array $schema, string $name) use ($compatibleConfigurationProfiles): array {
+                            $profileSource = ($schema['source'] ?? null) === 'compatible_configuration_profiles';
+
+                            return [
+                                'name' => $name,
+                                'label' => $profileSource ? 'Approved configuration profile' : Str::headline($name),
+                                'type' => $schema['type'],
+                                'min' => $schema['min'] ?? null,
+                                'max' => $schema['max'] ?? $schema['max_length'] ?? null,
+                                'options' => $profileSource
+                                    ? $compatibleConfigurationProfiles->pluck('id')->map(fn (int $id): string => (string) $id)->all()
+                                    : ($schema['enum'] ?? []),
+                                'optionLabels' => $profileSource
+                                    ? $compatibleConfigurationProfiles->mapWithKeys(fn ($profile): array => [
+                                        (string) $profile->id => $profile->name.' · v'.$profile->version,
+                                    ])->all()
+                                    : [],
+                            ];
+                        })->values()->all(),
+                ];
+            })
+            ->filter()
+            ->sortBy(fn (array $action): string => $action['level'].'|'.$action['label'])
+            ->values();
+        $breakGlassReviewers = $viewer->canDo('securityDevices.commands.admin')
+            && $viewer->two_factor_confirmed_at !== null
+            && $actions->contains(fn (array $action): bool => $action['allowsBreakGlass'])
+                ? $this->breakGlass->eligibleReviewers(
+                    $viewer,
+                    $device,
+                    $actions
+                        ->where('allowsBreakGlass', true)
+                        ->pluck('key')
+                        ->values()
+                        ->all(),
+                )
+                : collect();
+
+        $now = Carbon::now('UTC')->startOfSecond();
+        $history = $canObserve
+            ? DeviceCommandRequest::query()
+                ->where('device_id', $device->id)
+                ->with([
+                    'change.ticket:id,reference,title',
+                    'device',
+                    'requestedBy:id,name,approved_at,two_factor_confirmed_at',
+                    'approvedBy:id,name',
+                    'breakGlassReviewer:id,name,approved_at,two_factor_confirmed_at',
+                    'breakGlassReviewedBy:id,name',
+                    'attempts',
+                    'reconciliations',
+                ])
+                ->latest('id')
+                ->limit(30)
+                ->get()
+                ->filter(function (DeviceCommandRequest $command) use ($viewer): bool {
+                    try {
+                        $definition = $this->commandCapabilities->definition($command->capability);
+                    } catch (\DomainException) {
+                        return false;
+                    }
+
+                    return $this->managementAuthorization->evaluate(
+                        $viewer,
+                        $command->device,
+                        $definition,
+                        ManagementLevel::Observe,
+                    )->allowed;
+                })
+                ->map(function (DeviceCommandRequest $command) use (
+                    $viewer,
+                    $now,
+                    $siteId,
+                    $assignmentFingerprint,
+                    $freshness,
+                ): array {
+                    try {
+                        $definition = $this->commandCapabilities->definition($command->capability);
+                        $label = $definition->label;
+                    } catch (\DomainException) {
+                        $definition = null;
+                        $label = Str::headline($command->capability);
+                    }
+                    $latestAttempt = $command->attempts->sortByDesc('attempt_number')->first();
+                    $latestReconciliation = $command->reconciliations->sortByDesc('observed_at')->first();
+                    $canViewChange = $command->change?->ticket !== null
+                        && $this->itWorkAccess->canView($viewer, $command->change->ticket);
+                    $changeRequired = $definition?->requiresChange ?? $command->it_change_id !== null;
+                    $changeGovernanceCurrent = $command->is_break_glass
+                        || ! $changeRequired
+                        || ($command->it_change_id !== null
+                            && $command->requestedBy !== null
+                            && $this->changeEligibility->isEligible(
+                                (int) $command->it_change_id,
+                                $command->requestedBy,
+                                $command->device,
+                                (int) $command->site_id,
+                                $now->toImmutable(),
+                            )
+                            && $this->changeEligibility->isEligible(
+                                (int) $command->it_change_id,
+                                $viewer,
+                                $command->device,
+                                (int) $command->site_id,
+                                $now->toImmutable(),
+                            ));
+                    $deviceState = $command->device->status?->value ?? (string) $command->device->status;
+                    $parameterPolicyCurrent = false;
+                    if ($definition !== null) {
+                        try {
+                            $parameters = $this->commandParameters->validate(
+                                $definition,
+                                $command->encrypted_parameters ?? [],
+                            );
+                            $this->commandParameterPolicy->assertAllowed(
+                                $command->device,
+                                $definition,
+                                $parameters,
+                            );
+                            $parameterPolicyCurrent = true;
+                        } catch (Throwable) {
+                            $parameterPolicyCurrent = false;
+                        }
+                    }
+                    $stepUpCurrent = $definition === null
+                        || ! $definition->requiresStepUp
+                        || ($command->step_up_confirmed_at !== null
+                            && ! $command->step_up_confirmed_at->isFuture()
+                            && $command->step_up_confirmed_at->greaterThanOrEqualTo(
+                                $now->copy()->subSeconds(max(60, (int) config('security_devices.step_up_max_age_seconds', 900))),
+                            ));
+                    $requesterAuthorizationCurrent = $definition !== null
+                        && $command->requestedBy !== null
+                        && $this->managementAuthorization->evaluate(
+                            $command->requestedBy,
+                            $command->device,
+                            $definition,
+                        )->allowed;
+                    $viewerActionAuthorized = $definition !== null
+                        && $this->managementAuthorization->evaluate(
+                            $viewer,
+                            $command->device,
+                            $definition,
+                        )->allowed;
+                    $commandPreconditionsCurrent = $definition !== null
+                        && $command->expires_at?->isAfter($now)
+                        && $command->risk === $definition->risk
+                        && $command->management_level === $definition->level
+                        && $command->confirmation_mode === $definition->confirmationMode
+                        && (! $definition->isHighRisk() || $command->impact_acknowledged_at !== null)
+                        && $siteId !== null
+                        && (int) $command->site_id === $siteId
+                        && is_string($assignmentFingerprint)
+                        && is_string($command->assignment_fingerprint)
+                        && hash_equals($command->assignment_fingerprint, $assignmentFingerprint)
+                        && $command->provider === $command->device->provider
+                        && in_array($deviceState, $definition->allowedCurrentStates, true)
+                        && $this->declaredCommandCapabilities->supports($command->device, $command->capability)
+                        && $changeGovernanceCurrent
+                        && $parameterPolicyCurrent
+                        && $stepUpCurrent
+                        && $requesterAuthorizationCurrent
+                        && (! $definition->requiresFreshObservation || $freshness->isFresh())
+                        && (! $definition->requiresMfa || $command->requestedBy?->two_factor_confirmed_at !== null);
+                    $canViewBreakGlassDetail = $command->is_break_glass
+                        && ((int) $command->requested_by_user_id === (int) $viewer->id
+                            || (int) $command->break_glass_reviewer_user_id === (int) $viewer->id
+                            || $viewer->canDo('securityDevices.commands.admin'));
+
+                    return [
+                        'id' => $command->id,
+                        'uuid' => $command->command_uuid,
+                        'capability' => $command->capability,
+                        'label' => $label,
+                        'status' => $command->status->value,
+                        'risk' => $command->risk->value,
+                        'confirmationMode' => $command->confirmation_mode?->value,
+                        'impactAcknowledgedAt' => $command->impact_acknowledged_at?->toISOString(),
+                        'reason' => $command->reason,
+                        'safeParameters' => $command->safe_parameter_summary ?? [],
+                        'expectedState' => $command->expected_state ?? [],
+                        'requestedBy' => $command->requestedBy?->name,
+                        'approvedBy' => $command->approvedBy?->name,
+                        'isBreakGlass' => $command->is_break_glass,
+                        'breakGlass' => $command->is_break_glass ? [
+                            'reviewer' => $command->breakGlassReviewer?->name,
+                            'emergencyReason' => $canViewBreakGlassDetail ? $command->break_glass_reason : null,
+                            'declaredAt' => $command->break_glass_declared_at?->toISOString(),
+                            'notificationSentAt' => $command->break_glass_notification_sent_at?->toISOString(),
+                            'reviewDueAt' => $command->break_glass_review_due_at?->toISOString(),
+                            'reviewedBy' => $command->breakGlassReviewedBy?->name,
+                            'reviewedAt' => $command->break_glass_reviewed_at?->toISOString(),
+                            'outcome' => $command->break_glass_review_outcome?->value,
+                            'reviewSummary' => $canViewBreakGlassDetail ? $command->break_glass_review_summary : null,
+                            'overdue' => $command->break_glass_reviewed_at === null
+                                && $command->break_glass_review_due_at?->lessThanOrEqualTo($now),
+                        ] : null,
+                        'requestedAt' => $command->created_at?->toISOString(),
+                        'expiresAt' => $command->expires_at?->toISOString(),
+                        'reconciledAt' => $command->reconciled_at?->toISOString(),
+                        'safeFailureReason' => $command->safe_failure_reason,
+                        'blockedReasonCode' => $command->blocked_reason_code,
+                        'blockedAt' => $command->blocked_at?->toISOString(),
+                        'change' => $canViewChange ? [
+                            'id' => $command->change->id,
+                            'reference' => $command->change->ticket->reference,
+                            'title' => $command->change->ticket->title,
+                        ] : null,
+                        'nextAction' => $this->commandNextAction($command->status, $commandPreconditionsCurrent),
+                        'evidenceExportHref' => "/security-devices/devices/{$command->device_id}/commands/{$command->id}/evidence",
+                        'executionRoute' => $command->execution_route,
+                        'latestAttempt' => $latestAttempt ? [
+                            'number' => $latestAttempt->attempt_number,
+                            'status' => $latestAttempt->status->value,
+                            'runtime' => $latestAttempt->runtime,
+                            'safeResult' => $latestAttempt->safe_result_summary ?? [],
+                            'safeFailureReason' => $latestAttempt->safe_failure_reason,
+                            'completedAt' => $latestAttempt->completed_at?->toISOString(),
+                        ] : null,
+                        'latestReconciliation' => $latestReconciliation ? [
+                            'outcome' => $latestReconciliation->outcome->value,
+                            'observedState' => $latestReconciliation->observed_state ?? [],
+                            'safeEvidenceSummary' => $latestReconciliation->safe_evidence_summary,
+                            'observedAt' => $latestReconciliation->observed_at?->toISOString(),
+                        ] : null,
+                        'canDecide' => $command->status->value === 'awaiting_approval'
+                            && (int) $command->requested_by_user_id !== (int) $viewer->id
+                            && $viewer->canDo('securityDevices.commands.approve')
+                            && $commandPreconditionsCurrent,
+                        'canDispatch' => $command->status->value === 'ready'
+                            && ((int) $command->requested_by_user_id === (int) $viewer->id
+                                || $viewer->canDo('securityDevices.commands.admin'))
+                            && $viewerActionAuthorized,
+                        'dispatchPreconditionsCurrent' => $commandPreconditionsCurrent
+                            && $this->breakGlass->isDispatchable($command)
+                            && $this->commandExecutionRoutes->matches(
+                                $command->device,
+                                (int) $command->site_id,
+                                $command->capability,
+                                $command->collector_id === null ? null : (int) $command->collector_id,
+                            ),
+                        'canReviewBreakGlass' => $command->is_break_glass
+                            && $command->execution_completed_at !== null
+                            && $command->break_glass_reviewed_at === null
+                            && (int) $command->break_glass_reviewer_user_id === (int) $viewer->id
+                            && $viewer->canDo('securityDevices.commands.admin'),
+                    ];
+                })->values()->all()
+            : [];
+
+        $canUseAnyAction = $actions->contains(fn (array $action): bool => $action['allowed']);
+
+        return [
+            'visible' => $canObserve || $canUseAnyAction,
+            'actions' => $actions->all(),
+            'history' => $history,
+            'canObserve' => $canObserve,
+            'canApprove' => $viewer->canDo('securityDevices.commands.approve'),
+            'stepUpCurrent' => $this->stepUpCurrent($now),
+            'changeOptions' => $eligibleChanges->map(fn ($change): array => [
+                'id' => $change->id,
+                'reference' => $change->ticket->reference,
+                'title' => $change->ticket->title,
+                'workflowState' => $change->ticket->workflow_state,
+                'maintenanceEndsAt' => $change->maintenance_ends_at?->toISOString(),
+            ])->values()->all(),
+            'breakGlassReviewers' => $breakGlassReviewers->map(fn (User $reviewer): array => [
+                'id' => (int) $reviewer->id,
+                'name' => $reviewer->name,
+            ])->values()->all(),
+            'summary' => [
+                'declared' => $actions->count(),
+                'available' => $actions->where('available', true)->count(),
+                'awaitingApproval' => collect($history)->where('status', 'awaiting_approval')->count(),
+                'uncertain' => collect($history)->where('status', 'uncertain')->count(),
+                'blocked' => collect($history)->where('status', 'blocked')->count(),
+                'breakGlassReviewDue' => collect($history)
+                    ->where('isBreakGlass', true)
+                    ->filter(fn (array $command): bool => $command['breakGlass']['reviewedAt'] === null)
+                    ->count(),
+            ],
+        ];
+    }
+
+    private function commandNextAction(CommandStatus $status, bool $preconditionsCurrent = true): string
+    {
+        if ($status === CommandStatus::Ready && ! $preconditionsCurrent) {
+            return 'Approved conditions changed. Recheck the request; it will close safely without execution unless every condition is current.';
+        }
+
+        return match ($status) {
+            CommandStatus::Requested => 'Review the governance requirements before the request expires.',
+            CommandStatus::AwaitingStepUp => 'The requester must confirm their identity and safely resume this request before it expires.',
+            CommandStatus::AwaitingApproval => 'An independent reviewer must verify the Device, Site, reason, timing, and expected result.',
+            CommandStatus::AwaitingChange => 'Link an eligible approved IT Change whose maintenance window and Device/Site scope are current.',
+            CommandStatus::Ready => 'The requester or a command administrator can add this request to the governed execution queue.',
+            CommandStatus::Queued => 'Execution is queued. Do not create a duplicate request while this command is pending.',
+            CommandStatus::Dispatching,
+            CommandStatus::Accepted,
+            CommandStatus::Running => 'Execution is in progress. Wait for a provider result and fresh-state verification.',
+            CommandStatus::Succeeded,
+            CommandStatus::Reconciling => 'Execution reported success; the application is verifying the actual Device state.',
+            CommandStatus::Uncertain => 'Confirm the actual Device state before any retry. High-risk commands must not be repeated blindly.',
+            CommandStatus::Mismatch => 'Investigate the state mismatch and record the operational response before considering another command.',
+            CommandStatus::Failed => 'Review the safe failure evidence, correct the cause, and create a new request only if still required.',
+            CommandStatus::Rejected => 'The request was rejected. Create a new request only after addressing the reviewer decision.',
+            CommandStatus::Expired => 'The request expired without execution. Reconfirm the need and create a new short-lived request.',
+            CommandStatus::Cancelled => 'The request was cancelled and cannot be resumed.',
+            CommandStatus::Blocked => 'Resolve the recorded governance condition and create a new request. This request cannot execute or be resumed.',
+            CommandStatus::Reconciled => 'No further action is required; the fresh observed state matched the expected result.',
+        };
+    }
+
+    private function stepUpCurrent(Carbon $now): bool
+    {
+        if (! request()->hasSession()) {
+            return false;
+        }
+        $confirmedAt = request()->session()->get('auth.password_confirmed_at');
+        if (! is_numeric($confirmedAt)) {
+            return false;
+        }
+        $confirmed = Carbon::createFromTimestampUTC((int) $confirmedAt);
+        $maxAge = max(60, (int) config('security_devices.step_up_max_age_seconds', 900));
+
+        return ! $confirmed->isFuture() && $confirmed->greaterThanOrEqualTo($now->copy()->subSeconds($maxAge));
     }
 
     private function monitoringCapabilityEvidence(Device $device): ?bool

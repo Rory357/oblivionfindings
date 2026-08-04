@@ -9,6 +9,8 @@ use App\Services\Fleet\FleetTelemetryIngestService;
 use App\Services\Queclink\AckBuilder;
 use App\Services\Queclink\AtTrackFrame;
 use App\Services\Queclink\AtTrackProtocolParser;
+use App\Services\Queclink\GovernedCommandLifecycleService;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -26,6 +28,7 @@ class FrameRouter
         protected AtTrackProtocolParser $parser,
         protected AckBuilder $acks,
         protected FleetTelemetryIngestService $ingest,
+        protected GovernedCommandLifecycleService $governedCommands,
     ) {}
 
     /**
@@ -55,10 +58,40 @@ class FrameRouter
             return [];
         }
 
-        $this->logRaw($frame, $state, $queclinkDevice, 'inbound');
+        $storedFrame = $this->logRaw($frame, $state, $queclinkDevice, 'inbound');
 
         if (! $frame->isValid()) {
             return [];
+        }
+
+        if ($queclinkDevice && $queclinkDevice->isPaired()) {
+            try {
+                $this->governedCommands->fulfilFromReconnection(
+                    $queclinkDevice,
+                    (int) $storedFrame->id,
+                    $state->sessionId,
+                );
+            } catch (\Throwable $e) {
+                Log::warning('queclink: governed reconnection reconciliation intake failed', [
+                    'device_id' => $queclinkDevice->device_id,
+                    'frame_id' => $storedFrame->id,
+                    'error_type' => $e::class,
+                ]);
+            }
+        }
+
+        if ($queclinkDevice
+            && $queclinkDevice->isPaired()
+            && $frame->commandWord === 'GTALM') {
+            try {
+                $this->governedCommands->fulfilFromConfiguration($queclinkDevice, (int) $storedFrame->id);
+            } catch (\Throwable $e) {
+                Log::warning('queclink: governed configuration reconciliation intake failed', [
+                    'device_id' => $queclinkDevice->device_id,
+                    'frame_id' => $storedFrame->id,
+                    'error_type' => $e::class,
+                ]);
+            }
         }
 
         $outbound = [];
@@ -78,14 +111,36 @@ class FrameRouter
 
         // 2. Ingest telemetry into the fleet pipeline (only for paired devices).
         if ($queclinkDevice && $queclinkDevice->isPaired() && $frame->isReport()) {
-            try {
-                $this->ingest->ingest('queclink', $frame->payload);
-            } catch (\Throwable $e) {
-                Log::warning('queclink: ingest failed', [
-                    'imei' => $frame->imei,
-                    'command' => $frame->commandWord,
-                    'error' => $e->getMessage(),
+            if ($queclinkDevice->device_id === null) {
+                Log::warning('queclink: paired provider device has no canonical Device binding', [
+                    'queclink_device_id' => $queclinkDevice->id,
+                    'frame_id' => $storedFrame->id,
                 ]);
+            } else {
+                try {
+                    $result = $this->ingest->ingest(
+                        'queclink',
+                        $frame->payload,
+                        (int) $queclinkDevice->device_id,
+                    );
+                    if (($result['ok'] ?? false) === true && is_numeric($result['id'] ?? null)) {
+                        $this->governedCommands->fulfilFromTelemetry($queclinkDevice, (int) $result['id']);
+                    } elseif (($result['ok'] ?? false) !== true) {
+                        Log::warning('queclink: canonical telemetry intake rejected', [
+                            'queclink_device_id' => $queclinkDevice->id,
+                            'device_id' => $queclinkDevice->device_id,
+                            'frame_id' => $storedFrame->id,
+                            'status' => $result['status'] ?? null,
+                            'reason' => $result['error'] ?? 'unknown',
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('queclink: ingest failed', [
+                        'imei' => $frame->imei,
+                        'command' => $frame->commandWord,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
         }
 
@@ -97,12 +152,9 @@ class FrameRouter
         // 4. Dispatch any queued commands for paired devices (capped per frame).
         if ($queclinkDevice && $queclinkDevice->isPaired()) {
             foreach ($this->popQueuedCommands($queclinkDevice) as $command) {
-                $outbound[] = $command->raw_command;
-                $this->logRawOutbound($command->raw_command, $state, $queclinkDevice, $command->command_word);
-                $command->update([
-                    'status' => QueclinkPendingCommand::STATUS_SENT,
-                    'sent_at' => now(),
-                ]);
+                $sent = $this->governedCommands->markSent($command, $state->sessionId);
+                $outbound[] = $sent->raw_command;
+                $this->logRawOutbound($sent->raw_command, $state, $queclinkDevice, $sent->command_word);
             }
         }
 
@@ -174,17 +226,30 @@ class FrameRouter
         return $device;
     }
 
-    protected function logRaw(AtTrackFrame $frame, ConnectionState $state, ?QueclinkDevice $device, string $direction): void
+    protected function logRaw(AtTrackFrame $frame, ConnectionState $state, ?QueclinkDevice $device, string $direction): QueclinkRawFrame
     {
-        QueclinkRawFrame::create([
+        $payload = $frame->isValid() ? $frame->payload : null;
+        $protectedPayload = null;
+        $sensitive = $frame->commandWord === 'GTALM';
+        if ($sensitive && is_array($payload)) {
+            $protectedPayload = Crypt::encryptString(json_encode(
+                $payload,
+                JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES,
+            ));
+            unset($payload['config_text']);
+            $payload['configuration_payload_protected'] = true;
+        }
+        $stored = $this->frameStorage($frame->rawFrame, $sensitive);
+
+        return QueclinkRawFrame::create([
             'queclink_device_id' => $device?->id,
             'imei' => $frame->imei,
-            'tenant_id' => $device?->tenant_id,
             'direction' => $direction,
             'frame_type' => $frame->frameType,
             'command_word' => $frame->commandWord,
-            'raw_frame' => $this->rawFrameForStorage($frame->rawFrame),
-            'parsed_payload' => $frame->isValid() ? $frame->payload : null,
+            ...$stored,
+            'parsed_payload' => $payload,
+            'encrypted_parsed_payload' => $protectedPayload,
             'parse_ok' => $frame->isValid(),
             'parse_error' => $frame->parseError,
             'session_id' => $state->sessionId,
@@ -194,14 +259,15 @@ class FrameRouter
 
     protected function logRawOutbound(string $raw, ConnectionState $state, QueclinkDevice $device, ?string $commandWord = null): void
     {
+        $isCommand = ! str_starts_with($raw, '+SACK');
+
         QueclinkRawFrame::create([
             'queclink_device_id' => $device->id,
             'imei' => $device->imei,
-            'tenant_id' => $device->tenant_id,
             'direction' => 'outbound',
             'frame_type' => str_starts_with($raw, '+SACK') ? 'SACK' : 'AT',
             'command_word' => $commandWord,
-            'raw_frame' => $this->rawFrameForStorage($raw),
+            ...$this->frameStorage($raw, $isCommand),
             'parsed_payload' => null,
             'parse_ok' => true,
             'session_id' => $state->sessionId,
@@ -224,6 +290,22 @@ class FrameRouter
         return '0x'.strtoupper(bin2hex($raw));
     }
 
+    /** @return array{raw_frame: string, encrypted_raw_frame: ?string} */
+    private function frameStorage(string $raw, bool $sensitive): array
+    {
+        if (! $sensitive) {
+            return [
+                'raw_frame' => $this->rawFrameForStorage($raw),
+                'encrypted_raw_frame' => null,
+            ];
+        }
+
+        return [
+            'raw_frame' => '[encrypted sensitive frame]',
+            'encrypted_raw_frame' => Crypt::encryptString($raw),
+        ];
+    }
+
     protected function correlateAck(AtTrackFrame $frame, QueclinkDevice $device): void
     {
         // The serial number on an +ACK frame echoes the serial of the
@@ -236,11 +318,12 @@ class FrameRouter
             ->forDevice($device->id)
             ->where('serial_number', $frame->serialNumber)
             ->where('status', QueclinkPendingCommand::STATUS_SENT)
-            ->update([
-                'status' => QueclinkPendingCommand::STATUS_ACKED,
-                'acked_at' => now(),
-                'ack_response' => $frame->rawFrame,
-            ]);
+            ->orderBy('id')
+            ->get()
+            ->each(fn (QueclinkPendingCommand $command) => $this->governedCommands->markAcknowledged(
+                $command,
+                $frame->rawFrame,
+            ));
     }
 
     /** @return iterable<QueclinkPendingCommand> */
@@ -253,7 +336,20 @@ class FrameRouter
                 $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
             })
             ->orderBy('created_at')
-            ->limit(self::MAX_COMMANDS_PER_FRAME)
-            ->get();
+            ->limit(self::MAX_COMMANDS_PER_FRAME * 5)
+            ->get()
+            ->filter(function (QueclinkPendingCommand $command): bool {
+                if ($command->device_command_attempt_id === null || $command->governed_sequence <= 1) {
+                    return true;
+                }
+
+                return ! QueclinkPendingCommand::query()
+                    ->where('device_command_attempt_id', $command->device_command_attempt_id)
+                    ->where('governed_sequence', '<', $command->governed_sequence)
+                    ->where('status', '<>', QueclinkPendingCommand::STATUS_ACKED)
+                    ->exists();
+            })
+            ->take(self::MAX_COMMANDS_PER_FRAME)
+            ->values();
     }
 }

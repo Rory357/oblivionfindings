@@ -240,7 +240,7 @@ export function SecurityDevicesWorkspaceShell({
                                                     : 'text-muted-foreground'
                                             }
                                         >
-                                            Not configured
+                                            {tab.stateLabel}
                                         </Badge>
                                     )}
                                 </Link>

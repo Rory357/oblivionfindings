@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Services\References\ReferenceNumberGenerator;
 use App\Support\It\BusinessHours;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,7 +24,7 @@ use Illuminate\Database\QueryException;
  */
 class ItTicket extends Model
 {
-    use AuditableChanges, HasFactory;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     public const CATEGORIES = ['hardware', 'account', 'network', 'other'];
 
@@ -43,6 +44,13 @@ class ItTicket extends Model
         'major_incident',
     ];
 
+    /** Work types that may enter through the ordinary helpdesk intake/triage journey. */
+    public const INTAKE_WORK_TYPES = [
+        'incident',
+        'service_request',
+        'security_request',
+    ];
+
     public const IMPACTS = ['individual', 'team', 'site', 'organization'];
 
     public const URGENCIES = ['low', 'normal', 'high', 'critical'];
@@ -53,7 +61,6 @@ class ItTicket extends Model
     public const OPEN_STATUSES = ['open', 'in_progress', 'waiting'];
 
     protected $fillable = [
-        'tenant_id',
         'reference',
         'title',
         'description',
@@ -130,8 +137,7 @@ class ItTicket extends Model
     {
         // Every ticket gets a human-facing reference (IT-000123) — filled
         // here so factories and secondary write paths never miss it. The
-        // application-global index is the final backstop; createWithReference()
-        // also recognises the compatibility index during a rolling deploy.
+        // application-global index is the final backstop.
         static::creating(function (self $ticket) {
             if (! $ticket->reference) {
                 $ticket->reference = static::nextReference();
@@ -170,8 +176,7 @@ class ItTicket extends Model
                 return static::create($attributes);
             } catch (QueryException $exception) {
                 $attempts++;
-                $collidedOnReference = str_contains($exception->getMessage(), 'it_tickets_reference_uq')
-                    || str_contains($exception->getMessage(), 'it_tickets_tenant_reference_uq');
+                $collidedOnReference = str_contains($exception->getMessage(), 'it_tickets_reference_uq');
                 if (! $collidedOnReference || $attempts >= 5) {
                     throw $exception;
                 }
@@ -396,8 +401,4 @@ class ItTicket extends Model
     /*  Scopes */
     /* ------------------------------------------------------------------ */
 
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 }

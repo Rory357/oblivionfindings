@@ -49,15 +49,15 @@ class SecurityDevicesSingleApplicationAccessTest extends TestCase
         $this->assertFalse($this->access->canViewAllSites($coordinator));
     }
 
-    public function test_site_visibility_ignores_legacy_partition_values_and_integration_management_is_not_a_bypass(): void
+    public function test_site_visibility_follows_site_access_and_integration_management_is_not_a_bypass(): void
     {
-        $allowedSite = Site::factory()->create(['tenant_id' => 41]);
-        $hiddenSite = Site::factory()->create(['tenant_id' => 82]);
-        $viewer = $this->viewer('coordinator', $allowedSite, organizationId: 999, profileTenantId: 333);
+        $allowedSite = Site::factory()->create([]);
+        $hiddenSite = Site::factory()->create([]);
+        $viewer = $this->viewer('coordinator', $allowedSite);
         $this->grant($viewer, 'securityDevices.integrations.manage');
 
-        $allowed = $this->assignedDevice($allowedSite, ['tenant_id' => 777, 'name' => 'Allowed by canonical Site']);
-        $hidden = $this->assignedDevice($hiddenSite, ['tenant_id' => 999, 'name' => 'Hidden by canonical Site']);
+        $allowed = $this->assignedDevice($allowedSite, ['name' => 'Allowed by canonical Site']);
+        $hidden = $this->assignedDevice($hiddenSite, ['name' => 'Hidden by canonical Site']);
 
         $ids = $this->access->visibleDevices($viewer)->pluck('id')->all();
 
@@ -125,12 +125,10 @@ class SecurityDevicesSingleApplicationAccessTest extends TestCase
         $viewer = $this->siteViewer($allowedSite);
         $this->grant($viewer, 'securityDevices.devices.view');
         $allowedRoom = SiteRoom::query()->create([
-            'tenant_id' => 900,
             'site_id' => $allowedSite->id,
             'name' => 'Allowed comms room',
         ]);
         $hiddenRoom = SiteRoom::query()->create([
-            'tenant_id' => 900,
             'site_id' => $hiddenSite->id,
             'name' => 'Hidden comms room',
         ]);
@@ -207,18 +205,15 @@ class SecurityDevicesSingleApplicationAccessTest extends TestCase
     private function viewer(
         string $role,
         ?Site $site = null,
-        ?int $organizationId = null,
-        int $profileTenantId = 1,
     ): User {
         $viewer = User::factory()->create([
-            'organization_id' => $organizationId,
+
             'approved_at' => now(),
         ]);
         $viewer->roles()->attach(Role::query()->where('name', $role)->firstOrFail());
 
         if ($site) {
             HrEmployeeProfile::factory()->create([
-                'tenant_id' => $profileTenantId,
                 'user_id' => $viewer->id,
                 'primary_site_id' => $site->id,
                 'secondary_site_ids' => [],

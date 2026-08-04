@@ -74,7 +74,6 @@ test('agents can still log-and-triage with an assignee in one step', function ()
 
 test('a requester sees only their own tickets in the payload', function () {
     $mine = ItTicket::query()->create([
-        'tenant_id' => 1,
         'site_id' => $this->site->id,
         'title' => 'My broken headset',
         'requester_user_id' => $this->worker->id,
@@ -83,7 +82,6 @@ test('a requester sees only their own tickets in the payload', function () {
         'status' => 'open',
     ]);
     ItTicket::query()->create([
-        'tenant_id' => 1,
         'site_id' => $this->site->id,
         'title' => 'Someone else’s VPN issue',
         'requester_user_id' => $this->hr->id,
@@ -115,7 +113,6 @@ test('a requester sees only their own tickets in the payload', function () {
 
 test('requesters cannot work the queue or the provisioning routes', function () {
     $ticket = ItTicket::query()->create([
-        'tenant_id' => 1,
         'site_id' => $this->site->id,
         'title' => 'Queue ticket',
         'requester_user_id' => $this->worker->id,
@@ -135,7 +132,6 @@ test('requesters cannot work the queue or the provisioning routes', function () 
 
 test('the ticket policy scopes view, reopen and delete correctly', function () {
     $ticket = ItTicket::query()->create([
-        'tenant_id' => 1,
         'site_id' => $this->site->id,
         'title' => 'Policy ticket',
         'requester_user_id' => $this->worker->id,

@@ -3,12 +3,15 @@
 namespace Tests\Feature\SecurityDevices;
 
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoom\SignalRule;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoomAlert;
+use App\Models\Site;
+use App\Models\User;
 use Database\Seeders\SecurityDevicesSignalSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -63,7 +66,7 @@ class DeviceEventSignalPipelineTest extends TestCase
 
     public function test_critical_alarm_trigger_produces_control_room_alert(): void
     {
-        $device = Device::factory()->create([
+        $device = $this->assignedDevice([
             'domain' => 'security',
             'category' => 'alarm',
         ]);
@@ -72,7 +75,6 @@ class DeviceEventSignalPipelineTest extends TestCase
         $beforeSignals = Signal::count();
 
         $event = DeviceEvent::create([
-            'tenant_id' => $device->tenant_id ?? 1,
             'device_id' => $device->id,
             'event_type' => 'alarm_trigger',
             'severity' => 'critical',
@@ -116,7 +118,6 @@ class DeviceEventSignalPipelineTest extends TestCase
         $before = ControlRoomAlert::count();
 
         DeviceEvent::create([
-            'tenant_id' => $device->tenant_id ?? 1,
             'device_id' => $device->id,
             'event_type' => 'heartbeat',
             'severity' => 'info',
@@ -133,10 +134,9 @@ class DeviceEventSignalPipelineTest extends TestCase
 
     public function test_unknown_event_type_falls_back_to_generic_catchall(): void
     {
-        $device = Device::factory()->create();
+        $device = $this->assignedDevice();
 
         DeviceEvent::create([
-            'tenant_id' => $device->tenant_id ?? 1,
             'device_id' => $device->id,
             'event_type' => 'this_type_is_unknown_on_purpose',
             'severity' => 'warning',
@@ -151,5 +151,24 @@ class DeviceEventSignalPipelineTest extends TestCase
             $signal->signal_type_code,
             'Unknown event_type should route to device_signal_generic catch-all',
         );
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function assignedDevice(array $attributes = []): Device
+    {
+        $site = Site::factory()->create();
+        $device = Device::factory()->create($attributes);
+        $actor = User::factory()->create();
+
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assignment_type' => 'permanent',
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $actor->id,
+        ]);
+
+        return $device;
     }
 }

@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  */
 class ItProvisioningRequest extends Model
 {
-    use AuditableChanges;
+    use AuditableChanges, WritesLegacyStorageContext;
 
     public const TYPES = ['account', 'access', 'equipment', 'other'];
 
@@ -27,7 +28,6 @@ class ItProvisioningRequest extends Model
     public const PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 
     protected $fillable = [
-        'tenant_id',
         'employee_profile_id',
         'provisioning_workflow_id',
         'provisioning_template_task_id',
@@ -144,11 +144,6 @@ class ItProvisioningRequest extends Model
     /* ------------------------------------------------------------------ */
     /*  Scopes */
     /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     /* ------------------------------------------------------------------ */
     /*  Helpers */

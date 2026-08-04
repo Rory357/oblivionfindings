@@ -25,7 +25,7 @@ class WorkspaceCompatibilityTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->seed(SecurityDevicesPermissionsSeeder::class);
 
-        $this->admin = User::factory()->create(['organization_id' => 42]);
+        $this->admin = User::factory()->create();
         $this->admin->roles()->attach(Role::where('name', 'admin')->firstOrFail());
     }
 
@@ -59,31 +59,31 @@ class WorkspaceCompatibilityTest extends TestCase
                 '/security-devices/network-it',
                 'network-it',
                 'Network & IT',
-                ['overview', 'map', 'devices', 'interfaces', 'services', 'traffic-capacity', 'configuration-firmware'],
+                ['overview', 'map', 'devices', 'interfaces', 'services', 'traffic-capacity', 'configuration-firmware', 'management'],
             ],
             'security' => [
                 '/security-devices/security',
                 'security',
                 'Security',
-                ['overview', 'cctv', 'alarms', 'access-control', 'events'],
+                ['overview', 'cctv', 'alarms', 'access-control', 'events', 'management'],
             ],
             'healthcare' => [
                 '/security-devices/healthcare',
                 'healthcare',
                 'Healthcare',
-                ['overview', 'client-devices', 'shared-site-devices', 'data-flow', 'calibration-maintenance'],
+                ['overview', 'client-devices', 'shared-site-devices', 'data-flow', 'calibration-maintenance', 'management'],
             ],
             'tracking' => [
                 '/security-devices/tracking',
                 'tracking',
                 'Tracking',
-                ['overview', 'personal-safety', 'fleet', 'assets', 'geofences', 'history'],
+                ['overview', 'personal-safety', 'fleet', 'assets', 'geofences', 'history', 'management'],
             ],
             'facilities and IoT' => [
                 '/security-devices/facilities-iot',
                 'facilities-iot',
                 'Facilities & IoT',
-                ['overview', 'environment', 'building-systems', 'utilities', 'automations', 'history'],
+                ['overview', 'environment', 'building-systems', 'utilities', 'automations', 'history', 'management'],
             ],
         ];
     }
@@ -131,7 +131,7 @@ class WorkspaceCompatibilityTest extends TestCase
 
     public function test_legacy_redirect_still_requires_device_view_permission(): void
     {
-        $viewer = User::factory()->create(['organization_id' => 42]);
+        $viewer = User::factory()->create();
         $overrides = Permission::query()
             ->whereIn('key', ['securityDevices.viewAny', 'securityDevices.devices.view'])
             ->get()
@@ -151,18 +151,15 @@ class WorkspaceCompatibilityTest extends TestCase
     public function test_shared_workspace_query_uses_the_single_application_registry_and_preserves_filters(): void
     {
         Device::factory()->itInfrastructure()->create([
-            'tenant_id' => 42,
-            'name' => 'Tenant edge',
+            'name' => 'Primary edge',
             'status' => 'offline',
         ]);
         Device::factory()->itInfrastructure()->create([
-            'tenant_id' => 42,
-            'name' => 'Tenant healthy switch',
+            'name' => 'Primary healthy switch',
             'status' => 'active',
         ]);
         Device::factory()->itInfrastructure()->create([
-            'tenant_id' => 77,
-            'name' => 'Foreign edge',
+            'name' => 'Unrelated edge',
             'status' => 'offline',
         ]);
 
@@ -173,7 +170,7 @@ class WorkspaceCompatibilityTest extends TestCase
                 $this->assertSame('devices', $props['workspace']['activeTab']);
                 $this->assertSame(3, $props['workspace']['summary']['devices']);
                 $this->assertEqualsCanonicalizing(
-                    ['Tenant edge', 'Foreign edge'],
+                    ['Primary edge', 'Unrelated edge'],
                     collect($props['devices']['data'])->pluck('name')->all(),
                 );
                 $this->assertSame('offline', $props['filters']['status']);

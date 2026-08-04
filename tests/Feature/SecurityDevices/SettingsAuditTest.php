@@ -46,13 +46,13 @@ class SettingsAuditTest extends TestCase
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(SecurityDevicesPermissionsSeeder::class);
-        $this->admin = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
+        $this->admin = User::factory()->create(['approved_at' => now()]);
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
     }
 
     public function test_user_without_groups_or_reports_permission_is_forbidden(): void
     {
-        $user = User::factory()->create(['organization_id' => 42]);
+        $user = User::factory()->create();
         $user->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
 
         $this->actingAs($user)->get('/security-devices/settings')->assertForbidden();
@@ -61,7 +61,6 @@ class SettingsAuditTest extends TestCase
     public function test_settings_projects_real_safe_defaults_profiles_exceptions_and_feature_support(): void
     {
         IntegrationProviderConnection::create([
-            'tenant_id' => 42,
             'provider' => 'unifi',
             'secret_encrypted' => 'RAW-SECRET',
             'secret_last4' => '0042',
@@ -74,7 +73,6 @@ class SettingsAuditTest extends TestCase
             ],
         ]);
         MonitoringProfile::factory()->create([
-            'tenant_id' => 42,
             'name' => 'Critical infrastructure',
             'description' => 'Fast checks for core paths',
             'interval_seconds' => 60,
@@ -83,9 +81,9 @@ class SettingsAuditTest extends TestCase
             'stale_after_seconds' => 300,
             'is_active' => true,
         ]);
-        MonitoringProfile::factory()->create(['tenant_id' => 77, 'name' => 'Foreign profile']);
-        Device::factory()->create(['tenant_id' => 42, 'provider' => 'unifi']);
-        Device::factory()->create(['tenant_id' => 77, 'provider' => 'unifi']);
+        MonitoringProfile::factory()->create(['name' => 'Unrelated profile']);
+        Device::factory()->create(['provider' => 'unifi']);
+        Device::factory()->create(['provider' => 'unifi']);
 
         $this->actingAs($this->admin)
             ->get('/security-devices/settings')
@@ -98,9 +96,9 @@ class SettingsAuditTest extends TestCase
                     'refresh_interval_minutes' => 15,
                     'alert_motion_events' => true,
                 ], $props['providerOperationalDefaults'][0]['values']);
-                $this->assertSame(['Critical infrastructure', 'Foreign profile'], collect($props['monitoringProfiles'])->pluck('name')->all());
+                $this->assertSame(['Critical infrastructure', 'Unrelated profile'], collect($props['monitoringProfiles'])->pluck('name')->all());
                 $this->assertSame(2, $props['dataQuality']['unassigned_devices']);
-                $this->assertSame('unsupported', $props['featureSupport']['discovery_candidates']['state']);
+                $this->assertSame('supported', $props['featureSupport']['discovery_candidates']['state']);
                 $this->assertSame('read_only_append_only_application_evidence', $props['audit']['evidence_state']);
                 $encoded = json_encode($props, JSON_THROW_ON_ERROR);
                 $this->assertStringNotContainsString('RAW-', $encoded);
@@ -110,13 +108,13 @@ class SettingsAuditTest extends TestCase
 
     public function test_audit_is_report_permission_only_whitelisted_record_scoped_and_safely_projected(): void
     {
-        $device = Device::factory()->create(['tenant_id' => 42]);
-        $client = Client::factory()->create(['organization_id' => 42]);
-        $foreign = Device::factory()->create(['tenant_id' => 77]);
+        $device = Device::factory()->create([]);
+        $client = Client::factory()->create();
+        $unrelated = Device::factory()->create([]);
         AuditLog::query()->delete();
 
         AuditLog::create([
-            'organization_id' => 42,
+
             'user_id' => $this->admin->id,
             'action' => 'device.update',
             'auditable_type' => Device::class,
@@ -126,17 +124,17 @@ class SettingsAuditTest extends TestCase
             'user_agent' => 'RAW-AGENT',
         ]);
         AuditLog::create([
-            'organization_id' => 42,
+
             'action' => 'client.update',
             'auditable_type' => Client::class,
             'auditable_id' => $client->id,
             'meta' => ['fields' => ['name']],
         ]);
         AuditLog::create([
-            'organization_id' => 77,
+
             'action' => 'device.update',
             'auditable_type' => Device::class,
-            'auditable_id' => $foreign->id,
+            'auditable_id' => $unrelated->id,
             'meta' => ['fields' => ['name']],
         ]);
 
@@ -168,7 +166,6 @@ class SettingsAuditTest extends TestCase
     public function test_integration_secret_mutation_audit_never_persists_reusable_secret_content(): void
     {
         $secret = IntegrationProviderConnection::create([
-            'tenant_id' => 42,
             'provider' => 'unifi',
             'secret_encrypted' => 'RAW-CREATE-SECRET',
             'secret_last4' => '1234',
@@ -192,38 +189,37 @@ class SettingsAuditTest extends TestCase
 
     public function test_shared_audit_policy_redacts_technical_payloads_but_preserves_safe_state_evidence(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42]);
+        $site = Site::factory()->create([]);
         $device = Device::factory()->create([
-            'tenant_id' => 42,
             'external_ref' => ['provider_entity_id' => 'RAW-DEVICE-REF'],
             'config' => ['token' => 'RAW-DEVICE-CONFIG'],
             'meta' => ['payload' => 'RAW-DEVICE-META'],
         ]);
         $device->update(['status' => 'offline', 'config' => ['token' => 'RAW-UPDATED-CONFIG']]);
         Integration::create([
-            'tenant_id' => 42, 'provider' => 'unifi', 'display_name' => 'UniFi',
+            'provider' => 'unifi', 'display_name' => 'UniFi',
             'status' => Integration::STATUS_ERROR, 'config' => ['url' => 'https://RAW-INTEGRATION.test'],
             'last_error' => 'Bearer RAW-INTEGRATION-ERROR',
         ]);
         IntegrationSiteConfig::create([
-            'tenant_id' => 42, 'site_id' => $site->id, 'provider' => 'unifi',
+            'site_id' => $site->id, 'provider' => 'unifi',
             'status' => IntegrationSiteConfig::STATUS_HYBRID,
             'mapped_external_site_id' => 'RAW-EXTERNAL-ID',
             'overrides' => ['credential' => 'RAW-OVERRIDE'], 'is_active' => true,
         ]);
         IntegrationSyncLog::create([
-            'tenant_id' => 42, 'site_id' => $site->id, 'provider' => 'unifi',
+            'site_id' => $site->id, 'provider' => 'unifi',
             'action' => 'sync_devices', 'status' => IntegrationSyncLog::STATUS_FAILED,
             'error_message' => 'https://RAW-SYNC.test/?token=secret', 'started_at' => now(),
         ]);
         IntegrationEvent::create([
-            'tenant_id' => 42, 'site_id' => $site->id, 'canonical_device_id' => $device->id,
+            'site_id' => $site->id, 'canonical_device_id' => $device->id,
             'provider' => 'unifi', 'source_app' => 'protect', 'source_event_id' => 'RAW-EVENT-ID',
             'occurred_at' => now(), 'received_at' => now(), 'severity' => 'warn', 'event_type' => 'motion',
             'normalized_payload' => ['token' => 'RAW-NORMALIZED'], 'raw_payload' => ['frame' => 'RAW-PAYLOAD'],
         ]);
 
-        $encoded = AuditLog::query()->where('organization_id', 42)->pluck('meta')->toJson();
+        $encoded = AuditLog::query()->pluck('meta')->toJson();
         foreach (['RAW-', 'external_ref', 'config', 'meta', 'mapped_external_site_id', 'overrides', 'error_message', 'normalized_payload', 'raw_payload'] as $sentinel) {
             $this->assertStringNotContainsString($sentinel, $encoded);
         }
@@ -234,9 +230,9 @@ class SettingsAuditTest extends TestCase
 
     public function test_direct_audit_logger_calls_are_sanitized_for_protected_models(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42]);
-        $client = Client::factory()->create(['organization_id' => 42, 'site_id' => $site->id]);
-        $device = Device::factory()->create(['tenant_id' => 42]);
+        $site = Site::factory()->create([]);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $device = Device::factory()->create([]);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_SITE,
@@ -245,7 +241,7 @@ class SettingsAuditTest extends TestCase
         ]);
 
         AuditLogger::logOrFail('device.update', $device, [
-            'organization_id' => 42,
+
             'actor_id' => $this->admin->id,
             'client_id' => $client->id,
             'fields' => ['status', 'config', 'raw_payload', 'last_error'],
@@ -260,7 +256,7 @@ class SettingsAuditTest extends TestCase
                 'payload' => ['remote_target' => 'RAW-REMOTE-ID'],
             ],
             'scope' => [
-                'tenant_id' => 42,
+
                 'device_id' => $device->id,
                 'site_ids' => [$site->id],
                 'remote_target_id' => 'RAW-TARGET-ID',
@@ -270,7 +266,6 @@ class SettingsAuditTest extends TestCase
         ]);
 
         $audit = AuditLog::query()->where('action', 'device.update')->latest('id')->firstOrFail();
-        $this->assertSame(42, $audit->organization_id);
         $this->assertSame($this->admin->id, $audit->user_id);
         $this->assertNull($audit->client_id);
         $this->assertSame(['status'], data_get($audit->meta, 'fields'));
@@ -283,12 +278,12 @@ class SettingsAuditTest extends TestCase
         }
     }
 
-    public function test_protected_audit_logger_derives_canonical_organization_and_scope_instead_of_trusting_callers(): void
+    public function test_protected_audit_logger_derives_canonical_site_and_device_scope_instead_of_trusting_callers(): void
     {
-        $canonicalSite = Site::factory()->create(['tenant_id' => 42]);
-        $unrelatedSite = Site::factory()->create(['tenant_id' => 42]);
-        $device = Device::factory()->create(['tenant_id' => 42]);
-        $foreignDevice = Device::factory()->create(['tenant_id' => 77]);
+        $canonicalSite = Site::factory()->create([]);
+        $unrelatedSite = Site::factory()->create([]);
+        $device = Device::factory()->create([]);
+        $unrelatedDevice = Device::factory()->create([]);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_SITE,
@@ -298,26 +293,24 @@ class SettingsAuditTest extends TestCase
         AuditLog::query()->delete();
 
         AuditLogger::logOrFail('device.update', $device, [
-            'organization_id' => 77,
+
             'fields' => ['status'],
             'after' => ['status' => 'offline'],
             'scope' => [
-                'tenant_id' => 77,
+
                 'site_id' => $unrelatedSite->id,
-                'device_id' => $foreignDevice->id,
+                'device_id' => $unrelatedDevice->id,
                 'site_ids' => [$unrelatedSite->id],
-                'device_ids' => [$foreignDevice->id],
+                'device_ids' => [$unrelatedDevice->id],
             ],
         ]);
 
         $audit = AuditLog::query()->where('action', 'device.update')->sole();
-        $this->assertSame(42, $audit->organization_id);
-        $this->assertSame(42, data_get($audit->meta, 'scope.tenant_id'));
         $this->assertSame($canonicalSite->id, data_get($audit->meta, 'scope.site_id'));
         $this->assertSame([$canonicalSite->id], data_get($audit->meta, 'scope.site_ids'));
         $this->assertSame($device->id, data_get($audit->meta, 'scope.device_id'));
         $this->assertNull(data_get($audit->meta, 'scope.device_ids'));
-        $this->assertStringNotContainsString((string) $foreignDevice->id, json_encode($audit->meta, JSON_THROW_ON_ERROR));
+        $this->assertStringNotContainsString((string) $unrelatedDevice->id, json_encode($audit->meta, JSON_THROW_ON_ERROR));
 
         $rightfulViewer = $this->siteRestrictedViewer($canonicalSite);
         $unrelatedViewer = $this->siteRestrictedViewer($unrelatedSite);
@@ -330,21 +323,21 @@ class SettingsAuditTest extends TestCase
         });
     }
 
-    public function test_device_asset_link_audit_cannot_be_rehomed_by_foreign_caller_context(): void
+    public function test_device_asset_link_audit_cannot_be_rehomed_by_unrelated_caller_context(): void
     {
-        $canonicalSite = Site::factory()->create(['tenant_id' => 42]);
-        $hiddenSite = Site::factory()->create(['tenant_id' => 42]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
-        $device = Device::factory()->create(['tenant_id' => 42]);
-        $foreignDevice = Device::factory()->create(['tenant_id' => 77]);
+        $canonicalSite = Site::factory()->create([]);
+        $hiddenSite = Site::factory()->create([]);
+        $unrelatedSite = Site::factory()->create([]);
+        $device = Device::factory()->create([]);
+        $unrelatedDevice = Device::factory()->create([]);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_SITE,
             'assignable_id' => $canonicalSite->id,
             'assigned_at' => now(),
         ]);
-        $foreignClient = Client::factory()->create(['organization_id' => 77, 'site_id' => $foreignSite->id]);
-        $foreignActor = User::factory()->create(['organization_id' => 77, 'approved_at' => now()]);
+        $unrelatedClient = Client::factory()->create(['site_id' => $unrelatedSite->id]);
+        $unrelatedActor = User::factory()->create(['approved_at' => now()]);
         $link = DeviceAssetLink::create([
             'device_id' => $device->id,
             'asset_id' => Asset::factory()->create()->id,
@@ -354,33 +347,31 @@ class SettingsAuditTest extends TestCase
         AuditLog::query()->delete();
 
         AuditLogger::logOrFail('deviceassetlink.update', $link, [
-            'organization_id' => 77,
-            'client_id' => $foreignClient->id,
-            'actor_id' => $foreignActor->id,
+
+            'client_id' => $unrelatedClient->id,
+            'actor_id' => $unrelatedActor->id,
             'fields' => ['link_type'],
             'scope' => [
-                'tenant_id' => 77,
-                'site_id' => $foreignSite->id,
-                'site_ids' => [$foreignSite->id],
-                'device_id' => $foreignDevice->id,
+
+                'site_id' => $unrelatedSite->id,
+                'site_ids' => [$unrelatedSite->id],
+                'device_id' => $unrelatedDevice->id,
             ],
         ]);
 
         $audit = AuditLog::query()->where('action', 'deviceassetlink.update')->sole();
-        $this->assertSame(42, $audit->organization_id);
-        $this->assertSame($foreignActor->id, $audit->user_id);
+        $this->assertSame($unrelatedActor->id, $audit->user_id);
         $this->assertNull($audit->client_id);
-        $this->assertSame(42, data_get($audit->meta, 'scope.tenant_id'));
         $this->assertSame($canonicalSite->id, data_get($audit->meta, 'scope.site_id'));
         $this->assertSame([$canonicalSite->id], data_get($audit->meta, 'scope.site_ids'));
         $this->assertSame($device->id, data_get($audit->meta, 'scope.device_id'));
-        $this->assertStringNotContainsString('"tenant_id":77', json_encode($audit->meta, JSON_THROW_ON_ERROR));
-        $this->assertStringNotContainsString('"site_id":'.$foreignSite->id, json_encode($audit->meta, JSON_THROW_ON_ERROR));
-        $this->assertStringNotContainsString('"device_id":'.$foreignDevice->id, json_encode($audit->meta, JSON_THROW_ON_ERROR));
+        $this->assertStringNotContainsString('"client_id":'.$unrelatedClient->id, json_encode($audit->meta, JSON_THROW_ON_ERROR));
+        $this->assertStringNotContainsString('"site_id":'.$unrelatedSite->id, json_encode($audit->meta, JSON_THROW_ON_ERROR));
+        $this->assertStringNotContainsString('"device_id":'.$unrelatedDevice->id, json_encode($audit->meta, JSON_THROW_ON_ERROR));
 
         $rightfulViewer = $this->siteRestrictedViewer($canonicalSite);
         $hiddenViewer = $this->siteRestrictedViewer($hiddenSite);
-        $foreignViewer = $this->siteRestrictedViewer($foreignSite);
+        $unrelatedViewer = $this->siteRestrictedViewer($unrelatedSite);
 
         $this->actingAs($rightfulViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($link): void {
             $this->assertTrue(collect($page->toArray()['props']['audit']['entries'])->contains('record_reference', '#'.$link->id));
@@ -388,25 +379,25 @@ class SettingsAuditTest extends TestCase
         $this->actingAs($hiddenViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($link): void {
             $this->assertFalse(collect($page->toArray()['props']['audit']['entries'])->contains('record_reference', '#'.$link->id));
         });
-        $this->actingAs($foreignViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($link): void {
+        $this->actingAs($unrelatedViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($link): void {
             $this->assertFalse(collect($page->toArray()['props']['audit']['entries'])->contains('record_reference', '#'.$link->id));
         });
     }
 
     public function test_device_maintenance_audit_cannot_be_rehomed_and_has_no_actor_fallback_without_a_canonical_parent(): void
     {
-        $canonicalSite = Site::factory()->create(['tenant_id' => 42]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
-        $device = Device::factory()->create(['tenant_id' => 42]);
-        $foreignDevice = Device::factory()->create(['tenant_id' => 77]);
+        $canonicalSite = Site::factory()->create([]);
+        $unrelatedSite = Site::factory()->create([]);
+        $device = Device::factory()->create([]);
+        $unrelatedDevice = Device::factory()->create([]);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_SITE,
             'assignable_id' => $canonicalSite->id,
             'assigned_at' => now(),
         ]);
-        $foreignClient = Client::factory()->create(['organization_id' => 77, 'site_id' => $foreignSite->id]);
-        $foreignActor = User::factory()->create(['organization_id' => 77, 'approved_at' => now()]);
+        $unrelatedClient = Client::factory()->create(['site_id' => $unrelatedSite->id]);
+        $unrelatedActor = User::factory()->create(['approved_at' => now()]);
         $record = DeviceMaintenanceRecord::create([
             'device_id' => $device->id,
             'type' => 'inspection',
@@ -416,59 +407,56 @@ class SettingsAuditTest extends TestCase
         AuditLog::query()->delete();
 
         AuditLogger::logOrFail('devicemaintenancerecord.update', $record, [
-            'organization_id' => 77,
-            'client_id' => $foreignClient->id,
-            'actor_id' => $foreignActor->id,
+
+            'client_id' => $unrelatedClient->id,
+            'actor_id' => $unrelatedActor->id,
             'fields' => ['status'],
             'after' => ['status' => 'completed'],
             'scope' => [
-                'tenant_id' => 77,
-                'site_id' => $foreignSite->id,
-                'site_ids' => [$foreignSite->id],
-                'device_id' => $foreignDevice->id,
+
+                'site_id' => $unrelatedSite->id,
+                'site_ids' => [$unrelatedSite->id],
+                'device_id' => $unrelatedDevice->id,
             ],
         ]);
 
         $audit = AuditLog::query()->where('action', 'devicemaintenancerecord.update')->sole();
-        $this->assertSame(42, $audit->organization_id);
-        $this->assertSame($foreignActor->id, $audit->user_id);
+        $this->assertSame($unrelatedActor->id, $audit->user_id);
         $this->assertNull($audit->client_id);
-        $this->assertSame(42, data_get($audit->meta, 'scope.tenant_id'));
         $this->assertSame($canonicalSite->id, data_get($audit->meta, 'scope.site_id'));
         $this->assertSame([$canonicalSite->id], data_get($audit->meta, 'scope.site_ids'));
         $this->assertSame($device->id, data_get($audit->meta, 'scope.device_id'));
-        $this->assertStringNotContainsString('"tenant_id":77', json_encode($audit->meta, JSON_THROW_ON_ERROR));
-        $this->assertStringNotContainsString('"site_id":'.$foreignSite->id, json_encode($audit->meta, JSON_THROW_ON_ERROR));
-        $this->assertStringNotContainsString('"device_id":'.$foreignDevice->id, json_encode($audit->meta, JSON_THROW_ON_ERROR));
+        $this->assertStringNotContainsString('"client_id":'.$unrelatedClient->id, json_encode($audit->meta, JSON_THROW_ON_ERROR));
+        $this->assertStringNotContainsString('"site_id":'.$unrelatedSite->id, json_encode($audit->meta, JSON_THROW_ON_ERROR));
+        $this->assertStringNotContainsString('"device_id":'.$unrelatedDevice->id, json_encode($audit->meta, JSON_THROW_ON_ERROR));
 
         $rightfulViewer = $this->siteRestrictedViewer($canonicalSite);
-        $foreignViewer = $this->siteRestrictedViewer($foreignSite);
+        $unrelatedViewer = $this->siteRestrictedViewer($unrelatedSite);
         $this->actingAs($rightfulViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($record): void {
             $this->assertTrue(collect($page->toArray()['props']['audit']['entries'])->contains('record_reference', '#'.$record->id));
         });
-        $this->actingAs($foreignViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($record): void {
+        $this->actingAs($unrelatedViewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($record): void {
             $this->assertFalse(collect($page->toArray()['props']['audit']['entries'])->contains('record_reference', '#'.$record->id));
         });
 
         $orphan = new DeviceMaintenanceRecord(['device_id' => 999999]);
         AuditLogger::logOrFail('devicemaintenancerecord.update', $orphan, [
-            'organization_id' => 77,
-            'client_id' => $foreignClient->id,
-            'actor_id' => $foreignActor->id,
-            'scope' => ['tenant_id' => 77, 'device_id' => $foreignDevice->id],
+
+            'client_id' => $unrelatedClient->id,
+            'actor_id' => $unrelatedActor->id,
+            'scope' => ['device_id' => $unrelatedDevice->id],
         ]);
         $orphanAudit = AuditLog::query()->whereNull('auditable_id')->where('action', 'devicemaintenancerecord.update')->sole();
-        $this->assertNull($orphanAudit->organization_id);
         $this->assertNull($orphanAudit->client_id);
         $this->assertNull(data_get($orphanAudit->meta, 'scope'));
     }
 
     public function test_protected_child_model_survey_uses_only_unambiguous_canonical_device_relations(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42]);
-        $firstDevice = Device::factory()->create(['tenant_id' => 42]);
-        $secondDevice = Device::factory()->create(['tenant_id' => 42]);
-        $foreignDevice = Device::factory()->create(['tenant_id' => 77]);
+        $site = Site::factory()->create([]);
+        $firstDevice = Device::factory()->create([]);
+        $secondDevice = Device::factory()->create([]);
+        $unrelatedDevice = Device::factory()->create([]);
         foreach ([$firstDevice, $secondDevice] as $device) {
             DeviceAssignment::create([
                 'device_id' => $device->id,
@@ -483,21 +471,20 @@ class SettingsAuditTest extends TestCase
             new DeviceEvent(['device_id' => $firstDevice->id]),
         ] as $child) {
             $scope = SafeOperationalData::auditScope($child);
-            $this->assertSame(42, data_get($scope, 'tenant_id'));
+
             $this->assertSame($firstDevice->id, data_get($scope, 'device_id'));
             $this->assertSame([$site->id], data_get($scope, 'site_ids'));
         }
 
-        $group = DeviceGroup::create(['tenant_id' => 42, 'name' => 'Canonical group', 'type' => 'manual']);
-        $foreignGroup = DeviceGroup::create(['tenant_id' => 77, 'name' => 'Foreign group', 'type' => 'manual']);
+        $group = DeviceGroup::create(['name' => 'Canonical group', 'type' => 'manual']);
         $memberScope = SafeOperationalData::auditScope(new DeviceGroupMember([
             'device_group_id' => $group->id,
             'device_id' => $firstDevice->id,
         ]));
-        $this->assertSame(42, data_get($memberScope, 'tenant_id'));
+
         $this->assertSame($firstDevice->id, data_get($memberScope, 'device_id'));
         $this->assertSame([], SafeOperationalData::auditScope(new DeviceGroupMember([
-            'device_group_id' => $foreignGroup->id,
+            'device_group_id' => 999999,
             'device_id' => $firstDevice->id,
         ])));
 
@@ -506,103 +493,114 @@ class SettingsAuditTest extends TestCase
             'child_device_id' => $secondDevice->id,
             'relationship_type' => 'connected_to',
         ]));
-        $this->assertSame(42, data_get($relationshipScope, 'tenant_id'));
+
         $this->assertEqualsCanonicalizing([$firstDevice->id, $secondDevice->id], data_get($relationshipScope, 'device_ids'));
         $this->assertSame([$site->id], data_get($relationshipScope, 'site_ids'));
         $this->assertSame([], SafeOperationalData::auditScope(new DeviceRelationship([
             'parent_device_id' => $firstDevice->id,
-            'child_device_id' => $foreignDevice->id,
+            'child_device_id' => $unrelatedDevice->id,
             'relationship_type' => 'connected_to',
         ])));
     }
 
     public function test_orphan_device_assignment_audit_discards_fabricated_device_and_caller_scope(): void
     {
-        $canonicalSite = Site::factory()->create(['tenant_id' => 42]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
-        $foreignDevice = Device::factory()->create(['tenant_id' => 77]);
-        $foreignClient = Client::factory()->create(['organization_id' => 77, 'site_id' => $foreignSite->id]);
-        $foreignActor = User::factory()->create(['organization_id' => 77, 'approved_at' => now()]);
+        $canonicalSite = Site::factory()->create([]);
+        $unrelatedSite = Site::factory()->create([]);
+        $unrelatedDevice = Device::factory()->create([]);
+        $unrelatedClient = Client::factory()->create(['site_id' => $unrelatedSite->id]);
+        $unrelatedActor = User::factory()->create(['approved_at' => now()]);
         $orphan = new DeviceAssignment([
             'device_id' => 999999,
             'assignable_type' => DeviceAssignment::TARGET_SITE,
-            'assignable_id' => $foreignSite->id,
+            'assignable_id' => $unrelatedSite->id,
             'assigned_at' => now(),
         ]);
         AuditLog::query()->delete();
 
         AuditLogger::logOrFail('deviceassignment.update', $orphan, [
-            'organization_id' => 77,
-            'client_id' => $foreignClient->id,
-            'actor_id' => $foreignActor->id,
+
+            'client_id' => $unrelatedClient->id,
+            'actor_id' => $unrelatedActor->id,
             'fields' => ['assignment_type'],
             'scope' => [
-                'tenant_id' => 77,
-                'site_id' => $foreignSite->id,
-                'site_ids' => [$foreignSite->id],
-                'device_id' => $foreignDevice->id,
+
+                'site_id' => $unrelatedSite->id,
+                'site_ids' => [$unrelatedSite->id],
+                'device_id' => $unrelatedDevice->id,
             ],
         ]);
 
         $audit = AuditLog::query()->whereNull('auditable_id')->where('action', 'deviceassignment.update')->sole();
-        $this->assertNull($audit->organization_id);
-        $this->assertSame($foreignActor->id, $audit->user_id);
+        $this->assertSame($unrelatedActor->id, $audit->user_id);
         $this->assertNull($audit->client_id);
         $this->assertNull(data_get($audit->meta, 'scope'));
         $encoded = json_encode($audit->meta, JSON_THROW_ON_ERROR);
-        foreach (['999999', '"tenant_id":77', '"site_id":'.$foreignSite->id, '"device_id":'.$foreignDevice->id] as $sentinel) {
+        foreach (['999999', '"site_id":'.$unrelatedSite->id, '"device_id":'.$unrelatedDevice->id] as $sentinel) {
             $this->assertStringNotContainsString($sentinel, $encoded);
         }
 
-        foreach ([$this->siteRestrictedViewer($canonicalSite), $this->siteRestrictedViewer($foreignSite)] as $viewer) {
+        foreach ([$this->siteRestrictedViewer($canonicalSite), $this->siteRestrictedViewer($unrelatedSite)] as $viewer) {
             $this->actingAs($viewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page): void {
                 $this->assertFalse(collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'));
             });
         }
     }
 
-    public function test_device_assignment_with_cross_tenant_target_discards_all_scope(): void
+    public function test_site_assignment_uses_the_target_site_instead_of_caller_scope(): void
     {
-        $device = Device::factory()->create(['tenant_id' => 42]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
-        $foreignClient = Client::factory()->create(['organization_id' => 77, 'site_id' => $foreignSite->id]);
+        $device = Device::factory()->create([]);
+        $targetSite = Site::factory()->create([]);
+        $callerSite = Site::factory()->create([]);
+        $callerClient = Client::factory()->create(['site_id' => $callerSite->id]);
         $assignment = new DeviceAssignment([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_SITE,
-            'assignable_id' => $foreignSite->id,
+            'assignable_id' => $targetSite->id,
             'assigned_at' => now(),
         ]);
         AuditLog::query()->delete();
 
         AuditLogger::logOrFail('deviceassignment.update', $assignment, [
-            'organization_id' => 77,
-            'client_id' => $foreignClient->id,
+            'client_id' => $callerClient->id,
             'scope' => [
-                'tenant_id' => 77,
-                'site_id' => $foreignSite->id,
-                'site_ids' => [$foreignSite->id],
+                'site_id' => $callerSite->id,
+                'site_ids' => [$callerSite->id],
                 'device_id' => $device->id,
             ],
         ]);
 
         $audit = AuditLog::query()->whereNull('auditable_id')->where('action', 'deviceassignment.update')->sole();
-        $this->assertNull($audit->organization_id);
         $this->assertNull($audit->client_id);
-        $this->assertNull(data_get($audit->meta, 'scope'));
+        $this->assertSame($targetSite->id, data_get($audit->meta, 'scope.site_id'));
+        $this->assertSame([$targetSite->id], data_get($audit->meta, 'scope.site_ids'));
+        $this->assertSame($device->id, data_get($audit->meta, 'scope.device_id'));
+
+        $this->actingAs($this->siteRestrictedViewer($targetSite))
+            ->get('/security-devices/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $this->assertTrue(
+                collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'),
+            ));
+        $this->actingAs($this->siteRestrictedViewer($callerSite))
+            ->get('/security-devices/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $this->assertFalse(
+                collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'),
+            ));
     }
 
-    public function test_device_assignment_with_mismatched_room_and_site_tenants_discards_all_scope(): void
+    public function test_room_assignment_uses_the_rooms_site_instead_of_caller_scope(): void
     {
-        $canonicalSite = Site::factory()->create(['tenant_id' => 42]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
+        $canonicalSite = Site::factory()->create([]);
+        $unrelatedSite = Site::factory()->create([]);
         $mismatchedRoom = SiteRoom::create([
-            'tenant_id' => 77,
             'site_id' => $canonicalSite->id,
             'name' => 'Mismatched room',
         ]);
-        $device = Device::factory()->create(['tenant_id' => 42]);
-        $foreignClient = Client::factory()->create(['organization_id' => 77, 'site_id' => $foreignSite->id]);
-        $foreignActor = User::factory()->create(['organization_id' => 77, 'approved_at' => now()]);
+        $device = Device::factory()->create([]);
+        $unrelatedClient = Client::factory()->create(['site_id' => $unrelatedSite->id]);
+        $unrelatedActor = User::factory()->create(['approved_at' => now()]);
         $assignment = new DeviceAssignment([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_ROOM,
@@ -612,74 +610,93 @@ class SettingsAuditTest extends TestCase
         AuditLog::query()->delete();
 
         AuditLogger::logOrFail('deviceassignment.update', $assignment, [
-            'organization_id' => 77,
-            'client_id' => $foreignClient->id,
-            'actor_id' => $foreignActor->id,
+            'client_id' => $unrelatedClient->id,
+            'actor_id' => $unrelatedActor->id,
             'scope' => [
-                'tenant_id' => 77,
-                'site_id' => $foreignSite->id,
-                'site_ids' => [$foreignSite->id],
+                'site_id' => $unrelatedSite->id,
+                'site_ids' => [$unrelatedSite->id],
                 'device_id' => $device->id,
             ],
         ]);
 
         $audit = AuditLog::query()->whereNull('auditable_id')->where('action', 'deviceassignment.update')->sole();
-        $this->assertNull($audit->organization_id);
-        $this->assertSame($foreignActor->id, $audit->user_id);
+        $this->assertSame($unrelatedActor->id, $audit->user_id);
         $this->assertNull($audit->client_id);
-        $this->assertNull(data_get($audit->meta, 'scope'));
+        $this->assertSame($canonicalSite->id, data_get($audit->meta, 'scope.site_id'));
+        $this->assertSame([$canonicalSite->id], data_get($audit->meta, 'scope.site_ids'));
+        $this->assertSame($device->id, data_get($audit->meta, 'scope.device_id'));
 
-        foreach ([$this->siteRestrictedViewer($canonicalSite), $this->siteRestrictedViewer($foreignSite)] as $viewer) {
-            $this->actingAs($viewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page): void {
-                $this->assertFalse(collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'));
-            });
-        }
+        $this->actingAs($this->siteRestrictedViewer($canonicalSite))
+            ->get('/security-devices/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $this->assertTrue(
+                collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'),
+            ));
+        $this->actingAs($this->siteRestrictedViewer($unrelatedSite))
+            ->get('/security-devices/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $this->assertFalse(
+                collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'),
+            ));
     }
 
-    public function test_device_assignment_with_mismatched_client_and_site_tenants_discards_all_scope(): void
+    public function test_client_assignment_uses_the_clients_site_instead_of_caller_scope(): void
     {
-        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
-        $mismatchedClient = Client::factory()->create(['organization_id' => 42, 'site_id' => $foreignSite->id]);
-        $foreignCallerClient = Client::factory()->create(['organization_id' => 77, 'site_id' => $foreignSite->id]);
-        $device = Device::factory()->create(['tenant_id' => 42]);
+        $targetSite = Site::factory()->create([]);
+        $callerSite = Site::factory()->create([]);
+        $targetClient = Client::factory()->create(['site_id' => $targetSite->id]);
+        $callerClient = Client::factory()->create(['site_id' => $callerSite->id]);
+        $device = Device::factory()->create([]);
         $assignment = new DeviceAssignment([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_CLIENT,
-            'assignable_id' => $mismatchedClient->id,
+            'assignable_id' => $targetClient->id,
             'assigned_at' => now(),
         ]);
         AuditLog::query()->delete();
 
         AuditLogger::logOrFail('deviceassignment.update', $assignment, [
-            'organization_id' => 77,
-            'client_id' => $foreignCallerClient->id,
+            'client_id' => $callerClient->id,
             'scope' => [
-                'tenant_id' => 77,
-                'site_id' => $foreignSite->id,
-                'site_ids' => [$foreignSite->id],
+                'site_id' => $callerSite->id,
+                'site_ids' => [$callerSite->id],
                 'device_id' => $device->id,
             ],
         ]);
 
         $audit = AuditLog::query()->whereNull('auditable_id')->where('action', 'deviceassignment.update')->sole();
-        $this->assertNull($audit->organization_id);
         $this->assertNull($audit->client_id);
-        $this->assertNull(data_get($audit->meta, 'scope'));
+        $this->assertSame($targetSite->id, data_get($audit->meta, 'scope.site_id'));
+        $this->assertSame([$targetSite->id], data_get($audit->meta, 'scope.site_ids'));
+        $this->assertSame($device->id, data_get($audit->meta, 'scope.device_id'));
+
+        $this->actingAs($this->siteRestrictedViewer($targetSite))
+            ->get('/security-devices/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $this->assertTrue(
+                collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'),
+            ));
+        $this->actingAs($this->siteRestrictedViewer($callerSite))
+            ->get('/security-devices/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $this->assertFalse(
+                collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'),
+            ));
     }
 
-    public function test_all_sites_auditors_can_see_unscoped_legacy_assignment_evidence(): void
+    public function test_all_sites_auditors_can_see_null_site_assignment_evidence(): void
     {
-        $canonicalSite = Site::factory()->create(['tenant_id' => 42]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
-        $mismatchedClient = Client::factory()->create(['organization_id' => 42, 'site_id' => $foreignSite->id]);
-        $foreignCallerClient = Client::factory()->create(['organization_id' => 77, 'site_id' => $foreignSite->id]);
+        $canonicalSite = Site::factory()->create([]);
+        $callerSite = Site::factory()->create([]);
+        $siteLessClient = Client::factory()->create(['site_id' => null]);
+        $callerClient = Client::factory()->create(['site_id' => $callerSite->id]);
         $vehicle = Asset::factory()->create([
             'category' => 'Vehicle',
             'site_id' => null,
             'home_site_id' => null,
-            'client_id' => $mismatchedClient->id,
+            'client_id' => $siteLessClient->id,
         ]);
-        $device = Device::factory()->create(['tenant_id' => 42]);
+        $device = Device::factory()->create([]);
         $assignment = new DeviceAssignment([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
@@ -689,24 +706,23 @@ class SettingsAuditTest extends TestCase
         AuditLog::query()->delete();
 
         AuditLogger::logOrFail('deviceassignment.update', $assignment, [
-            'organization_id' => 77,
-            'client_id' => $foreignCallerClient->id,
+            'client_id' => $callerClient->id,
             'scope' => [
-                'tenant_id' => 77,
-                'site_id' => $foreignSite->id,
-                'site_ids' => [$foreignSite->id],
+                'site_id' => $callerSite->id,
+                'site_ids' => [$callerSite->id],
                 'device_id' => $device->id,
             ],
         ]);
 
         $audit = AuditLog::query()->whereNull('auditable_id')->where('action', 'deviceassignment.update')->sole();
-        $this->assertNull($audit->organization_id);
         $this->assertNull($audit->client_id);
-        $this->assertNull(data_get($audit->meta, 'scope'));
+        $this->assertSame($device->id, data_get($audit->meta, 'scope.device_id'));
+        $this->assertNull(data_get($audit->meta, 'scope.site_id'));
+        $this->assertNull(data_get($audit->meta, 'scope.site_ids'));
 
-        $foreignAdmin = User::factory()->create(['organization_id' => 77, 'approved_at' => now()]);
-        $foreignAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
-        foreach ([$this->admin, $foreignAdmin] as $viewer) {
+        $secondAdmin = User::factory()->create(['approved_at' => now()]);
+        $secondAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+        foreach ([$this->admin, $secondAdmin] as $viewer) {
             $this->actingAs($viewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page): void {
                 $this->assertTrue(collect($page->toArray()['props']['audit']['entries'])->contains('action', 'deviceassignment.update'));
             });
@@ -720,12 +736,12 @@ class SettingsAuditTest extends TestCase
             ));
     }
 
-    public function test_vehicle_assignment_scope_preserves_only_consistent_tenant_evidence(): void
+    public function test_vehicle_assignment_scope_preserves_only_consistent_site_evidence(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42]);
-        $siteLessClient = Client::factory()->create(['organization_id' => 42, 'site_id' => null]);
-        $siteClient = Client::factory()->create(['organization_id' => 42, 'site_id' => $site->id]);
-        $device = Device::factory()->create(['tenant_id' => 42]);
+        $site = Site::factory()->create([]);
+        $siteLessClient = Client::factory()->create(['site_id' => null]);
+        $siteClient = Client::factory()->create(['site_id' => $site->id]);
+        $device = Device::factory()->create([]);
         $vehicles = [
             Asset::factory()->create([
                 'category' => 'Vehicle', 'site_id' => null, 'home_site_id' => null, 'client_id' => $siteLessClient->id,
@@ -749,7 +765,6 @@ class SettingsAuditTest extends TestCase
                 'assigned_at' => now(),
             ]));
 
-            $this->assertSame(42, $scope['tenant_id']);
             $this->assertSame($device->id, $scope['device_id']);
             if ($index === 0) {
                 $this->assertArrayNotHasKey('site_ids', $scope);
@@ -761,9 +776,9 @@ class SettingsAuditTest extends TestCase
 
     public function test_future_device_audit_uses_only_the_current_assignment_after_a_site_move(): void
     {
-        $previousSite = Site::factory()->create(['tenant_id' => 42]);
-        $currentSite = Site::factory()->create(['tenant_id' => 42]);
-        $device = Device::factory()->create(['tenant_id' => 42]);
+        $previousSite = Site::factory()->create([]);
+        $currentSite = Site::factory()->create([]);
+        $device = Device::factory()->create([]);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_SITE,
@@ -798,9 +813,9 @@ class SettingsAuditTest extends TestCase
 
     public function test_historical_assignment_audit_uses_its_persisted_site_scope_after_device_moves(): void
     {
-        $previousSite = Site::factory()->create(['tenant_id' => 42]);
-        $currentSite = Site::factory()->create(['tenant_id' => 42]);
-        $device = Device::factory()->create(['tenant_id' => 42]);
+        $previousSite = Site::factory()->create([]);
+        $currentSite = Site::factory()->create([]);
+        $device = Device::factory()->create([]);
         AuditLog::query()->delete();
 
         $previousAssignment = DeviceAssignment::create([
@@ -838,8 +853,8 @@ class SettingsAuditTest extends TestCase
 
     public function test_auditable_assignment_resolves_canonical_scope_once_at_persistence_boundary(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42]);
-        $device = Device::factory()->create(['tenant_id' => 42]);
+        $site = Site::factory()->create([]);
+        $device = Device::factory()->create([]);
         AuditLog::query()->delete();
         $scopeQueries = 0;
         DB::listen(function (QueryExecuted $query) use (&$scopeQueries): void {
@@ -865,22 +880,21 @@ class SettingsAuditTest extends TestCase
 
     public function test_site_specific_integration_audit_is_limited_to_accessible_sites(): void
     {
-        $allowedSite = Site::factory()->create(['tenant_id' => 42]);
-        $hiddenSite = Site::factory()->create(['tenant_id' => 42]);
-        $viewer = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
+        $allowedSite = Site::factory()->create([]);
+        $hiddenSite = Site::factory()->create([]);
+        $viewer = User::factory()->create(['approved_at' => now()]);
         $viewer->roles()->attach(Role::query()->where('name', 'facilities_manager')->firstOrFail());
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42,
             'user_id' => $viewer->id,
             'primary_site_id' => $allowedSite->id,
             'secondary_site_ids' => [],
         ]);
         AuditLog::query()->delete();
         $allowed = IntegrationSiteConfig::create([
-            'tenant_id' => 42, 'site_id' => $allowedSite->id, 'provider' => 'unifi', 'is_active' => true,
+            'site_id' => $allowedSite->id, 'provider' => 'unifi', 'is_active' => true,
         ]);
         $hidden = IntegrationSiteConfig::create([
-            'tenant_id' => 42, 'site_id' => $hiddenSite->id, 'provider' => 'milesight', 'is_active' => true,
+            'site_id' => $hiddenSite->id, 'provider' => 'milesight', 'is_active' => true,
         ]);
 
         $this->actingAs($viewer)->get('/security-devices/settings')->assertOk()->assertInertia(function ($page) use ($allowed, $hidden): void {
@@ -892,10 +906,9 @@ class SettingsAuditTest extends TestCase
 
     private function siteRestrictedViewer(Site $site): User
     {
-        $viewer = User::factory()->create(['organization_id' => (int) $site->tenant_id, 'approved_at' => now()]);
+        $viewer = User::factory()->create(['approved_at' => now()]);
         $viewer->roles()->attach(Role::query()->where('name', 'facilities_manager')->firstOrFail());
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => (int) $site->tenant_id,
             'user_id' => $viewer->id,
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
@@ -906,23 +919,22 @@ class SettingsAuditTest extends TestCase
 
     public function test_deleted_site_audit_remains_visible_only_inside_the_persisted_scope(): void
     {
-        $allowedSite = Site::factory()->create(['tenant_id' => 42]);
-        $hiddenSite = Site::factory()->create(['tenant_id' => 42]);
-        $viewer = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
+        $allowedSite = Site::factory()->create([]);
+        $hiddenSite = Site::factory()->create([]);
+        $viewer = User::factory()->create(['approved_at' => now()]);
         $viewer->roles()->attach(Role::query()->where('name', 'facilities_manager')->firstOrFail());
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42, 'user_id' => $viewer->id,
+            'user_id' => $viewer->id,
             'primary_site_id' => $allowedSite->id, 'secondary_site_ids' => [],
         ]);
         AuditLog::query()->delete();
-        $allowed = IntegrationSiteConfig::create(['tenant_id' => 42, 'site_id' => $allowedSite->id, 'provider' => 'unifi']);
-        $hidden = IntegrationSiteConfig::create(['tenant_id' => 42, 'site_id' => $hiddenSite->id, 'provider' => 'unifi']);
+        $allowed = IntegrationSiteConfig::create(['site_id' => $allowedSite->id, 'provider' => 'unifi']);
+        $hidden = IntegrationSiteConfig::create(['site_id' => $hiddenSite->id, 'provider' => 'unifi']);
         $allowedId = $allowed->id;
         $hiddenId = $hidden->id;
         $allowed->delete();
         $hidden->delete();
         IntegrationSyncLog::create([
-            'tenant_id' => 42,
             'site_id' => null,
             'provider' => 'unifi',
             'action' => 'sync_devices',
@@ -950,12 +962,12 @@ class SettingsAuditTest extends TestCase
 
     public function test_deleted_devices_and_assignments_persist_safe_site_ids_for_all_canonical_assignment_contexts(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42]);
-        $room = SiteRoom::create(['tenant_id' => 42, 'site_id' => $site->id, 'name' => 'Safe room']);
-        $client = Client::factory()->create(['organization_id' => 42, 'site_id' => $site->id]);
-        $staff = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
+        $site = Site::factory()->create([]);
+        $room = SiteRoom::create(['site_id' => $site->id, 'name' => 'Safe room']);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $staff = User::factory()->create(['approved_at' => now()]);
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42, 'user_id' => $staff->id,
+            'user_id' => $staff->id,
             'primary_site_id' => $site->id, 'secondary_site_ids' => [],
         ]);
         $vehicle = Asset::factory()->create(['category' => 'vehicle', 'site_id' => $site->id]);
@@ -970,7 +982,7 @@ class SettingsAuditTest extends TestCase
             [DeviceAssignment::TARGET_STAFF, $staff->id],
             [DeviceAssignment::TARGET_VEHICLE, $vehicle->id],
         ] as [$type, $targetId]) {
-            $device = Device::factory()->create(['tenant_id' => 42]);
+            $device = Device::factory()->create([]);
             $assignment = DeviceAssignment::create([
                 'device_id' => $device->id,
                 'assignable_type' => $type,
@@ -980,7 +992,7 @@ class SettingsAuditTest extends TestCase
             $device->delete();
             $deletedDeviceIds[] = $device->id;
 
-            $assignmentDevice = Device::factory()->create(['tenant_id' => 42]);
+            $assignmentDevice = Device::factory()->create([]);
             $deletedAssignment = DeviceAssignment::create([
                 'device_id' => $assignmentDevice->id,
                 'assignable_type' => $type,
@@ -1007,10 +1019,10 @@ class SettingsAuditTest extends TestCase
             }
         }
 
-        $viewer = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
+        $viewer = User::factory()->create(['approved_at' => now()]);
         $viewer->roles()->attach(Role::query()->where('name', 'facilities_manager')->firstOrFail());
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42, 'user_id' => $viewer->id,
+            'user_id' => $viewer->id,
             'primary_site_id' => $site->id, 'secondary_site_ids' => [],
         ]);
 
@@ -1031,22 +1043,22 @@ class SettingsAuditTest extends TestCase
 
     public function test_site_restricted_group_count_only_includes_groups_with_visible_devices(): void
     {
-        $allowedSite = Site::factory()->create(['tenant_id' => 42]);
-        $hiddenSite = Site::factory()->create(['tenant_id' => 42]);
-        $viewer = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
+        $allowedSite = Site::factory()->create([]);
+        $hiddenSite = Site::factory()->create([]);
+        $viewer = User::factory()->create(['approved_at' => now()]);
         $viewer->roles()->attach(Role::query()->where('name', 'facilities_manager')->firstOrFail());
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42, 'user_id' => $viewer->id,
+            'user_id' => $viewer->id,
             'primary_site_id' => $allowedSite->id, 'secondary_site_ids' => [],
         ]);
-        $allowedDevice = Device::factory()->create(['tenant_id' => 42]);
-        $hiddenDevice = Device::factory()->create(['tenant_id' => 42]);
+        $allowedDevice = Device::factory()->create([]);
+        $hiddenDevice = Device::factory()->create([]);
         foreach ([[$allowedDevice, $allowedSite], [$hiddenDevice, $hiddenSite]] as [$device, $site]) {
             DeviceAssignment::create([
                 'device_id' => $device->id, 'assignable_type' => DeviceAssignment::TARGET_SITE,
                 'assignable_id' => $site->id, 'assigned_at' => now(),
             ]);
-            $group = DeviceGroup::create(['tenant_id' => 42, 'name' => 'Group '.$site->id, 'type' => 'manual']);
+            $group = DeviceGroup::create(['name' => 'Group '.$site->id, 'type' => 'manual']);
             $group->devices()->attach($device->id);
         }
 

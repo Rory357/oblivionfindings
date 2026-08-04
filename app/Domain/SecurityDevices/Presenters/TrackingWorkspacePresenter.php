@@ -2,6 +2,7 @@
 
 namespace App\Domain\SecurityDevices\Presenters;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -14,6 +15,7 @@ use App\Models\FleetTelemetryEvent;
 use App\Models\LoneWorkerSession;
 use App\Models\User;
 use App\Services\ConsentValidationService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -28,6 +30,7 @@ class TrackingWorkspacePresenter
 
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     public function present(User $viewer, Builder $trackingScope, array $activeTab): array
@@ -177,6 +180,7 @@ class TrackingWorkspacePresenter
                 ->get(['id', 'name'])
                 ->keyBy('id');
         }
+        $staffProfileHrefs = $this->staffProfileHrefs($viewer, $staff->keys());
 
         $assets = $assetIds->isEmpty()
             ? collect()
@@ -213,7 +217,7 @@ class TrackingWorkspacePresenter
                 ->unique('user_id')
                 ->keyBy('user_id');
 
-        return compact('clients', 'staff', 'assets', 'sessions');
+        return compact('clients', 'staff', 'staffProfileHrefs', 'assets', 'sessions');
     }
 
     private function sessionAccessible(User $viewer, LoneWorkerSession $session): bool
@@ -269,7 +273,7 @@ class TrackingWorkspacePresenter
         $privacy = match ($group) {
             'personal-safety' => $client
                 ? $this->clientPrivacy($viewer, $client, $assignment, $permissions)
-                : $this->staffPrivacy($viewer, $session, $permissions),
+                : $this->staffPrivacy($viewer, $assignment, $session, $permissions),
             'fleet' => $this->operationalPrivacy(
                 'fleet_operations',
                 $permissions['fleet'],
@@ -287,23 +291,27 @@ class TrackingWorkspacePresenter
 
         return [
             'id' => $device->id,
+            'deviceUid' => $device->device_uid,
             'name' => $device->name,
             'category' => $device->category,
             'subcategory' => $device->subcategory,
+            'manufacturer' => $device->manufacturer,
+            'model' => $device->model,
             'status' => $device->status?->value,
             'health' => $device->health_status?->value,
             'battery' => $device->battery_level,
             'lastSeenAt' => $device->last_seen_at?->toISOString(),
+            'siteId' => $this->siteId($assignment, $client, $session, $asset),
             'deviceHref' => "/security-devices/devices/{$device->id}",
             'group' => $group,
             'person' => $client ? [
                 'id' => $client->id,
                 'displayName' => $client->preferred_name ?: $client->first_name,
-                'href' => "/clients/{$client->id}",
+                'href' => "/operations/clients/{$client->id}",
             ] : ($staff ? [
                 'id' => $staff->id,
                 'displayName' => $staff->name,
-                'href' => "/hr/people/{$staff->id}",
+                'href' => $context['staffProfileHrefs']->get($staff->id),
             ] : null),
             'asset' => $asset ? $this->mapAsset($asset) : null,
             'personalSafety' => $group === 'personal-safety' ? [
@@ -316,6 +324,56 @@ class TrackingWorkspacePresenter
             'canonicalHref' => $canonicalHref,
             'historyHref' => $privacy['locationAllowed'] ? $canonicalHref : null,
         ];
+    }
+
+    /** @param Collection<int, int|string> $staffIds @return Collection<int, string> */
+    private function staffProfileHrefs(User $viewer, Collection $staffIds): Collection
+    {
+        if (! $viewer->canDo('hr.employees.viewAny') || $staffIds->isEmpty()) {
+            return collect();
+        }
+
+        $visibleStaff = User::query()
+            ->whereKey($staffIds->all())
+            ->select('users.id');
+        $this->siteAccess->applyStaffScope($visibleStaff, $viewer);
+
+        return HrEmployeeProfile::query()
+            ->whereIn('user_id', $visibleStaff)
+            ->pluck('id', 'user_id')
+            ->mapWithKeys(fn (mixed $profileId, mixed $userId): array => [
+                (int) $userId => "/hr/people/{$profileId}",
+            ]);
+    }
+
+    private function siteId(
+        ?DeviceAssignment $assignment,
+        ?Client $client,
+        ?LoneWorkerSession $session,
+        ?Asset $asset,
+    ): ?int {
+        if ($assignment?->assignable_type === DeviceAssignment::TARGET_SITE) {
+            return (int) $assignment->assignable_id;
+        }
+
+        if ($assignment?->assignable_type === DeviceAssignment::TARGET_CLIENT) {
+            return is_numeric($client?->site_id) ? (int) $client->site_id : null;
+        }
+
+        if ($assignment?->assignable_type === DeviceAssignment::TARGET_STAFF) {
+            $siteId = $session?->site_id
+                ?? $session?->client?->site_id
+                ?? $session?->shift?->site_id
+                ?? $session?->shift?->client?->site_id;
+
+            return is_numeric($siteId) ? (int) $siteId : null;
+        }
+
+        $siteId = $asset?->site_id
+            ?? $asset?->home_site_id
+            ?? $asset?->client?->site_id;
+
+        return is_numeric($siteId) ? (int) $siteId : null;
     }
 
     private function sourceAuthorised(
@@ -389,8 +447,12 @@ class TrackingWorkspacePresenter
                 || ! ConsentValidationService::isTrackingConsent($assignmentConsent))) {
             $assignmentConsent = null;
         }
-        $activeConsent = $assignmentConsent && ConsentValidationService::isValidTrackingConsent($assignmentConsent)
-            ? $assignmentConsent
+        $activeConsent = $assignment
+            ? ($assignment->isCollectionActive()
+                && $assignmentConsent
+                && ConsentValidationService::isValidTrackingConsent($assignmentConsent)
+                    ? $assignmentConsent
+                    : null)
             : ConsentValidationService::latestValidTrackingConsentForClient($client);
         $destinationAllowed = $permissions['telemetry'] && $permissions['assets'];
 
@@ -403,13 +465,16 @@ class TrackingWorkspacePresenter
                     ? 'Active client tracking consent and destination permissions.'
                     : 'Consent is active, but Asset telemetry permission is required for location.',
                 'expiresAt' => $activeConsent->expires_at?->toISOString(),
-                'purposeLabel' => $activeConsent->consentType?->purpose
+                'purposeLabel' => $assignment?->tracking_purpose
+                    ?: $activeConsent->consentType?->purpose
                     ?: $activeConsent->consentType?->name
                     ?: 'Client personal safety tracking',
             ];
         }
 
-        $state = $this->consentState($assignmentConsent);
+        $state = $assignment?->collection_stopped_at
+            ? ($assignment->collection_stop_reason === 'consent_withdrawn' ? 'withdrawn' : 'inactive')
+            : $this->consentState($assignmentConsent);
 
         return [
             'state' => $state,
@@ -422,19 +487,27 @@ class TrackingWorkspacePresenter
                 default => 'No active tracking consent is available.',
             },
             'expiresAt' => $assignmentConsent?->expires_at?->toISOString(),
-            'purposeLabel' => $assignmentConsent?->consentType?->purpose
+            'purposeLabel' => $assignment?->tracking_purpose
+                ?: $assignmentConsent?->consentType?->purpose
                 ?: 'Client personal safety tracking',
         ];
     }
 
-    private function staffPrivacy(User $viewer, ?LoneWorkerSession $session, array $permissions): array
-    {
+    private function staffPrivacy(
+        User $viewer,
+        ?DeviceAssignment $assignment,
+        ?LoneWorkerSession $session,
+        array $permissions,
+    ): array {
         $allowed = $viewer->canDo('hazards.view')
             && $permissions['telemetry']
+            && ($assignment?->isCollectionActive() ?? true)
             && $session !== null
             && in_array($session->status, self::LIVE_LONE_WORKER_STATES, true);
 
-        if ($session && $viewer->canDo('hazards.view')) {
+        if ($assignment?->isCollectionActive() !== false
+            && $session
+            && $viewer->canDo('hazards.view')) {
             return [
                 'state' => 'active',
                 'basis' => 'active_lone_worker_session',
@@ -443,13 +516,18 @@ class TrackingWorkspacePresenter
                     ? 'An authorised lone-worker safety session is live.'
                     : 'Asset telemetry permission is required for the live safety-session location.',
                 'expiresAt' => $session->expected_end_at?->toISOString(),
-                'purposeLabel' => 'Lone-worker safety monitoring',
+                'purposeLabel' => $assignment?->tracking_purpose ?: 'Lone-worker safety monitoring',
             ];
         }
 
         return [
-            ...$this->noPurpose('inactive', 'No authorised live lone-worker safety session is present.'),
-            'purposeLabel' => 'Lone-worker safety monitoring',
+            ...$this->noPurpose(
+                'inactive',
+                $assignment?->collection_stopped_at
+                    ? 'This tracking assignment has ended and its live location was revoked.'
+                    : 'No authorised live lone-worker safety session is present.',
+            ),
+            'purposeLabel' => $assignment?->tracking_purpose ?: 'Lone-worker safety monitoring',
         ];
     }
 
@@ -662,7 +740,7 @@ class TrackingWorkspacePresenter
                 'lng' => $event['longitude'],
                 'title' => $event['subjectLabel'],
                 'type' => $event['group'] === 'fleet' ? 'vehicle' : 'asset',
-                'status' => 'online',
+                'status' => 'historical',
             ])->values();
         }
 
@@ -676,7 +754,7 @@ class TrackingWorkspacePresenter
                 'type' => $device['group'] === 'fleet'
                     ? 'vehicle'
                     : ($device['group'] === 'assets' ? 'asset' : 'default'),
-                'status' => $device['status'] === DeviceStatus::Offline->value ? 'offline' : 'online',
+                'status' => $device['status'] ?? 'unknown',
             ])->values();
     }
 

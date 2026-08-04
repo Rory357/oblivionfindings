@@ -2,13 +2,18 @@
 
 namespace App\Domain\SecurityDevices\Services;
 
+use App\Domain\SecurityDevices\Enums\AssignmentType;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
+use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
+use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
+use UnexpectedValueException;
 
 class DeviceRegistryService
 {
@@ -18,6 +23,62 @@ class DeviceRegistryService
     public function query(): Builder
     {
         return Device::query();
+    }
+
+    /**
+     * Register a reviewed discovery result in the one canonical Device registry.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function registerDiscoveredDevice(array $attributes, int $siteId, int $actorId): Device
+    {
+        $site = Site::query()
+            ->whereKey($siteId)
+            ->where('is_active', true)
+            ->where('archived', false)
+            ->whereNull('archived_at')
+            ->first();
+        $actor = User::query()->whereKey($actorId)->whereNotNull('approved_at')->first();
+        $name = trim((string) ($attributes['name'] ?? ''));
+        $domain = DeviceDomain::tryFrom((string) ($attributes['domain'] ?? ''));
+        $category = trim((string) ($attributes['category'] ?? ''));
+        if ($site === null || $actor === null || $name === '' || $domain === null || $category === '') {
+            throw new UnexpectedValueException('Reviewed discovery target is unavailable.');
+        }
+
+        $allowed = array_intersect_key($attributes, array_flip([
+            'name',
+            'domain',
+            'category',
+            'subcategory',
+            'manufacturer',
+            'model',
+            'serial_number',
+            'mac_address',
+            'firmware_version',
+            'ip_address',
+            'provider',
+            'external_ref',
+        ]));
+        $allowed['name'] = $name;
+        $allowed['domain'] = $domain->value;
+        $allowed['category'] = $category;
+        $allowed['status'] = DeviceStatus::Active->value;
+        $allowed['created_by_user_id'] = $actor->id;
+
+        return DB::transaction(function () use ($allowed, $site, $actor): Device {
+            $device = Device::query()->create($allowed);
+            DeviceAssignment::query()->create([
+                'device_id' => $device->id,
+                'assignable_type' => DeviceAssignment::TARGET_SITE,
+                'assignable_id' => $site->id,
+                'assignment_type' => AssignmentType::Permanent,
+                'assigned_at' => now(),
+                'assigned_by_user_id' => $actor->id,
+            ]);
+
+            return $device;
+        }, 3);
     }
 
     /**
@@ -151,8 +212,8 @@ class DeviceRegistryService
     public function linkedToAsset(int $assetId): Builder
     {
         return Device::query()
-            ->whereHas('assetLinks', function (Builder $q) use ($assetId) {
-                $q->active()->forAsset($assetId);
+            ->whereHas('activeAssetLinks', function (Builder $q) use ($assetId) {
+                $q->forAsset($assetId);
             });
     }
 
@@ -162,10 +223,8 @@ class DeviceRegistryService
     public function assetsForDevice(int $deviceId): Builder
     {
         return Asset::query()
-            ->whereHas('deviceLinks', function (Builder $q) use ($deviceId) {
-                // Note: requires Asset model to have a deviceLinks() relationship added later.
-                // For now, query directly.
-                $q->active()->forDevice($deviceId);
+            ->whereHas('activeDeviceLinks', function (Builder $q) use ($deviceId) {
+                $q->forDevice($deviceId);
             });
     }
 }

@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -45,7 +46,7 @@ import {
     Trash2,
     Wrench,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { DeviceProfile, DeviceProfileSectionKey } from './device-profile';
 import { DeviceProfileNavigation } from './device-profile-navigation';
 import {
@@ -53,6 +54,7 @@ import {
     DeviceConfigurationSection,
     DeviceHealthSection,
     DeviceInterfacesSensorsSection,
+    DeviceManagementSection,
     DeviceMonitorsSection,
     DeviceProfileHeader,
     DeviceTicketsSection,
@@ -96,6 +98,7 @@ type AssetLink = {
     asset_id: number;
     asset_name: string | null;
     asset_tag: string | null;
+    href: string | null;
     link_type: string;
     linked_at: string;
     notes: string | null;
@@ -247,6 +250,31 @@ export default function DeviceShow({
     const [activeSection, setActiveSection] = useState<DeviceProfileSectionKey>(
         profile.sections[0]?.key ?? 'health',
     );
+    const [releaseOpen, setReleaseOpen] = useState(false);
+    const [decommissionOpen, setDecommissionOpen] = useState(false);
+    useEffect(() => {
+        const requested = new URLSearchParams(window.location.search).get(
+            'section',
+        ) as DeviceProfileSectionKey | null;
+        if (
+            requested &&
+            profile.sections.some((section) => section.key === requested)
+        ) {
+            setActiveSection(requested);
+        }
+    }, [profile.sections]);
+    const openProfileSection = (section: DeviceProfileSectionKey) => {
+        setActiveSection(section);
+        if (typeof window === 'undefined') return;
+
+        const url = new URL(window.location.href);
+        url.searchParams.set('section', section);
+        window.history.replaceState(
+            window.history.state,
+            '',
+            `${url.pathname}${url.search}${url.hash}`,
+        );
+    };
 
     // ── Asset-link dialog state ──────────────────────────────────
     const [linkOpen, setLinkOpen] = useState(false);
@@ -258,6 +286,8 @@ export default function DeviceShow({
     const [linkSubmitting, setLinkSubmitting] = useState(false);
     const [linkError, setLinkError] = useState('');
     const [unlinkingId, setUnlinkingId] = useState<number | null>(null);
+    const [pendingAssetUnlink, setPendingAssetUnlink] =
+        useState<AssetLink | null>(null);
 
     // Assets already linked to this device (active) — hide from picker.
     const linkedAssetIds = useMemo(
@@ -305,8 +335,6 @@ export default function DeviceShow({
     };
 
     const submitUnlink = (linkId: number) => {
-        if (!confirm('Unlink this asset? The link history is preserved.'))
-            return;
         setUnlinkingId(linkId);
         router.delete(
             `/security-devices/devices/${device.id}/asset-links/${linkId}`,
@@ -331,6 +359,8 @@ export default function DeviceShow({
     const [relSubmitting, setRelSubmitting] = useState(false);
     const [relError, setRelError] = useState('');
     const [unlinkingRelId, setUnlinkingRelId] = useState<number | null>(null);
+    const [pendingRelationshipRemoval, setPendingRelationshipRemoval] =
+        useState<Relationship | null>(null);
 
     const submitRelationship = () => {
         if (!relOtherDeviceId) {
@@ -372,7 +402,6 @@ export default function DeviceShow({
     };
 
     const submitUnlinkRelationship = (relId: number) => {
-        if (!confirm('Remove this relationship?')) return;
         setUnlinkingRelId(relId);
         router.delete(
             `/security-devices/devices/${device.id}/relationships/${relId}`,
@@ -397,6 +426,10 @@ export default function DeviceShow({
     const [docSubmitting, setDocSubmitting] = useState(false);
     const [docError, setDocError] = useState('');
     const [deletingDocId, setDeletingDocId] = useState<number | null>(null);
+    const [pendingDocumentDeletion, setPendingDocumentDeletion] = useState<{
+        id: number;
+        title: string;
+    } | null>(null);
 
     const submitDocument = () => {
         if (!docFile) {
@@ -448,7 +481,6 @@ export default function DeviceShow({
     };
 
     const submitDeleteDocument = (docId: number) => {
-        if (!confirm('Delete this document? This cannot be undone.')) return;
         setDeletingDocId(docId);
         router.delete(
             `/security-devices/devices/${device.id}/documents/${docId}`,
@@ -610,12 +642,6 @@ export default function DeviceShow({
     };
 
     const submitRelease = () => {
-        if (
-            !confirm(
-                'Release this device from its current assignment? It will return to the pool.',
-            )
-        )
-            return;
         router.post(
             `/security-devices/devices/${device.id}/release`,
             {},
@@ -683,16 +709,9 @@ export default function DeviceShow({
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => {
-                                            if (
-                                                confirm(
-                                                    `Decommission "${device.name}"?`,
-                                                )
-                                            )
-                                                router.delete(
-                                                    `/security-devices/devices/${device.id}`,
-                                                );
-                                        }}
+                                        onClick={() =>
+                                            setDecommissionOpen(true)
+                                        }
                                     >
                                         <Trash2 className="mr-2 h-4 w-4" />{' '}
                                         Decommission
@@ -704,19 +723,19 @@ export default function DeviceShow({
 
                 <DeviceProfileHeader
                     profile={profile}
-                    onOpenSection={setActiveSection}
+                    onOpenSection={openProfileSection}
                 />
 
                 <DeviceProfileNavigation
                     sections={profile.sections}
                     activeSection={activeSection}
-                    onSectionChange={setActiveSection}
+                    onSectionChange={openProfileSection}
                 />
 
                 <Tabs
                     value={activeSection}
                     onValueChange={(value) =>
-                        setActiveSection(value as DeviceProfileSectionKey)
+                        openProfileSection(value as DeviceProfileSectionKey)
                     }
                 >
                     {/* ── Overview tab ──────────────────────────── */}
@@ -737,6 +756,13 @@ export default function DeviceShow({
                             profile={profile}
                             editHref={`/security-devices/devices/${device.id}/edit`}
                             onEditServiceDue={() => setServiceDueOpen(true)}
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="management">
+                        <DeviceManagementSection
+                            profile={profile}
+                            deviceId={device.id}
                         />
                     </TabsContent>
 
@@ -780,7 +806,9 @@ export default function DeviceShow({
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    onClick={submitRelease}
+                                                    onClick={() =>
+                                                        setReleaseOpen(true)
+                                                    }
                                                 >
                                                     <Minus className="mr-1 h-3.5 w-3.5" />{' '}
                                                     Release
@@ -871,10 +899,20 @@ export default function DeviceShow({
                                                     className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm"
                                                 >
                                                     <div className="min-w-0 flex-1">
-                                                        <p className="truncate font-medium">
-                                                            {link.asset_name ??
-                                                                `Asset #${link.asset_id}`}
-                                                        </p>
+                                                        {link.href ? (
+                                                            <Link
+                                                                href={link.href}
+                                                                className="frontline-focus inline-block max-w-full truncate rounded-sm font-medium text-primary hover:underline"
+                                                            >
+                                                                {link.asset_name ??
+                                                                    `Asset #${link.asset_id}`}
+                                                            </Link>
+                                                        ) : (
+                                                            <p className="truncate font-medium">
+                                                                {link.asset_name ??
+                                                                    `Asset #${link.asset_id}`}
+                                                            </p>
+                                                        )}
                                                         {link.asset_tag && (
                                                             <p className="font-mono text-xs text-muted-foreground">
                                                                 {link.asset_tag}
@@ -900,10 +938,11 @@ export default function DeviceShow({
                                                             <Button
                                                                 size="sm"
                                                                 variant="ghost"
-                                                                className="h-7 px-2 text-status-critical hover:text-status-critical"
+                                                                className="min-h-11 min-w-11 px-2 text-status-critical hover:text-status-critical"
+                                                                aria-label={`Unlink ${link.asset_name ?? `Asset ${link.asset_id}`} from device`}
                                                                 onClick={() =>
-                                                                    submitUnlink(
-                                                                        link.id,
+                                                                    setPendingAssetUnlink(
+                                                                        link,
                                                                     )
                                                                 }
                                                                 disabled={
@@ -1490,10 +1529,11 @@ export default function DeviceShow({
                                                                 <Button
                                                                     size="sm"
                                                                     variant="ghost"
-                                                                    className="h-7 px-2 text-status-critical hover:text-status-critical"
+                                                                    className="min-h-11 min-w-11 px-2 text-status-critical hover:text-status-critical"
+                                                                    aria-label={`Remove relationship to ${r.device_name ?? `Device ${r.device_id}`}`}
                                                                     onClick={() =>
-                                                                        submitUnlinkRelationship(
-                                                                            r.id,
+                                                                        setPendingRelationshipRemoval(
+                                                                            r,
                                                                         )
                                                                     }
                                                                     disabled={
@@ -1548,10 +1588,11 @@ export default function DeviceShow({
                                                                 <Button
                                                                     size="sm"
                                                                     variant="ghost"
-                                                                    className="h-7 px-2 text-status-critical hover:text-status-critical"
+                                                                    className="min-h-11 min-w-11 px-2 text-status-critical hover:text-status-critical"
+                                                                    aria-label={`Remove relationship to ${r.device_name ?? `Device ${r.device_id}`}`}
                                                                     onClick={() =>
-                                                                        submitUnlinkRelationship(
-                                                                            r.id,
+                                                                        setPendingRelationshipRemoval(
+                                                                            r,
                                                                         )
                                                                     }
                                                                     disabled={
@@ -1840,10 +1881,14 @@ export default function DeviceShow({
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
-                                                            className="h-7 px-2 text-status-critical hover:text-status-critical"
+                                                            className="min-h-11 min-w-11 px-2 text-status-critical hover:text-status-critical"
+                                                            aria-label={`Delete document ${doc.title}`}
                                                             onClick={() =>
-                                                                submitDeleteDocument(
-                                                                    doc.id,
+                                                                setPendingDocumentDeletion(
+                                                                    {
+                                                                        id: doc.id,
+                                                                        title: doc.title,
+                                                                    },
                                                                 )
                                                             }
                                                             disabled={
@@ -2352,6 +2397,80 @@ export default function DeviceShow({
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
+
+                <ConfirmDialog
+                    open={pendingAssetUnlink !== null}
+                    onClose={() => setPendingAssetUnlink(null)}
+                    onConfirm={() => {
+                        if (pendingAssetUnlink) {
+                            submitUnlink(pendingAssetUnlink.id);
+                        }
+                    }}
+                    title="Unlink asset from device?"
+                    description={
+                        pendingAssetUnlink
+                            ? `Unlink “${pendingAssetUnlink.asset_name ?? `Asset ${pendingAssetUnlink.asset_id}`}” from this device? The asset and the historical link record are preserved.`
+                            : ''
+                    }
+                    confirmText="Unlink asset"
+                />
+
+                <ConfirmDialog
+                    open={pendingRelationshipRemoval !== null}
+                    onClose={() => setPendingRelationshipRemoval(null)}
+                    onConfirm={() => {
+                        if (pendingRelationshipRemoval) {
+                            submitUnlinkRelationship(
+                                pendingRelationshipRemoval.id,
+                            );
+                        }
+                    }}
+                    title="Remove device relationship?"
+                    description={
+                        pendingRelationshipRemoval
+                            ? `Remove the recorded relationship with “${pendingRelationshipRemoval.device_name ?? `Device ${pendingRelationshipRemoval.device_id}`}”? Neither device is deleted.`
+                            : ''
+                    }
+                    confirmText="Remove relationship"
+                />
+
+                <ConfirmDialog
+                    open={pendingDocumentDeletion !== null}
+                    onClose={() => setPendingDocumentDeletion(null)}
+                    onConfirm={() => {
+                        if (pendingDocumentDeletion) {
+                            submitDeleteDocument(pendingDocumentDeletion.id);
+                        }
+                    }}
+                    title="Delete device document?"
+                    description={
+                        pendingDocumentDeletion
+                            ? `Permanently delete “${pendingDocumentDeletion.title}” and its stored file? This cannot be undone.`
+                            : ''
+                    }
+                    confirmText="Delete document"
+                />
+
+                <ConfirmDialog
+                    open={releaseOpen}
+                    onClose={() => setReleaseOpen(false)}
+                    onConfirm={submitRelease}
+                    title="Release device assignment?"
+                    description={`Release “${device.name}” from its current assignment? It will return to the available device pool and the assignment history will be preserved.`}
+                    confirmText="Release device"
+                    variant="default"
+                />
+
+                <ConfirmDialog
+                    open={decommissionOpen}
+                    onClose={() => setDecommissionOpen(false)}
+                    onConfirm={() =>
+                        router.delete(`/security-devices/devices/${device.id}`)
+                    }
+                    title="Decommission device?"
+                    description={`Decommission “${device.name}”? It will leave the active estate but its record and operational history remain available.`}
+                    confirmText="Decommission device"
+                />
             </PageShell>
         </AppLayout>
     );

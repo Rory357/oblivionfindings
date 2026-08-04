@@ -44,18 +44,18 @@ class ResidentTrackingRefactorTest extends TestCase
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
-            'organization_id' => 1,
+
         ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
 
-        $this->site = Site::factory()->create(['tenant_id' => 1]);
+        $this->site = Site::factory()->create([]);
         $this->clientA = Client::factory()->create([
-            'organization_id' => 1,
+
             'site_id' => $this->site->id,
             'status' => 'active',
         ]);
         $this->clientB = Client::factory()->create([
-            'organization_id' => 1,
+
             'site_id' => $this->site->id,
             'status' => 'active',
         ]);
@@ -68,7 +68,6 @@ class ResidentTrackingRefactorTest extends TestCase
     public function test_index_shows_client_assigned_tracking_devices(): void
     {
         $device = Device::factory()->tracking()->create([
-            'tenant_id' => 1,
             'name' => 'Resident Tracker 1',
         ]);
         DeviceAssignment::create([
@@ -94,7 +93,7 @@ class ResidentTrackingRefactorTest extends TestCase
 
     public function test_index_excludes_released_assignments(): void
     {
-        $device = Device::factory()->tracking()->create(['tenant_id' => 1]);
+        $device = Device::factory()->tracking()->create([]);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => 'client',
@@ -114,7 +113,7 @@ class ResidentTrackingRefactorTest extends TestCase
 
     public function test_index_excludes_other_clients_devices(): void
     {
-        $device = Device::factory()->tracking()->create(['tenant_id' => 1]);
+        $device = Device::factory()->tracking()->create([]);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => 'client',
@@ -139,11 +138,9 @@ class ResidentTrackingRefactorTest extends TestCase
     public function test_assign_page_shows_unassigned_trackers(): void
     {
         $available = Device::factory()->tracking()->create([
-            'tenant_id' => 1,
             'name' => 'Free Tracker',
         ]);
         $assigned = Device::factory()->tracking()->create([
-            'tenant_id' => 1,
             'name' => 'Busy Tracker',
         ]);
 
@@ -179,7 +176,7 @@ class ResidentTrackingRefactorTest extends TestCase
 
     public function test_assign_creates_device_assignment(): void
     {
-        $device = Device::factory()->tracking()->create(['tenant_id' => 1]);
+        $device = Device::factory()->tracking()->create([]);
 
         $response = $this->actingAs($this->admin)
             ->post('/fleet-assets/resident-tracking/assign', [
@@ -241,7 +238,7 @@ class ResidentTrackingRefactorTest extends TestCase
 
     public function test_unassign_releases_device_assignment(): void
     {
-        $device = Device::factory()->tracking()->create(['tenant_id' => 1]);
+        $device = Device::factory()->tracking()->create([]);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => 'client',
@@ -263,7 +260,6 @@ class ResidentTrackingRefactorTest extends TestCase
     public function test_history_returns_tracker_info_from_canonical_device(): void
     {
         $device = Device::factory()->tracking()->create([
-            'tenant_id' => 1,
             'name' => 'History Tracker',
             'serial_number' => 'HIS-001',
         ]);
@@ -289,15 +285,12 @@ class ResidentTrackingRefactorTest extends TestCase
         });
     }
 
-    public function test_history_returns_null_tracker_when_none_assigned(): void
+    public function test_history_direct_url_is_forbidden_when_none_assigned(): void
     {
         $response = $this->actingAs($this->admin)
             ->get("/fleet-assets/resident-tracking/history/{$this->clientA->id}");
 
-        $response->assertOk();
-        $response->assertInertia(function ($page) {
-            $this->assertNull($page->toArray()['props']['tracker']);
-        });
+        $response->assertForbidden();
     }
 
     public function test_history_includes_fleet_telemetry_for_canonical_tracker(): void
@@ -319,7 +312,6 @@ class ResidentTrackingRefactorTest extends TestCase
             'paired_at' => now(),
         ]);
         $device = Device::factory()->tracking()->create([
-            'tenant_id' => 1,
             'name' => 'Amelia tracker',
             'provider' => 'queclink',
             'imei' => 'QUE-AMELIA',
@@ -370,7 +362,6 @@ class ResidentTrackingRefactorTest extends TestCase
     public function test_resident_data_includes_canonical_fields(): void
     {
         $device = Device::factory()->tracking()->create([
-            'tenant_id' => 1,
             'battery_level' => 65,
             'provider' => 'queclink',
         ]);

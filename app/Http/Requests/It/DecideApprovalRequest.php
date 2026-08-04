@@ -7,8 +7,8 @@ use App\Models\ItTicketApproval;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * The controller first conceals an inaccessible parent ticket, then applies
- * ItTicketApprovalPolicy@decide for pending-state and separation-of-duty rules.
+ * The request first conceals an inaccessible parent ticket; the locked approval
+ * lifecycle then revalidates pending state and separation of duties.
  */
 class DecideApprovalRequest extends FormRequest
 {
@@ -28,7 +28,7 @@ class DecideApprovalRequest extends FormRequest
     {
         return [
             'decision' => ['required', 'in:approve,reject'],
-            'reason' => ['nullable', 'string', 'max:1000'],
+            'reason' => ['required_if:decision,reject', 'nullable', 'string', 'max:1000'],
         ];
     }
 }

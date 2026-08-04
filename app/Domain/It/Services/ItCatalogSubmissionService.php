@@ -9,7 +9,6 @@ use App\Models\ItProvisioningRequest;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\User;
-use App\Support\LegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -22,6 +21,7 @@ class ItCatalogSubmissionService
         private readonly ItTicketRoutingService $routingService,
         private readonly ItWorkAccessService $workAccess,
         private readonly ItProvisioningAccessService $provisioningAccess,
+        private readonly ItCatalogFieldOptionService $fieldOptions,
     ) {}
 
     /**
@@ -66,21 +66,31 @@ class ItCatalogSubmissionService
                 ]);
             }
 
-            $values = $this->validateValues(
+            $validated = $this->validateValues(
                 $item,
                 (array) ($input['values'] ?? []),
-                $actor->canDo('it.manage'),
+                $actor,
             );
+            $values = $validated['values'];
             $result = match ($item->outcome_type) {
-                'service_request', 'security_request' => $this->createTicket($item, $actor, $values),
-                'provisioning' => $this->createProvisioning($item, $actor, $values),
+                'service_request', 'security_request' => $this->createTicket(
+                    $item,
+                    $actor,
+                    $values,
+                    $validated['display_values'],
+                ),
+                'provisioning' => $this->createProvisioning(
+                    $item,
+                    $actor,
+                    $values,
+                    $validated['display_values'],
+                ),
                 default => throw ValidationException::withMessages([
                     'catalog_item' => 'This catalogue item has an unsupported outcome.',
                 ]),
             };
 
             $submission = ItCatalogSubmission::query()->create([
-                'tenant_id' => LegacyStorageContext::id(),
                 'catalog_item_id' => $item->id,
                 'requester_user_id' => $actor->id,
                 'schema_version' => $item->form_schema_version,
@@ -98,9 +108,9 @@ class ItCatalogSubmissionService
 
     /**
      * @param  array<string, mixed>  $values
-     * @return array<string, mixed>
+     * @return array{values: array<string, mixed>, display_values: array<string, mixed>}
      */
-    private function validateValues(ItCatalogItem $item, array $values, bool $canUseInternalFields): array
+    private function validateValues(ItCatalogItem $item, array $values, User $actor): array
     {
         $fields = collect($item->form_schema['fields'] ?? [])
             ->filter(fn (mixed $field) => is_array($field) && isset($field['key']))
@@ -117,7 +127,7 @@ class ItCatalogSubmissionService
         $labels = [];
         foreach ($fields as $key => $field) {
             $visibility = $field['visibility'] ?? 'requester';
-            if (! $canUseInternalFields && in_array($visibility, ['internal', 'restricted'], true)) {
+            if (! $actor->canDo('it.manage') && in_array($visibility, ['internal', 'restricted'], true)) {
                 if (array_key_exists($key, $values)) {
                     throw ValidationException::withMessages([
                         "values.{$key}" => 'This field is reserved for IT staff.',
@@ -136,9 +146,45 @@ class ItCatalogSubmissionService
 
         $validated = Validator::make(['values' => $values], $rules, [], $labels)->validate();
 
-        return collect($validated['values'] ?? [])
+        $clean = collect($validated['values'] ?? [])
             ->only($fields->keys()->all())
             ->all();
+        $entityTypes = $fields
+            ->pluck('type')
+            ->filter(fn (mixed $type): bool => in_array($type, ItCatalogFieldOptionService::TYPES, true))
+            ->unique()
+            ->values()
+            ->all();
+        $options = $entityTypes !== []
+            ? $this->fieldOptions->forTypes($actor, $entityTypes)
+            : ['employee' => [], 'user' => [], 'asset' => []];
+        $displayValues = $clean;
+        $errors = [];
+        foreach ($fields as $key => $field) {
+            $type = (string) ($field['type'] ?? 'text');
+            if (! in_array($type, ItCatalogFieldOptionService::TYPES, true)
+                || ! array_key_exists($key, $clean)
+                || $clean[$key] === null
+                || $clean[$key] === '') {
+                continue;
+            }
+
+            $option = collect($options[$type] ?? [])->firstWhere('id', (int) $clean[$key]);
+            if (! is_array($option)) {
+                $errors["values.{$key}"] = 'This choice is no longer available to you.';
+
+                continue;
+            }
+            $displayValues[$key] = trim(implode(' — ', array_filter([
+                $option['name'] ?? null,
+                $option['detail'] ?? null,
+            ])));
+        }
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return ['values' => $clean, 'display_values' => $displayValues];
     }
 
     /**
@@ -163,7 +209,26 @@ class ItCatalogSubmissionService
             $rules[] = Rule::in((array) ($field['options'] ?? []));
         }
         if (in_array($type, ['text', 'textarea', 'email'], true)) {
+            if (isset($field['min'])) {
+                $rules[] = 'min:'.(int) $field['min'];
+            }
             $rules[] = 'max:'.(int) ($field['max'] ?? ($type === 'textarea' ? 5000 : 255));
+        }
+        if (in_array($type, ['integer', 'number'], true)) {
+            if (isset($field['min'])) {
+                $rules[] = 'min:'.(int) $field['min'];
+            }
+            if (isset($field['max'])) {
+                $rules[] = 'max:'.(int) $field['max'];
+            }
+        }
+        if ($type === 'multiselect') {
+            if (isset($field['min'])) {
+                $rules[] = 'min:'.(int) $field['min'];
+            }
+            if (isset($field['max'])) {
+                $rules[] = 'max:'.(int) $field['max'];
+            }
         }
 
         return $rules;
@@ -172,8 +237,12 @@ class ItCatalogSubmissionService
     /**
      * @param  array<string, mixed>  $values
      */
-    private function createTicket(ItCatalogItem $item, User $actor, array $values): ItTicket
-    {
+    private function createTicket(
+        ItCatalogItem $item,
+        User $actor,
+        array $values,
+        array $displayValues,
+    ): ItTicket {
         $siteId = $this->workAccess->defaultSiteId($actor);
         if (! $this->workAccess->canAssignScope($actor, $siteId, false)) {
             throw ValidationException::withMessages([
@@ -188,9 +257,8 @@ class ItCatalogSubmissionService
         }
 
         $ticket = ItTicket::createWithReference([
-            'tenant_id' => LegacyStorageContext::id(),
             'title' => $item->name,
-            'description' => $this->description($item, $values),
+            'description' => $this->description($item, $displayValues),
             'requester_user_id' => $actor->id,
             'requested_for_user_id' => $actor->id,
             'it_service_id' => $item->it_service_id,
@@ -228,8 +296,12 @@ class ItCatalogSubmissionService
     /**
      * @param  array<string, mixed>  $values
      */
-    private function createProvisioning(ItCatalogItem $item, User $actor, array $values): ItProvisioningRequest
-    {
+    private function createProvisioning(
+        ItCatalogItem $item,
+        User $actor,
+        array $values,
+        array $displayValues,
+    ): ItProvisioningRequest {
         $profileQuery = HrEmployeeProfile::query()
             ->where('is_active', true);
         $profile = isset($values['employee_profile_id'])
@@ -243,13 +315,12 @@ class ItCatalogSubmissionService
         }
 
         $provisioning = ItProvisioningRequest::query()->create([
-            'tenant_id' => LegacyStorageContext::id(),
             'employee_profile_id' => $profile->id,
             'type' => $item->provisioning_type ?: 'other',
             'item' => $item->name,
             'status' => 'pending',
             'priority' => $item->default_priority,
-            'notes' => $this->description($item, $values),
+            'notes' => $this->description($item, $displayValues),
             'created_by' => $actor->id,
         ]);
 

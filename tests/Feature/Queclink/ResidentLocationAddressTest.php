@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\Queclink;
 
+use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Jobs\ReverseGeocodeFleetTelemetryEvent;
 use App\Models\Asset;
@@ -228,6 +230,12 @@ class ResidentLocationAddressTest extends TestCase
             'device_uid' => $deviceUid,
             'legacy_asset_tracker_id' => $tracker->id,
         ]);
+        DeviceAssetLink::create([
+            'device_id' => $device->id,
+            'asset_id' => $asset->id,
+            'link_type' => LinkType::InstalledIn,
+            'linked_at' => now(),
+        ]);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => 'client',
@@ -261,6 +269,12 @@ class ResidentLocationAddressTest extends TestCase
             'imei' => $deviceUid,
             'device_uid' => $deviceUid,
             'legacy_asset_tracker_id' => $tracker->id,
+        ]);
+        DeviceAssetLink::create([
+            'device_id' => $device->id,
+            'asset_id' => $asset->id,
+            'link_type' => LinkType::InstalledIn,
+            'linked_at' => now(),
         ]);
 
         return compact('site', 'asset', 'tracker', 'device');

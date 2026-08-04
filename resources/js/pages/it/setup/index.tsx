@@ -3,6 +3,10 @@ import {
     type ItApiIdentity,
     type OneTimeApiCredential,
 } from '@/components/it/it-api-identities';
+import {
+    ItCatalogueManagement,
+    type CatalogManagementItem,
+} from '@/components/it/it-catalogue-management';
 import { ItModuleShell } from '@/components/it/it-module-shell';
 import {
     ItProvisioningTemplates,
@@ -32,6 +36,7 @@ import type { BreadcrumbItem } from '@/types';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
+    BookOpenCheck,
     Boxes,
     GitMerge,
     KeyRound,
@@ -101,6 +106,7 @@ interface Props {
     teams: Team[];
     queues: Queue[];
     services: Service[];
+    catalogItems?: CatalogManagementItem[];
     agents: Agent[];
     sites: Agent[];
     positionRoles?: string[];
@@ -138,6 +144,7 @@ export default function ItSetupIndex({
     teams,
     queues,
     services,
+    catalogItems = [],
     agents,
     sites,
     positionRoles = [],
@@ -157,6 +164,7 @@ export default function ItSetupIndex({
         | 'teams'
         | 'queues'
         | 'services'
+        | 'catalogue'
         | 'provisioning'
         | 'api'
         | 'operations';
@@ -167,6 +175,7 @@ export default function ItSetupIndex({
                     'teams',
                     'queues',
                     'services',
+                    'catalogue',
                     'provisioning',
                     'api',
                     'operations',
@@ -298,18 +307,21 @@ export default function ItSetupIndex({
         teams: 'Teams, queues & services',
         queues: 'Teams, queues & services',
         services: 'Teams, queues & services',
+        catalogue: 'Service catalogue',
         provisioning: 'Provisioning workflows',
         api: 'API identities',
         operations: 'Operations audit',
     }[tab];
     const setupDescription =
-        tab === 'provisioning'
-            ? 'Turn HR joiner, mover and leaver events into governed, traceable IT work without copying employee, asset, or device ownership.'
-            : tab === 'api'
-              ? 'Manage authenticated machine identities with explicit scopes, field allowlists, signatures, rate limits, expiry, and revocation.'
-              : tab === 'operations'
-                ? 'See configuration gaps, email delivery failures, and the health of the existing IT automations in one place.'
-                : 'Define accountable ownership, workload routing, and safe default assignment without hiding where work went.';
+        tab === 'catalogue'
+            ? 'Build and publish safe, guided request forms without asking staff for record numbers or routing details.'
+            : tab === 'provisioning'
+              ? 'Turn HR joiner, mover and leaver events into governed, traceable IT work without copying employee, asset, or device ownership.'
+              : tab === 'api'
+                ? 'Manage authenticated machine identities with explicit scopes, field allowlists, signatures, rate limits, expiry, and revocation.'
+                : tab === 'operations'
+                  ? 'See configuration gaps, email delivery failures, and the health of the existing IT automations in one place.'
+                  : 'Define accountable ownership, workload routing, and safe default assignment without hiding where work went.';
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -421,6 +433,13 @@ export default function ItSetupIndex({
                             Services
                         </Tab>
                         <Tab
+                            active={tab === 'catalogue'}
+                            onClick={() => setTab('catalogue')}
+                            icon={BookOpenCheck}
+                        >
+                            Service catalogue
+                        </Tab>
+                        <Tab
                             active={tab === 'provisioning'}
                             onClick={() => setTab('provisioning')}
                             icon={GitMerge}
@@ -488,6 +507,12 @@ export default function ItSetupIndex({
                             ))}
                         </Register>
                     ) : null}
+                    {tab === 'catalogue' ? (
+                        <ItCatalogueManagement
+                            items={catalogItems}
+                            services={services}
+                        />
+                    ) : null}
                     {tab === 'provisioning' ? (
                         <ItProvisioningTemplates
                             templates={provisioningTemplates}
@@ -523,8 +548,8 @@ export default function ItSetupIndex({
                                 {editingTeamId ? 'Edit team' : 'New team'}
                             </DialogTitle>
                             <DialogDescription>
-                                Managers and members must be IT agents in this
-                                organisation.
+                                Managers and members must be approved IT agents
+                                in this application.
                             </DialogDescription>
                         </DialogHeader>
                         <FormErrors errors={teamForm.errors} />

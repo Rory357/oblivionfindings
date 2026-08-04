@@ -3,6 +3,7 @@
 namespace App\Domain\Monitoring\Services;
 
 use App\Domain\Monitoring\Data\RuntimeEnvelope;
+use App\Domain\Monitoring\Exceptions\UnsupportedRuntimeContractVersion;
 use App\Domain\Monitoring\Jobs\ReplayMonitoringDeadLetter;
 use App\Domain\Monitoring\Models\MonitoringDeadLetter;
 use App\Domain\Monitoring\Models\MonitoringInbox;
@@ -12,7 +13,9 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use UnexpectedValueException;
 
 final class MonitoringReplayService
@@ -21,6 +24,7 @@ final class MonitoringReplayService
         private readonly RuntimeEnvelopeCodec $codec,
         private readonly SecurityDevicesAccessService $access,
         private readonly MonitoringEnvelopeConsumer $consumer,
+        private readonly ?RuntimeEnvelopeHandlerRegistry $handlers = null,
     ) {}
 
     public function replay(User $actor, MonitoringDeadLetter $letter, string $reason): void
@@ -34,7 +38,7 @@ final class MonitoringReplayService
                 throw new UnexpectedValueException('Resolved dead letters cannot be replayed.');
             }
 
-            $this->authorise($actor, $locked, true);
+            $this->assertReplayable($actor, $locked);
 
             $replaceIntent = false;
 
@@ -110,7 +114,7 @@ final class MonitoringReplayService
             if ($actor === null) {
                 throw new RuntimeException('Replay intent actor is unavailable.');
             }
-            $this->authorise($actor, $locked, true);
+            $this->assertReplayable($actor, $locked);
             $this->consumer->consume(
                 $locked->consumer,
                 $locked->envelope_bytes,
@@ -181,6 +185,86 @@ final class MonitoringReplayService
                 'message_id' => $locked->message_id,
             ]);
         });
+    }
+
+    /**
+     * Return only bounded operator-safe contract metadata. A valid envelope
+     * that references an inaccessible canonical target is omitted entirely.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function inspect(User $actor, MonitoringDeadLetter $letter): ?array
+    {
+        try {
+            $envelope = $this->authorise($actor, $letter, false);
+        } catch (AuthorizationException|HttpExceptionInterface) {
+            return null;
+        }
+
+        $supported = false;
+        if ($envelope instanceof RuntimeEnvelope) {
+            try {
+                $this->registry()->for($envelope->type, $envelope->payloadVersion);
+                $supported = true;
+            } catch (UnsupportedRuntimeContractVersion|LogicException) {
+                $supported = false;
+            }
+        }
+
+        $replayableReason = in_array($letter->reason_code, [
+            'sequence_gap',
+            'handler_failed',
+            'unsupported_version',
+        ], true);
+        $pending = $letter->replay_requested_at !== null;
+        $canReplay = $envelope instanceof RuntimeEnvelope
+            && $supported
+            && $replayableReason
+            && ! $pending;
+
+        return [
+            'schema_version' => $envelope?->schemaVersion,
+            'payload_version' => $envelope?->payloadVersion,
+            'message_type' => $envelope?->type->value,
+            'can_replay' => $canReplay,
+            'can_discard' => ! $pending,
+            'pending_replay' => $pending,
+            'operator_note' => match (true) {
+                $pending => 'Replay is queued. Evidence remains locked until processing completes.',
+                ! $envelope instanceof RuntimeEnvelope => 'Authentication or envelope validation failed. Preserve the evidence or discard it with a reason.',
+                ! $supported => 'This signed contract is not supported by the deployed runtime.',
+                ! $replayableReason => 'This failure is not safe to replay. Preserve or discard it after investigation.',
+                default => 'Replay consumes the original signed bytes and does not re-run a device command.',
+            },
+        ];
+    }
+
+    private function assertReplayable(User $actor, MonitoringDeadLetter $letter): RuntimeEnvelope
+    {
+        if (! in_array($letter->reason_code, ['sequence_gap', 'handler_failed', 'unsupported_version'], true)) {
+            throw new UnexpectedValueException('This dead-letter failure is not safe to replay.');
+        }
+
+        $envelope = $this->authorise($actor, $letter, true);
+        if (! $envelope instanceof RuntimeEnvelope) {
+            throw new UnexpectedValueException('Monitoring envelope is unavailable for replay.');
+        }
+
+        try {
+            $this->registry()->for($envelope->type, $envelope->payloadVersion);
+        } catch (UnsupportedRuntimeContractVersion|LogicException $exception) {
+            throw new UnexpectedValueException(
+                'This signed monitoring contract is not supported by the deployed runtime.',
+                previous: $exception,
+            );
+        }
+
+        return $envelope;
+    }
+
+    private function registry(): RuntimeEnvelopeHandlerRegistry
+    {
+        return $this->handlers ?? app(RuntimeEnvelopeHandlerRegistry::class);
     }
 
     private function authorise(

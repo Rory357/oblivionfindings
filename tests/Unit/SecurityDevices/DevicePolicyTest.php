@@ -19,7 +19,7 @@ class DevicePolicyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->policy = new DevicePolicy();
+        $this->policy = app(DevicePolicy::class);
         $this->seed(\Database\Seeders\RbacSeeder::class);
     }
 
@@ -31,7 +31,7 @@ class DevicePolicyTest extends TestCase
         // Admin should have all permissions via RBAC seeder.
         // Only test if the securityDevices permissions exist after seeding.
         $perm = Permission::where('key', 'securityDevices.viewAny')->first();
-        if (!$perm) {
+        if (! $perm) {
             // Permissions haven't been seeded yet (PR4 scope). Test the canDo path directly.
             $this->markTestSkipped('securityDevices permissions not yet seeded (PR4).');
         }

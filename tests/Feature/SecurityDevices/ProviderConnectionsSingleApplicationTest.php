@@ -7,7 +7,9 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
+use App\Models\Integration\Integration;
 use App\Models\Integration\IntegrationProviderConnection;
+use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Permission;
@@ -21,7 +23,6 @@ use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ProviderConnectionsSingleApplicationTest extends TestCase
@@ -38,20 +39,17 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
 
     public function test_provider_connection_is_application_wide_and_uses_the_new_read_model_contract(): void
     {
-        $manager = $this->manager(organizationId: 42);
-        DB::table('integration_tenant_secrets')->insert([
-            'tenant_id' => 77,
+        $manager = $this->manager();
+        IntegrationProviderConnection::query()->create([
             'provider' => 'milesight',
             'secret_encrypted' => Crypt::encryptString('RAW-PROVIDER-SECRET'),
             'secret_last4' => '0042',
             'status' => 'connected',
-            'config' => json_encode([
+            'config' => [
                 'base_url' => 'https://private-provider.example.test',
                 'api_token' => 'RAW-PROVIDER-CONFIG',
-            ], JSON_THROW_ON_ERROR),
+            ],
             'last_error' => 'Bearer RAW-PROVIDER-ERROR',
-            'created_at' => now(),
-            'updated_at' => now(),
         ]);
 
         $response = $this->actingAs($manager)->get('/security-devices/integrations/milesight');
@@ -60,7 +58,6 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
             $props = $page->toArray()['props'];
 
             $this->assertArrayHasKey('providerConnection', $props);
-            $this->assertArrayNotHasKey('tenantSecret', $props);
             $this->assertSame('connected', $props['providerConnection']['status']);
             $this->assertSame('0042', $props['providerConnection']['secret_last4']);
             $this->assertTrue($props['providerConnection']['endpoint_configured']);
@@ -72,10 +69,9 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
         });
     }
 
-    public function test_provider_identity_is_globally_unique_even_when_legacy_partition_values_differ(): void
+    public function test_provider_identity_is_globally_unique(): void
     {
         IntegrationProviderConnection::query()->create([
-            'tenant_id' => 11,
             'provider' => 'unifi',
             'secret_encrypted' => Crypt::encryptString('first-provider-secret'),
             'status' => IntegrationProviderConnection::STATUS_DISCONNECTED,
@@ -84,53 +80,146 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
         $this->expectException(QueryException::class);
 
         IntegrationProviderConnection::query()->create([
-            'tenant_id' => 12,
             'provider' => 'unifi',
             'secret_encrypted' => Crypt::encryptString('second-provider-secret'),
             'status' => IntegrationProviderConnection::STATUS_CONNECTED,
         ]);
     }
 
-    public function test_saving_a_key_updates_the_single_provider_connection_instead_of_creating_an_actor_partition(): void
+    public function test_queclink_cloud_contract_is_unavailable_and_legacy_credentials_can_only_be_removed(): void
     {
-        $manager = $this->manager(organizationId: 42);
-        $connectionId = DB::table('integration_tenant_secrets')->insertGetId([
-            'tenant_id' => 77,
+        $manager = $this->manager();
+        $connection = IntegrationProviderConnection::query()->create([
+            'provider' => 'queclink',
+            'secret_encrypted' => Crypt::encryptString('RAW-LEGACY-QUECLINK-KEY'),
+            'secret_last4' => '0042',
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
+            'last_tested_at' => now(),
+            'config' => ['base_url' => 'https://RAW-QUECLINK-CLOUD.test'],
+        ]);
+
+        $this->actingAs($manager)
+            ->get('/security-devices/integrations/queclink')
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $props = $page->toArray()['props'];
+                $this->assertSame('unavailable', $props['cloudIntegration']['status']);
+                $this->assertTrue($props['cloudIntegration']['legacy_credential_stored']);
+                $this->assertSame('0042', $props['cloudIntegration']['legacy_credential_last4']);
+                $this->assertArrayNotHasKey('providerConnection', $props);
+                $this->assertStringNotContainsString('RAW-', json_encode($props, JSON_THROW_ON_ERROR));
+            });
+
+        $this->actingAs($manager)
+            ->post('/security-devices/integrations/queclink/key', [
+                'api_key' => 'replacement-key',
+                'base_url' => 'https://replacement.example.test',
+            ])
+            ->assertStatus(405);
+
+        foreach (['test', 'rotate'] as $action) {
+            $this->actingAs($manager)
+                ->post("/security-devices/integrations/queclink/{$action}", [
+                    'api_key' => 'replacement-key',
+                    'base_url' => 'https://replacement.example.test',
+                ])
+                ->assertNotFound();
+        }
+
+        $this->assertSame($connection->id, IntegrationProviderConnection::query()->where('provider', 'queclink')->sole()->id);
+
+        $this->actingAs($manager)
+            ->delete('/security-devices/integrations/queclink/key')
+            ->assertRedirect();
+        $this->assertDatabaseMissing($connection->getTable(), ['provider' => 'queclink']);
+    }
+
+    public function test_saving_milesight_oauth_credentials_updates_the_single_provider_connection(): void
+    {
+        $manager = $this->manager();
+        $connection = IntegrationProviderConnection::query()->create([
             'provider' => 'milesight',
             'secret_encrypted' => Crypt::encryptString('old-secret'),
             'secret_last4' => '0000',
             'status' => 'connected',
-            'created_at' => now(),
-            'updated_at' => now(),
         ]);
 
         $this->actingAs($manager)->post('/security-devices/integrations/milesight/key', [
-            'api_key' => 'replacement-key-9876',
+            'client_id' => 'client-123',
+            'client_secret' => 'replacement-secret-9876',
             'base_url' => 'https://milesight.example.test',
         ])->assertRedirect();
 
-        $this->assertSame(1, DB::table('integration_tenant_secrets')->where('provider', 'milesight')->count());
-        $this->assertDatabaseHas('integration_tenant_secrets', [
-            'id' => $connectionId,
-            'provider' => 'milesight',
-            'secret_last4' => '9876',
-            'status' => 'disconnected',
-        ]);
-        $this->assertSame(1, DB::table('integrations')->where('provider', 'milesight')->count());
-        $this->assertDatabaseMissing('integration_tenant_secrets', [
-            'provider' => 'milesight',
-            'tenant_id' => 42,
-        ]);
+        $saved = IntegrationProviderConnection::query()->where('provider', 'milesight')->sole();
+        $this->assertSame($connection->id, $saved->id);
+        $this->assertSame('9876', $saved->secret_last4);
+        $this->assertSame('replacement-secret-9876', Crypt::decryptString($saved->secret_encrypted));
+        $this->assertSame('client-123', $saved->config['client_id']);
+        $this->assertSame('https://milesight.example.test', $saved->config['base_url']);
+        $this->assertSame(IntegrationProviderConnection::STATUS_DISCONNECTED, $saved->status);
+        $this->assertSame(1, Integration::query()->where('provider', 'milesight')->count());
     }
 
-    public function test_site_credentials_follow_canonical_site_access_and_ignore_legacy_partition_values(): void
+    public function test_milesight_webhook_secret_is_encrypted_configurable_and_never_projected(): void
     {
-        $allowedSite = Site::factory()->create(['tenant_id' => 701, 'name' => 'Allowed Site']);
-        $hiddenSite = Site::factory()->create(['tenant_id' => 702, 'name' => 'Hidden Site']);
-        $manager = $this->manager($allowedSite, organizationId: 42, profileTenantId: 801);
+        $manager = $this->manager();
+        IntegrationProviderConnection::query()->create([
+            'provider' => 'milesight',
+            'secret_encrypted' => Crypt::encryptString('oauth-client-secret'),
+            'secret_last4' => 'cret',
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
+            'config' => ['client_id' => 'client-123'],
+        ]);
+        $webhookSecret = 'RAW-MSC-WEBHOOK-SECRET-9876';
+
+        $this->actingAs($manager)
+            ->post('/security-devices/integrations/milesight/webhook', [
+                'webhook_secret' => 'RAW-SHORT',
+            ])
+            ->assertSessionHasErrors('webhook_secret');
+        $this->assertStringNotContainsString('RAW-SHORT', json_encode(session()->all(), JSON_THROW_ON_ERROR));
+
+        $this->actingAs($manager)
+            ->post('/security-devices/integrations/milesight/webhook', [
+                'webhook_secret' => $webhookSecret,
+            ])
+            ->assertRedirect();
+
+        $connection = IntegrationProviderConnection::query()->where('provider', 'milesight')->sole();
+        $this->assertSame($webhookSecret, Crypt::decryptString($connection->config['webhook_secret_encrypted']));
+        $this->assertSame('9876', $connection->config['webhook_secret_last4']);
+        $this->assertNotNull($connection->config['webhook_configured_at']);
+        $encryptedWebhookSecret = $connection->config['webhook_secret_encrypted'];
+
+        $this->actingAs($manager)
+            ->get('/security-devices/integrations/milesight')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($encryptedWebhookSecret, $webhookSecret): void {
+                $props = $page->toArray()['props'];
+                $this->assertTrue($props['providerConnection']['webhook_configured']);
+                $this->assertSame('9876', $props['providerConnection']['webhook_secret_last4']);
+                $this->assertStringEndsWith('/webhooks/milesight', $props['providerConnection']['webhook_url']);
+                $this->assertNull($props['providerConnection']['last_webhook_received_at']);
+                $this->assertStringNotContainsString($webhookSecret, json_encode($props, JSON_THROW_ON_ERROR));
+                $this->assertStringNotContainsString($encryptedWebhookSecret, json_encode($props, JSON_THROW_ON_ERROR));
+            });
+
+        $this->actingAs($manager)
+            ->delete('/security-devices/integrations/milesight/webhook')
+            ->assertRedirect();
+        $config = IntegrationProviderConnection::query()->where('provider', 'milesight')->sole()->config;
+        $this->assertArrayNotHasKey('webhook_secret_encrypted', $config);
+        $this->assertArrayNotHasKey('webhook_secret_last4', $config);
+        $this->assertArrayNotHasKey('webhook_configured_at', $config);
+    }
+
+    public function test_site_credentials_follow_canonical_site_access(): void
+    {
+        $allowedSite = Site::factory()->create(['name' => 'Allowed Site']);
+        $hiddenSite = Site::factory()->create(['name' => 'Hidden Site']);
+        $manager = $this->manager($allowedSite);
 
         IntegrationSiteSecret::query()->create([
-            'tenant_id' => 901,
             'site_id' => $allowedSite->id,
             'provider' => 'milesight',
             'capability' => 'network',
@@ -139,7 +228,6 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
             'last_tested_at' => now(),
         ]);
         IntegrationSiteSecret::query()->create([
-            'tenant_id' => 42,
             'site_id' => $hiddenSite->id,
             'provider' => 'milesight',
             'capability' => 'network',
@@ -157,15 +245,71 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
                 ->where('siteCredentials.0.site_name', 'Allowed Site'));
     }
 
+    public function test_milesight_application_mapping_uses_opaque_discovery_token_and_canonical_site_access(): void
+    {
+        $allowedSite = Site::factory()->create(['name' => 'Allowed Site']);
+        $secondAllowedSite = Site::factory()->create(['name' => 'Second Allowed Site']);
+        $hiddenSite = Site::factory()->create(['name' => 'Hidden Site']);
+        $manager = $this->manager($allowedSite);
+        HrEmployeeProfile::query()
+            ->where('user_id', $manager->id)
+            ->update(['secondary_site_ids' => [$secondAllowedSite->id]]);
+        IntegrationProviderConnection::query()->create([
+            'provider' => 'milesight',
+            'secret_encrypted' => Crypt::encryptString('client-secret'),
+            'secret_last4' => 'cret',
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
+            'config' => [
+                'client_id' => 'client-123',
+                'discovered_applications' => [[
+                    'external_id' => 'RAW-APPLICATION-ID',
+                    'name' => 'Care sensors',
+                    'meta' => ['device_count' => 4],
+                ]],
+            ],
+        ]);
+
+        $response = $this->actingAs($manager)->get('/security-devices/integrations/milesight');
+        $response->assertOk();
+        $props = $response->viewData('page')['props'];
+        $mappingToken = $props['discoveredApplications'][0]['mapping_token'];
+
+        $this->assertSame('Care sensors', $props['discoveredApplications'][0]['name']);
+        $this->assertSame(4, $props['discoveredApplications'][0]['device_count']);
+        $this->assertStringNotContainsString('RAW-APPLICATION-ID', json_encode($props, JSON_THROW_ON_ERROR));
+
+        $this->actingAs($manager)->post('/security-devices/integrations/milesight/applications/map', [
+            'site_id' => $hiddenSite->id,
+            'mapping_token' => $mappingToken,
+        ])->assertNotFound();
+        $this->assertSame(0, IntegrationSiteConfig::query()->count());
+
+        $this->actingAs($manager)->post('/security-devices/integrations/milesight/applications/map', [
+            'site_id' => $allowedSite->id,
+            'mapping_token' => $mappingToken,
+        ])->assertRedirect();
+
+        $mapping = IntegrationSiteConfig::query()->sole();
+        $this->assertSame($allowedSite->id, $mapping->site_id);
+        $this->assertSame('milesight', $mapping->provider);
+        $this->assertSame('RAW-APPLICATION-ID', $mapping->mapped_external_site_id);
+        $this->assertSame('Care sensors', $mapping->mapped_external_site_name);
+
+        $this->actingAs($manager)->post('/security-devices/integrations/milesight/applications/map', [
+            'site_id' => $secondAllowedSite->id,
+            'mapping_token' => $mappingToken,
+        ])->assertUnprocessable();
+        $this->assertSame(1, IntegrationSiteConfig::query()->count());
+    }
+
     public function test_provider_sync_history_only_includes_application_and_accessible_site_runs(): void
     {
-        $allowedSite = Site::factory()->create(['tenant_id' => 501]);
-        $hiddenSite = Site::factory()->create(['tenant_id' => 502]);
-        $manager = $this->manager($allowedSite, organizationId: 42, profileTenantId: 601);
+        $allowedSite = Site::factory()->create([]);
+        $hiddenSite = Site::factory()->create([]);
+        $manager = $this->manager($allowedSite);
 
         foreach (['milesight'] as $provider) {
             $applicationLog = IntegrationSyncLog::query()->create([
-                'tenant_id' => 701,
                 'provider' => $provider,
                 'site_id' => null,
                 'action' => 'discover_sites',
@@ -173,7 +317,6 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
                 'started_at' => now()->subMinutes(3),
             ]);
             $allowedLog = IntegrationSyncLog::query()->create([
-                'tenant_id' => 702,
                 'provider' => $provider,
                 'site_id' => $allowedSite->id,
                 'action' => 'sync_devices',
@@ -181,7 +324,6 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
                 'started_at' => now()->subMinutes(2),
             ]);
             $hiddenLog = IntegrationSyncLog::query()->create([
-                'tenant_id' => 42,
                 'provider' => $provider,
                 'site_id' => $hiddenSite->id,
                 'action' => 'pull_health',
@@ -203,9 +345,9 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
 
     public function test_queclink_hub_and_frame_feed_follow_canonical_device_and_site_access(): void
     {
-        $allowedSite = Site::factory()->create(['tenant_id' => 501]);
-        $hiddenSite = Site::factory()->create(['tenant_id' => 502]);
-        $manager = $this->manager($allowedSite, organizationId: 42, profileTenantId: 601);
+        $allowedSite = Site::factory()->create([]);
+        $hiddenSite = Site::factory()->create([]);
+        $manager = $this->manager($allowedSite);
         $assetTrackerManager = Permission::query()->where('key', 'assets.trackers.manage')->value('id');
         $this->assertNotNull($assetTrackerManager);
         $manager->permissionOverrides()->attach($assetTrackerManager, ['allowed' => false]);
@@ -213,8 +355,8 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
         $this->assertNotNull($viewUnassigned);
         $manager->permissionOverrides()->attach($viewUnassigned, ['allowed' => false]);
 
-        $allowedDevice = Device::factory()->tracking()->create(['tenant_id' => 701, 'provider' => 'queclink']);
-        $hiddenDevice = Device::factory()->tracking()->create(['tenant_id' => 42, 'provider' => 'queclink']);
+        $allowedDevice = Device::factory()->tracking()->create(['provider' => 'queclink']);
+        $hiddenDevice = Device::factory()->tracking()->create(['provider' => 'queclink']);
         foreach ([[$allowedDevice, $allowedSite], [$hiddenDevice, $hiddenSite]] as [$device, $site]) {
             DeviceAssignment::query()->create([
                 'device_id' => $device->id,
@@ -225,21 +367,18 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
         }
 
         $allowedTracker = QueclinkDevice::query()->create([
-            'tenant_id' => 801,
             'device_id' => $allowedDevice->id,
             'imei' => '860000000000101',
             'status' => QueclinkDevice::STATUS_PAIRED,
             'connection_state' => QueclinkDevice::CONN_CONNECTED,
         ]);
         $hiddenTracker = QueclinkDevice::query()->create([
-            'tenant_id' => 42,
             'device_id' => $hiddenDevice->id,
             'imei' => '860000000000102',
             'status' => QueclinkDevice::STATUS_PAIRED,
             'connection_state' => QueclinkDevice::CONN_CONNECTED,
         ]);
         $pendingTracker = QueclinkDevice::query()->create([
-            'tenant_id' => 999,
             'imei' => '860000000000103',
             'status' => QueclinkDevice::STATUS_PENDING,
             'connection_state' => QueclinkDevice::CONN_DISCONNECTED,
@@ -247,7 +386,6 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
 
         foreach ([$allowedTracker, $hiddenTracker, $pendingTracker] as $tracker) {
             QueclinkRawFrame::query()->create([
-                'tenant_id' => 999,
                 'queclink_device_id' => $tracker->id,
                 'imei' => $tracker->imei,
                 'direction' => QueclinkRawFrame::DIRECTION_INBOUND,
@@ -289,16 +427,14 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
 
     public function test_queclink_audit_records_provider_site_device_actor_and_bounded_outcome(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 501]);
-        $manager = $this->manager($site, organizationId: 42, profileTenantId: 601);
+        $site = Site::factory()->create([]);
+        $manager = $this->manager($site);
         $connection = IntegrationProviderConnection::query()->create([
-            'tenant_id' => 701,
             'provider' => 'queclink',
             'secret_encrypted' => Crypt::encryptString('provider-key'),
             'status' => IntegrationProviderConnection::STATUS_CONNECTED,
         ]);
         $canonicalDevice = Device::factory()->tracking()->create([
-            'tenant_id' => 801,
             'provider' => 'queclink',
         ]);
         DeviceAssignment::query()->create([
@@ -308,7 +444,6 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
             'assigned_at' => now(),
         ]);
         $tracker = QueclinkDevice::query()->create([
-            'tenant_id' => 901,
             'device_id' => $canonicalDevice->id,
             'imei' => '860000000000201',
             'status' => QueclinkDevice::STATUS_PENDING,
@@ -333,8 +468,8 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
 
     public function test_queclink_claim_and_release_use_canonical_asset_link_history(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 501]);
-        $manager = $this->manager($site, organizationId: 42, profileTenantId: 601);
+        $site = Site::factory()->create([]);
+        $manager = $this->manager($site);
         $permissionIds = Permission::query()
             ->whereIn('key', ['assets.viewAny', 'fleet.viewAny'])
             ->pluck('id');
@@ -347,7 +482,6 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
             'category' => 'vehicle',
         ]);
         $tracker = QueclinkDevice::query()->create([
-            'tenant_id' => 901,
             'imei' => '860000000000202',
             'status' => QueclinkDevice::STATUS_PENDING,
             'model_hint' => 'GV500CG',
@@ -391,11 +525,9 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
 
     private function manager(
         ?Site $site = null,
-        ?int $organizationId = null,
-        int $profileTenantId = 1,
     ): User {
         $user = User::factory()->create([
-            'organization_id' => $organizationId,
+
             'approved_at' => now(),
         ]);
         $user->roles()->attach(Role::query()->where('name', 'coordinator')->firstOrFail());
@@ -408,7 +540,6 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
 
         if ($site) {
             HrEmployeeProfile::factory()->create([
-                'tenant_id' => $profileTenantId,
                 'user_id' => $user->id,
                 'primary_site_id' => $site->id,
                 'secondary_site_ids' => [],

@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\It;
 
-use App\Http\Controllers\It\Concerns\StoresItAttachments;
 use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
+use App\Models\ItAttachment;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -15,7 +15,6 @@ use Illuminate\Foundation\Http\FormRequest;
 class StoreTicketCommentRequest extends FormRequest
 {
     use ConcealsInaccessibleItWork;
-    use StoresItAttachments;
 
     public function authorize(): bool
     {
@@ -29,7 +28,12 @@ class StoreTicketCommentRequest extends FormRequest
         return [
             'body' => ['required', 'string', 'max:5000'],
             'is_internal' => ['sometimes', 'boolean'],
-            ...$this->itAttachmentRules(),
+            'attachments' => ['sometimes', 'array', 'max:5'],
+            'attachments.*' => [
+                'file',
+                'max:'.ItAttachment::MAX_SIZE_KB,
+                'mimes:'.ItAttachment::ALLOWED_MIMES,
+            ],
         ];
     }
 }

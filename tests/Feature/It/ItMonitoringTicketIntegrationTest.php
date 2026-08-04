@@ -9,12 +9,11 @@ use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
 use App\Models\Site;
 use App\Models\User;
-use App\Support\LegacyStorageContext;
 use Database\Seeders\SecurityDevicesSignalSeeder;
 
-function monitoredDevice(string $domain = 'it_infrastructure'): Device
+function monitoredDevice(string $domain = 'it_infrastructure', ?Site $site = null): Device
 {
-    $site = Site::factory()->create();
+    $site ??= Site::factory()->create();
     $device = Device::factory()->create(['domain' => $domain]);
     $actor = User::factory()->create();
 
@@ -25,13 +24,6 @@ function monitoredDevice(string $domain = 'it_infrastructure'): Device
         'assignment_type' => 'permanent',
         'assigned_at' => now(),
         'assigned_by_user_id' => $actor->id,
-    ]);
-
-    ControlRoomDevice::create([
-        'name' => $device->name,
-        'canonical_device_id' => $device->id,
-        'site_id' => $site->id,
-        'type' => ControlRoomDevice::TYPE_NETWORK,
     ]);
 
     return $device;
@@ -59,15 +51,11 @@ it('links one ticket idempotently to a canonical device and alert', function () 
         'assigned_at' => now(),
         'assigned_by_user_id' => $actor->id,
     ]);
-    $projection = ControlRoomDevice::create([
-        'name' => $device->name,
-        'canonical_device_id' => $device->id,
-        'site_id' => $site->id,
-        'type' => ControlRoomDevice::TYPE_NETWORK,
-    ]);
     $alert = ControlRoomAlert::factory()->create([
-        'device_id' => $projection->id,
         'site_id' => $site->id,
+        'context' => [
+            'normalized_data' => ['canonical_device_id' => $device->id],
+        ],
     ]);
     $service = app(ItTicketLinkService::class);
 
@@ -96,15 +84,11 @@ it('rejects monitoring links when canonical device and alert site evidence is ab
         'is_organisation_wide' => false,
     ]);
     $device = Device::factory()->itInfrastructure()->create();
-    $projection = ControlRoomDevice::create([
-        'name' => $device->name,
-        'canonical_device_id' => $device->id,
-        'site_id' => $site->id,
-        'type' => ControlRoomDevice::TYPE_NETWORK,
-    ]);
     $alert = ControlRoomAlert::factory()->create([
         'site_id' => $site->id,
-        'device_id' => $projection->id,
+        'context' => [
+            'normalized_data' => ['canonical_device_id' => $device->id],
+        ],
     ]);
 
     expect(fn () => app(ItTicketLinkService::class)->linkMonitoringEvidence($ticket, $device, $alert))
@@ -136,6 +120,7 @@ it('creates one linked system incident for a confirmed IT infrastructure outage'
     ]);
 
     $ticket = ItTicket::sole();
+    $alert = ControlRoomAlert::query()->sole();
 
     expect($ticket->source)->toBe('system')
         ->and($ticket->work_type)->toBe('incident')
@@ -143,7 +128,45 @@ it('creates one linked system incident for a confirmed IT infrastructure outage'
         ->and($ticket->requester_user_id)->toBeNull()
         ->and($ticket->links()->where('relationship', 'source_alert')->exists())->toBeTrue()
         ->and($ticket->links()->where('relationship', 'affected_device')->exists())->toBeTrue()
-        ->and($ticket->events()->where('type', 'created_from_monitoring')->exists())->toBeTrue();
+        ->and($ticket->events()->where('type', 'created_from_monitoring')->exists())->toBeTrue()
+        ->and($alert->device_id)->toBeNull()
+        ->and((int) data_get($alert->context, 'normalized_data.canonical_device_id'))->toBe($device->id)
+        ->and((int) $alert->site_id)->toBe((int) $ticket->site_id);
+});
+
+it('keeps separate canonical Device outages distinct without Control Room projections', function () {
+    $site = Site::factory()->create();
+    $first = monitoredDevice(site: $site);
+    $second = monitoredDevice(site: $site);
+
+    foreach ([$first, $second] as $device) {
+        DeviceEvent::create([
+            'device_id' => $device->id,
+            'event_type' => 'offline',
+            'severity' => 'high',
+            'source' => 'oblivion_monitoring',
+            'occurred_at' => now(),
+        ]);
+    }
+
+    expect(ControlRoomDevice::query()->count())->toBe(0)
+        ->and(ControlRoomAlert::query()->count())->toBe(2)
+        ->and(ItTicket::query()->count())->toBe(2)
+        ->and(ControlRoomAlert::query()
+            ->pluck('context')
+            ->map(fn (array $context): int => (int) data_get($context, 'normalized_data.canonical_device_id'))
+            ->sort()
+            ->values()
+            ->all())->toBe(collect([$first->id, $second->id])->sort()->values()->all())
+        ->and(ItTicket::query()
+            ->with('links')
+            ->get()
+            ->flatMap(fn (ItTicket $ticket) => $ticket->links
+                ->where('relationship', 'affected_device')
+                ->pluck('linkable_id'))
+            ->sort()
+            ->values()
+            ->all())->toBe(collect([$first->id, $second->id])->sort()->values()->all());
 });
 
 it('adds repeated evidence to the same ticket instead of creating a duplicate', function () {
@@ -205,6 +228,7 @@ it('marks the ticket monitoring recovered but leaves technician resolution open'
             'severity' => $severity,
             'source' => 'oblivion_monitoring',
             'occurred_at' => now(),
+            'payload' => $eventType === 'online' ? ['legacy_monitoring_recovery' => true] : [],
         ]);
     }
 
@@ -230,7 +254,6 @@ it('does not recover a system ticket that lacks the enforced monitoring principa
         'status_reason' => 'monitoring_outage',
     ]);
     $ticket->links()->create([
-        ...LegacyStorageContext::attributes(),
         'relationship' => 'affected_device',
         'linkable_type' => $device->getMorphClass(),
         'linkable_id' => $device->id,
@@ -243,6 +266,7 @@ it('does not recover a system ticket that lacks the enforced monitoring principa
         'severity' => 'info',
         'source' => 'oblivion_monitoring',
         'occurred_at' => now(),
+        'payload' => ['legacy_monitoring_recovery' => true],
     ]);
 
     expect($ticket->fresh()->status_reason)->toBe('monitoring_outage')

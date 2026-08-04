@@ -9,7 +9,6 @@ use App\Models\ItTeam;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
-use App\Support\LegacyStorageContext;
 use DomainException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +24,6 @@ final class ItServiceManagementSetupService
             $this->guardActor($actor);
             $this->guardAgents($this->teamUserIds($data));
             $team = ItTeam::query()->create([
-                'tenant_id' => LegacyStorageContext::id(),
                 ...Arr::only($data, ['manager_user_id', 'name', 'description', 'is_active']),
             ]);
             $this->syncMembers($team, (array) ($data['members'] ?? []));
@@ -67,7 +65,6 @@ final class ItServiceManagementSetupService
             $this->guardQueueDefaults($actor, $data);
             $this->guardRoutingScope($actor, $data);
             $queue = ItQueue::query()->create([
-                'tenant_id' => LegacyStorageContext::id(),
                 ...Arr::only($data, ['team_id', 'key', 'name', 'description', 'is_active']),
                 'filter_rules' => $this->filterRules($data),
             ]);
@@ -120,7 +117,6 @@ final class ItServiceManagementSetupService
             $this->guardActor($actor);
             $this->guardAgents(array_filter([$data['owner_user_id'] ?? null]));
             $service = ItService::query()->create([
-                'tenant_id' => LegacyStorageContext::id(),
                 ...Arr::only($data, ['owner_user_id', 'key', 'name', 'description', 'status', 'criticality', 'is_active']),
             ]);
             AuditLogger::logOrFail('it.setup.service.created', $service, [

@@ -96,7 +96,6 @@ class AlertRoutingService
             return $alert;
         } catch (\Throwable $e) {
             Log::error('AlertRoutingService: signal processing failed', SafeOperationalData::logContext([
-                'tenant_id' => $event->tenant_id,
                 'provider' => $event->provider,
                 'error_category' => SafeOperationalData::failureCategory($e),
             ]));

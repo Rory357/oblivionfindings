@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,12 +11,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ItTeam extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     public const MEMBER_ROLES = ['member', 'lead', 'manager'];
 
     protected $fillable = [
-        'tenant_id',
         'manager_user_id',
         'name',
         'description',
@@ -51,10 +51,5 @@ class ItTeam extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(ItWorkTask::class, 'team_id');
-    }
-
-    public function scopeForTenant($query, int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 }

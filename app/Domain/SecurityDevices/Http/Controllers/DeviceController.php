@@ -19,7 +19,6 @@ use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
 use App\Models\Site;
 use App\Models\SiteRoom;
-use App\Support\LegacyStorageContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -245,6 +244,13 @@ class DeviceController extends Controller
             : collect();
 
         $profile = $this->profilePresenter->present($user, $device, $activeAssignment);
+        $passwordConfirmedAt = $request->session()->get('auth.password_confirmed_at');
+        $profile['management']['stepUpCurrent'] = is_numeric($passwordConfirmedAt)
+            && (int) $passwordConfirmedAt >= now()->subSeconds(
+                max(60, (int) config('security_devices.step_up_max_age_seconds', 900)),
+            )->timestamp;
+
+        $accessibleAssetIds = $this->access->accessibleAssetIds($user);
 
         return Inertia::render('security-devices/devices/show', [
             'device' => [
@@ -282,6 +288,9 @@ class DeviceController extends Controller
                 'asset_id' => $link->asset_id,
                 'asset_name' => $link->asset?->name,
                 'asset_tag' => $link->asset?->asset_tag,
+                'href' => in_array((int) $link->asset_id, $accessibleAssetIds, true)
+                    ? "/fleet-assets/assets/{$link->asset_id}"
+                    : null,
                 'link_type' => $link->link_type?->value,
                 'linked_at' => $link->linked_at?->toISOString(),
                 'notes' => $link->notes,
@@ -588,7 +597,6 @@ class DeviceController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $validated['tenant_id'] = LegacyStorageContext::id();
         $validated['created_by_user_id'] = $user->id;
 
         $device = Device::create($validated);

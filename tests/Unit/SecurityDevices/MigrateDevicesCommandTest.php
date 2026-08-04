@@ -9,12 +9,14 @@ use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
+use App\Models\LocationHardware;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class MigrateDevicesCommandTest extends TestCase
@@ -26,7 +28,6 @@ class MigrateDevicesCommandTest extends TestCase
     private function insertLocationHardware(array $overrides = []): int
     {
         $defaults = [
-            'tenant_id' => 1,
             'site_id' => Site::factory()->create()->id,
             'room_id' => null,
             'provider' => 'manual',
@@ -48,16 +49,19 @@ class MigrateDevicesCommandTest extends TestCase
             'deleted_at' => null,
         ];
 
-        return DB::table('location_hardware')->insertGetId(
-            array_merge($defaults, $overrides)
-        );
+        $attributes = array_merge($defaults, $overrides);
+        if (is_string($attributes['external_ref'])) {
+            $attributes['external_ref'] = json_decode($attributes['external_ref'], true, flags: JSON_THROW_ON_ERROR);
+        }
+
+        return (int) LocationHardware::query()->create($attributes)->getKey();
     }
 
     private function insertControlRoomDevice(array $overrides = []): int
     {
         $defaults = [
             'name' => 'CR Sensor',
-            'device_uid' => 'dev-'.\Illuminate\Support\Str::uuid(),
+            'device_uid' => 'dev-'.Str::uuid(),
             'type' => 'sensor',
             'vendor' => null,
             'model' => null,
@@ -186,7 +190,6 @@ class MigrateDevicesCommandTest extends TestCase
     {
         $site = Site::factory()->create();
         $room = SiteRoom::create([
-            'tenant_id' => 1,
             'site_id' => $site->id,
             'name' => 'Server Room',
         ]);

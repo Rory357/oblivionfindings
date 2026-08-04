@@ -22,10 +22,9 @@ function seedItAcceptanceFixtures(): ItAcceptanceManifest {
 ob_start();
 $admin = \App\Models\User::query()->where('email', 'admin@demo.test')->firstOrFail();
 $worker = \App\Models\User::query()->where('email', 'sw1@demo.test')->firstOrFail();
-$tenantId = (int) ($admin->organization_id ?: 1);
 
 $service = \App\Models\ItService::query()->updateOrCreate(
-    ['tenant_id' => $tenantId, 'key' => 'e2e-managed-connectivity'],
+    ['key' => 'e2e-managed-connectivity'],
     [
         'owner_user_id' => $admin->id,
         'name' => 'Managed connectivity',
@@ -37,7 +36,7 @@ $service = \App\Models\ItService::query()->updateOrCreate(
 );
 
 \App\Models\ItCatalogItem::query()->updateOrCreate(
-    ['tenant_id' => $tenantId, 'slug' => 'e2e-network-access'],
+    ['slug' => 'e2e-network-access'],
     [
         'it_service_id' => $service->id,
         'name' => 'Request managed network access',
@@ -68,7 +67,7 @@ $service = \App\Models\ItService::query()->updateOrCreate(
 );
 
 \App\Models\ItKbArticle::query()->updateOrCreate(
-    ['tenant_id' => $tenantId, 'slug' => 'e2e-restore-site-connectivity'],
+    ['slug' => 'e2e-restore-site-connectivity'],
     [
         'title' => 'Restore site connectivity',
         'category' => 'network',
@@ -90,9 +89,9 @@ $service = \App\Models\ItService::query()->updateOrCreate(
     ],
 );
 
-$ticket = function (string $title, array $attributes) use ($admin, $worker, $tenantId, $service) {
+$ticket = function (string $title, array $attributes) use ($admin, $worker, $service) {
     return \App\Models\ItTicket::query()->updateOrCreate(
-        ['tenant_id' => $tenantId, 'title' => $title],
+        ['title' => $title],
         [
             'description' => $attributes['description'],
             'requester_user_id' => $worker->id,
@@ -103,6 +102,7 @@ $ticket = function (string $title, array $attributes) use ($admin, $worker, $ten
             'source' => $attributes['source'] ?? 'agent',
             'work_type' => $attributes['work_type'],
             'workflow_state' => $attributes['workflow_state'],
+            'is_organisation_wide' => true,
             'priority' => $attributes['priority'] ?? 'high',
             'impact' => $attributes['impact'] ?? 'site',
             'urgency' => $attributes['urgency'] ?? 'high',
@@ -122,7 +122,6 @@ $emailTicket = $ticket('E2E inbound email printer incident', [
 $emailTicket->comments()->updateOrCreate(
     ['body' => 'Requester confirmed the printer is still offline.'],
     [
-        'tenant_id' => $tenantId,
         'author_user_id' => $worker->id,
         'is_internal' => false,
     ],
@@ -130,7 +129,6 @@ $emailTicket->comments()->updateOrCreate(
 $emailTicket->comments()->updateOrCreate(
     ['body' => 'Internal technician diagnostic: do not expose to requester.'],
     [
-        'tenant_id' => $tenantId,
         'author_user_id' => $admin->id,
         'is_internal' => true,
     ],
@@ -139,7 +137,6 @@ $emailTicket->comments()->updateOrCreate(
 \App\Models\ItEmailDelivery::query()->updateOrCreate(
     ['notification_uuid' => '00000000-0000-4000-8000-000000000011'],
     [
-        'tenant_id' => $tenantId,
         'it_ticket_id' => $emailTicket->id,
         'recipient_user_id' => $worker->id,
         'recipient_email' => $worker->email,
@@ -166,7 +163,7 @@ $problemTicket = $ticket('E2E recurring WAN instability', [
     'next_action' => 'Confirm the underlying carrier fault',
 ]);
 $problem = \App\Models\ItProblem::query()->updateOrCreate(
-    ['tenant_id' => $tenantId, 'ticket_id' => $problemTicket->id],
+    ['ticket_id' => $problemTicket->id],
     [
         'impact_summary' => 'Intermittent service degradation across managed sites.',
         'workaround' => 'Fail affected traffic over to the secondary SD-WAN path.',
@@ -183,7 +180,7 @@ $changeTicket = $ticket('E2E SD-WAN firmware change', [
     'next_action' => 'Review risk and approve the implementation plan',
 ]);
 $change = \App\Models\ItChange::query()->updateOrCreate(
-    ['tenant_id' => $tenantId, 'ticket_id' => $changeTicket->id],
+    ['ticket_id' => $changeTicket->id],
     [
         'change_type' => 'normal',
         'risk_level' => 'medium',
@@ -210,7 +207,7 @@ $majorTicket = $ticket('E2E regional connectivity outage', [
     'next_action' => 'Publish the next stakeholder update',
 ]);
 $major = \App\Models\ItMajorIncident::query()->updateOrCreate(
-    ['tenant_id' => $tenantId, 'ticket_id' => $majorTicket->id],
+    ['ticket_id' => $majorTicket->id],
     [
         'severity' => 'sev2',
         'impact_summary' => 'Multiple sites cannot reach centrally hosted services.',
@@ -229,7 +226,6 @@ $profile = \App\Domain\Hr\Models\HrEmployeeProfile::withTrashed()
     ->first();
 if ($profile === null) {
     $profile = \App\Domain\Hr\Models\HrEmployeeProfile::query()->create([
-        'tenant_id' => $tenantId,
         'user_id' => $worker->id,
         'employee_number' => 'E2E-SW1',
         'work_email' => $worker->email,
@@ -247,11 +243,10 @@ if ($profile === null) {
 
 foreach (['joiner', 'mover', 'leaver'] as $offset => $lifecycle) {
     $template = \App\Models\ItProvisioningTemplate::query()
-        ->where('tenant_id', $tenantId)
         ->where('lifecycle_type', $lifecycle)
         ->first();
     \App\Models\ItProvisioningWorkflow::query()->updateOrCreate(
-        ['tenant_id' => $tenantId, 'source_event_key' => "e2e-acceptance-{$lifecycle}"],
+        ['source_event_key' => "e2e-acceptance-{$lifecycle}"],
         [
             'employee_profile_id' => $profile->id,
             'provisioning_template_id' => $template?->id,

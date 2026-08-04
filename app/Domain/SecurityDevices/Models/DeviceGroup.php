@@ -2,13 +2,14 @@
 
 namespace App\Domain\SecurityDevices\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DeviceGroup extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, WritesLegacyStorageContext;
 
     protected $table = 'device_groups';
 
@@ -29,12 +30,5 @@ class DeviceGroup extends Model
     public function devices(): BelongsToMany
     {
         return $this->belongsToMany(Device::class, 'device_group_members');
-    }
-
-    // ── Scopes ────────────────────────────────────────────────────
-
-    public function scopeForTenant($query, int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 }

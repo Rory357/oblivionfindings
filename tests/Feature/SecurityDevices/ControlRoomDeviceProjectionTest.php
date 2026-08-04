@@ -2,11 +2,14 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\ControlRoom\Device as CrDevice;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
@@ -24,6 +27,8 @@ class ControlRoomDeviceProjectionTest extends TestCase
 
     private User $admin;
 
+    private Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -33,6 +38,12 @@ class ControlRoomDeviceProjectionTest extends TestCase
 
         $this->admin = User::factory()->create();
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+        $this->site = Site::factory()->create();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+        ]);
     }
 
     // ── Model has projection documentation ────────────────────────
@@ -111,31 +122,47 @@ class ControlRoomDeviceProjectionTest extends TestCase
         );
     }
 
-    // ── CR-specific methods still work ────────────────────────────
+    // ── Signal activity never becomes Device health authority ─────────
 
-    public function test_cr_device_lifecycle_methods_work(): void
+    public function test_cr_device_records_signal_activity_without_mutating_legacy_health_fields(): void
     {
+        $legacyLastSeen = now()->subDay()->startOfSecond();
         $crDevice = CrDevice::create([
-            'name' => 'Lifecycle Test',
+            'name' => 'Signal activity test',
             'type' => 'sensor',
             'status' => 'offline',
+            'last_seen_at' => $legacyLastSeen,
+            'battery_level' => 7,
         ]);
 
-        $crDevice->markOnline();
+        $crDevice->recordSignal();
         $crDevice->refresh();
-        $this->assertEquals('online', $crDevice->status);
-        $this->assertNotNull($crDevice->last_seen_at);
 
-        $crDevice->updateBattery(42);
-        $crDevice->refresh();
-        $this->assertEquals(42, $crDevice->battery_level);
+        $this->assertNotNull($crDevice->last_signal_at);
+        $this->assertTrue($crDevice->last_seen_at->equalTo($legacyLastSeen));
+        $this->assertSame('offline', $crDevice->status);
+        $this->assertSame(7, $crDevice->battery_level);
+    }
 
-        $this->assertTrue($crDevice->isOnline());
-        $this->assertFalse($crDevice->hasLowBattery());
-
-        $crDevice->markOffline();
-        $crDevice->refresh();
-        $this->assertEquals('offline', $crDevice->status);
+    public function test_cr_device_exposes_no_duplicate_health_lifecycle_api(): void
+    {
+        foreach ([
+            'markOnline',
+            'markOffline',
+            'updateBattery',
+            'isOnline',
+            'isStale',
+            'hasLowBattery',
+            'scopeOnline',
+            'scopeOffline',
+            'scopeStale',
+            'scopeLowBattery',
+        ] as $method) {
+            $this->assertFalse(
+                method_exists(CrDevice::class, $method),
+                "Control Room projection must not expose duplicate Device health method {$method}().",
+            );
+        }
     }
 
     // ── Controllers use canonical enrichment ──────────────────────
@@ -143,10 +170,12 @@ class ControlRoomDeviceProjectionTest extends TestCase
     public function test_device_index_includes_canonical_enrichment(): void
     {
         $canonical = Device::factory()->security()->create();
+        $this->assignCanonicalToSite($canonical);
         CrDevice::create([
             'name' => 'Enriched Device',
             'type' => 'camera',
             'status' => 'online',
+            'site_id' => $this->site->id,
             'canonical_device_id' => $canonical->id,
         ]);
 
@@ -165,10 +194,12 @@ class ControlRoomDeviceProjectionTest extends TestCase
     public function test_device_show_includes_canonical_detail_block(): void
     {
         $canonical = Device::factory()->itInfrastructure()->create();
+        $this->assignCanonicalToSite($canonical);
         $crDevice = CrDevice::create([
             'name' => 'Show Device',
             'type' => 'network',
             'status' => 'online',
+            'site_id' => $this->site->id,
             'canonical_device_id' => $canonical->id,
         ]);
 
@@ -196,5 +227,17 @@ class ControlRoomDeviceProjectionTest extends TestCase
                 ->has('devices')
                 ->has('stats')
             );
+    }
+
+    private function assignCanonicalToSite(Device $device): void
+    {
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $this->site->id,
+            'assignment_type' => 'permanent',
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $this->admin->id,
+        ]);
     }
 }

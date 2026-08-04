@@ -16,35 +16,37 @@ export function seedOperationsWorkspaceFixtures() {
     };
     const output = runLaravelPhp(`
 $admin = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->firstOrFail();
-$tenantId = (int) ($admin->organization_id ?? 1);
 \\Illuminate\\Support\\Facades\\Cache::put(
     "tasks.nav.{$admin->id}",
     ['view' => false, 'badge' => 0],
     now()->addMinutes(30),
 );
 $site = \\App\\Models\\Site::query()
-    ->where('tenant_id', $tenantId)
     ->where('is_active', true)
     ->orderBy('id')
     ->first();
 if (! $site) {
     $site = \\App\\Models\\Site::forceCreate([
-        'tenant_id' => $tenantId,
         'name' => 'Playwright Operations Site',
         'type' => 'facility',
         'is_active' => true,
+        'archived' => false,
+        'archived_at' => null,
     ]);
 }
+$site->forceFill([
+    'is_active' => true,
+    'archived' => false,
+    'archived_at' => null,
+])->save();
 $rawSentinel = 'PW-OPERATIONS-PRIVATE-EVIDENCE-MUST-NOT-RENDER';
 
-$upsertDevice = function (string $uid, string $name) use ($tenantId, $admin, $site, $rawSentinel) {
+$upsertDevice = function (string $uid, string $name) use ($admin, $site, $rawSentinel) {
     $device = \\App\\Domain\\SecurityDevices\\Models\\Device::withTrashed()
-        ->where('tenant_id', $tenantId)
         ->where('device_uid', $uid)
         ->first();
     if (! $device) {
         $device = new \\App\\Domain\\SecurityDevices\\Models\\Device([
-            'tenant_id' => $tenantId,
             'device_uid' => $uid,
         ]);
     } elseif ($device->trashed()) {

@@ -9,6 +9,7 @@ use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\ClientConsent;
+use App\Services\ConsentValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Routing\Controller;
@@ -108,18 +109,15 @@ class DeviceAssignmentController extends Controller
         }
 
         $consent = ClientConsent::query()
+            ->with('consentType')
             ->where('id', $consentId)
             ->where('client_id', $assignableId)
-            ->where('status', 'given')
-            ->where(function ($q) {
-                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })
             ->first();
 
-        if (! $consent) {
+        if (! $consent || ! ConsentValidationService::isValidTrackingConsent($consent)) {
             throw new \InvalidArgumentException(
-                'The chosen consent is not valid for this client (missing, not given, expired, '
-                .'or belongs to a different client).'
+                'The chosen consent is not an active location-tracking consent for this client '
+                .'(missing, withdrawn, superseded, expired, or recorded for another purpose).'
             );
         }
     }

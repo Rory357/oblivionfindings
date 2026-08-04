@@ -24,14 +24,13 @@ use Illuminate\Support\Collection;
  * Supported fields: domain, category, subcategory, provider, status, health_status.
  * Supported ops:    equals, not_equals, in.
  *
- * Anything outside that whitelist is silently ignored — rules are
- * operator-authored JSON today so the service guards against SQL-injection
- * risk and malformed input. A future v1.5 rule-builder UI can lean on this
- * service for preview and commit.
+ * Rules are authored through the governed Device Groups builder. The service
+ * retains defensive whitelist checks so imported or historic rows cannot turn
+ * rule values into arbitrary query columns or operators.
  */
 class DeviceGroupAutoRuleService
 {
-    private const ALLOWED_FIELDS = [
+    public const ALLOWED_FIELDS = [
         'domain',
         'category',
         'subcategory',
@@ -40,7 +39,7 @@ class DeviceGroupAutoRuleService
         'health_status',
     ];
 
-    private const ALLOWED_OPS = ['equals', 'not_equals', 'in'];
+    public const ALLOWED_OPS = ['equals', 'not_equals', 'in'];
 
     /**
      * Build a device-matching query from a rules array.
@@ -48,34 +47,24 @@ class DeviceGroupAutoRuleService
      * Returns an Eloquent Builder the caller can page / count / get off.
      * Unrecognised fields / ops are skipped silently.
      */
-    public function queryFromRules(array $rules): Builder
+    public function queryFromRules(array $rules, ?Builder $deviceScope = null): Builder
     {
-        $match = ($rules['match'] ?? 'all') === 'any' ? 'any' : 'all';
+        $match = $rules['match'] ?? null;
         $conditions = is_array($rules['conditions'] ?? null) ? $rules['conditions'] : [];
 
-        $query = Device::query();
+        $query = $deviceScope === null ? Device::query() : clone $deviceScope;
 
-        if (empty($conditions)) {
+        if (! $this->areRulesSupported($rules)) {
             // An empty rule set must NOT match everything — that would be a
-            // footgun on sync. Match nothing instead.
+            // footgun on sync. Historic malformed rules also fail closed.
             return $query->whereRaw('1 = 0');
         }
 
         $query->where(function (Builder $outer) use ($conditions, $match) {
             foreach ($conditions as $condition) {
-                if (! is_array($condition)) {
-                    continue;
-                }
-                $field = $condition['field'] ?? null;
-                $op = $condition['op'] ?? null;
-                $value = $condition['value'] ?? null;
-
-                if (! in_array($field, self::ALLOWED_FIELDS, true)) {
-                    continue;
-                }
-                if (! in_array($op, self::ALLOWED_OPS, true)) {
-                    continue;
-                }
+                $field = $condition['field'];
+                $op = $condition['op'];
+                $value = $condition['value'];
 
                 $method = $match === 'any' ? 'orWhere' : 'where';
                 $outer->{$method}(function (Builder $c) use ($field, $op, $value) {
@@ -85,6 +74,55 @@ class DeviceGroupAutoRuleService
         });
 
         return $query;
+    }
+
+    /** Historic/imported JSON must fail closed before any membership plan. */
+    public function areRulesSupported(array $rules): bool
+    {
+        if (! in_array($rules['match'] ?? null, ['all', 'any'], true)
+            || array_diff(array_keys($rules), ['match', 'conditions']) !== []
+            || ! is_array($rules['conditions'] ?? null)
+            || count($rules['conditions']) < 1
+            || count($rules['conditions']) > 8) {
+            return false;
+        }
+
+        foreach ($rules['conditions'] as $condition) {
+            if (! is_array($condition)
+                || array_diff(array_keys($condition), ['field', 'op', 'value']) !== []
+                || ! in_array($condition['field'] ?? null, self::ALLOWED_FIELDS, true)
+                || ! in_array($condition['op'] ?? null, self::ALLOWED_OPS, true)) {
+                return false;
+            }
+
+            $operation = $condition['op'];
+            $value = $condition['value'] ?? null;
+            if ($operation === 'in') {
+                if (! is_array($value) || count($value) < 1 || count($value) > 20) {
+                    return false;
+                }
+
+                $normalised = [];
+                foreach ($value as $item) {
+                    if (! is_string($item) || trim($item) === '' || mb_strlen(trim($item)) > 100) {
+                        return false;
+                    }
+                    $normalised[] = trim($item);
+                }
+
+                if (count(array_unique($normalised)) !== count($normalised)) {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (! is_string($value) || trim($value) === '' || mb_strlen(trim($value)) > 100) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function applyCondition(Builder $query, string $field, string $op, mixed $value): void
@@ -106,19 +144,42 @@ class DeviceGroupAutoRuleService
      *
      * @return array{count: int, sample: Collection<int, Device>}
      */
-    public function preview(DeviceGroup $group, int $limit = 20): array
+    public function preview(DeviceGroup $group, int $limit = 20, ?Builder $deviceScope = null): array
     {
         $rules = is_array($group->auto_rules) ? $group->auto_rules : [];
-        if (empty($rules)) {
+
+        return $this->previewRules($rules, $limit, $deviceScope);
+    }
+
+    /**
+     * Preview a proposed rule set before a group exists or changes are saved.
+     *
+     * @return array{count: int, sample: Collection<int, Device>}
+     */
+    public function previewRules(array $rules, int $limit = 20, ?Builder $deviceScope = null): array
+    {
+        if (empty($rules) || ! $this->areRulesSupported($rules)) {
             return ['count' => 0, 'sample' => collect()];
         }
 
-        $query = $this->queryFromRules($rules);
+        $query = $this->queryFromRules($rules, $deviceScope);
 
         return [
             'count' => (clone $query)->count(),
             'sample' => $query->orderBy('name')->limit($limit)->get(),
         ];
+    }
+
+    /**
+     * Report the exact visible membership delta without changing the group.
+     *
+     * @return array{added: int, removed: int, kept: int, total: int}
+     */
+    public function previewChanges(DeviceGroup $group, ?Builder $deviceScope = null): array
+    {
+        $plan = $this->membershipPlan($group, $deviceScope);
+
+        return $plan['counts'];
     }
 
     /**
@@ -129,35 +190,60 @@ class DeviceGroupAutoRuleService
      *
      * @return array{added: int, removed: int, kept: int, total: int}
      */
-    public function applyToGroup(DeviceGroup $group): array
+    public function applyToGroup(DeviceGroup $group, ?Builder $deviceScope = null): array
     {
-        $rules = is_array($group->auto_rules) ? $group->auto_rules : [];
-        if (empty($rules)) {
-            return ['added' => 0, 'removed' => 0, 'kept' => 0, 'total' => 0];
+        $plan = $this->membershipPlan($group, $deviceScope);
+
+        if (! empty($plan['to_add'])) {
+            $group->devices()->attach($plan['to_add']);
+        }
+        if (! empty($plan['to_remove'])) {
+            $group->devices()->detach($plan['to_remove']);
         }
 
-        $matchingIds = $this->queryFromRules($rules)
-            ->pluck('id')
+        return $plan['counts'];
+    }
+
+    /**
+     * @return array{
+     *     to_add: list<int>,
+     *     to_remove: list<int>,
+     *     counts: array{added: int, removed: int, kept: int, total: int}
+     * }
+     */
+    private function membershipPlan(DeviceGroup $group, ?Builder $deviceScope = null): array
+    {
+        $rules = is_array($group->auto_rules) ? $group->auto_rules : [];
+        if (empty($rules) || ! $this->areRulesSupported($rules)) {
+            return [
+                'to_add' => [],
+                'to_remove' => [],
+                'counts' => ['added' => 0, 'removed' => 0, 'kept' => 0, 'total' => 0],
+            ];
+        }
+
+        $matchingIds = $this->queryFromRules($rules, $deviceScope)
+            ->pluck('devices.id')
             ->all();
 
-        $existingIds = $group->devices()->pluck('devices.id')->all();
+        $existing = $group->devices();
+        if ($deviceScope !== null) {
+            $existing->whereIn('devices.id', (clone $deviceScope)->select('devices.id'));
+        }
+        $existingIds = $existing->pluck('devices.id')->all();
 
         $toAdd = array_values(array_diff($matchingIds, $existingIds));
         $toRemove = array_values(array_diff($existingIds, $matchingIds));
-        $kept = count(array_intersect($matchingIds, $existingIds));
-
-        if (! empty($toAdd)) {
-            $group->devices()->attach($toAdd);
-        }
-        if (! empty($toRemove)) {
-            $group->devices()->detach($toRemove);
-        }
 
         return [
-            'added' => count($toAdd),
-            'removed' => count($toRemove),
-            'kept' => $kept,
-            'total' => count($matchingIds),
+            'to_add' => $toAdd,
+            'to_remove' => $toRemove,
+            'counts' => [
+                'added' => count($toAdd),
+                'removed' => count($toRemove),
+                'kept' => count(array_intersect($matchingIds, $existingIds)),
+                'total' => count($matchingIds),
+            ],
         ];
     }
 }

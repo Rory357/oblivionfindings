@@ -45,6 +45,7 @@ return [
 
     'retention' => [
         'telemetry_days' => env('FLEET_TELEMETRY_RETENTION_DAYS', 365),
+        'personal_location_days' => env('PERSONAL_LOCATION_RETENTION_DAYS', 90),
     ],
 
     'reimbursement_rate_per_km' => env('FLEET_REIMBURSEMENT_RATE_PER_KM', 0.99),

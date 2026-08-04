@@ -1,9 +1,13 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Asset;
+use App\Models\AssetAssignment;
+use App\Models\AuditLog;
 use App\Models\ItCatalogItem;
 use App\Models\ItCatalogSubmission;
 use App\Models\ItProvisioningRequest;
+use App\Models\ItService;
 use App\Models\ItTicket;
 use App\Models\Role;
 use App\Models\Site;
@@ -80,15 +84,13 @@ beforeEach(function () {
 
 test('published catalogue discovery is application-wide and strips internal fields for requesters', function () {
     ItCatalogItem::factory()->create([
-        'tenant_id' => 1,
         'name' => 'Request Microsoft 365 access',
         'slug' => 'request-microsoft-365-access',
         'sort_order' => 10,
         'form_schema' => catalogSchema(),
     ]);
-    ItCatalogItem::factory()->unpublished()->create(['tenant_id' => 1, 'name' => 'Draft request']);
+    ItCatalogItem::factory()->unpublished()->create(['name' => 'Draft request']);
     ItCatalogItem::factory()->create([
-        'tenant_id' => 1,
         'name' => 'Request a desk phone',
         'sort_order' => 20,
     ]);
@@ -115,9 +117,18 @@ test('published catalogue discovery is application-wide and strips internal fiel
 });
 
 test('catalogue submission enforces the published schema version required fields and internal boundary', function () {
+    $schema = catalogSchema();
+    $schema['fields'][] = [
+        'key' => 'device_count',
+        'label' => 'Number of devices',
+        'type' => 'integer',
+        'required' => false,
+        'min' => 1,
+        'max' => 5,
+    ];
     $item = ItCatalogItem::factory()->create([
         'form_schema_version' => 3,
-        'form_schema' => catalogSchema(),
+        'form_schema' => $schema,
     ]);
 
     $this->actingAs($this->worker)
@@ -147,6 +158,18 @@ test('catalogue submission enforces the published schema version required fields
             ],
         ])
         ->assertSessionHasErrors('values.fulfilment_note');
+
+    $this->actingAs($this->worker)
+        ->post("/it/catalog/{$item->id}/submissions", [
+            'schema_version' => 3,
+            'idempotency_key' => 'invalid-number-range',
+            'values' => [
+                'details' => 'Please help',
+                'system_name' => 'VPN',
+                'device_count' => 6,
+            ],
+        ])
+        ->assertSessionHasErrors('values.device_count');
 
     expect(ItCatalogSubmission::query()->count())->toBe(0);
 });
@@ -252,8 +275,8 @@ test('provisioning catalogue intake creates the canonical provisioning record an
 });
 
 test('a requester cannot submit an unpublished or internal-only catalogue item', function () {
-    $draft = ItCatalogItem::factory()->unpublished()->create(['tenant_id' => 1]);
-    $internal = ItCatalogItem::factory()->create(['tenant_id' => 1, 'internal_only' => true]);
+    $draft = ItCatalogItem::factory()->unpublished()->create();
+    $internal = ItCatalogItem::factory()->create(['internal_only' => true]);
     $payload = [
         'schema_version' => 1,
         'idempotency_key' => 'blocked',
@@ -266,4 +289,181 @@ test('a requester cannot submit an unpublished or internal-only catalogue item',
     $this->actingAs($this->worker)
         ->post("/it/catalog/{$internal->id}/submissions", $payload)
         ->assertNotFound();
+});
+
+test('agents author version publish and reasonedly unpublish catalogue forms end to end', function () {
+    $service = ItService::factory()->create(['name' => 'Workplace technology']);
+    $payload = [
+        'it_service_id' => $service->id,
+        'name' => 'Request workplace equipment',
+        'description' => 'Request approved equipment for your role.',
+        'outcome_type' => 'provisioning',
+        'category' => 'hardware',
+        'provisioning_type' => 'equipment',
+        'default_priority' => 'normal',
+        'requires_approval' => true,
+        'internal_only' => false,
+        'search_terms' => ['laptop', 'equipment'],
+        'sort_order' => 20,
+        'form_schema' => [
+            'fields' => [[
+                'key' => 'employee_profile_id',
+                'label' => 'Who needs the equipment?',
+                'type' => 'employee',
+                'required' => true,
+                'visibility' => 'requester',
+                'help' => 'Choose an employee you are allowed to request for.',
+            ]],
+        ],
+    ];
+
+    $this->actingAs($this->agent)
+        ->post('/it/setup/catalogue-items', $payload)
+        ->assertRedirect()
+        ->assertSessionDoesntHaveErrors();
+
+    $item = ItCatalogItem::query()->sole();
+    expect($item->is_published)->toBeFalse()
+        ->and($item->form_schema_version)->toBe(1)
+        ->and($item->slug)->toBe('request-workplace-equipment')
+        ->and(AuditLog::query()->where('action', 'it.catalogue.item.created')->count())->toBe(1);
+
+    $this->actingAs($this->agent)
+        ->get('/it/setup?tab=catalogue')
+        ->assertInertia(fn ($page) => $page
+            ->has('catalogItems', 1)
+            ->where('catalogItems.0.is_published', false));
+    $this->actingAs($this->worker)
+        ->get('/it')
+        ->assertInertia(fn ($page) => $page->has('catalogItems', 0));
+
+    $this->actingAs($this->agent)
+        ->post("/it/setup/catalogue-items/{$item->id}/publish")
+        ->assertRedirect();
+    $this->actingAs($this->worker)
+        ->get('/it')
+        ->assertInertia(fn ($page) => $page
+            ->has('catalogItems', 1)
+            ->where('catalogItems.0.name', 'Request workplace equipment'));
+
+    $payload['form_schema']['fields'][] = [
+        'key' => 'asset_id',
+        'label' => 'Existing equipment',
+        'type' => 'asset',
+        'required' => false,
+        'visibility' => 'requester',
+    ];
+    $this->actingAs($this->agent)
+        ->patch("/it/setup/catalogue-items/{$item->id}", $payload)
+        ->assertRedirect()
+        ->assertSessionDoesntHaveErrors();
+    expect($item->fresh()->form_schema_version)->toBe(2)
+        ->and($item->fresh()->is_published)->toBeTrue();
+
+    $this->actingAs($this->agent)
+        ->post("/it/setup/catalogue-items/{$item->id}/unpublish")
+        ->assertSessionHasErrors('reason');
+    $this->actingAs($this->agent)
+        ->post("/it/setup/catalogue-items/{$item->id}/unpublish", [
+            'reason' => 'The equipment catalogue is being replaced.',
+        ])
+        ->assertRedirect();
+    expect($item->fresh()->is_published)->toBeFalse()
+        ->and(AuditLog::query()
+            ->where('action', 'it.catalogue.item.unpublished')
+            ->where('meta->reason', 'The equipment catalogue is being replaced.')
+            ->count())->toBe(1);
+});
+
+test('catalogue entity fields expose only canonical choices and reject forged direct objects', function () {
+    $assignedAsset = Asset::factory()->forSite($this->site)->create([
+        'name' => 'Assigned laptop',
+        'asset_tag' => 'LT-001',
+        'status' => 'active',
+    ]);
+    AssetAssignment::query()->create([
+        'asset_id' => $assignedAsset->id,
+        'assignee_type' => 'staff',
+        'assignee_id' => $this->worker->id,
+        'purpose' => 'Work device',
+        'assigned_at' => now(),
+    ]);
+
+    $other = catalogUser('support_worker');
+    $otherProfile = HrEmployeeProfile::factory()->create([
+        'user_id' => $other->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+        'created_by' => $this->agent->id,
+        'updated_by' => $this->agent->id,
+    ]);
+    $otherAsset = Asset::factory()->forSite($this->site)->create([
+        'name' => 'Someone else’s laptop',
+        'status' => 'active',
+    ]);
+    AssetAssignment::query()->create([
+        'asset_id' => $otherAsset->id,
+        'assignee_type' => 'staff',
+        'assignee_id' => $other->id,
+        'purpose' => 'Work device',
+        'assigned_at' => now(),
+    ]);
+
+    $item = ItCatalogItem::factory()->create([
+        'name' => 'Report equipment issue',
+        'form_schema' => [
+            'fields' => [
+                ['key' => 'employee', 'label' => 'Employee', 'type' => 'employee', 'required' => true],
+                ['key' => 'user', 'label' => 'User', 'type' => 'user', 'required' => true],
+                ['key' => 'asset', 'label' => 'Equipment', 'type' => 'asset', 'required' => true],
+            ],
+        ],
+    ]);
+
+    $this->actingAs($this->worker)
+        ->get('/it')
+        ->assertInertia(fn ($page) => $page
+            ->where('catalogFieldOptions.employee.0.id', $this->workerProfile->id)
+            ->where('catalogFieldOptions.user.0.id', $this->worker->id)
+            ->where('catalogFieldOptions.asset.0.id', $assignedAsset->id)
+            ->where('catalogFieldOptions.employee', fn ($options) => ! collect($options)->pluck('id')->contains($otherProfile->id))
+            ->where('catalogFieldOptions.user', fn ($options) => ! collect($options)->pluck('id')->contains($other->id))
+            ->where('catalogFieldOptions.asset', fn ($options) => ! collect($options)->pluck('id')->contains($otherAsset->id)));
+
+    $this->actingAs($this->worker)
+        ->post("/it/catalog/{$item->id}/submissions", [
+            'schema_version' => 1,
+            'idempotency_key' => 'forged-entity-options',
+            'values' => [
+                'employee' => $otherProfile->id,
+                'user' => $other->id,
+                'asset' => $otherAsset->id,
+            ],
+        ])
+        ->assertSessionHasErrors([
+            'values.employee',
+            'values.user',
+            'values.asset',
+        ]);
+
+    $this->actingAs($this->worker)
+        ->post("/it/catalog/{$item->id}/submissions", [
+            'schema_version' => 1,
+            'idempotency_key' => 'canonical-entity-options',
+            'values' => [
+                'employee' => $this->workerProfile->id,
+                'user' => $this->worker->id,
+                'asset' => $assignedAsset->id,
+            ],
+        ])
+        ->assertRedirect()
+        ->assertSessionDoesntHaveErrors();
+
+    $ticket = ItTicket::query()->sole();
+    expect($ticket->description)->toContain($this->worker->name)
+        ->and($ticket->description)->toContain('Assigned laptop')
+        ->and($ticket->description)->toContain('LT-001')
+        ->and($ticket->description)->not->toContain("Equipment: {$assignedAsset->id}");
 });

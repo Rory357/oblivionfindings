@@ -14,6 +14,7 @@ use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceGroup;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
+use App\Models\Asset;
 use App\Models\AuditLog;
 use App\Models\ControlRoom\Device as ControlRoomDevice;
 use App\Models\ControlRoomAlert;
@@ -43,9 +44,9 @@ class DeviceProfileWorkspaceTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->seed(SecurityDevicesPermissionsSeeder::class);
 
-        $this->admin = User::factory()->create(['organization_id' => 42]);
+        $this->admin = User::factory()->create();
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
-        $this->worker = User::factory()->create(['organization_id' => 42]);
+        $this->worker = User::factory()->create();
         $this->worker->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
         $this->worker->permissionOverrides()->syncWithoutDetaching([
             Permission::query()->where('key', 'controlRoom.alerts.view')->value('id') => ['allowed' => false],
@@ -55,9 +56,8 @@ class DeviceProfileWorkspaceTest extends TestCase
     public function test_profile_reconciles_required_sections_and_redacts_raw_runtime_evidence(): void
     {
         $sentinel = 'DEVICE-PROFILE-RAW-EVIDENCE-MUST-NOT-RENDER';
-        $site = Site::factory()->create(['tenant_id' => 42, 'name' => 'Harbour Care']);
+        $site = Site::factory()->create(['name' => 'Harbour Care']);
         $device = Device::factory()->create([
-            'tenant_id' => 42,
             'name' => 'Harbour edge gateway',
             'domain' => 'it_infrastructure',
             'category' => 'networking',
@@ -77,7 +77,6 @@ class DeviceProfileWorkspaceTest extends TestCase
             'notes' => 'Primary WAN edge device for Harbour Care.',
         ]);
         $group = DeviceGroup::query()->create([
-            'tenant_id' => 42,
             'name' => 'Critical network edge',
             'type' => 'manual',
         ]);
@@ -89,9 +88,8 @@ class DeviceProfileWorkspaceTest extends TestCase
             'assignment_type' => 'permanent',
             'assigned_at' => now(),
         ]);
-        $profile = MonitoringProfile::factory()->create(['tenant_id' => 42]);
+        $profile = MonitoringProfile::factory()->create([]);
         $monitor = Monitor::factory()->create([
-            'tenant_id' => 42,
             'device_id' => $device->id,
             'profile_id' => $profile->id,
             'name' => 'WAN interface',
@@ -102,7 +100,6 @@ class DeviceProfileWorkspaceTest extends TestCase
             'last_observation_at' => now()->subMinutes(2),
         ]);
         MonitorObservation::factory()->create([
-            'tenant_id' => 42,
             'monitor_id' => $monitor->id,
             'state' => MonitorState::Failed,
             'value' => 91.4,
@@ -133,12 +130,10 @@ class DeviceProfileWorkspaceTest extends TestCase
             'notes' => $sentinel,
         ]);
         $ticket = ItTicket::factory()->create([
-            'tenant_id' => 42,
             'requester_user_id' => $this->admin->id,
             'title' => 'Investigate Harbour connectivity',
         ]);
         ItTicketLink::query()->create([
-            'tenant_id' => 42,
             'ticket_id' => $ticket->id,
             'relationship' => 'affected_device',
             'linkable_type' => Device::class,
@@ -147,7 +142,7 @@ class DeviceProfileWorkspaceTest extends TestCase
             'created_by_user_id' => $this->admin->id,
         ]);
         AuditLog::query()->create([
-            'organization_id' => 42,
+
             'user_id' => $this->admin->id,
             'action' => 'device.update',
             'auditable_type' => Device::class,
@@ -172,6 +167,7 @@ class DeviceProfileWorkspaceTest extends TestCase
                 'topology',
                 'interfaces-sensors',
                 'configuration',
+                'management',
                 'assignments',
                 'tickets',
                 'events',
@@ -199,10 +195,93 @@ class DeviceProfileWorkspaceTest extends TestCase
         });
     }
 
+    public function test_vehicle_assignment_uses_the_canonical_fleet_destination_when_the_viewer_can_open_it(): void
+    {
+        $site = Site::factory()->create(['name' => 'Fleet operations']);
+        $vehicle = Asset::factory()->vehicle()->forSite($site)->create([
+            'name' => 'Fleet response van',
+        ]);
+        $device = Device::factory()->tracking()->create(['name' => 'Response van tracker']);
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
+            'assignable_id' => $vehicle->id,
+            'assignment_type' => 'permanent',
+            'assigned_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/security-devices/devices/{$device->id}")
+            ->assertOk()
+            ->assertInertia(function ($page) use ($vehicle): void {
+                $location = $page->toArray()['props']['profile']['header']['location'];
+
+                $this->assertSame('vehicle', $location['type']);
+                $this->assertSame('Fleet response van', $location['name']);
+                $this->assertSame("/fleet-assets/vehicles/{$vehicle->id}", $location['href']);
+            });
+    }
+
+    public function test_management_uses_server_declared_actions_and_fails_closed_without_an_execution_adapter(): void
+    {
+        $site = Site::factory()->create(['name' => 'Harbour Care']);
+        $device = Device::factory()->security()->create([
+            'name' => 'Harbour service door',
+            'category' => 'access_control',
+            'subcategory' => 'door_controller',
+            'provider' => 'unconfigured-door-provider',
+            'config' => [
+                'management' => [
+                    'capabilities' => ['access.door.unlock_timed'],
+                ],
+                'provider_token' => 'DEVICE-PROFILE-COMMAND-SECRET',
+            ],
+        ]);
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->withSession(['auth.password_confirmed_at' => now()->timestamp])
+            ->get("/security-devices/devices/{$device->id}");
+
+        $response->assertOk()->assertInertia(function ($page): void {
+            $props = $page->toArray()['props'];
+            $management = $props['profile']['management'];
+            $action = $management['actions'][0];
+
+            $this->assertTrue(collect($props['profile']['sections'])->pluck('key')->contains('management'));
+            $this->assertTrue($management['visible']);
+            $this->assertTrue($management['canObserve']);
+            $this->assertTrue($management['stepUpCurrent']);
+            $this->assertSame(1, $management['summary']['declared']);
+            $this->assertSame(0, $management['summary']['available']);
+            $this->assertSame('access.door.unlock_timed', $action['key']);
+            $this->assertSame('control', $action['level']);
+            $this->assertSame('high', $action['risk']);
+            $this->assertNotSame('', $action['impact']);
+            $this->assertNotSame('', $action['expectedResult']);
+            $this->assertSame('acknowledge_impact', $action['confirmationMode']);
+            $this->assertSame('unavailable', $action['executionMode']);
+            $this->assertTrue($action['allowed']);
+            $this->assertFalse($action['adapterAvailable']);
+            $this->assertFalse($action['available']);
+            $this->assertSame('provider_adapter_required', $action['state']);
+            $this->assertSame('duration_seconds', $action['parameters'][0]['name']);
+            $this->assertSame([], $management['history']);
+            $this->assertStringNotContainsString(
+                'DEVICE-PROFILE-COMMAND-SECRET',
+                json_encode($props, JSON_THROW_ON_ERROR),
+            );
+        });
+    }
+
     public function test_capabilities_require_device_evidence_as_well_as_actor_permission(): void
     {
         $configured = Device::factory()->create([
-            'tenant_id' => 42,
             'domain' => 'iot_healthcare',
             'meta' => [
                 'capabilities' => [
@@ -213,7 +292,6 @@ class DeviceProfileWorkspaceTest extends TestCase
             ],
         ]);
         $unknown = Device::factory()->create([
-            'tenant_id' => 42,
             'domain' => 'it_infrastructure',
             'meta' => [],
             'config' => [],
@@ -231,8 +309,9 @@ class DeviceProfileWorkspaceTest extends TestCase
             $this->assertSame('unsupported', $capabilities['monitoring']['state']);
             $this->assertTrue($capabilities['maintenance']['supported']);
             $this->assertTrue($capabilities['maintenance']['available']);
-            $this->assertTrue($capabilities['control']['supported']);
+            $this->assertFalse($capabilities['control']['supported']);
             $this->assertFalse($capabilities['control']['available']);
+            $this->assertSame('unknown_not_configured', $capabilities['control']['state']);
         });
         $unknownResponse->assertOk()->assertInertia(function ($page): void {
             $capabilities = $page->toArray()['props']['profile']['capabilities'];
@@ -244,9 +323,8 @@ class DeviceProfileWorkspaceTest extends TestCase
 
     public function test_freshness_and_required_action_share_the_newest_authoritative_observation(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42]);
+        $site = Site::factory()->create([]);
         $device = Device::factory()->create([
-            'tenant_id' => 42,
             'status' => 'active',
             'health_status' => 'healthy',
             'last_seen_at' => now()->subHour(),
@@ -258,12 +336,10 @@ class DeviceProfileWorkspaceTest extends TestCase
             'assigned_at' => now(),
         ]);
         $profile = MonitoringProfile::factory()->create([
-            'tenant_id' => 42,
             'stale_after_seconds' => 900,
         ]);
         $observedAt = now()->subMinute()->startOfSecond();
         Monitor::factory()->create([
-            'tenant_id' => 42,
             'device_id' => $device->id,
             'profile_id' => $profile->id,
             'kind' => MonitorKind::Icmp,
@@ -286,9 +362,8 @@ class DeviceProfileWorkspaceTest extends TestCase
 
     public function test_a_stale_monitor_cannot_be_masked_by_a_fresh_slow_cadence_monitor(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42]);
+        $site = Site::factory()->create([]);
         $device = Device::factory()->create([
-            'tenant_id' => 42,
             'status' => 'active',
             'health_status' => 'healthy',
             'last_seen_at' => now()->subMinute(),
@@ -300,22 +375,18 @@ class DeviceProfileWorkspaceTest extends TestCase
             'assigned_at' => now(),
         ]);
         $fastProfile = MonitoringProfile::factory()->create([
-            'tenant_id' => 42,
             'stale_after_seconds' => 60,
         ]);
         $slowProfile = MonitoringProfile::factory()->create([
-            'tenant_id' => 42,
             'stale_after_seconds' => 3600,
         ]);
         Monitor::factory()->create([
-            'tenant_id' => 42,
             'device_id' => $device->id,
             'profile_id' => $fastProfile->id,
             'current_state' => MonitorState::Stale,
             'last_observation_at' => now()->subMinutes(5),
         ]);
         Monitor::factory()->create([
-            'tenant_id' => 42,
             'device_id' => $device->id,
             'profile_id' => $slowProfile->id,
             'current_state' => MonitorState::Healthy,
@@ -335,9 +406,8 @@ class DeviceProfileWorkspaceTest extends TestCase
 
     public function test_unsupported_monitoring_capability_never_prompts_for_monitoring_coverage(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42]);
+        $site = Site::factory()->create([]);
         $device = Device::factory()->create([
-            'tenant_id' => 42,
             'status' => 'active',
             'health_status' => 'healthy',
             'last_seen_at' => now(),
@@ -362,11 +432,10 @@ class DeviceProfileWorkspaceTest extends TestCase
 
     public function test_narrow_integration_alert_permission_does_not_emit_inaccessible_control_room_links(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42]);
-        $viewer = User::factory()->create(['organization_id' => 42]);
+        $site = Site::factory()->create([]);
+        $viewer = User::factory()->create();
         $viewer->roles()->attach(Role::query()->where('name', 'facilities_manager')->firstOrFail());
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42,
             'user_id' => $viewer->id,
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
@@ -375,7 +444,7 @@ class DeviceProfileWorkspaceTest extends TestCase
             Permission::query()->where('key', 'controlRoom.alerts.view')->value('id') => ['allowed' => true],
             Permission::query()->where('key', 'controlRoom.viewAny')->value('id') => ['allowed' => false],
         ]);
-        $device = Device::factory()->create(['tenant_id' => 42]);
+        $device = Device::factory()->create([]);
         DeviceAssignment::query()->create([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_SITE,
@@ -395,25 +464,22 @@ class DeviceProfileWorkspaceTest extends TestCase
 
     public function test_profile_uses_canonical_device_relationships_for_monitor_profile_and_collector_projections(): void
     {
-        $device = Device::factory()->create(['tenant_id' => 42]);
-        $legacyPartitionedProfile = MonitoringProfile::factory()->create(['tenant_id' => 77]);
-        $legacyPartitionedCollector = MonitoringCollector::factory()->create([
-            'tenant_id' => 77,
+        $device = Device::factory()->create([]);
+        $unassignedDeviceProfile = MonitoringProfile::factory()->create([]);
+        $unassignedDeviceCollector = MonitoringCollector::factory()->create([
             'name' => 'Remote site collector',
         ]);
         Monitor::factory()->create([
-            'tenant_id' => 42,
             'device_id' => $device->id,
-            'profile_id' => $legacyPartitionedProfile->id,
-            'collector_id' => $legacyPartitionedCollector->id,
+            'profile_id' => $unassignedDeviceProfile->id,
+            'collector_id' => $unassignedDeviceCollector->id,
             'name' => 'Primary monitor',
         ]);
         Monitor::factory()->create([
-            'tenant_id' => 77,
             'device_id' => $device->id,
-            'profile_id' => $legacyPartitionedProfile->id,
-            'collector_id' => $legacyPartitionedCollector->id,
-            'name' => 'Legacy partitioned monitor',
+            'profile_id' => $unassignedDeviceProfile->id,
+            'collector_id' => $unassignedDeviceCollector->id,
+            'name' => 'Secondary monitor',
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -423,7 +489,7 @@ class DeviceProfileWorkspaceTest extends TestCase
             $monitors = $page->toArray()['props']['profile']['monitors'];
             $this->assertCount(2, $monitors);
             $this->assertEqualsCanonicalizing(
-                ['Primary monitor', 'Legacy partitioned monitor'],
+                ['Primary monitor', 'Secondary monitor'],
                 collect($monitors)->pluck('name')->all(),
             );
             foreach ($monitors as $monitor) {
@@ -435,14 +501,13 @@ class DeviceProfileWorkspaceTest extends TestCase
 
     public function test_profile_omits_sections_and_data_the_viewer_cannot_open(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42]);
+        $site = Site::factory()->create([]);
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42,
             'user_id' => $this->worker->id,
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
         ]);
-        $device = Device::factory()->create(['tenant_id' => 42]);
+        $device = Device::factory()->create([]);
         DeviceAssignment::query()->create([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_SITE,
@@ -463,21 +528,18 @@ class DeviceProfileWorkspaceTest extends TestCase
             'description' => 'Private maintenance',
             'scheduled_for' => now(),
         ]);
-        $monitoringProfile = MonitoringProfile::factory()->create(['tenant_id' => 42]);
+        $monitoringProfile = MonitoringProfile::factory()->create([]);
         Monitor::factory()->create([
-            'tenant_id' => 42,
             'device_id' => $device->id,
             'profile_id' => $monitoringProfile->id,
             'name' => 'Private monitor',
             'kind' => MonitorKind::Icmp,
         ]);
         $ticket = ItTicket::factory()->create([
-            'tenant_id' => 42,
             'requester_user_id' => $this->admin->id,
             'title' => 'Private linked ticket',
         ]);
         ItTicketLink::query()->create([
-            'tenant_id' => 42,
             'ticket_id' => $ticket->id,
             'relationship' => 'affected_device',
             'linkable_type' => Device::class,
@@ -485,7 +547,7 @@ class DeviceProfileWorkspaceTest extends TestCase
             'created_by_user_id' => $this->admin->id,
         ]);
         AuditLog::query()->create([
-            'organization_id' => 42,
+
             'user_id' => $this->admin->id,
             'action' => 'private.device.action',
             'auditable_type' => Device::class,

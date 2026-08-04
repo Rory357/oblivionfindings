@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\ItTicket;
 use App\Models\Role;
 use App\Models\Site;
@@ -57,9 +58,14 @@ test('a requester rates their own resolved ticket — score, comment and a singl
     expect($ticket->csat_comment)->toBe('Sorted in minutes — thank you.');
     expect($ticket->csat_submitted_at)->not->toBeNull();
     expect($ticket->events()->where('type', 'csat_submitted')->count())->toBe(1);
+    expect(AuditLog::query()
+        ->where('action', 'it.ticket.csat.submitted')
+        ->where('auditable_type', $ticket->getMorphClass())
+        ->where('auditable_id', $ticket->id)
+        ->count())->toBe(1);
 });
 
-test('CSAT is editable while resolved, but a re-rate never duplicates the event or moves the stamp', function () {
+test('CSAT is editable while resolved, with one submission and an explicit update trail', function () {
     $ticket = csatTicket([
         'requester_user_id' => $this->worker->id,
         'status' => 'resolved',
@@ -73,7 +79,8 @@ test('CSAT is editable while resolved, but a re-rate never duplicates the event 
 
     $this->travel(10)->minutes();
 
-    // Change of heart — the score updates, the stamp and the event do not.
+    // Change of heart — the score updates, the original stamp stays, and the
+    // change receives its own integrity trail without duplicating submission.
     $this->actingAs($this->worker)
         ->post("/it/tickets/{$ticket->id}/csat", ['score' => 4, 'comment' => 'Actually great.'])
         ->assertRedirect();
@@ -83,6 +90,12 @@ test('CSAT is editable while resolved, but a re-rate never duplicates the event 
     expect($ticket->csat_comment)->toBe('Actually great.');
     expect($ticket->csat_submitted_at->equalTo($firstStamp))->toBeTrue();
     expect($ticket->events()->where('type', 'csat_submitted')->count())->toBe(1);
+    expect($ticket->events()->where('type', 'csat_updated')->count())->toBe(1);
+    expect(AuditLog::query()
+        ->where('action', 'it.ticket.csat.updated')
+        ->where('auditable_type', $ticket->getMorphClass())
+        ->where('auditable_id', $ticket->id)
+        ->count())->toBe(1);
 });
 
 test('only the requester rates, and only while the ticket is resolved', function () {

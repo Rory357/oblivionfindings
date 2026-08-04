@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\ItTicket;
 use App\Models\Role;
 use App\Models\Site;
@@ -27,8 +28,9 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->agent = itMergeUser('hr');              // holds it.manage
     $this->worker = itMergeUser('support_worker'); // it.request only
+    $this->otherWorker = itMergeUser('support_worker');
     $this->site = Site::factory()->create();
-    foreach ([$this->agent, $this->worker] as $user) {
+    foreach ([$this->agent, $this->worker, $this->otherWorker] as $user) {
         HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,
             'primary_site_id' => $this->site->id,
@@ -43,6 +45,8 @@ function mergeTicket(array $overrides = []): ItTicket
 {
     return ItTicket::factory()->create([
         'site_id' => test()->site->id,
+        'requester_user_id' => test()->worker->id,
+        'requested_for_user_id' => test()->worker->id,
         ...$overrides,
     ]);
 }
@@ -59,6 +63,29 @@ test('a requester cannot merge tickets', function () {
     $target = mergeTicket(['status' => 'open']);
 
     expect($this->worker->can('merge', [$source, $target]))->toBeFalse();
+});
+
+test('tickets with different requester audiences cannot be merged', function () {
+    $source = mergeTicket(['status' => 'open']);
+    $target = mergeTicket([
+        'status' => 'open',
+        'requester_user_id' => $this->otherWorker->id,
+        'requested_for_user_id' => $this->otherWorker->id,
+    ]);
+
+    expect($this->agent->can('merge', [$source, $target]))->toBeFalse();
+
+    $this->actingAs($this->agent)
+        ->from(route('it.tickets.show', $source))
+        ->post("/it/tickets/{$source->id}/merge", [
+            'target_ticket_id' => $target->id,
+            'reason' => 'Same technical issue',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('error', 'Tickets with different requesters cannot be merged because their conversations are private.');
+
+    expect($source->refresh()->merged_into_ticket_id)->toBeNull()
+        ->and($source->status)->toBe('open');
 });
 
 test('a ticket cannot be merged into itself', function () {
@@ -94,7 +121,6 @@ test('merging folds the conversation and watchers onto the survivor and closes t
     $target = mergeTicket(['status' => 'open']);
 
     $source->comments()->create([
-        'tenant_id' => 1,
         'author_user_id' => $this->worker->id,
         'body' => 'Same issue as the other ticket',
         'is_internal' => false,
@@ -102,7 +128,10 @@ test('merging folds the conversation and watchers onto the survivor and closes t
     $source->watchers()->syncWithoutDetaching([$this->worker->id]);
 
     $this->actingAs($this->agent)
-        ->post("/it/tickets/{$source->id}/merge", ['target_ticket_id' => $target->id])
+        ->post("/it/tickets/{$source->id}/merge", [
+            'target_ticket_id' => $target->id,
+            'reason' => 'Duplicate report of the same access issue',
+        ])
         ->assertRedirect(route('it.tickets.show', $target));
 
     $source->refresh();
@@ -118,6 +147,40 @@ test('merging folds the conversation and watchers onto the survivor and closes t
     // A merged marker on each side.
     expect($source->events()->where('type', 'merged')->count())->toBe(1);
     expect($target->events()->where('type', 'merged')->count())->toBe(1);
+    expect($source->events()->where('type', 'merged')->where('payload->reason', 'Duplicate report of the same access issue')->exists())->toBeTrue()
+        ->and(AuditLog::query()
+            ->where('action', 'it.ticket.merged')
+            ->where('auditable_id', $source->id)
+            ->exists())->toBeTrue();
+});
+
+test('merge requires a reason and a repeated merge cannot write duplicate history', function () {
+    $source = mergeTicket(['status' => 'open']);
+    $target = mergeTicket(['status' => 'open']);
+
+    $this->actingAs($this->agent)
+        ->post("/it/tickets/{$source->id}/merge", ['target_ticket_id' => $target->id])
+        ->assertSessionHasErrors('reason');
+
+    $this->actingAs($this->agent)
+        ->post("/it/tickets/{$source->id}/merge", [
+            'target_ticket_id' => $target->id,
+            'reason' => 'Duplicate report',
+        ])
+        ->assertRedirect(route('it.tickets.show', $target));
+
+    $this->actingAs($this->agent)
+        ->from(route('it.tickets.show', $source))
+        ->post("/it/tickets/{$source->id}/merge", [
+            'target_ticket_id' => $target->id,
+            'reason' => 'Repeated stale request',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('error', 'This ticket has already been merged.');
+
+    expect($source->events()->where('type', 'merged')->count())->toBe(1)
+        ->and($target->events()->where('type', 'merged')->count())->toBe(1)
+        ->and(AuditLog::query()->where('action', 'it.ticket.merged')->count())->toBe(1);
 });
 
 test('a merged source cannot be reopened', function () {
@@ -130,7 +193,9 @@ test('a merged source cannot be reopened', function () {
 
     $this->actingAs($this->agent)
         ->from(route('it.tickets.show', $source))
-        ->post("/it/tickets/{$source->id}/reopen")
+        ->post("/it/tickets/{$source->id}/reopen", [
+            'reason' => 'Attempting to reopen stale merged work.',
+        ])
         ->assertRedirect()
         ->assertSessionHas('error');
 
@@ -143,6 +208,11 @@ test('the workspace offers live merge targets to agents but not requesters', fun
         'requester_user_id' => $this->worker->id,
     ]);
     $candidate = mergeTicket(['status' => 'open']);
+    mergeTicket([
+        'status' => 'open',
+        'requester_user_id' => $this->otherWorker->id,
+        'requested_for_user_id' => $this->otherWorker->id,
+    ]);
     // A closed-away merged ticket must never be offered as a target.
     mergeTicket([
         'status' => 'closed',

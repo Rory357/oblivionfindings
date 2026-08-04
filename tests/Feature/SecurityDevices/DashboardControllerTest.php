@@ -256,8 +256,8 @@ class DashboardControllerTest extends TestCase
 
     public function test_group_count(): void
     {
-        DeviceGroup::create(['tenant_id' => 1, 'name' => 'Group A', 'type' => 'custom']);
-        DeviceGroup::create(['tenant_id' => 1, 'name' => 'Group B', 'type' => 'location']);
+        DeviceGroup::create(['name' => 'Group A', 'type' => 'custom']);
+        DeviceGroup::create(['name' => 'Group B', 'type' => 'location']);
 
         $response = $this->actingAs($this->admin)->get('/security-devices');
 
@@ -266,20 +266,17 @@ class DashboardControllerTest extends TestCase
 
     public function test_dashboard_data_covers_the_single_application_registry_for_all_sites_users(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
 
-        $tenantDevice = Device::factory()->security()->create([
-            'tenant_id' => 42,
-            'name' => 'Tenant camera',
+        $primaryDevice = Device::factory()->security()->create([
+            'name' => 'Primary camera',
             'health_status' => HealthStatus::Critical,
         ]);
-        $foreignDevice = Device::factory()->security()->create([
-            'tenant_id' => 77,
-            'name' => 'Foreign camera',
+        $unrelatedDevice = Device::factory()->security()->create([
+            'name' => 'Unrelated camera',
             'health_status' => HealthStatus::Critical,
         ]);
 
-        foreach ([$tenantDevice, $foreignDevice] as $device) {
+        foreach ([$primaryDevice, $unrelatedDevice] as $device) {
             DeviceEvent::create([
                 'device_id' => $device->id,
                 'event_type' => 'offline',
@@ -296,8 +293,8 @@ class DashboardControllerTest extends TestCase
             ]);
         }
 
-        DeviceGroup::create(['tenant_id' => 42, 'name' => 'Tenant group', 'type' => 'custom']);
-        DeviceGroup::create(['tenant_id' => 77, 'name' => 'Foreign group', 'type' => 'custom']);
+        DeviceGroup::create(['name' => 'Primary group', 'type' => 'custom']);
+        DeviceGroup::create(['name' => 'Unrelated group', 'type' => 'custom']);
 
         $response = $this->actingAs($this->admin)->get('/security-devices');
 
@@ -309,15 +306,15 @@ class DashboardControllerTest extends TestCase
             $this->assertSame(2, $props['stats']['overdueMaintenance']);
             $this->assertSame(2, $props['groupCount']);
             $this->assertEqualsCanonicalizing(
-                ['Tenant camera', 'Foreign camera'],
+                ['Primary camera', 'Unrelated camera'],
                 collect($props['attentionDevices'])->pluck('name')->all(),
             );
             $this->assertEqualsCanonicalizing(
-                ['Tenant camera', 'Foreign camera'],
+                ['Primary camera', 'Unrelated camera'],
                 collect($props['recentEvents'])->pluck('device_name')->all(),
             );
             $this->assertEqualsCanonicalizing(
-                ['Tenant camera maintenance', 'Foreign camera maintenance'],
+                ['Primary camera maintenance', 'Unrelated camera maintenance'],
                 collect($props['overdueMaintenance'])->pluck('description')->all(),
             );
         });

@@ -472,7 +472,16 @@ function DeviceHeading({ device }: { device: FacilityDevice }) {
                 </Link>
                 <p className="text-sm text-muted-foreground">
                     {device.subcategoryLabel ?? device.categoryLabel} ·{' '}
-                    {device.site?.name ?? 'Site not assigned'}
+                    {device.site ? (
+                        <Link
+                            href={device.site.href}
+                            className="frontline-focus rounded-sm hover:text-primary hover:underline"
+                        >
+                            {device.site.name}
+                        </Link>
+                    ) : (
+                        'Site not assigned'
+                    )}
                 </p>
             </div>
             <State value={device.technicalState} />

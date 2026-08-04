@@ -18,7 +18,7 @@ import {
     TriangleAlert,
     Users,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     Area,
     AreaChart,
@@ -31,7 +31,6 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
-import { toast } from 'sonner';
 
 interface Named {
     name: string;
@@ -174,25 +173,62 @@ export function ItReports() {
     const [days, setDays] = useState(30);
     const [data, setData] = useState<ReportData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [reloadVersion, setReloadVersion] = useState(0);
+    const requestId = useRef(0);
 
-    const load = useCallback(() => {
-        setLoading(true);
+    useEffect(() => {
+        const activeRequest = ++requestId.current;
+        const controller = new AbortController();
         const to = new Date();
         const from = new Date();
         from.setDate(from.getDate() - (days - 1));
         const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
+        setLoading(true);
+        setError(null);
+        setData(null);
+
         axios
             .get<ReportData>('/it/reports/data', {
                 params: { from: fmt(from), to: fmt(to) },
+                signal: controller.signal,
             })
-            .then((r) => setData(r.data))
-            .catch(() => toast.error('Could not load the reports.'))
-            .finally(() => setLoading(false));
-    }, [days]);
+            .then((response) => {
+                if (
+                    controller.signal.aborted ||
+                    activeRequest !== requestId.current
+                ) {
+                    return;
+                }
 
-    useEffect(() => {
-        load();
-    }, [load]);
+                setData(response.data);
+            })
+            .catch(() => {
+                if (
+                    controller.signal.aborted ||
+                    activeRequest !== requestId.current
+                ) {
+                    return;
+                }
+
+                setError(
+                    'Reports could not be loaded. Check your connection and try again.',
+                );
+            })
+            .finally(() => {
+                if (
+                    controller.signal.aborted ||
+                    activeRequest !== requestId.current
+                ) {
+                    return;
+                }
+
+                setLoading(false);
+            });
+
+        return () => controller.abort();
+    }, [days, reloadVersion]);
 
     /** CSV download URL for a card, carrying the active window. */
     const exportUrl = (card: string) => {
@@ -261,17 +297,57 @@ export function ItReports() {
                 </div>
             </div>
 
-            {loading && !data ? (
-                <div className="flex flex-col gap-4" aria-hidden>
+            {loading ? (
+                <div className="flex flex-col gap-4">
+                    <p
+                        role="status"
+                        aria-live="polite"
+                        className="text-sm text-muted-foreground"
+                    >
+                        Loading reports for the selected range…
+                    </p>
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                         {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
                             <div
                                 key={i}
+                                aria-hidden="true"
                                 className="h-20 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
                             />
                         ))}
                     </div>
-                    <div className="h-64 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" />
+                    <div
+                        aria-hidden="true"
+                        className="h-64 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none"
+                    />
+                </div>
+            ) : error ? (
+                <div
+                    role="alert"
+                    className="flex flex-col items-start gap-3 rounded-2xl border border-status-critical/30 bg-status-critical-bg p-5"
+                >
+                    <div className="flex items-start gap-3">
+                        <TriangleAlert
+                            className="mt-0.5 h-5 w-5 text-status-critical"
+                            aria-hidden="true"
+                        />
+                        <div>
+                            <h3 className="font-semibold">
+                                Reports are unavailable
+                            </h3>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {error}
+                            </p>
+                        </div>
+                    </div>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                            setReloadVersion((version) => version + 1)
+                        }
+                    >
+                        Try again
+                    </Button>
                 </div>
             ) : !hasAnything ? (
                 <div className="flex flex-col items-center rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">

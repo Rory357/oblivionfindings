@@ -1,10 +1,14 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
 
 import { TicketLinkedContext } from '../ticket-linked-context';
 
 vi.mock('@inertiajs/react', () => ({
+    router: {
+        post: vi.fn(),
+        delete: vi.fn(),
+    },
     Link: ({
         href,
         children,
@@ -31,6 +35,8 @@ const deviceFixture = {
     health_status: 'healthy',
     last_seen_at: '2026-07-18T00:58:00Z',
     href: '/security-devices/devices/10',
+    is_monitoring_evidence: false,
+    can_unlink: true,
 };
 
 const alertFixture = {
@@ -41,6 +47,44 @@ const alertFixture = {
     status: 'resolved',
     triggered_at: '2026-07-18T00:55:00Z',
     href: '/control-room/alerts/20',
+};
+
+const incidentEvidenceFixture = {
+    id: 30,
+    version: 1,
+    captured_at: '2026-07-18T00:56:00Z',
+    checksum: 'a'.repeat(64),
+    integrity: 'verified' as const,
+    site: { id: 4, name: 'Kauri House' },
+    alert: {
+        id: 20,
+        reference: 'CR-000123',
+        type: 'device offline',
+        severity: 'high',
+        source: 'security_devices',
+        triggered_at: '2026-07-18T00:55:00Z',
+    },
+    ticket: { id: 40, reference: 'IT-000040', title: 'Core switch offline' },
+    device: {
+        id: 10,
+        uid: 'NET-CORE-01',
+        name: 'Core switch before replacement',
+        domain: 'it_infrastructure',
+        category: 'network',
+        subcategory: 'switch',
+        status: 'offline',
+        health_status: 'critical',
+        last_seen_at: '2026-07-18T00:54:00Z',
+    },
+    observation: {
+        id: 90,
+        event_type: 'offline',
+        severity: 'high',
+        source: 'oblivion_monitoring',
+        occurred_at: '2026-07-18T00:55:00Z',
+        message: 'WAN probe failed.',
+        monitor_correlation_key: 'b'.repeat(64),
+    },
 };
 
 const problemFixture = {
@@ -88,6 +132,7 @@ it('shows monitoring recovery and canonical deep links without raw payloads', ()
             recoveredAt="2026-07-18T01:00:00Z"
             devices={[deviceFixture]}
             alerts={[alertFixture]}
+            incidentEvidence={[incidentEvidenceFixture]}
             problems={[problemFixture]}
             changes={[changeFixture]}
             majorIncidents={[majorIncidentFixture]}
@@ -95,6 +140,15 @@ it('shows monitoring recovery and canonical deep links without raw payloads', ()
     );
 
     expect(screen.getByText('Monitoring recovered')).toBeInTheDocument();
+    expect(
+        screen.getByText('Frozen when the incident was raised'),
+    ).toBeVisible();
+    expect(screen.getByText('Integrity verified')).toBeVisible();
+    expect(screen.getByText('Core switch before replacement')).toBeVisible();
+    expect(screen.getByText('WAN probe failed.')).toBeVisible();
+    expect(
+        screen.getByText(/later live changes do not rewrite/i),
+    ).toBeVisible();
     expect(screen.getByRole('link', { name: /core switch/i })).toHaveAttribute(
         'href',
         '/security-devices/devices/10',
@@ -123,4 +177,50 @@ it('shows monitoring recovery and canonical deep links without raw payloads', ()
         '/it/major-incidents/12',
     );
     expect(screen.queryByText(/signal_payload/i)).not.toBeInTheDocument();
+    expect(
+        screen.queryByText(/monitor_correlation_key/i),
+    ).not.toBeInTheDocument();
+});
+
+it('lets an agent remove a human Device link but protects monitoring evidence', async () => {
+    const { router } = await import('@inertiajs/react');
+    render(
+        <TicketLinkedContext
+            ticketId={40}
+            canManage
+            deviceOptions={[
+                {
+                    id: 11,
+                    name: 'Ward tablet',
+                    uid: 'HC-0011',
+                    site_id: 4,
+                },
+            ]}
+            recoveredAt={null}
+            devices={[
+                deviceFixture,
+                {
+                    ...deviceFixture,
+                    id: 12,
+                    name: 'WAN monitor',
+                    is_monitoring_evidence: true,
+                    can_unlink: false,
+                },
+            ]}
+            alerts={[]}
+        />,
+    );
+
+    expect(screen.getByText('Linked context')).toBeVisible();
+    expect(screen.getByText('Add affected Device')).toBeVisible();
+    expect(screen.getByText('Monitoring evidence')).toBeVisible();
+    expect(
+        screen.getAllByRole('button', { name: /remove link/i }),
+    ).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /remove link/i }));
+    expect(router.delete).toHaveBeenCalledWith(
+        '/it/tickets/40/devices/10',
+        expect.objectContaining({ preserveScroll: true }),
+    );
 });

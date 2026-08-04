@@ -7,7 +7,6 @@ import {
     Activity,
     AlertTriangle,
     ArrowDownToLine,
-    ArrowRight,
     ArrowUpFromLine,
     Building2,
     Cable,
@@ -16,8 +15,6 @@ import {
     CircleHelp,
     FileDiff,
     Gauge,
-    GitBranch,
-    Network,
     Router,
     Server,
     ShieldCheck,
@@ -25,6 +22,8 @@ import {
     Wifi,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+
+import { TopologyMap } from './topology-map';
 
 type NetworkAction = {
     key: string;
@@ -65,7 +64,7 @@ type TopologyNode = {
 };
 
 type TopologyEdge = {
-    id: number;
+    id: number | string;
     parentId: number;
     parentName: string;
     childId: number;
@@ -73,6 +72,10 @@ type TopologyEdge = {
     type: string | null;
     label: string;
     port: string | null;
+    source?: string;
+    confidence?: number;
+    reviewState?: string;
+    evidenceLabel?: string;
 };
 
 type NetworkInterface = {
@@ -149,6 +152,19 @@ type ConfigurationRow = {
         desiredVersion: string | null;
         observedAt: string | null;
     };
+    latestSnapshot?: {
+        id: number;
+        sourceKind: string;
+        source: string;
+        capturedAt: string | null;
+        contentHash: string;
+        configurationHash: string;
+        contentSize: number;
+        mimeType: string;
+        storageState: string;
+        diff: { changes?: unknown[]; truncated?: boolean } | null;
+        downloadHref: string | null;
+    } | null;
 };
 
 export type NetworkItWorkspaceData = {
@@ -222,6 +238,7 @@ export type NetworkItWorkspaceData = {
         inventoryTruncated: boolean;
         devices: NetworkDevice[];
         topology: {
+            source?: string;
             state: string;
             label: string;
             nodeCount: number;
@@ -229,6 +246,16 @@ export type NetworkItWorkspaceData = {
             unlinkedCount: number;
             nodes: TopologyNode[];
             edges: TopologyEdge[];
+            snapshots?: Array<{
+                id: number;
+                site: { id: number; name: string; href: string } | null;
+                source: string;
+                capturedAt: string | null;
+                nodeCount: number;
+                edgeCount: number;
+                changeCount: number;
+            }>;
+            changes?: { added: number; removed: number; changed: number };
         };
         interfaces: NetworkInterface[];
         services: NetworkService[];
@@ -691,16 +718,24 @@ function DevicesPanel({
                                             device.subcategory ??
                                                 device.category,
                                         )}
-                                        {device.site
-                                            ? ` · ${device.site.name}`
-                                            : ' · Site not assigned'}
+                                        {' · '}
+                                        {device.site ? (
+                                            <Link
+                                                href={device.site.href}
+                                                className="frontline-focus rounded-sm hover:text-primary hover:underline"
+                                            >
+                                                {device.site.name}
+                                            </Link>
+                                        ) : (
+                                            'Site not assigned'
+                                        )}
                                     </p>
                                 </div>
                                 <StateBadge
                                     state={device.health ?? device.status}
                                 />
                             </div>
-                            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                                 <Detail
                                     label="IP address"
                                     value={
@@ -729,7 +764,7 @@ function DevicesPanel({
                                             : 'Never observed'
                                     }
                                 />
-                            </dl>
+                            </div>
                             <div className="mt-4 flex flex-wrap gap-2">
                                 <Badge variant="outline">
                                     {device.monitoring.enabled} enabled checks
@@ -766,7 +801,7 @@ function TopologyPanel({
     return (
         <Panel
             title="Known topology evidence"
-            description="Only explicit canonical relationships are drawn; no inferred edge is presented as fact."
+            description="Latest native and provider snapshots are shown with source, confidence, changes, and inferred-versus-reviewed labels; only canonical visible Devices are linked."
         >
             <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3">
                 <StateBadge state={topology.state} />
@@ -780,84 +815,7 @@ function TopologyPanel({
                     text={`${topology.unlinkedCount} ${topology.unlinkedCount === 1 ? 'device has' : 'devices have'} no known relationship`}
                 />
             ) : null}
-            {topology.nodes.length === 0 ? (
-                <EmptyLine
-                    icon={<GitBranch className="h-4 w-4" />}
-                    text="No visible topology nodes."
-                />
-            ) : (
-                <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
-                    <div className="space-y-2">
-                        <h3 className="text-sm font-semibold">Devices</h3>
-                        {topology.nodes.map((node) => (
-                            <article
-                                key={node.id}
-                                className="flex items-center justify-between gap-3 rounded-lg border p-3"
-                            >
-                                <div className="flex min-w-0 items-center gap-3">
-                                    <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                                        <Network
-                                            className="h-4 w-4"
-                                            aria-hidden="true"
-                                        />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <Link
-                                            href={node.href}
-                                            className="block truncate text-sm font-medium text-primary hover:underline"
-                                        >
-                                            {node.name}
-                                        </Link>
-                                        <p className="truncate text-xs text-muted-foreground">
-                                            {node.site ?? 'Site not assigned'}
-                                        </p>
-                                    </div>
-                                </div>
-                                <StateBadge state={node.health} />
-                            </article>
-                        ))}
-                    </div>
-                    <div className="space-y-2">
-                        <h3 className="text-sm font-semibold">
-                            Known relationships
-                        </h3>
-                        {topology.edges.length === 0 ? (
-                            <EmptyLine
-                                icon={<Cable className="h-4 w-4" />}
-                                text="No explicit relationships have been recorded."
-                            />
-                        ) : (
-                            topology.edges.map((edge) => (
-                                <article
-                                    key={edge.id}
-                                    className="rounded-lg border p-3"
-                                >
-                                    <div className="flex flex-wrap items-center gap-2 text-sm">
-                                        <span className="font-medium">
-                                            {edge.parentName}
-                                        </span>
-                                        <ArrowRight
-                                            className="h-4 w-4 text-muted-foreground"
-                                            aria-hidden="true"
-                                        />
-                                        <span className="font-medium">
-                                            {edge.childName}
-                                        </span>
-                                        <Badge variant="outline">
-                                            {edge.label}
-                                        </Badge>
-                                        {edge.port ? (
-                                            <Badge variant="secondary">
-                                                {edge.port}
-                                            </Badge>
-                                        ) : null}
-                                    </div>
-                                </article>
-                            ))
-                        )}
-                    </div>
-                </div>
-            )}
+            <TopologyMap topology={topology} />
         </Panel>
     );
 }
@@ -1219,7 +1177,7 @@ function ConfigurationPanel({
                                             }
                                         />
                                     </div>
-                                    <dl className="mt-3 space-y-2 text-xs">
+                                    <div className="mt-3 space-y-2 text-xs">
                                         <Detail
                                             label="Observed fingerprint"
                                             value={shortHash(
@@ -1243,7 +1201,7 @@ function ConfigurationPanel({
                                                     : 'Not observed'
                                             }
                                         />
-                                    </dl>
+                                    </div>
                                 </section>
                                 <section className="rounded-lg bg-muted/40 p-3">
                                     <div className="flex items-center justify-between gap-2">
@@ -1254,7 +1212,7 @@ function ConfigurationPanel({
                                             state={row.firmware.state}
                                         />
                                     </div>
-                                    <dl className="mt-3 space-y-2 text-xs">
+                                    <div className="mt-3 space-y-2 text-xs">
                                         <Detail
                                             label="Current"
                                             value={
@@ -1280,9 +1238,54 @@ function ConfigurationPanel({
                                                     : 'Not observed'
                                             }
                                         />
-                                    </dl>
+                                    </div>
                                 </section>
                             </div>
+                            {row.latestSnapshot ? (
+                                <section className="mt-4 rounded-lg border bg-muted/20 p-3 text-xs">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <strong>
+                                            Latest governed snapshot
+                                        </strong>
+                                        <StateBadge
+                                            state={
+                                                row.latestSnapshot.storageState
+                                            }
+                                        />
+                                    </div>
+                                    <p className="mt-2 text-muted-foreground">
+                                        {stateLabel(
+                                            row.latestSnapshot.sourceKind,
+                                        )}{' '}
+                                        ·{' '}
+                                        {stateLabel(row.latestSnapshot.source)}
+                                        {' · '}
+                                        {row.latestSnapshot.capturedAt
+                                            ? formatDateTime(
+                                                  row.latestSnapshot.capturedAt,
+                                              )
+                                            : 'Capture time unavailable'}
+                                    </p>
+                                    <p className="mt-1 text-muted-foreground">
+                                        Configuration fingerprint{' '}
+                                        {shortHash(
+                                            row.latestSnapshot
+                                                .configurationHash,
+                                        )}{' '}
+                                        · {row.latestSnapshot.contentSize} bytes
+                                    </p>
+                                    {row.latestSnapshot.downloadHref ? (
+                                        <Link
+                                            href={
+                                                row.latestSnapshot.downloadHref
+                                            }
+                                            className="frontline-focus mt-3 inline-flex min-h-11 items-center font-medium text-primary hover:underline"
+                                        >
+                                            Download governed snapshot
+                                        </Link>
+                                    ) : null}
+                                </section>
+                            ) : null}
                         </article>
                     ))}
                 </div>
@@ -1325,10 +1328,10 @@ function GapBanner({ text }: { text: string }) {
 
 function Detail({ label, value }: { label: string; value: string }) {
     return (
-        <div>
+        <dl>
             <dt className="text-muted-foreground">{label}</dt>
             <dd className="font-medium break-words">{value}</dd>
-        </div>
+        </dl>
     );
 }
 

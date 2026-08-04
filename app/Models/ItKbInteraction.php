@@ -2,16 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ItKbInteraction extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
-        'tenant_id', 'it_kb_article_id', 'user_id', 'it_ticket_id',
+        'it_kb_article_id', 'user_id', 'it_ticket_id',
         'event_type', 'source', 'context', 'occurred_at',
     ];
 

@@ -30,8 +30,24 @@ final class RuntimeEnvelopeCodec
 
     public const int MAX_KEY_BYTES = 128;
 
-    private const array REQUIRED_FIELDS = [
+    private const array V1_REQUIRED_FIELDS = [
         'schema_version',
+        'message_id',
+        'type',
+        'source',
+        'sequence',
+        'occurred_at',
+        'ingested_at',
+        'idempotency_key',
+        'trace_id',
+        'payload',
+        'key_id',
+        'signature',
+    ];
+
+    private const array V2_REQUIRED_FIELDS = [
+        'schema_version',
+        'payload_version',
         'message_id',
         'type',
         'source',
@@ -89,6 +105,7 @@ final class RuntimeEnvelopeCodec
             throw new UnexpectedValueException('Monitoring envelope fields are invalid.');
         }
 
+        $schemaVersion = $this->acceptedSchemaVersion($document['schema_version'] ?? null);
         $this->validateFieldSet($document);
         $this->validateUnsignedDocument($document);
         $this->validatePayload($document['payload']);
@@ -123,6 +140,7 @@ final class RuntimeEnvelopeCodec
             payload: $document['payload'],
             keyId: $document['key_id'],
             signature: $document['signature'],
+            payloadVersion: $schemaVersion === 1 ? 1 : $document['payload_version'],
         );
     }
 
@@ -139,7 +157,7 @@ final class RuntimeEnvelopeCodec
      */
     private function document(RuntimeEnvelope $envelope, string $keyId): array
     {
-        return [
+        $document = [
             'schema_version' => $envelope->schemaVersion,
             'message_id' => $envelope->messageId,
             'type' => $envelope->type->value,
@@ -152,6 +170,12 @@ final class RuntimeEnvelopeCodec
             'payload' => $envelope->payload,
             'key_id' => $keyId,
         ];
+
+        if ($envelope->schemaVersion >= 2) {
+            $document['payload_version'] = $envelope->payloadVersion;
+        }
+
+        return $document;
     }
 
     /**
@@ -159,9 +183,10 @@ final class RuntimeEnvelopeCodec
      */
     private function validateFieldSet(array $document): void
     {
+        $schemaVersion = $this->acceptedSchemaVersion($document['schema_version'] ?? null);
         $fields = array_keys($document);
         sort($fields, SORT_STRING);
-        $required = self::REQUIRED_FIELDS;
+        $required = $schemaVersion === 1 ? self::V1_REQUIRED_FIELDS : self::V2_REQUIRED_FIELDS;
         sort($required, SORT_STRING);
 
         if ($fields !== $required) {
@@ -174,9 +199,7 @@ final class RuntimeEnvelopeCodec
      */
     private function validateUnsignedDocument(array $document): void
     {
-        if (($document['schema_version'] ?? null) !== 1) {
-            throw new UnexpectedValueException('Monitoring envelope version is unsupported.');
-        }
+        $schemaVersion = $this->acceptedSchemaVersion($document['schema_version'] ?? null);
 
         if (! $this->validUuid($document['message_id'] ?? null)
             || ! $this->validUuid($document['trace_id'] ?? null)
@@ -191,6 +214,11 @@ final class RuntimeEnvelopeCodec
             throw new UnexpectedValueException('Monitoring envelope fields are invalid.');
         }
 
+        $payloadVersion = $schemaVersion === 1 ? 1 : ($document['payload_version'] ?? null);
+        if (! is_int($payloadVersion) || $payloadVersion < 1 || $payloadVersion > 65_535) {
+            throw new UnexpectedValueException('Monitoring envelope payload version is invalid.');
+        }
+
         $this->timestamp($document['occurred_at'] ?? null);
         $this->timestamp($document['ingested_at'] ?? null);
 
@@ -202,6 +230,24 @@ final class RuntimeEnvelopeCodec
     private function validIdentifier(mixed $value, int $maximumLength): bool
     {
         return is_string($value) && $value !== '' && strlen($value) <= $maximumLength;
+    }
+
+    private function acceptedSchemaVersion(mixed $version): int
+    {
+        if (! is_int($version)) {
+            throw new UnexpectedValueException('Monitoring envelope fields are invalid.');
+        }
+
+        $accepted = collect((array) config('monitoring.contracts.accepted', [1]))
+            ->filter(fn (mixed $candidate): bool => is_int($candidate) && $candidate > 0)
+            ->values()
+            ->all();
+
+        if (! in_array($version, $accepted, true)) {
+            throw new UnexpectedValueException('Monitoring envelope version is unsupported.');
+        }
+
+        return $version;
     }
 
     private function validUuid(mixed $value): bool

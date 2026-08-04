@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Http;
 function itMailboxConnection(array $overrides = []): ItMailboxConnection
 {
     return ItMailboxConnection::create(array_merge([
-        'tenant_id' => 1,
         'provider' => ItMailboxConnection::PROVIDER_MICROSOFT,
         'status' => ItMailboxConnection::STATUS_CONNECTED,
         'access_token' => 'access-123',

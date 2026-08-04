@@ -145,26 +145,23 @@ class MaintenanceHealthControllerTest extends TestCase
 
     public function test_maintenance_health_data_covers_the_single_application_registry_for_all_sites_users(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
 
-        $tenantDevice = Device::factory()->create([
-            'tenant_id' => 42,
-            'name' => 'Tenant sensor',
+        $primaryDevice = Device::factory()->create([
+            'name' => 'Primary sensor',
             'health_status' => HealthStatus::Critical,
             'status' => DeviceStatus::Active,
             'battery_level' => 10,
             'battery_updated_at' => now(),
         ]);
-        $foreignDevice = Device::factory()->create([
-            'tenant_id' => 77,
-            'name' => 'Foreign sensor',
+        $unrelatedDevice = Device::factory()->create([
+            'name' => 'Unrelated sensor',
             'health_status' => HealthStatus::Critical,
             'status' => DeviceStatus::Active,
             'battery_level' => 10,
             'battery_updated_at' => now(),
         ]);
 
-        foreach ([$tenantDevice, $foreignDevice] as $device) {
+        foreach ([$primaryDevice, $unrelatedDevice] as $device) {
             DeviceMaintenanceRecord::create([
                 'device_id' => $device->id,
                 'type' => 'inspection',
@@ -182,15 +179,15 @@ class MaintenanceHealthControllerTest extends TestCase
             $this->assertSame(2, $props['stats']['overdue']);
             $this->assertSame(2, $props['stats']['critical']);
             $this->assertEqualsCanonicalizing(
-                ['Tenant sensor maintenance', 'Foreign sensor maintenance'],
+                ['Primary sensor maintenance', 'Unrelated sensor maintenance'],
                 collect($props['records']['data'])->pluck('description')->all(),
             );
             $this->assertEqualsCanonicalizing(
-                ['Tenant sensor', 'Foreign sensor'],
+                ['Primary sensor', 'Unrelated sensor'],
                 collect($props['attentionDevices'])->pluck('name')->all(),
             );
             $this->assertEqualsCanonicalizing(
-                ['Tenant sensor', 'Foreign sensor'],
+                ['Primary sensor', 'Unrelated sensor'],
                 collect($props['lowBatteryDevices'])->pluck('name')->all(),
             );
         });
@@ -289,39 +286,39 @@ class MaintenanceHealthControllerTest extends TestCase
             ->assertSessionHasErrors(['type']);
     }
 
-    public function test_maintenance_mutations_ignore_legacy_partition_values_for_authorized_stock(): void
+    public function test_maintenance_mutations_allow_authorized_unassigned_stock(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
-        $foreignDevice = Device::factory()->create(['tenant_id' => 77]);
-        $foreignRecord = DeviceMaintenanceRecord::create([
-            'device_id' => $foreignDevice->id,
+
+        $unrelatedDevice = Device::factory()->create([]);
+        $unrelatedRecord = DeviceMaintenanceRecord::create([
+            'device_id' => $unrelatedDevice->id,
             'type' => 'inspection',
             'status' => 'scheduled',
-            'description' => 'Foreign maintenance',
+            'description' => 'Unrelated maintenance',
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/security-devices/devices/{$foreignDevice->id}/maintenance", [
+            ->post("/security-devices/devices/{$unrelatedDevice->id}/maintenance", [
                 'type' => 'inspection',
                 'description' => 'Should not be created',
             ])
             ->assertRedirect();
 
         $this->actingAs($this->admin)
-            ->put("/security-devices/maintenance/{$foreignRecord->id}", [
+            ->put("/security-devices/maintenance/{$unrelatedRecord->id}", [
                 'description' => 'Should not be updated',
             ])
             ->assertRedirect();
 
         $this->actingAs($this->admin)
-            ->post("/security-devices/maintenance/{$foreignRecord->id}/complete")
+            ->post("/security-devices/maintenance/{$unrelatedRecord->id}/complete")
             ->assertRedirect();
 
-        $foreignRecord->refresh();
-        $this->assertSame('Should not be updated', $foreignRecord->description);
-        $this->assertSame('completed', $foreignRecord->status);
+        $unrelatedRecord->refresh();
+        $this->assertSame('Should not be updated', $unrelatedRecord->description);
+        $this->assertSame('completed', $unrelatedRecord->status);
         $this->assertDatabaseHas('device_maintenance_records', [
-            'device_id' => $foreignDevice->id,
+            'device_id' => $unrelatedDevice->id,
             'description' => 'Should not be created',
         ]);
     }

@@ -21,6 +21,15 @@ class Monitor extends Model
         return MonitorFactory::new();
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $monitor): void {
+            if (! $monitor->isDirty('effective_state')) {
+                $monitor->effective_state = $monitor->current_state ?? MonitorState::Unknown;
+            }
+        });
+    }
+
     protected $fillable = [
         'device_id',
         'profile_id',
@@ -30,8 +39,13 @@ class Monitor extends Model
         'target',
         'config',
         'current_state',
+        'effective_state',
         'pending_state',
         'pending_count',
+        'pending_since_at',
+        'root_cause_monitor_id',
+        'suppression_reason',
+        'suppressed_at',
         'affects_availability',
         'is_enabled',
         'last_observation_at',
@@ -42,6 +56,7 @@ class Monitor extends Model
     protected $casts = [
         'kind' => MonitorKind::class,
         'current_state' => MonitorState::class,
+        'effective_state' => MonitorState::class,
         'pending_state' => MonitorState::class,
         'config' => 'array',
         'pending_count' => 'integer',
@@ -49,6 +64,8 @@ class Monitor extends Model
         'is_enabled' => 'boolean',
         'last_observation_at' => 'datetime',
         'last_state_changed_at' => 'datetime',
+        'pending_since_at' => 'immutable_datetime',
+        'suppressed_at' => 'immutable_datetime',
         'suppressed_until' => 'datetime',
     ];
 
@@ -70,5 +87,20 @@ class Monitor extends Model
     public function observations(): HasMany
     {
         return $this->hasMany(MonitorObservation::class, 'monitor_id');
+    }
+
+    public function rootCauseMonitor(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'root_cause_monitor_id');
+    }
+
+    public function upstreamDependencies(): HasMany
+    {
+        return $this->hasMany(MonitorDependency::class, 'downstream_monitor_id');
+    }
+
+    public function downstreamDependencies(): HasMany
+    {
+        return $this->hasMany(MonitorDependency::class, 'upstream_monitor_id');
     }
 }

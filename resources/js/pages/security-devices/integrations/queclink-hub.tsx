@@ -1,4 +1,6 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageHero, PageLayout } from '@/components/page';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,7 +45,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -92,6 +94,7 @@ type FrameType = 'RESP' | 'ACK' | 'SACK' | 'BUFF' | 'AT' | 'unknown';
 
 type Device = {
     id: number;
+    canonical_device_id?: number | null;
     reference: string;
     status: DeviceStatus;
     pending_pairing_type?: PairingType | null;
@@ -141,8 +144,10 @@ type RecentCommand = {
     created_at: string | null;
     sent_at: string | null;
     acked_at: string | null;
+    fulfilled_at: string | null;
     cancelled_at?: string | null;
     expires_at: string | null;
+    governed: boolean;
     failure_category: string | null;
 };
 
@@ -186,11 +191,11 @@ type Props = {
         frames_last_hour: number;
         last_frame_at: string | null;
     };
-    providerConnection: {
-        status: 'connected' | 'disconnected' | 'error';
-        secret_last4?: string | null;
-        last_tested_at?: string | null;
-    } | null;
+    cloudIntegration: {
+        status: 'unavailable';
+        legacy_credential_stored: boolean;
+        legacy_credential_last4: string | null;
+    };
     siteCredentials: SiteCredentialRow[];
     targets: {
         vehicles: Target[];
@@ -220,6 +225,13 @@ type FrameFilters = {
     commandWord: string;
     parseStatus: 'all' | 'ok' | 'error';
 };
+
+type FrameStreamState =
+    | 'connecting'
+    | 'live'
+    | 'reconnecting'
+    | 'error'
+    | 'paused';
 
 function framesUrl(filters: FrameFilters): string {
     const params = new URLSearchParams();
@@ -283,7 +295,7 @@ export default function QueclinkHub({
     listener,
     devices,
     statistics,
-    providerConnection,
+    cloudIntegration,
     siteCredentials,
     targets,
     presets,
@@ -357,7 +369,7 @@ export default function QueclinkHub({
                         <div className="relative">
                             <TabsList
                                 data-testid="queclink-tab-list"
-                                className="scrollbar-pretty flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b bg-transparent p-0 pb-1"
+                                className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b bg-transparent p-0 pb-1"
                             >
                                 <TabsTrigger
                                     value="overview"
@@ -414,7 +426,7 @@ export default function QueclinkHub({
                                     className={hubTabClassName}
                                 >
                                     <Database className="h-4 w-4" />
-                                    IMS cloud
+                                    Cloud API
                                 </TabsTrigger>
                             </TabsList>
                         </div>
@@ -479,7 +491,10 @@ export default function QueclinkHub({
                         </TabsContent>
 
                         <TabsContent value="ims" className="space-y-6 pt-6">
-                            <ImsCloudTab providerConnection={providerConnection} can={can} />
+                            <CloudIntegrationTab
+                                cloudIntegration={cloudIntegration}
+                                can={can}
+                            />
                         </TabsContent>
                     </Tabs>
                 </div>
@@ -531,7 +546,7 @@ function ListenerStatusBadge({ listener }: { listener: Props['listener'] }) {
 
 // ── Overview tab ──────────────────────────────────────────────────
 
-function OverviewTab({
+export function OverviewTab({
     listener,
     devices,
     statistics,
@@ -550,26 +565,78 @@ function OverviewTab({
         state: string;
         instructions: string[];
     } | null>(null);
+    const [provisioningError, setProvisioningError] = useState<string | null>(
+        null,
+    );
     const [family, setFamily] = useState<'gv500cg' | 'gl30m'>('gv500cg');
     const [provisioningLoading, setProvisioningLoading] = useState(false);
+    const provisioningRequest = useRef(0);
 
     const portChanged = settings.data.port !== listener.port;
 
-    function generateProvisioning() {
+    async function generateProvisioning() {
+        const requestId = ++provisioningRequest.current;
         setProvisioningLoading(true);
-        fetch(
-            `/security-devices/integrations/queclink/provisioning?family=${family}`,
-        )
-            .then((r) => r.json())
-            .then((d) => {
-                if (d.error) {
-                    alert(d.error);
-                    setProvisioning(null);
-                } else {
-                    setProvisioning(d);
-                }
-            })
-            .finally(() => setProvisioningLoading(false));
+        setProvisioning(null);
+        setProvisioningError(null);
+
+        try {
+            const response = await fetch(
+                `/security-devices/integrations/queclink/provisioning?family=${family}`,
+                { headers: { Accept: 'application/json' } },
+            );
+            const payload: unknown = await response.json().catch(() => null);
+
+            if (requestId !== provisioningRequest.current) return;
+
+            const body =
+                payload && typeof payload === 'object'
+                    ? (payload as Record<string, unknown>)
+                    : {};
+            const safeError =
+                typeof body.error === 'string' && body.error.length <= 200
+                    ? body.error.trim()
+                    : '';
+
+            if (!response.ok || safeError !== '') {
+                setProvisioningError(
+                    safeError ||
+                        'Readiness could not be checked. Review the listener settings and try again.',
+                );
+                return;
+            }
+
+            if (
+                body.state !== 'ready_for_secure_provisioning' ||
+                !Array.isArray(body.instructions) ||
+                !body.instructions.every(
+                    (instruction) =>
+                        typeof instruction === 'string' &&
+                        instruction.length > 0 &&
+                        instruction.length <= 300,
+                )
+            ) {
+                setProvisioningError(
+                    'Readiness returned an unexpected response. Try again or review runtime health.',
+                );
+                return;
+            }
+
+            setProvisioning({
+                state: body.state,
+                instructions: body.instructions as string[],
+            });
+        } catch {
+            if (requestId === provisioningRequest.current) {
+                setProvisioningError(
+                    'Readiness could not be checked. Confirm the application is online and try again.',
+                );
+            }
+        } finally {
+            if (requestId === provisioningRequest.current) {
+                setProvisioningLoading(false);
+            }
+        }
     }
 
     return (
@@ -636,11 +703,8 @@ function OverviewTab({
                                 disabled={!can.manage}
                             />
                             <p className="text-xs text-muted-foreground">
-                                Default: 8090. Devices must be configured with{' '}
-                                <code className="rounded bg-muted px-1 py-0.5">
-                                    AT+GTSRI
-                                </code>{' '}
-                                to point at this port.
+                                Default: 8090. Apply this port through the
+                                approved secure device-management process.
                             </p>
                             {portChanged &&
                                 deviceCount(devices, 'paired') > 0 && (
@@ -676,8 +740,9 @@ function OverviewTab({
                                 disabled={!can.manage}
                             />
                             <p className="text-xs text-muted-foreground">
-                                The address devices dial into. Used in the
-                                provisioning string generator below.
+                                The address devices dial into. An existing
+                                hostname remains protected; enter a value only
+                                to set or replace it.
                             </p>
                         </div>
                         <div className="md:col-span-2">
@@ -696,14 +761,14 @@ function OverviewTab({
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Provisioning string</CardTitle>
+                    <CardTitle role="heading" aria-level={2}>
+                        Provisioning readiness
+                    </CardTitle>
                     <CardDescription>
-                        Generate the{' '}
-                        <code className="rounded bg-muted px-1 py-0.5">
-                            AT+GTSRI
-                        </code>{' '}
-                        command to paste into the @Track MT Setup tool when
-                        configuring a new device.
+                        Confirm that the protected listener endpoint is ready
+                        before applying the server configuration through the
+                        approved secure device-management process. No hostname,
+                        credential, or raw command is displayed here.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -712,11 +777,18 @@ function OverviewTab({
                             <Label>Device family</Label>
                             <Select
                                 value={family}
-                                onValueChange={(v) =>
-                                    setFamily(v as 'gv500cg' | 'gl30m')
-                                }
+                                onValueChange={(v) => {
+                                    provisioningRequest.current += 1;
+                                    setFamily(v as 'gv500cg' | 'gl30m');
+                                    setProvisioning(null);
+                                    setProvisioningError(null);
+                                    setProvisioningLoading(false);
+                                }}
                             >
-                                <SelectTrigger className="w-48">
+                                <SelectTrigger
+                                    aria-label="Device family"
+                                    className="w-48"
+                                >
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -733,7 +805,8 @@ function OverviewTab({
                             type="button"
                             variant="outline"
                             onClick={generateProvisioning}
-                            disabled={provisioningLoading}
+                            disabled={!can.manage || provisioningLoading}
+                            className="frontline-focus min-h-11"
                         >
                             {provisioningLoading ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -743,11 +816,27 @@ function OverviewTab({
                             Check readiness
                         </Button>
                     </div>
+                    {provisioningError ? (
+                        <Alert variant="destructive">
+                            <XCircle aria-hidden="true" />
+                            <AlertTitle>Readiness check failed</AlertTitle>
+                            <AlertDescription>
+                                {provisioningError}
+                            </AlertDescription>
+                        </Alert>
+                    ) : null}
                     {provisioning && (
-                        <div className="space-y-3 rounded-lg border p-4">
-                            <Badge variant="outline">
-                                {provisioning.state}
-                            </Badge>
+                        <div
+                            className="space-y-3 rounded-lg border border-status-success/30 bg-status-success-bg p-4"
+                            aria-live="polite"
+                        >
+                            <div className="flex items-center gap-2 font-medium text-status-success">
+                                <ShieldCheck
+                                    className="h-4 w-4"
+                                    aria-hidden="true"
+                                />
+                                Ready for secure provisioning
+                            </div>
                             <ol className="space-y-1 text-sm text-muted-foreground">
                                 {provisioning.instructions.map((step, i) => (
                                     <li key={i}>
@@ -942,6 +1031,7 @@ function PendingTab({
     can: Props['can'];
 }) {
     const [claiming, setClaiming] = useState<Device | null>(null);
+    const [rejecting, setRejecting] = useState<Device | null>(null);
 
     if (pending.length === 0) {
         return (
@@ -1018,21 +1108,8 @@ function PendingTab({
                                             variant="ghost"
                                             className="ml-1 text-status-critical hover:text-status-critical"
                                             disabled={!can.manage}
-                                            onClick={() => {
-                                                if (
-                                                    confirm(
-                                                        `Reject ${d.reference}? It will be ignored until manually re-allowed.`,
-                                                    )
-                                                ) {
-                                                    router.post(
-                                                        `/security-devices/integrations/queclink/devices/${d.id}/reject`,
-                                                        {},
-                                                        {
-                                                            preserveScroll: true,
-                                                        },
-                                                    );
-                                                }
-                                            }}
+                                            aria-label={`Reject tracker ${d.reference}`}
+                                            onClick={() => setRejecting(d)}
                                         >
                                             <Trash2 className="h-3 w-3" />
                                         </Button>
@@ -1052,6 +1129,26 @@ function PendingTab({
                     onClose={() => setClaiming(null)}
                 />
             )}
+            <ConfirmDialog
+                open={rejecting !== null}
+                onClose={() => setRejecting(null)}
+                onConfirm={() => {
+                    if (rejecting) {
+                        router.post(
+                            `/security-devices/integrations/queclink/devices/${rejecting.id}/reject`,
+                            {},
+                            { preserveScroll: true },
+                        );
+                    }
+                }}
+                title="Reject tracker?"
+                description={
+                    rejecting
+                        ? `Reject “${rejecting.reference}”? It will be ignored until an authorised operator restores it to the pending tray.`
+                        : ''
+                }
+                confirmText="Reject tracker"
+            />
         </>
     );
 }
@@ -1065,6 +1162,8 @@ export function RejectedTab({
     pagination?: DevicePagination;
     can: Props['can'];
 }) {
+    const [restoring, setRestoring] = useState<Device | null>(null);
+
     return (
         <>
             <Card>
@@ -1125,21 +1224,9 @@ export function RejectedTab({
                                                 size="sm"
                                                 variant="outline"
                                                 disabled={!can.manage}
-                                                onClick={() => {
-                                                    if (
-                                                        confirm(
-                                                            `Restore ${device.reference} to the pending tray?`,
-                                                        )
-                                                    ) {
-                                                        router.post(
-                                                            `/security-devices/integrations/queclink/devices/${device.id}/restore`,
-                                                            {},
-                                                            {
-                                                                preserveScroll: true,
-                                                            },
-                                                        );
-                                                    }
-                                                }}
+                                                onClick={() =>
+                                                    setRestoring(device)
+                                                }
                                             >
                                                 <RefreshCw className="mr-1 h-3 w-3" />
                                                 Restore
@@ -1153,6 +1240,27 @@ export function RejectedTab({
                 </CardContent>
             </Card>
             <DevicePager pagination={pagination} label="rejected" />
+            <ConfirmDialog
+                open={restoring !== null}
+                onClose={() => setRestoring(null)}
+                onConfirm={() => {
+                    if (restoring) {
+                        router.post(
+                            `/security-devices/integrations/queclink/devices/${restoring.id}/restore`,
+                            {},
+                            { preserveScroll: true },
+                        );
+                    }
+                }}
+                title="Restore tracker to pending?"
+                description={
+                    restoring
+                        ? `Restore “${restoring.reference}” to the pending tray? It will still require an authorised claim before it receives commands.`
+                        : ''
+                }
+                confirmText="Restore tracker"
+                variant="default"
+            />
         </>
     );
 }
@@ -1473,6 +1581,7 @@ function DevicesTab({
 }) {
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [bulkOpen, setBulkOpen] = useState(false);
+    const [releasing, setReleasing] = useState<Device | null>(null);
     const allSelected =
         paired.length > 0 && selectedIds.length === paired.length;
     const selectedDevices = paired.filter((device) =>
@@ -1604,21 +1713,7 @@ function DevicesTab({
                                             size="sm"
                                             variant="ghost"
                                             disabled={!can.manage}
-                                            onClick={() => {
-                                                if (
-                                                    confirm(
-                                                        `Release ${d.reference}? It will return to the pending tray and stop receiving commands.`,
-                                                    )
-                                                ) {
-                                                    router.post(
-                                                        `/security-devices/integrations/queclink/devices/${d.id}/release`,
-                                                        {},
-                                                        {
-                                                            preserveScroll: true,
-                                                        },
-                                                    );
-                                                }
-                                            }}
+                                            onClick={() => setReleasing(d)}
                                         >
                                             <Unlink className="mr-1 h-3 w-3" />
                                             Release
@@ -1637,6 +1732,26 @@ function DevicesTab({
                     onClose={() => setBulkOpen(false)}
                 />
             )}
+            <ConfirmDialog
+                open={releasing !== null}
+                onClose={() => setReleasing(null)}
+                onConfirm={() => {
+                    if (releasing) {
+                        router.post(
+                            `/security-devices/integrations/queclink/devices/${releasing.id}/release`,
+                            {},
+                            { preserveScroll: true },
+                        );
+                    }
+                }}
+                title="Release tracker assignment?"
+                description={
+                    releasing
+                        ? `Release “${releasing.reference}”? It will return to the pending tray and stop receiving governed commands until it is claimed again.`
+                        : ''
+                }
+                confirmText="Release tracker"
+            />
         </>
     );
 }
@@ -1665,11 +1780,11 @@ function BulkActionDialog({
         <Dialog open onOpenChange={onClose}>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Bulk apply</DialogTitle>
+                    <DialogTitle>Review bulk management</DialogTitle>
                     <DialogDescription>
-                        Queue commands for every selected paired device.
-                        Commands still send through the normal pending-command
-                        queue.
+                        Choose the intended action, then continue to Device
+                        Management for Site checks, change control, independent
+                        approval, and protected verification.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -1816,9 +1931,8 @@ function BulkActionDialog({
                             );
                         }}
                     >
-                        {action === 'apply_preset'
-                            ? `Apply to ${devices.length} device${devices.length === 1 ? '' : 's'}`
-                            : `Queue ${devices.length} command${devices.length === 1 ? '' : 's'}`}
+                        Review {devices.length} device
+                        {devices.length === 1 ? '' : 's'}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -1871,12 +1985,12 @@ function PresetsCard({
                         <div>
                             <CardTitle>Configuration presets</CardTitle>
                             <CardDescription>
-                                Apply a saved bundle of settings to{' '}
+                                Reuse an encrypted, immutable profile for{' '}
                                 {target
                                     ? target.reference
-                                    : 'the selected device'}{' '}
-                                in one click. Each section queues its own
-                                command.
+                                    : 'the selected device'}
+                                . Applying it always continues through governed
+                                Device Management.
                             </CardDescription>
                         </div>
                     </div>
@@ -1964,7 +2078,7 @@ function PresetsCard({
                                     onClick={() => setConfirm(preset)}
                                 >
                                     <Play className="mr-2 h-3 w-3" />
-                                    Apply
+                                    Review application
                                 </Button>
                             </div>
                         ))}
@@ -1976,16 +2090,18 @@ function PresetsCard({
                 <Dialog open onOpenChange={() => setConfirm(null)}>
                     <DialogContent className="sm:max-w-md">
                         <DialogHeader>
-                            <DialogTitle>Apply “{confirm.name}”?</DialogTitle>
+                            <DialogTitle>
+                                Review “{confirm.name}” in Device Management?
+                            </DialogTitle>
                             <DialogDescription>
-                                Queues {confirm.sections.length} command
-                                {confirm.sections.length === 1
-                                    ? ''
-                                    : 's'} to{' '}
+                                This does not send a tracker command. It opens a
+                                governed request for{' '}
                                 <span className="font-mono">
                                     {target?.reference}
                                 </span>
-                                . The tracker applies them on its next check-in.
+                                , where the profile, Site, approved change,
+                                independent approval, and protected readback are
+                                checked before and after execution.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="flex flex-wrap gap-2">
@@ -2008,8 +2124,7 @@ function PresetsCard({
                                 onClick={() => applyPreset(confirm)}
                             >
                                 <Play className="mr-2 h-3 w-3" />
-                                Queue {confirm.sections.length} command
-                                {confirm.sections.length === 1 ? '' : 's'}
+                                Continue to governed review
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -2858,8 +2973,8 @@ export function DeviceSettingsTab({
                             <div>
                                 <CardTitle>Device settings</CardTitle>
                                 <CardDescription>
-                                    Live GL30 configuration, queued updates, and
-                                    readback status.
+                                    Protected GL30 readback and configuration
+                                    profiles governed through Device Management.
                                 </CardDescription>
                             </div>
                         </div>
@@ -2955,8 +3070,8 @@ export function DeviceSettingsTab({
                         <div>
                             <CardTitle>Read one section</CardTitle>
                             <CardDescription>
-                                Queue a focused GTRTO readback before changing
-                                the same section.
+                                Request a protected GTRTO readback through the
+                                same governed Device Management lifecycle.
                             </CardDescription>
                         </div>
                     </div>
@@ -3150,7 +3265,7 @@ export function DeviceSettingsTab({
                                     }}
                                 >
                                     <Send className="mr-2 h-3 w-3" />
-                                    Queue server settings
+                                    Review server profile
                                 </Button>
                             </CardContent>
                         </Card>
@@ -3431,7 +3546,7 @@ export function DeviceSettingsTab({
                                     }}
                                 >
                                     <Send className="mr-2 h-3 w-3" />
-                                    Queue global settings
+                                    Review global profile
                                 </Button>
                             </CardContent>
                         </Card>
@@ -3477,15 +3592,30 @@ export function DeviceSettingsTab({
                                 <Send className="h-4 w-4" />
                             </div>
                             <div>
-                                <CardTitle>Command status</CardTitle>
+                                <CardTitle>Command history</CardTitle>
                                 <CardDescription>
-                                    Recent queued AT commands for the selected
-                                    device.
+                                    Protected delivery history. New or repeated
+                                    actions must start from Device Management.
                                 </CardDescription>
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-3">
+                        {target?.canonical_device_id ? (
+                            <Button asChild size="sm" variant="outline">
+                                <Link
+                                    href={`/security-devices/devices/${target.canonical_device_id}?section=management`}
+                                >
+                                    <ShieldCheck className="mr-1 h-3 w-3" />
+                                    Open Device Management
+                                </Link>
+                            </Button>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                Link this tracker to a canonical Device before
+                                starting a governed action.
+                            </p>
+                        )}
                         {recentCommands.length === 0 ? (
                             <p className="text-sm text-muted-foreground">
                                 No commands queued yet.
@@ -3505,7 +3635,11 @@ export function DeviceSettingsTab({
                                             {commandStatusBadge(command.status)}
                                         </div>
                                         <p className="mt-1 text-xs text-muted-foreground">
-                                            Command content protected
+                                            {command.governed
+                                                ? 'Governed Device execution detail · content protected'
+                                                : command.status === 'queued'
+                                                  ? 'Legacy provider-console command · cancellation only · content protected'
+                                                  : 'Legacy provider-console history · read only · content protected'}
                                         </p>
                                         <dl className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                                             <div>
@@ -3556,50 +3690,27 @@ export function DeviceSettingsTab({
                                                 <Database className="mr-1 h-3 w-3" />
                                                 Inspect
                                             </Button>
-                                            {command.status === 'queued' && (
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="outline"
-                                                    disabled={!can.manage}
-                                                    onClick={() =>
-                                                        router.post(
-                                                            `/security-devices/integrations/queclink/commands/${command.id}/cancel`,
-                                                            {},
-                                                            {
-                                                                preserveScroll: true,
-                                                            },
-                                                        )
-                                                    }
-                                                >
-                                                    <XCircle className="mr-1 h-3 w-3" />
-                                                    Cancel
-                                                </Button>
-                                            )}
-                                            {[
-                                                'failed',
-                                                'expired',
-                                                'cancelled',
-                                            ].includes(command.status) && (
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="outline"
-                                                    disabled={!can.manage}
-                                                    onClick={() =>
-                                                        router.post(
-                                                            `/security-devices/integrations/queclink/commands/${command.id}/retry`,
-                                                            {},
-                                                            {
-                                                                preserveScroll: true,
-                                                            },
-                                                        )
-                                                    }
-                                                >
-                                                    <RefreshCw className="mr-1 h-3 w-3" />
-                                                    Retry
-                                                </Button>
-                                            )}
+                                            {command.status === 'queued' &&
+                                                !command.governed && (
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="outline"
+                                                        disabled={!can.manage}
+                                                        onClick={() =>
+                                                            router.post(
+                                                                `/security-devices/integrations/queclink/commands/${command.id}/cancel`,
+                                                                {},
+                                                                {
+                                                                    preserveScroll: true,
+                                                                },
+                                                            )
+                                                        }
+                                                    >
+                                                        <XCircle className="mr-1 h-3 w-3" />
+                                                        Cancel
+                                                    </Button>
+                                                )}
                                         </div>
                                     </Card>
                                 ))}
@@ -3627,6 +3738,13 @@ export function DeviceSettingsTab({
                             ? 'Provider operation failed.'
                             : 'No failure category is recorded.'}
                     </p>
+                    {!selectedCommand?.governed && (
+                        <p className="text-sm text-muted-foreground">
+                            This is read-only legacy provider-console history.
+                            Review current Device state and start any new action
+                            from Device Management.
+                        </p>
+                    )}
                 </DialogContent>
             </Dialog>
         </div>
@@ -3752,8 +3870,8 @@ function AdvancedQueclinkSectionForm({
                     <div>
                         <CardTitle>Advanced GL30 sections</CardTitle>
                         <CardDescription>
-                            Protocol-backed writes for the sections beyond SRI
-                            and CFG.
+                            Build an encrypted profile for sections beyond SRI
+                            and CFG, then review it in Device Management.
                         </CardDescription>
                     </div>
                 </div>
@@ -3866,7 +3984,7 @@ function AdvancedQueclinkSectionForm({
                         }}
                     >
                         <Send className="mr-2 h-3 w-3" />
-                        Queue {definition.label}
+                        Review {definition.label}
                     </Button>
                     <Button
                         type="button"
@@ -3938,6 +4056,11 @@ export function DebugConsoleTab({
         parseStatus: 'all',
     });
     const [streaming, setStreaming] = useState(true);
+    const [streamState, setStreamState] =
+        useState<FrameStreamState>('connecting');
+    const [streamError, setStreamError] = useState<string | null>(null);
+    const [historyError, setHistoryError] = useState<string | null>(null);
+    const [connectionAttempt, setConnectionAttempt] = useState(0);
     const esRef = useRef<EventSource | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [autoscroll, setAutoscroll] = useState(true);
@@ -3949,20 +4072,44 @@ export function DebugConsoleTab({
     };
     const loadRecentFrames = useCallback(
         async (signal?: AbortSignal) => {
-            let response: Response;
-
             try {
-                response = await fetch(framesUrl(filters), {
+                const response = await fetch(framesUrl(filters), {
                     headers: { Accept: 'application/json' },
                     signal,
                 });
-            } catch {
-                return;
-            }
 
-            if (!response.ok) return;
-            const payload = (await response.json()) as { frames?: Frame[] };
-            setFrames((prev) => mergeFrames(prev, payload.frames ?? []));
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const payload: unknown = await response.json();
+                if (
+                    !payload ||
+                    typeof payload !== 'object' ||
+                    !Array.isArray((payload as { frames?: unknown }).frames)
+                ) {
+                    throw new Error('Unexpected frame history response');
+                }
+
+                setFrames((previous) =>
+                    mergeFrames(
+                        previous,
+                        (payload as { frames: Frame[] }).frames,
+                    ),
+                );
+                setHistoryError(null);
+            } catch (caught) {
+                if (
+                    signal?.aborted ||
+                    (caught as { name?: string })?.name === 'AbortError'
+                ) {
+                    return;
+                }
+
+                setHistoryError(
+                    'Recent frames could not be loaded. Live connection status is shown separately.',
+                );
+            }
         },
         [filters],
     );
@@ -3979,11 +4126,23 @@ export function DebugConsoleTab({
         if (!streaming) {
             esRef.current?.close();
             esRef.current = null;
+            setStreamState('paused');
+            setStreamError(null);
             return;
         }
+
+        let active = true;
+        setStreamState('connecting');
+        setStreamError(null);
         const url = frameStreamUrl(filters);
         const es = new EventSource(url);
+        es.onopen = () => {
+            if (!active) return;
+            setStreamState('live');
+            setStreamError(null);
+        };
         es.onmessage = (e) => {
+            if (!active) return;
             try {
                 const frame = JSON.parse(e.data) as Frame;
                 setFrames((prev) => mergeFrames(prev, [frame]));
@@ -3992,14 +4151,28 @@ export function DebugConsoleTab({
             }
         };
         es.onerror = () => {
-            /* browser will auto-reconnect via the retry: header */
+            if (!active) return;
+
+            if (es.readyState === EventSource.CLOSED) {
+                setStreamState('error');
+                setStreamError(
+                    'The live frame connection is unavailable. Reconnect after checking listener runtime health.',
+                );
+                return;
+            }
+
+            setStreamState('reconnecting');
+            setStreamError(
+                'The live frame connection was interrupted. The browser is reconnecting automatically.',
+            );
         };
         esRef.current = es;
         return () => {
+            active = false;
             es.close();
             esRef.current = null;
         };
-    }, [streaming, filters]);
+    }, [streaming, filters, connectionAttempt]);
 
     useEffect(() => {
         if (!streaming) return;
@@ -4017,10 +4190,58 @@ export function DebugConsoleTab({
         }
     }, [frames, autoscroll]);
 
+    const streamStatus = {
+        connecting: {
+            label: 'Connecting',
+            icon: Loader2,
+            className: 'text-status-info',
+        },
+        live: {
+            label: 'Live',
+            icon: Activity,
+            className: 'text-status-success',
+        },
+        reconnecting: {
+            label: 'Reconnecting',
+            icon: RefreshCw,
+            className: 'text-status-warning',
+        },
+        error: {
+            label: 'Unavailable',
+            icon: XCircle,
+            className: 'text-status-critical',
+        },
+        paused: {
+            label: 'Paused',
+            icon: Clock,
+            className: 'text-muted-foreground',
+        },
+    }[streamState];
+    const StreamStatusIcon = streamStatus.icon;
+
+    const toggleStreaming = () => {
+        if (streamState === 'error') {
+            setStreamState('connecting');
+            setStreamError(null);
+            setConnectionAttempt((attempt) => attempt + 1);
+            return;
+        }
+
+        if (streaming) {
+            setStreamState('paused');
+            setStreaming(false);
+            return;
+        }
+
+        setStreamState('connecting');
+        setStreamError(null);
+        setStreaming(true);
+    };
+
     return (
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:items-start">
             {/* Live frame stream */}
-            <Card className="lg:col-span-2">
+            <Card>
                 <CardHeader>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
@@ -4031,19 +4252,33 @@ export function DebugConsoleTab({
                             </CardDescription>
                         </div>
                         <div className="flex items-center gap-2">
+                            <Badge
+                                variant="outline"
+                                role="status"
+                                aria-live="polite"
+                                className={streamStatus.className}
+                            >
+                                <StreamStatusIcon
+                                    className={`mr-1 h-3 w-3 ${
+                                        streamState === 'connecting' ||
+                                        streamState === 'reconnecting'
+                                            ? 'animate-spin motion-reduce:animate-none'
+                                            : ''
+                                    }`}
+                                    aria-hidden="true"
+                                />
+                                {streamStatus.label}
+                            </Badge>
                             <Button
                                 size="sm"
-                                variant={streaming ? 'default' : 'outline'}
-                                onClick={() => setStreaming((s) => !s)}
+                                variant="outline"
+                                onClick={toggleStreaming}
                             >
-                                {streaming ? (
-                                    <>
-                                        <RefreshCw className="mr-2 h-3 w-3 animate-spin" />
-                                        Live
-                                    </>
-                                ) : (
-                                    'Resume'
-                                )}
+                                {streamState === 'error'
+                                    ? 'Reconnect'
+                                    : streaming
+                                      ? 'Pause'
+                                      : 'Resume'}
                             </Button>
                             <Button
                                 size="sm"
@@ -4056,6 +4291,18 @@ export function DebugConsoleTab({
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    {historyError || streamError ? (
+                        <Alert variant="destructive" role="alert">
+                            <AlertTriangle aria-hidden="true" />
+                            <AlertTitle>
+                                Frame transport needs attention
+                            </AlertTitle>
+                            <AlertDescription className="space-y-1">
+                                {historyError ? <p>{historyError}</p> : null}
+                                {streamError ? <p>{streamError}</p> : null}
+                            </AlertDescription>
+                        </Alert>
+                    ) : null}
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         <div className="space-y-2">
                             <Label className="text-xs">Direction</Label>
@@ -4137,7 +4384,13 @@ export function DebugConsoleTab({
                     >
                         {frames.length === 0 ? (
                             <div className="flex h-full items-center justify-center text-muted-foreground">
-                                Waiting for frames…
+                                {streamState === 'live'
+                                    ? 'Waiting for frames…'
+                                    : streamState === 'paused'
+                                      ? 'Frame stream paused.'
+                                      : streamState === 'error'
+                                        ? 'Live frames are unavailable.'
+                                        : 'Establishing the live frame connection…'}
                             </div>
                         ) : (
                             <div className="divide-y">
@@ -4150,8 +4403,7 @@ export function DebugConsoleTab({
                 </CardContent>
             </Card>
 
-            {/* AT Command REPL */}
-            <CommandRepl devices={devices} can={can} />
+            <GovernedCommandHandoff devices={devices} can={can} />
         </div>
     );
 }
@@ -4189,7 +4441,7 @@ function FrameLine({ frame }: { frame: Frame }) {
     );
 }
 
-function CommandRepl({
+export function GovernedCommandHandoff({
     devices,
     can,
 }: {
@@ -4197,32 +4449,29 @@ function CommandRepl({
     can: Props['can'];
 }) {
     const [target, setTarget] = useState<Device | null>(devices[0] ?? null);
-    const [mode, setMode] = useState<'preset' | 'raw'>('preset');
-    const presetForm = useForm<{
+    const locationForm = useForm<{
         mode: 'preset';
-        preset: 'request_location' | 'reboot' | 'set_interval';
-        interval_seconds: number;
+        preset: 'request_location';
     }>({
         mode: 'preset',
         preset: 'request_location',
-        interval_seconds: 60,
     });
-    const rawForm = useForm<{ mode: 'raw'; raw: string }>({
-        mode: 'raw',
-        raw: '',
+    const restartForm = useForm<{
+        mode: 'preset';
+        preset: 'reboot';
+    }>({
+        mode: 'preset',
+        preset: 'reboot',
     });
 
     return (
-        <Card>
+        <Card className="order-first 2xl:order-last">
             <CardHeader>
-                <CardTitle>Send command</CardTitle>
+                <CardTitle>Governed device actions</CardTitle>
                 <CardDescription>
-                    Queue an{' '}
-                    <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                        AT+GTXXX
-                    </code>{' '}
-                    command — it sends on the device's next frame and expires
-                    after 5 minutes if unsent.
+                    Continue in the canonical Device Management workspace so
+                    identity confirmation, reason, approval or IT Change,
+                    provider delivery, fresh evidence, and audit stay together.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -4252,275 +4501,146 @@ function CommandRepl({
                     </Select>
                 </div>
 
-                <div className="space-y-2">
-                    <Label>Mode</Label>
-                    <Select
-                        value={mode}
-                        onValueChange={(v) => setMode(v as 'preset' | 'raw')}
-                    >
-                        <SelectTrigger>
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="preset">
-                                Preset (one-click commands)
-                            </SelectItem>
-                            <SelectItem value="raw">
-                                Raw AT+ command (advanced)
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
+                <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+                    Raw and configuration-change commands are not exposed from
+                    this provider console. Only capabilities with a governed
+                    Device adapter appear in Management.
                 </div>
 
-                <Separator />
-
-                {mode === 'preset' ? (
-                    <div className="space-y-3">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full justify-start"
-                            disabled={
-                                !can.manage || !target || presetForm.processing
-                            }
-                            onClick={() => {
-                                presetForm.setData(
-                                    'preset',
-                                    'request_location',
-                                );
-                                presetForm.transform(() => ({
-                                    mode: 'preset',
-                                    preset: 'request_location',
-                                }));
-                                presetForm.post(
-                                    `/security-devices/integrations/queclink/devices/${target!.id}/command`,
-                                    { preserveScroll: true },
-                                );
-                            }}
-                        >
-                            <Send className="mr-2 h-3 w-3" /> Request current
-                            location
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full justify-start"
-                            disabled={
-                                !can.manage || !target || presetForm.processing
-                            }
-                            onClick={() => {
-                                if (
-                                    !confirm(
-                                        'Reboot the device? It will be offline for ~60 seconds.',
-                                    )
-                                )
-                                    return;
-                                presetForm.transform(() => ({
-                                    mode: 'preset',
-                                    preset: 'reboot',
-                                }));
-                                presetForm.post(
-                                    `/security-devices/integrations/queclink/devices/${target!.id}/command`,
-                                    { preserveScroll: true },
-                                );
-                            }}
-                        >
-                            <Send className="mr-2 h-3 w-3" /> Reboot device
-                        </Button>
-                        <div className="space-y-2 rounded-md border p-3">
-                            <Label className="text-xs">
-                                Set reporting interval (seconds)
-                            </Label>
-                            <div className="flex gap-2">
-                                <Input
-                                    type="number"
-                                    min={5}
-                                    max={86400}
-                                    value={presetForm.data.interval_seconds}
-                                    onChange={(e) =>
-                                        presetForm.setData(
-                                            'interval_seconds',
-                                            parseInt(
-                                                e.target.value || '60',
-                                                10,
-                                            ),
-                                        )
-                                    }
-                                />
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    disabled={
-                                        !can.manage ||
-                                        !target ||
-                                        presetForm.processing
-                                    }
-                                    onClick={() => {
-                                        presetForm.transform(() => ({
-                                            mode: 'preset',
-                                            preset: 'set_interval',
-                                            interval_seconds:
-                                                presetForm.data
-                                                    .interval_seconds,
-                                        }));
-                                        presetForm.post(
-                                            `/security-devices/integrations/queclink/devices/${target!.id}/command`,
-                                            { preserveScroll: true },
-                                        );
-                                    }}
-                                >
-                                    Set
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <form
-                        onSubmit={(e) => {
-                            e.preventDefault();
+                <div className="grid gap-2">
+                    <Button
+                        type="button"
+                        className="w-full"
+                        disabled={
+                            !can.manage ||
+                            !target ||
+                            locationForm.processing ||
+                            restartForm.processing
+                        }
+                        onClick={() => {
                             if (!target) return;
-                            rawForm.post(
+
+                            locationForm.post(
                                 `/security-devices/integrations/queclink/devices/${target.id}/command`,
-                                {
-                                    preserveScroll: true,
-                                    onSuccess: () => rawForm.reset('raw'),
-                                },
                             );
                         }}
-                        className="space-y-2"
                     >
-                        <Label className="text-xs">Raw command</Label>
-                        <Textarea
-                            value={rawForm.data.raw}
-                            onChange={(e) =>
-                                rawForm.setData('raw', e.target.value)
-                            }
-                            placeholder="AT+GTRTO=gv500cg,1,,,,,$"
-                            className="font-mono text-xs"
-                            rows={3}
-                        />
-                        {rawForm.errors.raw && (
-                            <p className="text-xs text-status-critical">
-                                {rawForm.errors.raw}
-                            </p>
-                        )}
-                        <Button
-                            type="submit"
-                            disabled={
-                                !can.manage ||
-                                !target ||
-                                rawForm.processing ||
-                                !rawForm.data.raw
-                            }
-                            className="w-full"
-                        >
-                            <Send className="mr-2 h-3 w-3" /> Queue command
-                        </Button>
-                        <p className="text-xs text-muted-foreground">
-                            Append{' '}
-                            <code className="rounded bg-muted px-1 py-0.5">
-                                $
-                            </code>{' '}
-                            if missing. A 4-hex-char serial is appended
-                            automatically if not provided.
-                        </p>
-                    </form>
-                )}
+                        <ShieldCheck className="mr-2 h-4 w-4" /> Review governed
+                        location refresh
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        disabled={
+                            !can.manage ||
+                            !target ||
+                            locationForm.processing ||
+                            restartForm.processing
+                        }
+                        onClick={() => {
+                            if (!target) return;
+
+                            restartForm.post(
+                                `/security-devices/integrations/queclink/devices/${target.id}/command`,
+                            );
+                        }}
+                    >
+                        <RefreshCw className="mr-2 h-4 w-4" /> Review governed
+                        restart
+                    </Button>
+                </div>
             </CardContent>
         </Card>
     );
 }
 
-// ── IMS Cloud tab (preserves existing scaffold behaviour) ─────────
+// ── Cloud API boundary ─────────────────────────────────────────────
 
-function ImsCloudTab({
-    providerConnection,
+export function CloudIntegrationTab({
+    cloudIntegration,
     can,
 }: {
-    providerConnection: Props['providerConnection'];
+    cloudIntegration: Props['cloudIntegration'];
     can: Props['can'];
 }) {
-    const form = useForm<{ api_key: string; base_url: string }>({
-        api_key: '',
-        base_url: '',
-    });
+    const [removeLegacyCredentialOpen, setRemoveLegacyCredentialOpen] =
+        useState(false);
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Queclink IMS cloud (optional)</CardTitle>
-                <CardDescription>
-                    Direct TCP intake is the primary path. IMS credentials are
-                    kept here for parity — useful when you need device-fleet
-                    sync from Queclink's cloud account in addition to live
-                    telemetry.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-                {providerConnection ? (
-                    <div className="flex flex-wrap items-center gap-3 text-sm">
-                        <span>
-                            Key ending in{' '}
-                            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                                •••{providerConnection.secret_last4}
-                            </code>
-                        </span>
-                        <Badge>{providerConnection.status}</Badge>
-                        {providerConnection.last_tested_at && (
-                            <span className="text-xs text-muted-foreground">
-                                Last tested {fmt(providerConnection.last_tested_at)}
-                            </span>
-                        )}
+        <>
+            <Card className="border-status-warning/30">
+                <CardHeader>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <CardTitle>Queclink cloud API</CardTitle>
+                        <Badge variant="outline">Cloud API unavailable</Badge>
                     </div>
-                ) : (
-                    <form
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            form.post(
-                                '/security-devices/integrations/queclink/key',
-                                {
-                                    preserveScroll: true,
-                                    onSuccess: () => form.reset('api_key'),
-                                },
-                            );
-                        }}
-                        className="space-y-3"
-                    >
-                        <div className="space-y-2">
-                            <Label>Base URL (optional)</Label>
-                            <Input
-                                type="url"
-                                value={form.data.base_url}
-                                onChange={(e) =>
-                                    form.setData('base_url', e.target.value)
+                    <CardDescription>
+                        Direct TCP intake remains the primary path. No verified
+                        public Queclink cloud contract is enabled, so Oblivion
+                        Findings does not save, test, rotate, or use new cloud
+                        credentials and does not imply cloud inventory or sync.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="rounded-lg border bg-muted/30 p-4 text-sm">
+                        <p className="font-medium">
+                            Native operations remain available
+                        </p>
+                        <p className="mt-1 text-muted-foreground">
+                            Listener health, direct tracker telemetry, canonical
+                            assignment, configuration reads, protected profiles,
+                            and governed Device Management continue through
+                            their existing native contracts.
+                        </p>
+                    </div>
+
+                    {cloudIntegration.legacy_credential_stored ? (
+                        <div className="space-y-3 rounded-lg border border-status-warning/30 bg-status-warning/5 p-4 text-sm">
+                            <p className="font-medium">
+                                Legacy cloud credential ending in{' '}
+                                {cloudIntegration.legacy_credential_last4 ??
+                                    'unknown'}
+                            </p>
+                            <p className="text-muted-foreground">
+                                This retained credential is not used, tested, or
+                                considered connected. Remove it after confirming
+                                no external process depends on the retired
+                                scaffold.
+                            </p>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={!can.manage}
+                                onClick={() =>
+                                    setRemoveLegacyCredentialOpen(true)
                                 }
-                                placeholder="https://ims.queclink.com"
-                            />
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remove legacy cloud credential
+                            </Button>
                         </div>
-                        <div className="space-y-2">
-                            <Label>API key</Label>
-                            <Input
-                                type="password"
-                                value={form.data.api_key}
-                                onChange={(e) =>
-                                    form.setData('api_key', e.target.value)
-                                }
-                                required
-                            />
-                        </div>
-                        <Button
-                            type="submit"
-                            disabled={
-                                !can.manage ||
-                                form.processing ||
-                                !form.data.api_key
-                            }
-                        >
-                            Save IMS credentials
-                        </Button>
-                    </form>
-                )}
-            </CardContent>
-        </Card>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">
+                            No legacy cloud credential is stored. There is
+                            nothing to configure or clean up here.
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
+            <ConfirmDialog
+                open={removeLegacyCredentialOpen}
+                onClose={() => setRemoveLegacyCredentialOpen(false)}
+                onConfirm={() =>
+                    router.delete(
+                        '/security-devices/integrations/queclink/key',
+                        { preserveScroll: true },
+                    )
+                }
+                title="Remove legacy Queclink cloud credential?"
+                description="Remove the unused retired cloud credential? Native TCP monitoring and governed Device Management continue unchanged. This credential cannot be recovered from Oblivion Findings."
+                confirmText="Remove legacy credential"
+            />
+        </>
     );
 }

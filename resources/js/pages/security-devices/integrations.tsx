@@ -29,7 +29,6 @@ export type Provider = {
     name: string;
     vendor: string;
     summary: string;
-    implementation_status: 'live' | 'scaffold';
     capabilities: string[];
     device_scope: string[];
     docs_href: string | null;
@@ -39,6 +38,7 @@ export type Provider = {
         | 'error'
         | 'untested'
         | 'disabled'
+        | 'unavailable'
         | 'not_configured';
     connected: boolean;
     last_tested_at: string | null;
@@ -88,9 +88,31 @@ export type Provider = {
         unsupported_checks: number;
     };
     monitoring_support: {
-        state: 'not_assessed';
+        state: 'supported' | 'capability_absent';
         scope: 'provider';
         note: string;
+    };
+    runtime: {
+        version: string;
+        contract_state:
+            | 'native_runtime_only'
+            | 'connection_health_only'
+            | 'inventory_sync'
+            | 'topology_collection';
+        contract_label: string;
+        contract_note: string;
+        capabilities: string[];
+        page_limit: number;
+        minimum_interval_seconds: number;
+        backfill_limit: number;
+        cursor_scopes: number;
+        partial_scopes: number;
+        exception_count: number;
+        latest_completed_at: string | null;
+        latest_exception_at: string | null;
+        exception_codes: string[];
+        disconnect_ready: boolean;
+        revoke_ready: boolean;
     };
     exceptions: ProviderException[];
     exception_count: number;
@@ -123,6 +145,13 @@ function ConnectionBadge({ provider }: { provider: Provider }) {
             <Badge variant="secondary" className="gap-1">
                 <Plug className="h-3 w-3" />
                 Disabled
+            </Badge>
+        );
+    if (provider.connection_status === 'unavailable')
+        return (
+            <Badge variant="outline" className="gap-1">
+                <Plug className="h-3 w-3" />
+                Cloud API unavailable
             </Badge>
         );
     return (
@@ -197,9 +226,9 @@ export function ProviderCard({
                         </p>
                     </div>
                     <div className="flex flex-wrap justify-end gap-2">
-                        {provider.implementation_status === 'scaffold' ? (
-                            <Badge variant="outline">Adapter scaffold</Badge>
-                        ) : null}
+                        <Badge variant="outline">
+                            {provider.runtime.contract_label}
+                        </Badge>
                         <ConnectionBadge provider={provider} />
                     </div>
                 </div>
@@ -257,6 +286,49 @@ export function ProviderCard({
                 ) : null}
 
                 <section
+                    aria-label={`${provider.name} runtime capabilities`}
+                    className="rounded-lg border p-3 text-sm"
+                >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="font-semibold">
+                            Runtime contract v{provider.runtime.version}
+                        </h3>
+                        <Badge
+                            variant={
+                                provider.monitoring_support.state ===
+                                'supported'
+                                    ? 'outline'
+                                    : 'secondary'
+                            }
+                        >
+                            {provider.monitoring_support.state === 'supported'
+                                ? 'Monitoring capable'
+                                : 'Monitoring capability absent'}
+                        </Badge>
+                    </div>
+                    <p className="mt-2 text-muted-foreground">
+                        {provider.runtime.capabilities.length
+                            ? provider.runtime.capabilities
+                                  .map((value) => value.replaceAll('_', ' '))
+                                  .join(', ')
+                            : 'No runtime capabilities declared'}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        Page limit {provider.runtime.page_limit} · minimum
+                        interval {provider.runtime.minimum_interval_seconds}s ·
+                        backfill limit {provider.runtime.backfill_limit} ·{' '}
+                        {provider.runtime.cursor_scopes} cursor scopes ·{' '}
+                        {provider.runtime.exception_count} runtime exceptions
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        {provider.runtime.contract_note}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        {provider.monitoring_support.note}
+                    </p>
+                </section>
+
+                <section
                     aria-label={`${provider.name} exceptions`}
                     className="space-y-2"
                 >
@@ -306,7 +378,6 @@ type Props = {
     providers: Provider[];
     stats: {
         providers_total: number;
-        providers_live: number;
         providers_connected: number;
         providers_errored: number;
         imported_devices: number;

@@ -12,9 +12,11 @@ use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Site;
 use App\Models\SiteRoom;
+use App\Services\Integration\Contracts\ConnectionHealthCapability;
+use App\Services\Integration\Contracts\DeviceSyncCapability;
+use App\Services\Integration\Contracts\InventoryDiscoveryCapability;
 use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Services\Integration\UnifiOperationalBridgeService;
-use App\Support\LegacyStorageContext;
 use App\Support\SafeOperationalData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -62,7 +64,7 @@ class UnifiController extends Controller
             ->forProvider(self::PROVIDER)
             ->whereIn('site_id', $siteIds)
             ->whereHas('site')
-            ->with('site:id,name,type,tenant_id')
+            ->with('site:id,name,type')
             ->orderBy('site_id')
             ->get()
             ->map(fn (IntegrationSiteConfig $config) => [
@@ -211,7 +213,6 @@ class UnifiController extends Controller
                 'provider' => self::PROVIDER,
             ],
             [
-                'tenant_id' => LegacyStorageContext::id(),
                 'secret_encrypted' => Crypt::encryptString($request->string('api_key')->toString()),
                 'secret_last4' => substr($request->string('api_key')->toString(), -4),
                 'status' => IntegrationProviderConnection::STATUS_DISCONNECTED,
@@ -225,7 +226,6 @@ class UnifiController extends Controller
                 'provider' => self::PROVIDER,
             ],
             [
-                'tenant_id' => LegacyStorageContext::id(),
                 'display_name' => 'UniFi',
                 'status' => Integration::STATUS_INACTIVE,
                 'last_error' => null,
@@ -247,11 +247,12 @@ class UnifiController extends Controller
             ->forProvider(self::PROVIDER)
             ->firstOrFail();
 
-        if (! $registry->has(self::PROVIDER)) {
-            return redirect()->back()->with('error', 'UniFi adapter is not registered.');
+        if (! $registry->hasCapability(self::PROVIDER, ConnectionHealthCapability::class)) {
+            return redirect()->back()->with('error', 'UniFi connection testing is not available.');
         }
 
-        $adapter = $registry->resolve(self::PROVIDER);
+        $adapter = $registry->capability(self::PROVIDER, ConnectionHealthCapability::class);
+        assert($adapter instanceof ConnectionHealthCapability);
         $isConnected = $adapter->testConnection($connection);
 
         if ($isConnected) {
@@ -266,7 +267,6 @@ class UnifiController extends Controller
                     'provider' => self::PROVIDER,
                 ],
                 [
-                    'tenant_id' => LegacyStorageContext::id(),
                     'display_name' => 'UniFi',
                     'status' => Integration::STATUS_ACTIVE,
                     'last_tested_at' => now(),
@@ -288,7 +288,6 @@ class UnifiController extends Controller
                 'provider' => self::PROVIDER,
             ],
             [
-                'tenant_id' => LegacyStorageContext::id(),
                 'display_name' => 'UniFi',
                 'status' => Integration::STATUS_ERROR,
                 'last_tested_at' => now(),
@@ -327,7 +326,7 @@ class UnifiController extends Controller
     }
 
     /**
-     * Discover UniFi sites and cache them in tenant config.
+     * Discover UniFi sites and cache them in the application provider config.
      */
     public function syncSites(Request $request, IntegrationAdapterRegistry $registry)
     {
@@ -338,12 +337,11 @@ class UnifiController extends Controller
             ->forProvider(self::PROVIDER)
             ->firstOrFail();
 
-        if (! $registry->has(self::PROVIDER)) {
-            return redirect()->back()->with('error', 'UniFi adapter is not registered.');
+        if (! $registry->hasCapability(self::PROVIDER, InventoryDiscoveryCapability::class)) {
+            return redirect()->back()->with('error', 'UniFi inventory discovery is not available.');
         }
 
         $syncLog = IntegrationSyncLog::create([
-            'tenant_id' => LegacyStorageContext::id(),
             'provider' => self::PROVIDER,
             'action' => 'discover_sites',
             'status' => IntegrationSyncLog::STATUS_STARTED,
@@ -351,7 +349,8 @@ class UnifiController extends Controller
         ]);
 
         try {
-            $adapter = $registry->resolve(self::PROVIDER);
+            $adapter = $registry->capability(self::PROVIDER, InventoryDiscoveryCapability::class);
+            assert($adapter instanceof InventoryDiscoveryCapability);
             $sites = $adapter->discoverSites($connection);
             $hosts = [];
             if (method_exists($adapter, 'discoverHosts')) {
@@ -443,7 +442,6 @@ class UnifiController extends Controller
                 'provider' => self::PROVIDER,
             ],
             [
-                'tenant_id' => LegacyStorageContext::id(),
                 'mapped_external_site_id' => (string) $discoveredSite['external_id'],
                 'mapped_external_site_name' => (string) ($discoveredSite['name'] ?? 'Provider location'),
                 'status' => IntegrationSiteConfig::STATUS_HYBRID,
@@ -513,12 +511,11 @@ class UnifiController extends Controller
             return redirect()->back()->with('error', 'Test and connect your UniFi API key before syncing devices.');
         }
 
-        if (! $registry->has(self::PROVIDER)) {
-            return redirect()->back()->with('error', 'UniFi adapter is not registered.');
+        if (! $registry->hasCapability(self::PROVIDER, DeviceSyncCapability::class)) {
+            return redirect()->back()->with('error', 'UniFi device sync is not available.');
         }
 
         $syncLog = IntegrationSyncLog::create([
-            'tenant_id' => LegacyStorageContext::id(),
             'provider' => self::PROVIDER,
             'site_id' => $siteConfig->site_id,
             'action' => 'sync_devices',
@@ -527,7 +524,8 @@ class UnifiController extends Controller
         ]);
 
         try {
-            $adapter = $registry->resolve(self::PROVIDER);
+            $adapter = $registry->capability(self::PROVIDER, DeviceSyncCapability::class);
+            assert($adapter instanceof DeviceSyncCapability);
             $result = $adapter->syncDevices($siteConfig, $connection);
 
             $syncLog->update([

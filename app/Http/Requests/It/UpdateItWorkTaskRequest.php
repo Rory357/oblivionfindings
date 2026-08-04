@@ -33,6 +33,7 @@ class UpdateItWorkTaskRequest extends FormRequest
             'sort_order' => ['sometimes', 'integer', 'min:0', 'max:1000000'],
             'dependency_ids' => ['sometimes', 'array'],
             'dependency_ids.*' => ['integer', 'distinct', 'exists:it_work_tasks,id'],
+            'reason' => ['nullable', 'required_if:status,cancelled', 'string', 'max:2000'],
         ];
     }
 }

@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,12 +25,12 @@ import { Head, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle,
-    Clock,
     Loader2,
     MapPin,
     RefreshCw,
     ShieldAlert,
     Trash2,
+    Webhook,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -48,7 +49,34 @@ type ProviderConnection = {
     last_tested_at?: string;
     last_synced_at?: string;
     endpoint_configured: boolean;
+    client_id_configured: boolean;
+    applications_synced_at?: string | null;
+    webhook_configured: boolean;
+    webhook_secret_last4?: string | null;
+    webhook_url: string;
+    last_webhook_received_at?: string | null;
 } | null;
+
+type DiscoveredApplication = {
+    mapping_token: string;
+    name: string;
+    device_count?: number | null;
+};
+
+type SiteConfig = {
+    id: number;
+    site_id: number;
+    site_name: string;
+    site_type?: string | null;
+    mapped_external_site_name?: string | null;
+    is_active: boolean;
+};
+
+type SiteOption = {
+    id: number;
+    name: string;
+    type?: string | null;
+};
 
 type SyncLog = {
     id: number;
@@ -65,6 +93,9 @@ type SyncLog = {
 
 type Props = {
     providerConnection: ProviderConnection;
+    discoveredApplications: DiscoveredApplication[];
+    siteConfigs: SiteConfig[];
+    sites: SiteOption[];
     syncLogs: SyncLog[];
     siteCredentials: SiteCredentialRow[];
     can: {
@@ -114,21 +145,46 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 export default function MilesightIntegration({
     providerConnection,
+    discoveredApplications,
+    siteConfigs,
+    sites,
     syncLogs,
     siteCredentials,
     can,
 }: Props) {
     const [showRotateForm, setShowRotateForm] = useState(false);
     const [testingConnection, setTestingConnection] = useState(false);
+    const [syncingApplications, setSyncingApplications] = useState(false);
+    const [syncingSiteConfigId, setSyncingSiteConfigId] = useState<
+        number | null
+    >(null);
+    const [mappingSites, setMappingSites] = useState<Record<string, string>>(
+        {},
+    );
+    const [removeCredentialsOpen, setRemoveCredentialsOpen] = useState(false);
+    const [disableWebhookOpen, setDisableWebhookOpen] = useState(false);
+    const [mappingToRemove, setMappingToRemove] = useState<SiteConfig | null>(
+        null,
+    );
 
-    const saveKeyForm = useForm<{ api_key: string; base_url: string }>({
-        api_key: '',
+    const saveKeyForm = useForm<{
+        client_id: string;
+        client_secret: string;
+        base_url: string;
+    }>({
+        client_id: '',
+        client_secret: '',
         base_url: '',
     });
 
-    const rotateKeyForm = useForm<{ api_key: string }>({ api_key: '' });
+    const rotateKeyForm = useForm<{ client_secret: string }>({
+        client_secret: '',
+    });
+    const webhookSecretForm = useForm<{ webhook_secret: string }>({
+        webhook_secret: '',
+    });
 
-    const hasKey = !!providerConnection;
+    const hasKey = !!providerConnection?.client_id_configured;
     const connStatus = providerConnection
         ? (connectionStatusConfig[providerConnection.status] ??
           connectionStatusConfig.disconnected)
@@ -148,20 +204,18 @@ export default function MilesightIntegration({
                     />
                 }
             >
-                {/* ── Scaffold state banner ───────────────────────────── */}
-                <Card className="border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30">
+                <Card className="border-status-info/30 bg-status-info-bg dark:border-status-info/30">
                     <CardContent className="flex items-start gap-3 p-4 text-sm">
-                        <Clock className="mt-0.5 h-4 w-4 text-status-warning dark:text-status-warning" />
+                        <CheckCircle className="mt-0.5 h-4 w-4 text-status-info dark:text-status-info" />
                         <div className="space-y-1 leading-6">
                             <p className="font-medium">
-                                Scaffold stage — credential management only.
+                                OAuth inventory and Device Registry sync
                             </p>
                             <p className="text-muted-foreground">
-                                Save your API key and verify the connection here
-                                today. Gateway / application mapping, LoRaWAN
-                                device import, and payload decoding for bed,
-                                fall, door, temp, leak and air-quality sensors
-                                ship in a follow-up release.
+                                Connect the Milesight Development Platform,
+                                discover applications, map each one to an
+                                approved Site, then import its gateways and
+                                sensors into the canonical Device Registry.
                             </p>
                         </div>
                     </CardContent>
@@ -172,8 +226,8 @@ export default function MilesightIntegration({
                     <CardHeader>
                         <CardTitle>API credentials</CardTitle>
                         <CardDescription>
-                            Stored encrypted for this application. Only the last four
-                            characters are ever shown.
+                            Stored encrypted for this application. Only the last
+                            four characters are ever shown.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -186,12 +240,31 @@ export default function MilesightIntegration({
                                         {
                                             preserveScroll: true,
                                             onSuccess: () =>
-                                                saveKeyForm.reset('api_key'),
+                                                saveKeyForm.reset(
+                                                    'client_secret',
+                                                ),
                                         },
                                     );
                                 }}
                                 className="space-y-4"
                             >
+                                <div className="space-y-2">
+                                    <Label htmlFor="client_id">
+                                        OAuth client ID
+                                    </Label>
+                                    <Input
+                                        id="client_id"
+                                        value={saveKeyForm.data.client_id}
+                                        onChange={(e) =>
+                                            saveKeyForm.setData(
+                                                'client_id',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="Milesight client ID"
+                                        required
+                                    />
+                                </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="base_url">
                                         Server URL (optional)
@@ -210,23 +283,25 @@ export default function MilesightIntegration({
                                     />
                                     <p className="text-xs text-muted-foreground">
                                         Defaults to the Milesight Development
-                                        Platform. Override for a self-hosted
-                                        gateway bridge or regional cloud.
+                                        Platform. Only an HTTPS regional API
+                                        endpoint should be entered here.
                                     </p>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="api_key">API key</Label>
+                                    <Label htmlFor="client_secret">
+                                        OAuth client secret
+                                    </Label>
                                     <Input
-                                        id="api_key"
+                                        id="client_secret"
                                         type="password"
-                                        value={saveKeyForm.data.api_key}
+                                        value={saveKeyForm.data.client_secret}
                                         onChange={(e) =>
                                             saveKeyForm.setData(
-                                                'api_key',
+                                                'client_secret',
                                                 e.target.value,
                                             )
                                         }
-                                        placeholder="Milesight API key"
+                                        placeholder="Milesight client secret"
                                         required
                                     />
                                 </div>
@@ -235,7 +310,8 @@ export default function MilesightIntegration({
                                     disabled={
                                         !can.manage ||
                                         saveKeyForm.processing ||
-                                        !saveKeyForm.data.api_key
+                                        !saveKeyForm.data.client_id ||
+                                        !saveKeyForm.data.client_secret
                                     }
                                 >
                                     {saveKeyForm.processing
@@ -247,9 +323,10 @@ export default function MilesightIntegration({
                             <>
                                 <div className="flex flex-wrap items-center gap-3">
                                     <span className="text-sm">
-                                        Key ending in{' '}
+                                        Client secret ending in{' '}
                                         <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                                            •••{providerConnection?.secret_last4}
+                                            •••
+                                            {providerConnection?.secret_last4}
                                         </code>
                                     </span>
                                     {connStatus && (
@@ -269,13 +346,17 @@ export default function MilesightIntegration({
                                     <p>
                                         Last tested:{' '}
                                         <span className="text-foreground">
-                                            {fmt(providerConnection?.last_tested_at)}
+                                            {fmt(
+                                                providerConnection?.last_tested_at,
+                                            )}
                                         </span>
                                     </p>
                                     <p>
                                         Last sync:{' '}
                                         <span className="text-foreground">
-                                            {fmt(providerConnection?.last_synced_at)}
+                                            {fmt(
+                                                providerConnection?.last_synced_at,
+                                            )}
                                         </span>
                                     </p>
                                 </div>
@@ -326,24 +407,15 @@ export default function MilesightIntegration({
                                         }
                                         disabled={!can.manage}
                                     >
-                                        Rotate key
+                                        Rotate secret
                                     </Button>
                                     <Button
                                         variant="ghost"
                                         size="sm"
                                         className="text-status-critical hover:text-status-critical"
-                                        onClick={() => {
-                                            if (
-                                                !confirm(
-                                                    'Remove Milesight credentials? Any sensors already synced remain; only the key is deleted.',
-                                                )
-                                            )
-                                                return;
-                                            router.delete(
-                                                '/security-devices/integrations/milesight/key',
-                                                { preserveScroll: true },
-                                            );
-                                        }}
+                                        onClick={() =>
+                                            setRemoveCredentialsOpen(true)
+                                        }
                                         disabled={!can.manage}
                                     >
                                         <Trash2 className="mr-2 h-4 w-4" />
@@ -360,7 +432,7 @@ export default function MilesightIntegration({
                                                     preserveScroll: true,
                                                     onSuccess: () => {
                                                         rotateKeyForm.reset(
-                                                            'api_key',
+                                                            'client_secret',
                                                         );
                                                         setShowRotateForm(
                                                             false,
@@ -371,16 +443,18 @@ export default function MilesightIntegration({
                                         }}
                                         className="space-y-3 rounded-lg border p-4"
                                     >
-                                        <Label htmlFor="rotate_api_key">
-                                            New API key
+                                        <Label htmlFor="rotate_client_secret">
+                                            New client secret
                                         </Label>
                                         <Input
-                                            id="rotate_api_key"
+                                            id="rotate_client_secret"
                                             type="password"
-                                            value={rotateKeyForm.data.api_key}
+                                            value={
+                                                rotateKeyForm.data.client_secret
+                                            }
                                             onChange={(e) =>
                                                 rotateKeyForm.setData(
-                                                    'api_key',
+                                                    'client_secret',
                                                     e.target.value,
                                                 )
                                             }
@@ -391,7 +465,8 @@ export default function MilesightIntegration({
                                                 size="sm"
                                                 disabled={
                                                     rotateKeyForm.processing ||
-                                                    !rotateKeyForm.data.api_key
+                                                    !rotateKeyForm.data
+                                                        .client_secret
                                                 }
                                             >
                                                 {rotateKeyForm.processing
@@ -405,7 +480,7 @@ export default function MilesightIntegration({
                                                 onClick={() => {
                                                     setShowRotateForm(false);
                                                     rotateKeyForm.reset(
-                                                        'api_key',
+                                                        'client_secret',
                                                     );
                                                 }}
                                             >
@@ -416,6 +491,392 @@ export default function MilesightIntegration({
                                 )}
                             </>
                         )}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="space-y-1.5">
+                                <CardTitle
+                                    role="heading"
+                                    aria-level={2}
+                                    className="flex items-center gap-2"
+                                >
+                                    <Webhook className="h-4 w-4" />
+                                    Real-time monitoring webhook
+                                </CardTitle>
+                                <CardDescription>
+                                    Receive signed Milesight status, sensor and
+                                    safety events through Oblivion Findings'
+                                    native Monitoring runtime. Events remain
+                                    linked to the canonical Device and Site.
+                                </CardDescription>
+                            </div>
+                            <Badge
+                                className={
+                                    providerConnection?.webhook_configured
+                                        ? 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success'
+                                        : 'bg-muted text-muted-foreground'
+                                }
+                            >
+                                {providerConnection?.webhook_configured
+                                    ? 'Signature verification enabled'
+                                    : 'Not configured'}
+                            </Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.8fr)]">
+                            <div className="space-y-2">
+                                <Label htmlFor="milesight_webhook_url">
+                                    Callback URL
+                                </Label>
+                                <Input
+                                    id="milesight_webhook_url"
+                                    value={
+                                        providerConnection?.webhook_url ??
+                                        'Save API credentials to create the callback.'
+                                    }
+                                    readOnly
+                                />
+                                <p className="text-xs leading-5 text-muted-foreground">
+                                    Add this HTTPS callback to the same
+                                    Milesight Development Platform application
+                                    that owns the mapped Devices. Then use
+                                    Milesight's Test action.
+                                </p>
+                            </div>
+                            <div className="rounded-lg border bg-muted/20 p-4 text-sm">
+                                <p className="font-medium">
+                                    What happens after verification
+                                </p>
+                                <p className="mt-1 leading-6 text-muted-foreground">
+                                    Signed batches are replay-protected, matched
+                                    to one current Device and Site, and queued
+                                    through the common Monitoring event path.
+                                    Unknown Devices and mismatched Sites are
+                                    rejected before anything is stored.
+                                </p>
+                            </div>
+                        </div>
+
+                        {providerConnection?.webhook_configured && (
+                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-status-success/25 bg-status-success-bg p-4 text-sm">
+                                <div className="space-y-1">
+                                    <p className="font-medium text-status-success">
+                                        Webhook secret ending in •••
+                                        {
+                                            providerConnection.webhook_secret_last4
+                                        }
+                                    </p>
+                                    <p className="text-muted-foreground">
+                                        Last verified event:{' '}
+                                        <span className="text-foreground">
+                                            {fmt(
+                                                providerConnection.last_webhook_received_at,
+                                            )}
+                                        </span>
+                                    </p>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-status-critical hover:text-status-critical"
+                                    disabled={!can.manage}
+                                    onClick={() => setDisableWebhookOpen(true)}
+                                >
+                                    Disable webhook
+                                </Button>
+                            </div>
+                        )}
+
+                        <form
+                            className="space-y-3 rounded-lg border p-4"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                webhookSecretForm.post(
+                                    '/security-devices/integrations/milesight/webhook',
+                                    {
+                                        preserveScroll: true,
+                                        onSuccess: () =>
+                                            webhookSecretForm.reset(
+                                                'webhook_secret',
+                                            ),
+                                    },
+                                );
+                            }}
+                        >
+                            <div className="space-y-2">
+                                <Label htmlFor="milesight_webhook_secret">
+                                    {providerConnection?.webhook_configured
+                                        ? 'Replace webhook secret key'
+                                        : 'Webhook secret key'}
+                                </Label>
+                                <Input
+                                    id="milesight_webhook_secret"
+                                    type="password"
+                                    autoComplete="new-password"
+                                    value={
+                                        webhookSecretForm.data.webhook_secret
+                                    }
+                                    onChange={(event) =>
+                                        webhookSecretForm.setData(
+                                            'webhook_secret',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="Paste the Milesight application webhook secret"
+                                    required
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Stored encrypted and never displayed again.
+                                    This is separate from the OAuth client
+                                    secret above.
+                                </p>
+                            </div>
+                            <Button
+                                type="submit"
+                                disabled={
+                                    !can.manage ||
+                                    !hasKey ||
+                                    webhookSecretForm.processing ||
+                                    webhookSecretForm.data.webhook_secret
+                                        .length < 16
+                                }
+                            >
+                                {webhookSecretForm.processing
+                                    ? 'Saving…'
+                                    : providerConnection?.webhook_configured
+                                      ? 'Replace verification secret'
+                                      : 'Enable verified webhook'}
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="space-y-1.5">
+                            <CardTitle>Applications and Site mapping</CardTitle>
+                            <CardDescription>
+                                Discover Milesight applications, then map each
+                                application to the Oblivion Findings Site it
+                                belongs to. Imports cannot move a Device across
+                                Sites.
+                            </CardDescription>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                setSyncingApplications(true);
+                                router.post(
+                                    '/security-devices/integrations/milesight/applications/sync',
+                                    {},
+                                    {
+                                        preserveScroll: true,
+                                        onFinish: () =>
+                                            setSyncingApplications(false),
+                                    },
+                                );
+                            }}
+                            disabled={
+                                !can.manage ||
+                                providerConnection?.status !== 'connected' ||
+                                syncingApplications
+                            }
+                        >
+                            {syncingApplications ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                            )}
+                            Discover applications
+                        </Button>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                        <p className="text-xs text-muted-foreground">
+                            Last discovered:{' '}
+                            <span className="text-foreground">
+                                {fmt(
+                                    providerConnection?.applications_synced_at,
+                                )}
+                            </span>
+                        </p>
+
+                        {discoveredApplications.length === 0 ? (
+                            <div className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
+                                Test the connection, then discover applications.
+                                Applications are derived from the bounded device
+                                inventory returned by Milesight.
+                            </div>
+                        ) : (
+                            <div className="grid gap-3 xl:grid-cols-2">
+                                {discoveredApplications.map((application) => {
+                                    const selectedSite =
+                                        mappingSites[
+                                            application.mapping_token
+                                        ] ?? '';
+
+                                    return (
+                                        <div
+                                            key={application.mapping_token}
+                                            className="space-y-3 rounded-xl border p-4"
+                                        >
+                                            <div>
+                                                <p className="font-medium">
+                                                    {application.name}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {application.device_count ??
+                                                        0}{' '}
+                                                    devices reported
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-col gap-2 sm:flex-row">
+                                                <select
+                                                    aria-label={`Site for ${application.name}`}
+                                                    className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                                    value={selectedSite}
+                                                    onChange={(event) =>
+                                                        setMappingSites(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [application.mapping_token]:
+                                                                    event.target
+                                                                        .value,
+                                                            }),
+                                                        )
+                                                    }
+                                                >
+                                                    <option value="">
+                                                        Select an approved Site
+                                                    </option>
+                                                    {sites.map((site) => (
+                                                        <option
+                                                            key={site.id}
+                                                            value={site.id}
+                                                        >
+                                                            {site.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <Button
+                                                    size="sm"
+                                                    disabled={
+                                                        !can.manage ||
+                                                        selectedSite === ''
+                                                    }
+                                                    onClick={() =>
+                                                        router.post(
+                                                            '/security-devices/integrations/milesight/applications/map',
+                                                            {
+                                                                site_id:
+                                                                    Number(
+                                                                        selectedSite,
+                                                                    ),
+                                                                mapping_token:
+                                                                    application.mapping_token,
+                                                            },
+                                                            {
+                                                                preserveScroll: true,
+                                                            },
+                                                        )
+                                                    }
+                                                >
+                                                    <MapPin className="mr-2 h-4 w-4" />
+                                                    Map to Site
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        <div className="space-y-3">
+                            <h3 className="text-sm font-semibold">
+                                Active Site mappings
+                            </h3>
+                            {siteConfigs.length === 0 ? (
+                                <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                                    No Milesight application is mapped yet.
+                                </p>
+                            ) : (
+                                siteConfigs.map((siteConfig) => (
+                                    <div
+                                        key={siteConfig.id}
+                                        className="flex flex-col gap-3 rounded-xl border p-4 lg:flex-row lg:items-center lg:justify-between"
+                                    >
+                                        <div>
+                                            <p className="font-medium">
+                                                {siteConfig.site_name}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {siteConfig.mapped_external_site_name ??
+                                                    'Milesight application'}
+                                            </p>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                disabled={
+                                                    !can.manage ||
+                                                    syncingSiteConfigId !==
+                                                        null ||
+                                                    providerConnection?.status !==
+                                                        'connected'
+                                                }
+                                                onClick={() => {
+                                                    setSyncingSiteConfigId(
+                                                        siteConfig.id,
+                                                    );
+                                                    router.post(
+                                                        '/security-devices/integrations/milesight/devices/sync',
+                                                        {
+                                                            site_config_id:
+                                                                siteConfig.id,
+                                                        },
+                                                        {
+                                                            preserveScroll: true,
+                                                            onFinish: () =>
+                                                                setSyncingSiteConfigId(
+                                                                    null,
+                                                                ),
+                                                        },
+                                                    );
+                                                }}
+                                            >
+                                                {syncingSiteConfigId ===
+                                                siteConfig.id ? (
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <RefreshCw className="mr-2 h-4 w-4" />
+                                                )}
+                                                Sync Devices
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="text-status-critical hover:text-status-critical"
+                                                disabled={!can.manage}
+                                                onClick={() =>
+                                                    setMappingToRemove(
+                                                        siteConfig,
+                                                    )
+                                                }
+                                            >
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                Remove mapping
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -479,10 +940,11 @@ export default function MilesightIntegration({
                 {/* ── Sensor coverage ─────────────────────────────────── */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Sensor coverage planned</CardTitle>
+                        <CardTitle>Imported Device classification</CardTitle>
                         <CardDescription>
-                            LoRaWAN device families that will import with
-                            decoded payloads once PR D1 lands.
+                            Imported gateways and sensors appear in the same
+                            canonical Device Registry used by Sites, Client
+                            profiles, monitoring, maintenance, and IT tickets.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-3 text-sm md:grid-cols-3">
@@ -509,6 +971,54 @@ export default function MilesightIntegration({
                         </div>
                     </CardContent>
                 </Card>
+
+                <ConfirmDialog
+                    open={removeCredentialsOpen}
+                    onClose={() => setRemoveCredentialsOpen(false)}
+                    onConfirm={() =>
+                        router.delete(
+                            '/security-devices/integrations/milesight/key',
+                            { preserveScroll: true },
+                        )
+                    }
+                    title="Remove Milesight credentials?"
+                    description="Remove the OAuth connection? Devices already synced remain in the canonical registry, but discovery, monitoring and future syncs stop until credentials are configured again."
+                    confirmText="Remove credentials"
+                />
+
+                <ConfirmDialog
+                    open={disableWebhookOpen}
+                    onClose={() => setDisableWebhookOpen(false)}
+                    onConfirm={() =>
+                        router.delete(
+                            '/security-devices/integrations/milesight/webhook',
+                            { preserveScroll: true },
+                        )
+                    }
+                    title="Disable Milesight webhook verification?"
+                    description="New callbacks will be rejected until a verified webhook secret is configured again. Existing Device and monitoring history is preserved."
+                    confirmText="Disable webhook"
+                />
+
+                <ConfirmDialog
+                    open={mappingToRemove !== null}
+                    onClose={() => setMappingToRemove(null)}
+                    onConfirm={() => {
+                        if (mappingToRemove) {
+                            router.delete(
+                                `/security-devices/integrations/milesight/applications/${mappingToRemove.id}`,
+                                { preserveScroll: true },
+                            );
+                        }
+                    }}
+                    title="Remove Milesight Site mapping?"
+                    description={
+                        mappingToRemove
+                            ? `Remove the Milesight application mapping for “${mappingToRemove.site_name}”? Imported Devices remain in the canonical registry, but this Site will no longer receive Milesight sync or monitoring updates.`
+                            : ''
+                    }
+                    confirmText="Remove mapping"
+                />
             </PageLayout>
         </AppLayout>
     );

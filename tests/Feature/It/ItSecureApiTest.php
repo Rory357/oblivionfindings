@@ -219,8 +219,7 @@ test('scoped identities create and read only allowed site work type and fields w
         ->assertJsonMissingPath('data.raw_device_config')
         ->assertJsonMissingPath('data.command_capability');
     $ticket = ItTicket::query()->sole();
-    expect($ticket->tenant_id)->toBe(1)
-        ->and($ticket->source)->toBe('system')
+    expect($ticket->source)->toBe('system')
         ->and($ticket->requester_user_id)->toBe($this->manager->id)
         ->and($ticket->description)->toContain('five failed probes');
 

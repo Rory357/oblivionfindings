@@ -32,7 +32,7 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
             'email' => 'security-devices-admin@example.test',
             'email_verified_at' => now(),
             'approved_at' => now(),
-            'organization_id' => 1,
+
             'password' => 'not-used-by-this-feature-test',
         ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->firstOrFail());
@@ -42,7 +42,7 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
             'email' => 'security-devices-auditor@example.test',
             'email_verified_at' => now(),
             'approved_at' => now(),
-            'organization_id' => 1,
+
             'password' => 'not-used-by-this-feature-test',
         ]);
         $this->auditor->roles()->attach(Role::where('name', 'auditor')->firstOrFail());
@@ -127,20 +127,17 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
     public function test_discovery_summary_reports_stale_collectors_from_real_heartbeat_times(): void
     {
         MonitoringCollector::factory()->create([
-            'tenant_id' => 1,
             'name' => 'Online collector',
             'status' => 'online',
             'last_seen_at' => now()->subMinute(),
         ]);
         MonitoringCollector::factory()->create([
-            'tenant_id' => 1,
             'name' => 'Stale collector',
             'status' => 'offline',
             'last_seen_at' => now()->subMinutes(10),
         ]);
         MonitoringCollector::factory()->create([
-            'tenant_id' => 2,
-            'name' => 'Other tenant collector',
+            'name' => 'Unassigned collector',
             'status' => 'offline',
             'last_seen_at' => null,
         ]);
@@ -172,8 +169,8 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
 
     public function test_sites_destination_uses_explicit_all_sites_access_and_does_not_require_sites_module_access(): void
     {
-        Site::factory()->create(['tenant_id' => 1, 'name' => 'Koru House']);
-        Site::factory()->create(['tenant_id' => 2, 'name' => 'Other tenant site']);
+        Site::factory()->create(['name' => 'Koru House']);
+        Site::factory()->create(['name' => 'Kea Lodge']);
 
         $this->actingAs($this->admin)
             ->get('/security-devices/sites')
@@ -181,14 +178,14 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/sites/index')
                 ->has('sites', 2)
-                ->where('sites.0.name', 'Koru House')
+                ->where('sites.0.name', 'Kea Lodge')
             );
     }
 
-    public function test_site_technology_detail_ignores_legacy_partition_values_for_all_sites_users(): void
+    public function test_site_technology_detail_is_available_to_all_sites_users(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1, 'name' => 'Koru House']);
-        $otherTenantSite = Site::factory()->create(['tenant_id' => 2]);
+        $site = Site::factory()->create(['name' => 'Koru House']);
+        $otherSite = Site::factory()->create([]);
 
         $this->actingAs($this->admin)
             ->get("/security-devices/sites/{$site->id}")
@@ -201,7 +198,7 @@ class SecurityDevicesNavigationRoutesTest extends TestCase
             );
 
         $this->actingAs($this->admin)
-            ->get("/security-devices/sites/{$otherTenantSite->id}")
+            ->get("/security-devices/sites/{$otherSite->id}")
             ->assertOk();
     }
 }

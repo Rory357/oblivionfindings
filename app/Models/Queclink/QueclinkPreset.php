@@ -2,6 +2,8 @@
 
 namespace App\Models\Queclink;
 
+use App\Domain\SecurityDevices\Management\Models\DeviceConfigurationProfile;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,10 +20,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class QueclinkPreset extends Model
 {
+    use WritesLegacyStorageContext;
+
     protected $table = 'queclink_presets';
 
     protected $fillable = [
-        'tenant_id',
+        'device_configuration_profile_id',
         'name',
         'slug',
         'description',
@@ -41,10 +45,15 @@ class QueclinkPreset extends Model
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
+    public function configurationProfile(): BelongsTo
+    {
+        return $this->belongsTo(DeviceConfigurationProfile::class, 'device_configuration_profile_id');
+    }
+
     /** @return array<string, array<string, mixed>> */
     public function sectionPayloads(): array
     {
-        $payload = $this->payload ?? [];
+        $payload = $this->configurationProfile?->sectionPayloads() ?? $this->payload ?? [];
 
         return array_filter($payload, fn ($section) => is_array($section));
     }

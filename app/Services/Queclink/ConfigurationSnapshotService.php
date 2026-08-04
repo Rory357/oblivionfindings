@@ -53,17 +53,17 @@ class ConfigurationSnapshotService
         }
 
         $groups = $frames->groupBy(fn (QueclinkRawFrame $frame) => (string) data_get(
-            $frame->parsed_payload,
+            $frame->protectedParsedPayload(),
             'send_time',
             $frame->created_at?->toIso8601String() ?? $frame->id,
         ));
 
         foreach ($groups as $group) {
             $first = $group->first();
-            $expected = (int) data_get($first->parsed_payload, 'config_total_packets', 1);
+            $expected = (int) data_get($first->protectedParsedPayload(), 'config_total_packets', 1);
             $packets = $group
-                ->filter(fn (QueclinkRawFrame $frame) => data_get($frame->parsed_payload, 'config_text') !== null)
-                ->sortBy(fn (QueclinkRawFrame $frame) => (int) data_get($frame->parsed_payload, 'config_current_packet', 1))
+                ->filter(fn (QueclinkRawFrame $frame) => data_get($frame->protectedParsedPayload(), 'config_text') !== null)
+                ->sortBy(fn (QueclinkRawFrame $frame) => (int) data_get($frame->protectedParsedPayload(), 'config_current_packet', 1))
                 ->values();
 
             if ($packets->count() < $expected) {
@@ -71,7 +71,7 @@ class ConfigurationSnapshotService
             }
 
             $raw = $packets
-                ->map(fn (QueclinkRawFrame $frame) => (string) data_get($frame->parsed_payload, 'config_text'))
+                ->map(fn (QueclinkRawFrame $frame) => (string) data_get($frame->protectedParsedPayload(), 'config_text'))
                 ->filter()
                 ->implode(',');
 
@@ -263,7 +263,6 @@ class ConfigurationSnapshotService
         }
 
         return [
-            'new_password' => $values[0] ?? '',
             'device_name' => $values[1] ?? 'GL30MEU',
             'gnss_timeout_seconds' => $values[2] ?? '150',
             'event_mask' => strtoupper($values[3] ?? '08E3'),

@@ -5,19 +5,21 @@ use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
 use App\Domain\Hr\Services\OnboardingService;
+use App\Models\AuditLog;
 use App\Models\ItProvisioningRequest;
+use App\Models\ItProvisioningWorkflow;
 use App\Models\ItTicket;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Validation\ValidationException;
 
 function itProfile(Site $site, ?User $user = null, bool $current = false): HrEmployeeProfile
 {
     $user ??= User::factory()->create();
 
-    return HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
+    return HrEmployeeProfile::factory()->create([
         'user_id' => $user->id,
         'employee_number' => 'EMP-IT-'.$user->id,
         'work_email' => $user->email,
@@ -33,7 +35,6 @@ function itProfile(Site $site, ?User $user = null, bool $current = false): HrEmp
 function itChecklist(HrEmployeeProfile $profile): HrOnboardingChecklist
 {
     return HrOnboardingChecklist::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'template_key' => 'support_worker:all',
         'status' => 'in_progress',
@@ -109,7 +110,6 @@ test('the /it hub is gated on it permissions', function () {
 
 test('generating a checklist raises provisioning requests for non-equipment IT tasks', function () {
     HrOnboardingTemplate::query()->create([
-        'tenant_id' => 1,
         'role' => 'support_worker',
         'site_type' => 'all',
         'is_active' => true,
@@ -135,18 +135,24 @@ test('generating a checklist raises provisioning requests for non-equipment IT t
 
     $accountRequest = $requests->firstWhere('type', 'account');
     expect($accountRequest->item)->toBe('Create Microsoft 365 account');
-    expect((int) $accountRequest->tenant_id)->toBe(1);
     expect($accountRequest->onboarding_task_id)->not->toBeNull();
 
-    // Idempotent per task: one request per bridged onboarding task, even if
-    // re-run. The equipment task keeps zero (asset path, never bridged).
+    // A second active checklist is rejected, while the first checklist's
+    // cross-module provisioning work remains idempotent per onboarding task.
+    // The equipment task keeps zero (asset path, never bridged).
     $bridgedTasks = $checklist->tasks
         ->where('category', 'it')
         ->reject(fn ($task) => str_contains(strtolower($task->title), 'laptop'));
     $equipmentTask = $checklist->tasks->firstWhere('title', 'Issue laptop');
 
-    $this->svc->generateChecklist($profile, $this->hr->id);
+    expect(fn () => $this->svc->generateChecklist($profile, $this->hr->id))
+        ->toThrow(
+            ValidationException::class,
+            'An active onboarding checklist already exists for this employee.',
+        );
 
+    expect(HrOnboardingChecklist::query()->where('employee_profile_id', $profile->id)->count())
+        ->toBe(1);
     expect($bridgedTasks)->toHaveCount(2);
     foreach ($bridgedTasks as $task) {
         expect(ItProvisioningRequest::query()->where('onboarding_task_id', $task->id)->count())
@@ -168,7 +174,6 @@ test('fulfilling a request records the outcome and completes the linked onboardi
         'status' => 'pending',
     ]);
     $request = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'onboarding_task_id' => $task->id,
         'type' => 'account',
@@ -204,7 +209,6 @@ test('fulfilling a request records the outcome and completes the linked onboardi
 test('provisioning lists and direct actions conceal inaccessible Sites', function () {
     $localProfile = itProfile($this->site);
     $local = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $localProfile->id,
         'type' => 'account',
         'item' => 'Local email',
@@ -213,7 +217,6 @@ test('provisioning lists and direct actions conceal inaccessible Sites', functio
     $remoteSite = Site::factory()->create();
     $remoteProfile = itProfile($remoteSite);
     $remote = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $remoteProfile->id,
         'type' => 'account',
         'item' => 'Remote email',
@@ -276,9 +279,19 @@ test('tickets can be created and resolved from the helpdesk queue', function () 
 test('provisioning assign, fulfil and cancel each write an activity event', function () {
     $profile = itProfile($this->site);
     $agent = itProvisioningAgent($this->site);
+    $workflow = ItProvisioningWorkflow::query()->create([
+        'employee_profile_id' => $profile->id,
+        'lifecycle_type' => 'joiner',
+        'source_type' => 'manual',
+        'source_id' => 42,
+        'source_event_key' => 'manual:42:lifecycle-proof',
+        'status' => 'pending',
+        'effective_at' => now(),
+        'created_by_user_id' => $this->hr->id,
+    ]);
 
     $request = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1,
+        'provisioning_workflow_id' => $workflow->id,
         'employee_profile_id' => $profile->id,
         'type' => 'account',
         'item' => 'Email account',
@@ -291,6 +304,11 @@ test('provisioning assign, fulfil and cancel each write an activity event', func
         ->assertRedirect();
     expect($request->refresh()->status)->toBe('in_progress');
     expect($request->events()->where('type', 'assigned')->count())->toBe(1);
+    expect($workflow->fresh()->status)->toBe('in_progress');
+    expect(AuditLog::query()
+        ->where('action', 'it.provisioning.request.assigned')
+        ->where('auditable_id', $request->id)
+        ->exists())->toBeTrue();
 
     // Fulfilling records a `fulfilled` event (no onboarding task to complete here).
     $this->actingAs($this->hr)
@@ -300,7 +318,6 @@ test('provisioning assign, fulfil and cancel each write an activity event', func
 
     // Cancelling a fresh request records a `cancelled` event with the reason.
     $toCancel = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'type' => 'access',
         'item' => 'VPN access',
@@ -312,6 +329,16 @@ test('provisioning assign, fulfil and cancel each write an activity event', func
     $cancelled = $toCancel->events()->where('type', 'cancelled')->first();
     expect($cancelled)->not->toBeNull();
     expect($cancelled->payload['reason'] ?? null)->toBe('Duplicate');
+    expect(AuditLog::query()
+        ->where('action', 'it.provisioning.request.cancelled')
+        ->where('auditable_id', $toCancel->id)
+        ->where('meta->reason', 'Duplicate')
+        ->exists())->toBeTrue();
+
+    $this->actingAs($this->hr)
+        ->post("/it/provisioning/{$toCancel->id}/cancel", ['reason' => 'Repeated click'])
+        ->assertSessionHas('error', 'This request is already cancelled.');
+    expect($toCancel->events()->where('type', 'cancelled')->count())->toBe(1);
 });
 
 test('an agent raises a manual provisioning request; requesters cannot', function () {
@@ -337,6 +364,11 @@ test('an agent raises a manual provisioning request; requesters cannot', functio
     expect($req->priority)->toBe('high');
     expect((int) $req->assigned_to_user_id)->toBe($agent->id);
     expect($req->events()->where('type', 'created')->count())->toBe(1);
+    expect(AuditLog::query()
+        ->where('action', 'it.provisioning.request.created')
+        ->where('auditable_id', $req->id)
+        ->where('meta->source', 'manual')
+        ->exists())->toBeTrue();
 
     // Unassigned manual request stays pending.
     $this->actingAs($this->hr)
@@ -348,6 +380,18 @@ test('an agent raises a manual provisioning request; requesters cannot', functio
         ])
         ->assertRedirect();
     expect(ItProvisioningRequest::query()->firstWhere('item', 'Email setup')->status)->toBe('pending');
+
+    $remoteSite = Site::factory()->create();
+    $remoteProfile = itProfile($remoteSite);
+    $this->actingAs($this->hr)
+        ->post('/it/provisioning', [
+            'employee_profile_id' => $remoteProfile->id,
+            'type' => 'access',
+            'item' => 'Hidden Site access',
+            'priority' => 'normal',
+        ])
+        ->assertForbidden();
+    expect(ItProvisioningRequest::query()->where('item', 'Hidden Site access')->exists())->toBeFalse();
 
     // Self-service requesters (no it.manage) cannot raise provisioning requests.
     $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
@@ -365,10 +409,30 @@ test('an agent raises a manual provisioning request; requesters cannot', functio
         ->assertForbidden();
 });
 
+test('provisioning cancellation requires a reason before changing canonical work', function () {
+    $profile = itProfile($this->site);
+    $request = ItProvisioningRequest::query()->create([
+        'employee_profile_id' => $profile->id,
+        'type' => 'access',
+        'item' => 'Shared drive access',
+        'status' => 'pending',
+    ]);
+
+    $this->actingAs($this->hr)
+        ->post("/it/provisioning/{$request->id}/cancel")
+        ->assertSessionHasErrors('reason');
+
+    expect($request->fresh()->status)->toBe('pending')
+        ->and($request->events()->where('type', 'cancelled')->count())->toBe(0)
+        ->and(AuditLog::query()
+            ->where('action', 'it.provisioning.request.cancelled')
+            ->where('auditable_id', $request->id)
+            ->exists())->toBeFalse();
+});
+
 test('an agent raises a ticket linked to a provisioning request; requesters cannot link', function () {
     $profile = itProfile($this->site);
     $req = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'type' => 'equipment',
         'item' => 'Laptop',
@@ -411,19 +475,19 @@ test('an agent raises a ticket linked to a provisioning request; requesters cann
 test('an agent exports the provisioning queue as CSV; requesters cannot', function () {
     $profile = itProfile($this->site);
     ItProvisioningRequest::query()->create([
-        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'employee_profile_id' => $profile->id,
         'type' => 'account', 'item' => 'Email account', 'status' => 'pending', 'priority' => 'high',
     ]);
     // A CSV formula-injection payload in a user-controlled field is neutralised.
     ItProvisioningRequest::query()->create([
-        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'employee_profile_id' => $profile->id,
         'type' => 'other', 'item' => '=cmd|calc', 'status' => 'pending',
     ]);
     // A request from an inaccessible Site never leaks into the export.
     $remoteSite = Site::factory()->create();
     $remoteProfile = itProfile($remoteSite);
     ItProvisioningRequest::query()->create([
-        'tenant_id' => 1, 'employee_profile_id' => $remoteProfile->id,
+        'employee_profile_id' => $remoteProfile->id,
         'type' => 'account', 'item' => 'Remote Site secret', 'status' => 'pending',
     ]);
 
@@ -451,11 +515,11 @@ test('an agent exports the provisioning queue as CSV; requesters cannot', functi
 test('the provisioning export respects the status filter', function () {
     $profile = itProfile($this->site);
     ItProvisioningRequest::query()->create([
-        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'employee_profile_id' => $profile->id,
         'type' => 'account', 'item' => 'Pending item', 'status' => 'pending',
     ]);
     ItProvisioningRequest::query()->create([
-        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'employee_profile_id' => $profile->id,
         'type' => 'account', 'item' => 'Done item', 'status' => 'done',
     ]);
 

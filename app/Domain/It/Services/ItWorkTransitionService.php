@@ -7,6 +7,7 @@ use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\Enums\ItWorkType;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
+use App\Services\AuditLogger;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -108,6 +109,11 @@ final class ItWorkTransitionService
             $this->authorizeActor($locked, $input, $from);
 
             if ($from === $to) {
+                if ($to === ItWorkflowState::Waiting->value
+                    && ($input->waitingParty !== null || $input->reason !== null || $input->nextAction !== null)) {
+                    return $this->reviseWaitingContext($locked, $input);
+                }
+
                 return $locked;
             }
 
@@ -137,8 +143,61 @@ final class ItWorkTransitionService
                 ],
             );
 
+            AuditLogger::logOrFail('it.work.transitioned', $locked, [
+                'actor_id' => $input->actor->id,
+                'from_status' => $fromStatus,
+                'to_status' => $locked->status,
+                'from_workflow_state' => $from,
+                'to_workflow_state' => $to,
+                'reason' => $input->reason,
+                'source' => $input->source,
+                'resolution_code' => $input->resolutionCode,
+                'application_scope' => 'single_application',
+            ]);
+
             return $locked->refresh();
         });
+    }
+
+    private function reviseWaitingContext(ItTicket $ticket, ItTransitionInput $input): ItTicket
+    {
+        $this->guardWaiting('waiting', $input);
+
+        $before = $ticket->only(['waiting_party', 'waiting_reason', 'next_action']);
+        $ticket->waiting_party = $input->waitingParty;
+        $ticket->waiting_reason = $input->reason;
+        $ticket->status_reason = $input->reason;
+        $ticket->next_action = $input->nextAction;
+        $ticket->waiting_since ??= now();
+
+        if (! $ticket->isDirty()) {
+            return $ticket;
+        }
+
+        $ticket->save();
+        $changedFields = collect(['waiting_party', 'waiting_reason', 'next_action'])
+            ->filter(fn (string $field): bool => $before[$field] !== $ticket->getAttribute($field))
+            ->values()
+            ->all();
+
+        ItTicketEvent::record($ticket, 'waiting_updated', $input->actor->id, [
+            'waiting_party' => $ticket->waiting_party,
+            'changed_fields' => $changedFields,
+            'reason_recorded' => true,
+            'next_action_recorded' => filled($ticket->next_action),
+            'via' => $input->source,
+        ]);
+        AuditLogger::logOrFail('it.work.waiting.updated', $ticket, [
+            'actor_id' => $input->actor->id,
+            'waiting_party' => $ticket->waiting_party,
+            'changed_fields' => $changedFields,
+            'reason_recorded' => true,
+            'next_action_recorded' => filled($ticket->next_action),
+            'source' => $input->source,
+            'application_scope' => 'single_application',
+        ]);
+
+        return $ticket->refresh();
     }
 
     private function currentState(ItTicket $ticket): string

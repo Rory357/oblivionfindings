@@ -212,15 +212,73 @@ describe('NetworkItWorkspacePanels', () => {
             screen.getByText('Known topology is incomplete'),
         ).toBeInTheDocument();
         expect(
-            screen.getByRole('link', { name: 'Edge gateway' }),
+            screen.getByRole('link', {
+                name: /^Edge gatewayKauri House · Healthy$/,
+            }),
         ).toBeInTheDocument();
         expect(
-            screen.getByRole('link', { name: 'Core switch' }),
+            screen.getByRole('link', {
+                name: /^Core switchKauri House · Warning$/,
+            }),
         ).toBeInTheDocument();
         expect(screen.getByText('WAN1')).toBeInTheDocument();
         expect(
             screen.getByText('1 device has no known relationship'),
         ).toBeInTheDocument();
+    });
+
+    it('links an infrastructure device and its canonical Site workspace', () => {
+        render(
+            <NetworkItWorkspacePanels
+                data={{
+                    ...base,
+                    activeTab: {
+                        ...base.activeTab,
+                        key: 'devices',
+                        label: 'Devices',
+                        devices: [
+                            {
+                                id: 21,
+                                name: 'Kauri core switch',
+                                category: 'networking',
+                                subcategory: 'managed_switch',
+                                status: 'active',
+                                health: 'healthy',
+                                lastSeenAt: '2026-07-19T05:00:00.000Z',
+                                href: '/security-devices/devices/21',
+                                site: {
+                                    id: 4,
+                                    name: 'Kauri House',
+                                    href: '/security-devices/sites/4',
+                                },
+                                identifiers: {
+                                    ipAddress: '10.0.0.21',
+                                    macAddress: null,
+                                    serialNumber: null,
+                                },
+                                firmwareVersion: '1.4.0',
+                                monitoring: {
+                                    enabled: 2,
+                                    attention: 0,
+                                    uncertain: 0,
+                                },
+                                wanPath: false,
+                            },
+                        ],
+                    },
+                }}
+            />,
+        );
+
+        const card = screen.getByRole('article', {
+            name: 'Kauri core switch',
+        });
+        expect(
+            within(card).getByRole('link', { name: 'Kauri core switch' }),
+        ).toHaveAttribute('href', '/security-devices/devices/21');
+        expect(
+            within(card).getByRole('link', { name: 'Kauri House' }),
+        ).toHaveAttribute('href', '/security-devices/sites/4');
     });
 
     it('shows allowlisted interface and retained capacity observations with visible gaps', () => {

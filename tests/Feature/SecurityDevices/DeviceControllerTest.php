@@ -162,25 +162,21 @@ class DeviceControllerTest extends TestCase
 
     public function test_index_stats_saved_views_and_provider_options_cover_the_single_application_registry(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
-        $profile = MonitoringProfile::factory()->create(['tenant_id' => 42]);
+
+        $profile = MonitoringProfile::factory()->create([]);
         $monitored = Device::factory()->create([
-            'tenant_id' => 42,
             'name' => 'Monitored device',
-            'provider' => 'tenant-provider',
+            'provider' => 'primary-provider',
         ]);
         $unmonitored = Device::factory()->create([
-            'tenant_id' => 42,
             'name' => 'Unmonitored device',
-            'provider' => 'tenant-provider',
+            'provider' => 'primary-provider',
         ]);
-        $legacyPartitioned = Device::factory()->create([
-            'tenant_id' => 77,
-            'name' => 'Legacy partitioned device',
+        $unassignedDevice = Device::factory()->create([
+            'name' => 'Unassigned device',
             'provider' => 'legacy-provider',
         ]);
         Monitor::factory()->create([
-            'tenant_id' => 42,
             'profile_id' => $profile->id,
             'device_id' => $monitored->id,
             'current_state' => MonitorState::Healthy,
@@ -190,16 +186,16 @@ class DeviceControllerTest extends TestCase
         $response = $this->actingAs($this->admin)
             ->get('/security-devices/devices?view=unmonitored');
 
-        $response->assertOk()->assertInertia(function ($page) use ($legacyPartitioned, $unmonitored): void {
+        $response->assertOk()->assertInertia(function ($page) use ($unassignedDevice, $unmonitored): void {
             $props = $page->toArray()['props'];
 
             $this->assertEqualsCanonicalizing(
-                [$unmonitored->id, $legacyPartitioned->id],
+                [$unmonitored->id, $unassignedDevice->id],
                 collect($props['devices']['data'])->pluck('id')->all(),
             );
             $this->assertSame(3, $props['stats']['total']);
             $this->assertSame(2, collect($props['savedViews'])->firstWhere('key', 'unmonitored')['count']);
-            $this->assertSame(['legacy-provider', 'tenant-provider'], $props['filterOptions']['providers']);
+            $this->assertSame(['legacy-provider', 'primary-provider'], $props['filterOptions']['providers']);
             $this->assertTrue($props['can']['export']);
             $this->assertSame('unmonitored', $props['filters']['view']);
         });
@@ -207,17 +203,16 @@ class DeviceControllerTest extends TestCase
 
     public function test_inventory_and_device_direct_links_honour_site_access(): void
     {
-        $this->viewer->forceFill(['organization_id' => 42])->save();
-        $allowedSite = Site::factory()->create(['tenant_id' => 42]);
-        $hiddenSite = Site::factory()->create(['tenant_id' => 42]);
+
+        $allowedSite = Site::factory()->create([]);
+        $hiddenSite = Site::factory()->create([]);
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42,
             'user_id' => $this->viewer->id,
             'primary_site_id' => $allowedSite->id,
             'secondary_site_ids' => [],
         ]);
-        $allowed = Device::factory()->create(['tenant_id' => 42, 'name' => 'Allowed device']);
-        $hidden = Device::factory()->create(['tenant_id' => 42, 'name' => 'Hidden device']);
+        $allowed = Device::factory()->create(['name' => 'Allowed device']);
+        $hidden = Device::factory()->create(['name' => 'Hidden device']);
         foreach ([[$allowed, $allowedSite], [$hidden, $hiddenSite]] as [$device, $site]) {
             DeviceAssignment::create([
                 'device_id' => $device->id,
@@ -244,13 +239,13 @@ class DeviceControllerTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_admin_can_open_unassigned_stock_regardless_of_legacy_partition_value(): void
+    public function test_admin_can_open_unassigned_stock_with_all_sites_access(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
-        $foreign = Device::factory()->create(['tenant_id' => 77]);
+
+        $unrelated = Device::factory()->create([]);
 
         $this->actingAs($this->admin)
-            ->get("/security-devices/devices/{$foreign->id}")
+            ->get("/security-devices/devices/{$unrelated->id}")
             ->assertOk();
     }
 
@@ -362,9 +357,8 @@ class DeviceControllerTest extends TestCase
         $this->assertEquals($this->admin->id, $device->created_by_user_id);
     }
 
-    public function test_store_uses_inert_legacy_storage_value_not_user_organization(): void
+    public function test_store_uses_application_storage_defaults(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
 
         $this->actingAs($this->admin)
             ->post('/security-devices/devices', [
@@ -376,7 +370,6 @@ class DeviceControllerTest extends TestCase
 
         $this->assertDatabaseHas('devices', [
             'name' => 'Scoped Camera',
-            'tenant_id' => 1,
             'created_by_user_id' => $this->admin->id,
         ]);
     }

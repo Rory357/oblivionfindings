@@ -21,6 +21,41 @@ final readonly class ProbeTarget
         return new self('tcp', self::normaliseHost($host), self::validPort($port), null);
     }
 
+    public static function icmp(string $host): self
+    {
+        return new self('icmp', self::normaliseHost($host), 0, null);
+    }
+
+    public static function dns(string $server, int $port = 53): self
+    {
+        return new self('dns', self::normaliseHost($server), self::validPort($port), null);
+    }
+
+    public static function tls(string $host, int $port = 443): self
+    {
+        return new self('tls', self::normaliseHost($host), self::validPort($port), null);
+    }
+
+    public static function snmp(string $host, int $port = 161): self
+    {
+        return new self('snmp', self::normaliseHost($host), self::validPort($port), null);
+    }
+
+    public static function ssh(string $host, int $port = 22): self
+    {
+        return new self('ssh', self::normaliseHost($host), self::validPort($port), null);
+    }
+
+    public static function winrm(string $url): self
+    {
+        $target = self::http($url);
+        if ($target->scheme !== 'https' || $target->path !== '/wsman') {
+            throw new EgressDenied('WinRM requires an HTTPS /wsman target');
+        }
+
+        return new self('winrm', $target->host, $target->port, $target->path);
+    }
+
     public static function http(string $url): self
     {
         if ($url === '' || strlen($url) > self::MAX_URL_BYTES

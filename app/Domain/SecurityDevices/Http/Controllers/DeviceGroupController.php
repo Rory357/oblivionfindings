@@ -8,9 +8,11 @@ use App\Domain\SecurityDevices\Models\DeviceGroup;
 use App\Domain\SecurityDevices\Services\DeviceGroupAutoRuleService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
-use App\Support\LegacyStorageContext;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator as ValidatorContract;
 use Inertia\Inertia;
 
 class DeviceGroupController extends Controller
@@ -27,7 +29,10 @@ class DeviceGroupController extends Controller
         $user = $request->user();
         $this->assertCanManageGroups($user);
 
-        $query = DeviceGroup::query()->withCount('devices');
+        $visibleDeviceIds = $this->access->visibleDevices($user)->select('devices.id');
+        $query = DeviceGroup::query()->withCount([
+            'devices' => fn ($devices) => $devices->whereIn('devices.id', clone $visibleDeviceIds),
+        ]);
 
         if ($request->filled('search')) {
             $search = $request->input('search');
@@ -71,7 +76,10 @@ class DeviceGroupController extends Controller
         $user = $request->user();
         $this->assertCanManageGroups($user);
 
+        $visibleDevices = $this->access->visibleDevices($user);
+        $visibleDeviceIds = (clone $visibleDevices)->select('devices.id');
         $members = $group->devices()
+            ->whereIn('devices.id', clone $visibleDeviceIds)
             ->with(['assignments' => fn ($q) => $q->active()])
             ->orderBy('name')
             ->paginate(30)
@@ -79,7 +87,7 @@ class DeviceGroupController extends Controller
 
         // Available devices for the add-member dialog (not already in this group).
         $existingDeviceIds = $group->devices()->pluck('devices.id');
-        $availableDevices = Device::query()
+        $availableDevices = (clone $visibleDevices)
             ->whereNotIn('id', $existingDeviceIds)
             ->operational()
             ->orderBy('name')
@@ -137,10 +145,9 @@ class DeviceGroupController extends Controller
             'name' => ['required', 'string', 'max:255', 'unique:device_groups,name'],
             'type' => ['nullable', 'string', 'in:location,functional,vendor,maintenance,custom'],
             'description' => ['nullable', 'string', 'max:2000'],
-            'auto_rules' => ['nullable', 'array'],
         ]);
+        $validated = array_merge($validated, $this->validateAutoRules($request));
 
-        $validated['tenant_id'] = LegacyStorageContext::id();
         $validated['type'] = $validated['type'] ?? 'custom';
 
         $group = DeviceGroup::create($validated);
@@ -160,6 +167,7 @@ class DeviceGroupController extends Controller
                 'name' => $group->name,
                 'type' => $group->type,
                 'description' => $group->description,
+                'auto_rules' => is_array($group->auto_rules) ? $group->auto_rules : null,
             ],
         ]);
     }
@@ -173,8 +181,8 @@ class DeviceGroupController extends Controller
             'name' => ['required', 'string', 'max:255', "unique:device_groups,name,{$group->id}"],
             'type' => ['nullable', 'string', 'in:location,functional,vendor,maintenance,custom'],
             'description' => ['nullable', 'string', 'max:2000'],
-            'auto_rules' => ['nullable', 'array'],
         ]);
+        $validated = array_merge($validated, $this->validateAutoRules($request));
 
         $group->update($validated);
 
@@ -191,15 +199,45 @@ class DeviceGroupController extends Controller
         $user = $request->user();
         $this->assertCanManageGroups($user);
 
-        $result = $this->autoRules->preview($group);
+        $result = $this->autoRules->preview(
+            $group,
+            deviceScope: $this->access->visibleDevices($user),
+        );
 
         return response()->json([
             'count' => $result['count'],
+            'changes' => $this->autoRules->previewChanges(
+                $group,
+                $this->access->visibleDevices($user),
+            ),
             'sample' => $result['sample']->map(fn (Device $d) => [
                 'id' => $d->id,
                 'name' => $d->name,
                 'device_uid' => $d->device_uid,
                 'category' => $d->category,
+            ])->values(),
+        ]);
+    }
+
+    /** Preview unsaved builder rules without creating or changing membership. */
+    public function previewDraftAutoRules(Request $request)
+    {
+        $user = $request->user();
+        $this->assertCanManageGroups($user);
+
+        $validated = $this->validateAutoRules($request, required: true);
+        $result = $this->autoRules->previewRules(
+            $validated['auto_rules'],
+            deviceScope: $this->access->visibleDevices($user),
+        );
+
+        return response()->json([
+            'count' => $result['count'],
+            'sample' => $result['sample']->map(fn (Device $device) => [
+                'id' => $device->id,
+                'name' => $device->name,
+                'device_uid' => $device->device_uid,
+                'category' => $device->category,
             ])->values(),
         ]);
     }
@@ -214,11 +252,14 @@ class DeviceGroupController extends Controller
         $this->assertCanManageGroups($user);
 
         $rules = is_array($group->auto_rules) ? $group->auto_rules : [];
-        if (empty($rules)) {
-            return redirect()->back()->with('error', 'This group has no auto-rules configured.');
+        if (empty($rules) || ! $this->autoRules->areRulesSupported($rules)) {
+            return redirect()->back()->with('error', 'This group has no valid automatic-membership rule. Edit and save the rule before applying changes.');
         }
 
-        $delta = $this->autoRules->applyToGroup($group);
+        $delta = $this->autoRules->applyToGroup(
+            $group,
+            $this->access->visibleDevices($user),
+        );
 
         return redirect()->back()->with(
             'success',
@@ -244,15 +285,19 @@ class DeviceGroupController extends Controller
         $this->assertCanManageGroups($user);
 
         $validated = $request->validate([
-            'device_id' => ['required', 'integer', 'exists:devices,id'],
+            'device_id' => ['required', 'integer'],
         ]);
+        $device = $this->access->visibleDevices($user)
+            ->whereKey($validated['device_id'])
+            ->first();
+        abort_unless($device, 404);
 
         // Prevent duplicate membership.
-        if ($group->devices()->where('devices.id', $validated['device_id'])->exists()) {
+        if ($group->devices()->where('devices.id', $device->id)->exists()) {
             return back()->withErrors(['device_id' => 'Device is already a member of this group.']);
         }
 
-        $group->devices()->attach($validated['device_id']);
+        $group->devices()->attach($device->id);
 
         return back()->with('success', 'Device added to group.');
     }
@@ -261,6 +306,8 @@ class DeviceGroupController extends Controller
     {
         $user = $request->user();
         $this->assertCanManageGroups($user);
+        $this->access->assertCanViewDevice($user, $device);
+        abort_unless($group->devices()->where('devices.id', $device->id)->exists(), 404);
 
         $group->devices()->detach($device->id);
 
@@ -273,5 +320,70 @@ class DeviceGroupController extends Controller
             $user->canDo('securityDevices.groups.manage') && $this->access->canViewAllSites($user),
             403,
         );
+    }
+
+    /**
+     * Validate and normalise the governed automatic-membership schema.
+     *
+     * @return array{auto_rules?: array{match: string, conditions: list<array{field: string, op: string, value: string|list<string>}>}|null}
+     */
+    private function validateAutoRules(Request $request, bool $required = false): array
+    {
+        $validator = Validator::make($request->all(), [
+            'auto_rules' => [$required ? 'required' : 'nullable', 'array:match,conditions'],
+            'auto_rules.match' => ['required_with:auto_rules', Rule::in(['all', 'any'])],
+            'auto_rules.conditions' => ['required_with:auto_rules', 'array', 'min:1', 'max:8'],
+            'auto_rules.conditions.*' => ['required', 'array:field,op,value'],
+            'auto_rules.conditions.*.field' => ['required', 'string', Rule::in(DeviceGroupAutoRuleService::ALLOWED_FIELDS)],
+            'auto_rules.conditions.*.op' => ['required', 'string', Rule::in(DeviceGroupAutoRuleService::ALLOWED_OPS)],
+            'auto_rules.conditions.*.value' => ['required'],
+        ]);
+
+        $validator->after(function (ValidatorContract $validator) use ($request): void {
+            $conditions = $request->input('auto_rules.conditions', []);
+            if (! is_array($conditions)) {
+                return;
+            }
+
+            foreach ($conditions as $index => $condition) {
+                if (! is_array($condition)) {
+                    continue;
+                }
+
+                $operation = $condition['op'] ?? null;
+                $value = $condition['value'] ?? null;
+                $key = "auto_rules.conditions.{$index}.value";
+
+                if ($operation === 'in') {
+                    $items = is_array($value) ? $value : [];
+                    $validItems = array_filter($items, fn ($item) => is_string($item) && trim($item) !== '' && mb_strlen(trim($item)) <= 100);
+                    $normalised = array_map(fn (string $item) => trim($item), $validItems);
+                    if (count($items) < 1 || count($items) > 20 || count($normalised) !== count($items) || count(array_unique($normalised)) !== count($normalised)) {
+                        $validator->errors()->add($key, 'Enter between 1 and 20 unique values, with no blank values.');
+                    }
+
+                    continue;
+                }
+
+                if (in_array($operation, ['equals', 'not_equals'], true)
+                    && (! is_string($value) || trim($value) === '' || mb_strlen(trim($value)) > 100)) {
+                    $validator->errors()->add($key, 'Enter a value between 1 and 100 characters.');
+                }
+            }
+        });
+
+        $validated = $validator->validate();
+        if (! array_key_exists('auto_rules', $validated) || $validated['auto_rules'] === null) {
+            return $required ? ['auto_rules' => null] : $validated;
+        }
+
+        foreach ($validated['auto_rules']['conditions'] as &$condition) {
+            $condition['value'] = $condition['op'] === 'in'
+                ? array_values(array_unique(array_map(fn (string $value) => trim($value), $condition['value'])))
+                : trim($condition['value']);
+        }
+        unset($condition);
+
+        return ['auto_rules' => $validated['auto_rules']];
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,12 +12,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ItCatalogItem extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, WritesLegacyStorageContext;
 
     public const OUTCOME_TYPES = ['service_request', 'security_request', 'provisioning'];
 
     protected $fillable = [
-        'tenant_id',
         'it_service_id',
         'name',
         'slug',
@@ -54,11 +54,6 @@ class ItCatalogItem extends Model
     public function submissions(): HasMany
     {
         return $this->hasMany(ItCatalogSubmission::class, 'catalog_item_id');
-    }
-
-    public function scopeForTenant(Builder $query, int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 
     public function scopePublished(Builder $query): Builder

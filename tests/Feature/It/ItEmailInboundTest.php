@@ -19,7 +19,7 @@ use App\Models\User;
 function itInboundRequestSender(string $email): User
 {
     $site = Site::factory()->create();
-    $sender = User::factory()->create(['email' => $email, 'organization_id' => 1]);
+    $sender = User::factory()->create(['email' => $email]);
     $permission = Permission::query()->firstOrCreate(
         ['key' => 'it.request'],
         ['description' => 'Create IT requests', 'group' => 'it', 'module' => 'Operations'],
@@ -48,10 +48,9 @@ test('email is a recognised ticket source', function () {
 });
 
 test('an inbound email row records its ticket link', function () {
-    $ticket = ItTicket::factory()->create(['tenant_id' => 1, 'source' => 'email']);
+    $ticket = ItTicket::factory()->create(['source' => 'email']);
 
     $inbound = ItInboundEmail::create([
-        'tenant_id' => 1,
         'it_ticket_id' => $ticket->id,
         'from_email' => 'requester@example.test',
         'subject' => 'The printer is jammed',
@@ -68,7 +67,6 @@ test('an inbound email row records its ticket link', function () {
 
 test('an unmatched inbound email can be logged without a ticket', function () {
     $inbound = ItInboundEmail::create([
-        'tenant_id' => 1,
         'it_ticket_id' => null,
         'from_email' => 'stranger@example.test',
         'subject' => 'Random',
@@ -132,8 +130,8 @@ test('a known sender opens a new ticket by email', function () {
 
 test('a reply carrying a ticket reference threads onto that ticket', function () {
     config(['it.inbound_mail.secret' => 'top-secret']);
-    $sender = User::factory()->create(['email' => 'worker@example.test', 'organization_id' => 1]);
-    $ticket = ItTicket::factory()->create(['tenant_id' => 1, 'requester_user_id' => $sender->id]);
+    $sender = User::factory()->create(['email' => 'worker@example.test']);
+    $ticket = ItTicket::factory()->create(['requester_user_id' => $sender->id]);
 
     $this->postJson('/api/it/email/inbound', [
         'from' => 'worker@example.test',
@@ -148,8 +146,8 @@ test('a reply carrying a ticket reference threads onto that ticket', function ()
 });
 
 test('the ingestor can be driven directly — the poller contract (E1)', function () {
-    $sender = User::factory()->create(['email' => 'worker@example.test', 'organization_id' => 1]);
-    $ticket = ItTicket::factory()->create(['tenant_id' => 1, 'requester_user_id' => $sender->id]);
+    $sender = User::factory()->create(['email' => 'worker@example.test']);
+    $ticket = ItTicket::factory()->create(['requester_user_id' => $sender->id]);
 
     $inbound = app(InboundEmailIngestor::class)->ingest([
         'from' => 'worker@example.test',

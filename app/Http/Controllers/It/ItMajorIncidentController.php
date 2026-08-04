@@ -326,7 +326,7 @@ class ItMajorIncidentController extends Controller
 
         if ($wide && $siteWasSupplied && $data['site_id'] !== null) {
             throw ValidationException::withMessages([
-                'site_id' => 'Organisation-wide work cannot also have a Site.',
+                'site_id' => 'Application-wide work cannot also have a Site.',
             ]);
         }
 

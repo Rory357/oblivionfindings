@@ -14,6 +14,7 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\ConsentTypeVersion;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -76,11 +77,63 @@ class FleetDeviceRefactorTest extends TestCase
 
         $response = $this->actingAs($this->admin)->get('/fleet-assets/devices');
 
-        $response->assertInertia(function ($page) {
+        $response->assertInertia(function ($page) use ($vehicle) {
             $d = $page->toArray()['props']['devices']['data'][0];
             $this->assertNotNull($d['asset']);
             $this->assertEquals('Van 42', $d['asset']['name']);
+            $this->assertSame("/fleet-assets/vehicles/{$vehicle->id}", $d['asset']['href']);
         });
+    }
+
+    public function test_asset_links_are_emitted_only_for_destination_routes_the_viewer_can_open(): void
+    {
+        $vehicle = Asset::factory()->vehicle()->create(['name' => 'Destination van']);
+        $equipment = Asset::factory()->create([
+            'name' => 'Destination equipment',
+            'category' => 'IT Equipment',
+        ]);
+        $vehicleDevice = Device::factory()->tracking()->create(['name' => 'Vehicle destination tracker']);
+        $equipmentDevice = Device::factory()->tracking()->create(['name' => 'Equipment destination tracker']);
+
+        foreach ([[$vehicleDevice, $vehicle], [$equipmentDevice, $equipment]] as [$device, $asset]) {
+            DeviceAssetLink::create([
+                'device_id' => $device->id,
+                'asset_id' => $asset->id,
+                'link_type' => LinkType::InstalledIn,
+                'linked_at' => now(),
+            ]);
+        }
+
+        $fleetViewer = $this->viewerWithPermissions(['fleet.viewAny']);
+        $this->actingAs($fleetViewer)
+            ->get('/fleet-assets/devices')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($equipmentDevice, $vehicle, $vehicleDevice): void {
+                $rows = collect($page->toArray()['props']['devices']['data'])->keyBy('id');
+
+                $this->assertSame(
+                    "/fleet-assets/vehicles/{$vehicle->id}",
+                    $rows->get($vehicleDevice->id)['asset']['href'],
+                );
+                $this->assertNull($rows->get($equipmentDevice->id)['asset']['href']);
+            });
+
+        $assetViewer = $this->viewerWithPermissions(['assets.trackers.manage', 'assets.viewAny']);
+        $this->actingAs($assetViewer)
+            ->get('/fleet-assets/devices')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($equipment, $equipmentDevice, $vehicle, $vehicleDevice): void {
+                $rows = collect($page->toArray()['props']['devices']['data'])->keyBy('id');
+
+                $this->assertSame(
+                    "/fleet-assets/assets/{$vehicle->id}",
+                    $rows->get($vehicleDevice->id)['asset']['href'],
+                );
+                $this->assertSame(
+                    "/fleet-assets/assets/{$equipment->id}",
+                    $rows->get($equipmentDevice->id)['asset']['href'],
+                );
+            });
     }
 
     public function test_index_stats_correct(): void
@@ -522,5 +575,25 @@ class FleetDeviceRefactorTest extends TestCase
             'created_by' => $this->admin->id,
             'updated_by' => $this->admin->id,
         ], $overrides));
+    }
+
+    /** @param array<int, string> $permissions */
+    private function viewerWithPermissions(array $permissions): User
+    {
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        foreach ($permissions as $key) {
+            Permission::firstOrCreate(
+                ['key' => $key],
+                ['description' => $key, 'group' => 'test', 'module' => 'Test'],
+            );
+        }
+        $overrides = Permission::query()
+            ->whereIn('key', $permissions)
+            ->pluck('id')
+            ->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])
+            ->all();
+        $viewer->permissionOverrides()->sync($overrides);
+
+        return $viewer;
     }
 }

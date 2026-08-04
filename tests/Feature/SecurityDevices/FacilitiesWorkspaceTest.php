@@ -35,7 +35,7 @@ class FacilitiesWorkspaceTest extends TestCase
         $this->seed(SecurityDevicesPermissionsSeeder::class);
 
         $this->admin = User::factory()->create([
-            'organization_id' => 42,
+
             'approved_at' => now(),
         ]);
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
@@ -43,14 +43,14 @@ class FacilitiesWorkspaceTest extends TestCase
 
     public function test_overview_reconciles_distinct_facility_groups_sites_freshness_events_and_maintenance(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42, 'name' => 'Kauri House']);
+        $site = Site::factory()->create(['name' => 'Kauri House']);
         $environment = $this->facilityDevice('Kauri fridge sensor', 'cold_chain', 'fridge_sensor');
         $building = $this->facilityDevice('Kauri fire panel', 'building_safety', 'fire_panel');
         $utility = $this->facilityDevice('Kauri generator', 'mechanical', 'generator_monitor');
         $automation = $this->facilityDevice('Kauri plant relay', 'facility_access', 'smart_relay', [
             'meta' => ['automation' => ['name' => 'Plant room ventilation', 'status' => 'success']],
         ]);
-        $foreign = $this->facilityDevice('Foreign gas sensor', 'gas_detection', 'co_detector', ['tenant_id' => 77]);
+        $unrelated = $this->facilityDevice('Unrelated gas sensor', 'gas_detection', 'co_detector', []);
         foreach ([$environment, $building, $utility, $automation] as $device) {
             $this->assignToSite($device, $site);
         }
@@ -76,7 +76,7 @@ class FacilitiesWorkspaceTest extends TestCase
         $this->actingAs($this->admin)
             ->get('/security-devices/facilities-iot')
             ->assertOk()
-            ->assertInertia(function ($page) use ($foreign, $site): void {
+            ->assertInertia(function ($page) use ($unrelated, $site): void {
                 $facilities = $page->toArray()['props']['facilitiesWorkspace'];
 
                 $this->assertSame([
@@ -95,7 +95,7 @@ class FacilitiesWorkspaceTest extends TestCase
                 $this->assertSame(4, $facilities['overview']['freshness']['not_collected']);
                 $this->assertSame($site->id, $facilities['overview']['sites'][0]['id']);
                 $this->assertContains(
-                    $foreign->id,
+                    $unrelated->id,
                     collect($facilities['activeTab']['devices'])->pluck('id')->all(),
                 );
             });
@@ -198,7 +198,6 @@ class FacilitiesWorkspaceTest extends TestCase
             ],
         ]);
         Integration::create([
-            'tenant_id' => 42,
             'provider' => 'milesight',
             'display_name' => 'Milesight IoT',
             'status' => Integration::STATUS_ACTIVE,
@@ -208,7 +207,6 @@ class FacilitiesWorkspaceTest extends TestCase
             'last_tested_at' => now()->subHour(),
         ]);
         IntegrationSyncLog::create([
-            'tenant_id' => 42,
             'provider' => 'milesight',
             'action' => 'sync_health',
             'status' => IntegrationSyncLog::STATUS_SUCCESS,
@@ -312,7 +310,6 @@ class FacilitiesWorkspaceTest extends TestCase
     {
         $facility = $this->facilityDevice('Filtered leak detector', 'leak_detection', 'water_sensor');
         $network = Device::factory()->itInfrastructure()->create([
-            'tenant_id' => 42,
             'name' => 'Unrelated network device',
         ]);
         foreach ([
@@ -346,7 +343,6 @@ class FacilitiesWorkspaceTest extends TestCase
         array $attributes = [],
     ): Device {
         return Device::factory()->facilities()->create([
-            'tenant_id' => 42,
             'name' => $name,
             'category' => $category,
             'subcategory' => $subcategory,
@@ -372,7 +368,6 @@ class FacilitiesWorkspaceTest extends TestCase
         array $attributes = [],
     ): Monitor {
         return Monitor::factory()->create([
-            'tenant_id' => 42,
             'device_id' => $device->id,
             'name' => $name,
             'kind' => MonitorKind::Provider,
@@ -389,7 +384,6 @@ class FacilitiesWorkspaceTest extends TestCase
         array $metrics = [],
     ): MonitorObservation {
         return MonitorObservation::factory()->create([
-            'tenant_id' => 42,
             'monitor_id' => $monitor->id,
             'state' => $monitor->current_state,
             'value' => $value,

@@ -23,8 +23,7 @@ function provBulkProfile(Site $site, ?User $user = null, bool $current = false):
 {
     $user ??= User::factory()->create();
 
-    return HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
+    return HrEmployeeProfile::factory()->create([
         'user_id' => $user->id,
         'employee_number' => 'EMP-PB-'.$user->id,
         'work_email' => $user->email,
@@ -51,16 +50,16 @@ beforeEach(function () {
 test('bulk assign moves pending requests to in progress and records an event', function () {
     $profile = provBulkProfile($this->site);
     $pendingA = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'employee_profile_id' => $profile->id,
         'type' => 'account', 'item' => 'Email account', 'status' => 'pending',
     ]);
     $pendingB = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'employee_profile_id' => $profile->id,
         'type' => 'access', 'item' => 'VPN access', 'status' => 'pending',
     ]);
     // A settled request in the same batch keeps its history.
     $done = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'employee_profile_id' => $profile->id,
         'type' => 'equipment', 'item' => 'Laptop', 'status' => 'done',
     ]);
 
@@ -94,7 +93,6 @@ test('bulk assign moves pending requests to in progress and records an event', f
 test('bulk fulfil marks requests done and completes the linked onboarding task', function () {
     $profile = provBulkProfile($this->site);
     $checklist = HrOnboardingChecklist::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'template_key' => 'support_worker:all',
         'status' => 'in_progress',
@@ -111,18 +109,18 @@ test('bulk fulfil marks requests done and completes the linked onboarding task',
         'status' => 'pending',
     ]);
     $linked = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'employee_profile_id' => $profile->id,
         'onboarding_task_id' => $task->id, 'type' => 'account',
         'item' => $task->title, 'status' => 'in_progress', 'created_by' => $this->hr->id,
     ]);
     // Manual request (no onboarding task) fulfils too.
     $manual = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'employee_profile_id' => $profile->id,
         'type' => 'access', 'item' => 'VPN access', 'status' => 'in_progress',
     ]);
     // Cancelled request is skipped, never re-opened.
     $cancelled = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'employee_profile_id' => $profile->id,
         'type' => 'other', 'item' => 'Old kit', 'status' => 'cancelled',
     ]);
 
@@ -151,13 +149,13 @@ test('bulk fulfil marks requests done and completes the linked onboarding task',
 test('provisioning bulk is agent-only and Site-scoped', function () {
     $profile = provBulkProfile($this->site);
     $mine = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1, 'employee_profile_id' => $profile->id,
+        'employee_profile_id' => $profile->id,
         'type' => 'account', 'item' => 'Email', 'status' => 'pending',
     ]);
     $remoteSite = Site::factory()->create();
     $remoteProfile = provBulkProfile($remoteSite);
     $remote = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1, 'employee_profile_id' => $remoteProfile->id,
+        'employee_profile_id' => $remoteProfile->id,
         'type' => 'account', 'item' => 'Remote Site email', 'status' => 'pending',
     ]);
 

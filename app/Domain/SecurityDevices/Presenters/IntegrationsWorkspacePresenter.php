@@ -2,6 +2,8 @@
 
 namespace App\Domain\SecurityDevices\Presenters;
 
+use App\Domain\Monitoring\Models\ProviderCapabilityCursor;
+use App\Domain\Monitoring\Models\ProviderCapabilityException;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Integration\IntegrationProviderConnection;
@@ -9,10 +11,20 @@ use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\Integration\IntegrationSyncLog;
 use App\Models\User;
+use App\Services\Integration\Contracts\DeviceSyncCapability;
+use App\Services\Integration\Contracts\EventCollectionCapability;
+use App\Services\Integration\Contracts\InventoryDiscoveryCapability;
+use App\Services\Integration\Contracts\ObservationCollectionCapability;
+use App\Services\Integration\Contracts\SnapshotCollectionCapability;
+use App\Services\Integration\Contracts\TopologyCollectionCapability;
+use App\Services\Integration\Contracts\WebhookVerificationCapability;
+use App\Services\Integration\Data\IntegrationCapabilityManifest;
+use App\Services\Integration\IntegrationAdapterRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class IntegrationsWorkspacePresenter
 {
@@ -23,12 +35,15 @@ class IntegrationsWorkspacePresenter
     private const SITE_MAPPING_DISPLAY_LIMIT = 50;
 
     private const PROVIDERS = [
-        ['slug' => 'unifi', 'name' => 'UniFi', 'vendor' => 'Ubiquiti', 'implementation_status' => 'live', 'summary' => 'Network, CCTV, and access infrastructure.', 'capabilities' => ['network', 'cctv', 'access_control', 'device_health', 'event_stream'], 'device_scope' => ['cameras', 'doors', 'access points', 'switches', 'gateways']],
-        ['slug' => 'queclink', 'name' => 'Queclink', 'vendor' => 'Queclink Wireless', 'implementation_status' => 'scaffold', 'summary' => 'Cellular GPS trackers for vehicles, assets, and personal safety.', 'capabilities' => ['tracking', 'telemetry', 'device_health', 'event_stream'], 'device_scope' => ['vehicle trackers', 'personal trackers', 'asset trackers']],
-        ['slug' => 'milesight', 'name' => 'Milesight', 'vendor' => 'Milesight IoT', 'implementation_status' => 'scaffold', 'summary' => 'LoRaWAN gateways and environmental or support sensors.', 'capabilities' => ['iot', 'environmental', 'healthcare_sensors', 'gateway_management', 'event_stream'], 'device_scope' => ['bed sensors', 'fall sensors', 'door contacts', 'environment sensors', 'gateways']],
+        ['slug' => 'unifi', 'name' => 'UniFi', 'vendor' => 'Ubiquiti', 'summary' => 'Network, CCTV, and access infrastructure.', 'capabilities' => ['network', 'cctv', 'access_control', 'device_health', 'event_stream'], 'device_scope' => ['cameras', 'doors', 'access points', 'switches', 'gateways']],
+        ['slug' => 'queclink', 'name' => 'Queclink', 'vendor' => 'Queclink Wireless', 'summary' => 'Cellular GPS trackers for vehicles, assets, and personal safety.', 'capabilities' => ['tracking', 'telemetry', 'device_health', 'event_stream'], 'device_scope' => ['vehicle trackers', 'personal trackers', 'asset trackers']],
+        ['slug' => 'milesight', 'name' => 'Milesight', 'vendor' => 'Milesight IoT', 'summary' => 'OAuth inventory import for LoRaWAN gateways and environmental or support sensors.', 'capabilities' => ['iot', 'environmental', 'healthcare_sensors', 'device_inventory'], 'device_scope' => ['bed sensors', 'fall sensors', 'door contacts', 'environment sensors', 'gateways']],
     ];
 
-    public function __construct(private readonly SecurityDevicesAccessService $access) {}
+    public function __construct(
+        private readonly SecurityDevicesAccessService $access,
+        private readonly IntegrationAdapterRegistry $adapters,
+    ) {}
 
     /** @return array<string, mixed> */
     public function present(User $viewer): array
@@ -73,13 +88,21 @@ class IntegrationsWorkspacePresenter
             ->groupBy('provider')
             ->get()
             ->keyBy('provider');
-        $configs = $providerSlugs->flatMap(fn (string $provider) => (clone $configQuery)
-            ->where('provider', $provider)
-            ->with('site:id,name')
-            ->orderBy('site_id')
-            ->limit(self::SITE_MAPPING_DISPLAY_LIMIT)
-            ->get())
-            ->groupBy('provider');
+        $configs = collect();
+        if ($configStats->sum('total_count') > 0) {
+            $rankedConfigs = (clone $configQuery)
+                ->select('integration_site_configs.*')
+                ->selectRaw('ROW_NUMBER() OVER (PARTITION BY provider ORDER BY site_id) AS provider_row');
+            $configs = IntegrationSiteConfig::query()
+                ->fromSub($rankedConfigs, 'integration_site_configs')
+                ->join('sites', 'sites.id', '=', 'integration_site_configs.site_id')
+                ->select(['integration_site_configs.*', 'sites.name as site_name'])
+                ->where('provider_row', '<=', self::SITE_MAPPING_DISPLAY_LIMIT)
+                ->orderBy('provider')
+                ->orderBy('site_id')
+                ->get()
+                ->groupBy('provider');
+        }
         $siteSecretQuery = IntegrationSiteSecret::query()
             ->when($siteIds === [], fn ($query) => $query->whereRaw('1 = 0'))
             ->when($siteIds !== [], fn ($query) => $query->whereIn('site_id', $siteIds))
@@ -96,21 +119,43 @@ class IntegrationsWorkspacePresenter
             ->selectRaw("SUM(CASE WHEN (last_error IS NULL OR last_error = '') AND is_enabled = 1 AND last_tested_at IS NOT NULL THEN 1 ELSE 0 END) as connected_count")
             ->selectRaw("SUM(CASE WHEN (last_error IS NULL OR last_error = '') AND is_enabled = 0 THEN 1 ELSE 0 END) as disabled_count")
             ->selectRaw('MAX(last_tested_at) as latest_tested_at')
+            ->selectRaw('GROUP_CONCAT(DISTINCT CASE WHEN is_enabled = 1 AND capability IS NOT NULL THEN capability END) as enabled_capabilities')
             ->groupBy('provider')
             ->get()
             ->keyBy('provider');
-        $siteSecretCapabilities = (clone $siteSecretQuery)
-            ->where('is_enabled', true)
-            ->whereNotNull('capability')
-            ->select(['provider', 'capability'])
-            ->distinct()
-            ->orderBy('capability')
-            ->get()
-            ->groupBy('provider')
-            ->map(fn ($rows) => $rows->pluck('capability')->values()->all());
+        $siteSecretCapabilities = $siteSecretStats->map(fn ($row): array => collect(explode(',', (string) $row->enabled_capabilities))
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->all());
         $syncSummaries = $this->syncSummaries($siteIds, $this->access->canViewAllSites($viewer));
+        $cursorQuery = ProviderCapabilityCursor::query()
+            ->when(! $this->access->canViewAllSites($viewer), fn (Builder $query) => $siteIds === []
+                ? $query->whereRaw('1 = 0')
+                : $query->whereIn('site_id', $siteIds));
+        $cursorRows = (clone $cursorQuery)
+            ->select(['provider', 'capability'])
+            ->selectRaw("'cursor' AS runtime_kind")
+            ->addSelect(['retry_not_before', 'exception_count', 'last_completed_at'])
+            ->selectRaw('NULL AS code')
+            ->selectRaw('NULL AS occurred_at');
+        $exceptionRows = ProviderCapabilityException::query()
+            ->when(! $this->access->canViewAllSites($viewer), fn (Builder $query) => $siteIds === []
+                ? $query->whereRaw('1 = 0')
+                : $query->whereIn('site_id', $siteIds))
+            ->select(['provider', 'capability'])
+            ->selectRaw("'exception' AS runtime_kind")
+            ->selectRaw('NULL AS retry_not_before')
+            ->selectRaw('0 AS exception_count')
+            ->selectRaw('NULL AS last_completed_at')
+            ->addSelect(['code', 'occurred_at']);
+        $runtimeRows = $cursorRows
+            ->unionAll($exceptionRows)
+            ->get()
+            ->groupBy('provider');
 
-        $providers = collect(self::PROVIDERS)->map(function (array $catalog) use ($canManage, $canViewDevices, $configStats, $configs, $deviceCounts, $duplicateCounts, $eventsByProvider, $connections, $siteSecretCapabilities, $siteSecretStats, $syncSummaries, $unassignedCounts): array {
+        $providers = collect(self::PROVIDERS)->map(function (array $catalog) use ($canManage, $canViewDevices, $configStats, $configs, $deviceCounts, $duplicateCounts, $eventsByProvider, $connections, $runtimeRows, $siteSecretCapabilities, $siteSecretStats, $syncSummaries, $unassignedCounts): array {
             $slug = $catalog['slug'];
             $connection = $connections->get($slug);
             $siteSecretStat = $siteSecretStats->get($slug);
@@ -121,15 +166,6 @@ class IntegrationsWorkspacePresenter
             $untestedSiteSecretCount = (int) ($siteSecretStat?->untested_count ?? 0);
             $disabledSiteSecretCount = (int) ($siteSecretStat?->disabled_count ?? 0);
             $siteSecretExceptionCount = $erroredSiteSecretCount + $untestedSiteSecretCount;
-            $credentialConfigured = $connection !== null || $siteSecretTotal > 0;
-            $connectionStatus = match (true) {
-                $erroredSiteSecretCount > 0 => IntegrationProviderConnection::STATUS_ERROR,
-                $connection !== null => $connection->status,
-                $connectedSiteSecretCount > 0 => IntegrationProviderConnection::STATUS_CONNECTED,
-                $untestedSiteSecretCount > 0 => IntegrationSiteCredentialsPresenter::STATE_UNTESTED,
-                $disabledSiteSecretCount > 0 => IntegrationSiteCredentialsPresenter::STATE_DISABLED,
-                default => 'not_configured',
-            };
             $providerConfigs = $configs->get($slug, collect())->values();
             $providerConfigStat = $configStats->get($slug);
             $configTotal = (int) ($providerConfigStat?->total_count ?? 0);
@@ -139,14 +175,44 @@ class IntegrationsWorkspacePresenter
             $unassigned = (int) ($unassignedCounts[$slug] ?? 0);
             $duplicateCandidates = (int) ($duplicateCounts[$slug] ?? 0);
             $unsupportedChecks = 0;
-            $syncAt = $sync['at'] ?? $connection?->last_synced_at;
+            $manifest = $this->adapters->manifest($slug);
+            $contract = $this->runtimeContract($slug, $manifest);
+            $nativeRuntimeOnly = $contract['state'] === 'native_runtime_only';
+            if ($nativeRuntimeOnly) {
+                $providerConfigs = collect();
+                $configTotal = 0;
+                $unmappedCount = 0;
+                $sync = $this->emptySyncSummary();
+            }
+            $credentialConfigured = ! $nativeRuntimeOnly && ($connection !== null || $siteSecretTotal > 0);
+            $connectionStatus = $nativeRuntimeOnly ? 'unavailable' : match (true) {
+                $erroredSiteSecretCount > 0 => IntegrationProviderConnection::STATUS_ERROR,
+                $connection !== null => $connection->status,
+                $connectedSiteSecretCount > 0 => IntegrationProviderConnection::STATUS_CONNECTED,
+                $untestedSiteSecretCount > 0 => IntegrationSiteCredentialsPresenter::STATE_UNTESTED,
+                $disabledSiteSecretCount > 0 => IntegrationSiteCredentialsPresenter::STATE_DISABLED,
+                default => 'not_configured',
+            };
+            $runtimeCapabilities = collect($manifest->capabilities)
+                ->map(fn (string $capability): string => Str::of(class_basename($capability))
+                    ->beforeLast('Capability')
+                    ->snake()
+                    ->toString())
+                ->values();
+            $providerRuntimeRows = $runtimeRows->get($slug, collect());
+            $providerCursors = $providerRuntimeRows->where('runtime_kind', 'cursor');
+            $providerRuntimeExceptions = $providerRuntimeRows->where('runtime_kind', 'exception');
+            $syncAt = $nativeRuntimeOnly ? null : ($sync['at'] ?? $connection?->last_synced_at);
             $syncFreshness = $syncAt === null
                 ? 'never'
                 : (($sync['stale_scope_count'] ?? 0) > 0 || $syncAt->lt(now()->subHours(self::STALE_SYNC_HOURS)) ? 'stale' : 'current');
 
             $exceptions = collect();
-            if (! $credentialConfigured) {
+            if (! $credentialConfigured && ! $nativeRuntimeOnly) {
                 $exceptions->push($this->exception('missing_credentials', 'Credentials are not configured.', 'Add credentials', $canManage ? "/security-devices/integrations/{$slug}" : null));
+            }
+            if ($nativeRuntimeOnly && $connection !== null) {
+                $exceptions->push($this->exception('legacy_cloud_credential', 'A legacy Queclink cloud credential is stored but is not used or considered connected.', 'Remove legacy credential', $canManage ? '/security-devices/integrations/queclink?tab=ims' : null));
             }
             if ($erroredSiteSecretCount > 0) {
                 $exceptions->push($this->exception('site_credential_error', "{$erroredSiteSecretCount} site credential has failure evidence.", 'Review site credentials', $canManage ? "/security-devices/integrations/{$slug}" : null, $erroredSiteSecretCount));
@@ -157,12 +223,12 @@ class IntegrationsWorkspacePresenter
             if ($unmappedCount > 0) {
                 $exceptions->push($this->exception('unmapped_site', "{$unmappedCount} site mapping requires attention.", 'Review site mappings', $canManage ? "/security-devices/integrations/{$slug}" : null, $unmappedCount));
             }
-            if (in_array($sync['status'], [IntegrationSyncLog::STATUS_FAILED, IntegrationSyncLog::STATUS_PARTIAL], true)) {
+            if (! $nativeRuntimeOnly && in_array($sync['status'], [IntegrationSyncLog::STATUS_FAILED, IntegrationSyncLog::STATUS_PARTIAL], true)) {
                 $exceptions->push($this->exception('integration_error', 'The latest provider sync did not complete successfully.', 'Review sync diagnostics', $canManage ? "/security-devices/integrations/{$slug}" : null, max(1, $sync['items_errored'])));
-            } elseif ($connection?->status === IntegrationProviderConnection::STATUS_ERROR) {
+            } elseif (! $nativeRuntimeOnly && $connection?->status === IntegrationProviderConnection::STATUS_ERROR) {
                 $exceptions->push($this->exception('integration_error', 'The provider connection needs attention.', 'Test the connection', $canManage ? "/security-devices/integrations/{$slug}" : null));
             }
-            if ($syncFreshness === 'stale') {
+            if (! $nativeRuntimeOnly && $syncFreshness === 'stale') {
                 $exceptions->push($this->exception('stale_sync', 'One or more latest sync scopes are more than 24 hours old.', 'Review sync schedule', $canManage ? "/security-devices/integrations/{$slug}" : null, max(1, (int) ($sync['stale_site_count'] ?? 0))));
             }
             if ($unassigned > 0) {
@@ -176,8 +242,10 @@ class IntegrationsWorkspacePresenter
                 'docs_href' => $canManage ? "/security-devices/integrations/{$slug}" : null,
                 'connection_status' => $connectionStatus,
                 'connected' => $connectionStatus === IntegrationProviderConnection::STATUS_CONNECTED,
-                'last_tested_at' => $connection?->last_tested_at?->toISOString()
-                    ?? (filled($siteSecretStat?->latest_tested_at) ? Carbon::parse($siteSecretStat->latest_tested_at)->toISOString() : null),
+                'last_tested_at' => $nativeRuntimeOnly
+                    ? null
+                    : ($connection?->last_tested_at?->toISOString()
+                        ?? (filled($siteSecretStat?->latest_tested_at) ? Carbon::parse($siteSecretStat->latest_tested_at)->toISOString() : null)),
                 'last_synced_at' => $syncAt?->toISOString(),
                 'device_count' => $deviceCount,
                 'events_24h' => (int) ($eventsByProvider[$slug] ?? 0),
@@ -187,7 +255,7 @@ class IntegrationsWorkspacePresenter
                     'unmapped' => $unmappedCount,
                     'sites' => $providerConfigs->map(fn (IntegrationSiteConfig $config): array => [
                         'id' => $config->site_id,
-                        'name' => $config->site?->name,
+                        'name' => $config->site_name,
                         'state' => ! $config->is_active
                             || $config->status === IntegrationSiteConfig::STATUS_DISCONNECTED
                             || blank($config->mapped_external_site_id)
@@ -214,9 +282,31 @@ class IntegrationsWorkspacePresenter
                     'unsupported_checks' => $unsupportedChecks,
                 ],
                 'monitoring_support' => [
-                    'state' => 'not_assessed',
+                    'state' => $runtimeCapabilities->intersect(['observation_collection', 'event_collection', 'webhook_verification', 'topology_collection', 'snapshot_collection'])->isNotEmpty()
+                        ? 'supported'
+                        : 'capability_absent',
                     'scope' => 'provider',
-                    'note' => 'Monitoring support is assessed from canonical provider capability evidence, not device metadata.',
+                    'note' => 'Monitoring support is taken from the typed provider manifest. An absent capability is not treated as healthy or silently emulated.',
+                ],
+                'runtime' => [
+                    'version' => $manifest->version,
+                    'contract_state' => $contract['state'],
+                    'contract_label' => $contract['label'],
+                    'contract_note' => $contract['note'],
+                    'capabilities' => $runtimeCapabilities,
+                    'page_limit' => $manifest->pageLimit,
+                    'minimum_interval_seconds' => $manifest->minimumIntervalSeconds,
+                    'backfill_limit' => $manifest->backfillLimit,
+                    'cursor_scopes' => $providerCursors->count(),
+                    'partial_scopes' => $providerCursors->whereNotNull('retry_not_before')->count(),
+                    'exception_count' => max((int) $providerCursors->sum('exception_count'), $providerRuntimeExceptions->count()),
+                    'latest_completed_at' => $providerCursors->max('last_completed_at')?->toIso8601String(),
+                    'latest_exception_at' => filled($providerRuntimeExceptions->max('occurred_at'))
+                        ? Carbon::parse($providerRuntimeExceptions->max('occurred_at'))->toIso8601String()
+                        : null,
+                    'exception_codes' => $providerRuntimeExceptions->pluck('code')->filter()->unique()->sort()->values(),
+                    'disconnect_ready' => $canManage && $credentialConfigured && ! $nativeRuntimeOnly,
+                    'revoke_ready' => $canManage && $credentialConfigured && ! $nativeRuntimeOnly,
                 ],
                 'exceptions' => $exceptions->values()->all(),
                 'exception_count' => $exceptions->sum('count'),
@@ -225,12 +315,12 @@ class IntegrationsWorkspacePresenter
             if ($canManage) {
                 $provider['credential'] = [
                     'configured' => $credentialConfigured,
-                    'reference' => $connection?->secret_last4,
-                    'reference_label' => $connection?->secret_last4 ? 'Credential ending '.$connection->secret_last4 : null,
-                    'display_state' => $connection !== null
+                    'reference' => $nativeRuntimeOnly ? null : $connection?->secret_last4,
+                    'reference_label' => ! $nativeRuntimeOnly && $connection?->secret_last4 ? 'Credential ending '.$connection->secret_last4 : null,
+                    'display_state' => ! $nativeRuntimeOnly && $connection !== null
                         ? 'provider_connection_configured'
                         : ($siteSecretTotal > 0 ? 'site_credentials_configured' : 'not_configured'),
-                    'rotation_state' => $this->rotationState($connection, $siteSecretTotal),
+                    'rotation_state' => $nativeRuntimeOnly ? 'not_configured' : $this->rotationState($connection, $siteSecretTotal),
                     'rotation_cadence_days' => self::ROTATION_CADENCE_DAYS,
                     'rotated_at' => $connection?->rotated_at?->toISOString(),
                     'created_at' => $connection?->created_at?->toISOString(),
@@ -251,7 +341,6 @@ class IntegrationsWorkspacePresenter
             'providers' => $providers,
             'stats' => [
                 'providers_total' => count(self::PROVIDERS),
-                'providers_live' => collect(self::PROVIDERS)->where('implementation_status', 'live')->count(),
                 'providers_connected' => collect($providers)->where('connected', true)->count(),
                 'providers_errored' => collect($providers)->where('connection_status', IntegrationProviderConnection::STATUS_ERROR)->count(),
                 'imported_devices' => collect($providers)->sum('device_count'),
@@ -264,6 +353,95 @@ class IntegrationsWorkspacePresenter
                 'credential_rotation_cadence_days' => self::ROTATION_CADENCE_DAYS,
                 'alert_owner' => 'Control Room',
             ],
+        ];
+    }
+
+    /** @return array{state: string, label: string, note: string} */
+    private function runtimeContract(string $provider, IntegrationCapabilityManifest $manifest): array
+    {
+        if ($manifest->capabilities === []) {
+            return [
+                'state' => 'native_runtime_only',
+                'label' => 'Native operations only',
+                'note' => $provider === 'queclink'
+                    ? 'No verified Queclink cloud API contract is enabled. Direct TCP intake, canonical tracking, and governed Device Management remain available through their separate native contracts.'
+                    : 'No provider cloud capability is declared. Only separately registered native runtime paths are available.',
+            ];
+        }
+
+        if ($manifest->supports(TopologyCollectionCapability::class)) {
+            $collectsEvents = $manifest->supports(EventCollectionCapability::class);
+            $collectsObservations = $manifest->supports(ObservationCollectionCapability::class);
+            $collectsSnapshots = $manifest->supports(SnapshotCollectionCapability::class);
+
+            return [
+                'state' => match (true) {
+                    $collectsObservations && $collectsSnapshots => 'monitoring_topology_snapshot_collection',
+                    $collectsObservations => 'monitoring_topology_collection',
+                    $collectsSnapshots => 'topology_snapshot_collection',
+                    default => 'topology_collection',
+                },
+                'label' => match (true) {
+                    $collectsObservations && $collectsEvents && $collectsSnapshots => 'Monitoring, inventory, sync, topology, configuration and events',
+                    $collectsObservations && $collectsSnapshots => 'Monitoring, inventory, sync, topology and configuration',
+                    $collectsEvents && $collectsSnapshots => 'Inventory, sync, topology, configuration and events',
+                    $collectsSnapshots => 'Inventory, sync, topology and configuration',
+                    $collectsObservations && $collectsEvents => 'Monitoring, inventory, sync, topology and events',
+                    $collectsObservations => 'Monitoring, inventory, sync and topology',
+                    $collectsEvents => 'Inventory, sync, topology and events',
+                    default => 'Inventory, sync and topology',
+                },
+                'note' => match (true) {
+                    $collectsObservations && $collectsEvents && $collectsSnapshots => 'Authenticated provider monitoring, canonical Device synchronization, typed topology, governed read-only configuration snapshots, and typed event collection are implemented. Only declared runtime capabilities are used.',
+                    $collectsObservations && $collectsSnapshots => 'Authenticated provider monitoring, canonical Device synchronization, typed topology, and governed read-only configuration snapshots are implemented. Only declared runtime capabilities are used.',
+                    $collectsEvents && $collectsSnapshots => 'Authenticated inventory, canonical Device synchronization, typed topology, governed read-only configuration snapshots, and typed event collection are implemented. Only declared runtime capabilities are used.',
+                    $collectsSnapshots => 'Authenticated inventory, canonical Device synchronization, typed topology, and governed read-only configuration snapshots are implemented. Only declared runtime capabilities are used.',
+                    $collectsObservations && $collectsEvents => 'Authenticated provider monitoring, canonical Device synchronization, typed topology, and typed event collection are implemented. Only declared runtime capabilities are used.',
+                    $collectsObservations => 'Authenticated provider monitoring, canonical Device synchronization, and typed topology collection are implemented. Only declared runtime capabilities are used.',
+                    $collectsEvents => 'Authenticated inventory, canonical Device synchronization, typed topology, and typed event collection are implemented. Only declared runtime capabilities are used.',
+                    default => 'Authenticated inventory, canonical Device synchronization, and typed topology collection are implemented. Only declared runtime capabilities are used.',
+                },
+            ];
+        }
+
+        if ($manifest->supports(InventoryDiscoveryCapability::class)
+            && $manifest->supports(DeviceSyncCapability::class)) {
+            $collectsObservations = $manifest->supports(ObservationCollectionCapability::class);
+            if ($manifest->supports(WebhookVerificationCapability::class)) {
+                return [
+                    'state' => $collectsObservations
+                        ? 'monitoring_inventory_sync_webhook'
+                        : 'inventory_sync_webhook',
+                    'label' => $collectsObservations
+                        ? 'Monitoring, inventory, sync and signed events'
+                        : 'Inventory, sync and signed events',
+                    'note' => $collectsObservations
+                        ? 'Authenticated provider status monitoring, canonical Device synchronization, and replay-protected signed webhook events are implemented. Topology is not inferred when its contract is absent.'
+                        : 'Authenticated provider inventory, canonical Device synchronization, and replay-protected signed webhook events are implemented. Polling or topology is not inferred when its contract is absent.',
+                ];
+            }
+
+            if ($collectsObservations) {
+                return [
+                    'state' => 'monitoring_inventory_sync',
+                    'label' => 'Monitoring, inventory and sync',
+                    'note' => 'Authenticated provider status monitoring and canonical Device synchronization are implemented. Topology and events are not inferred when their contracts are absent.',
+                ];
+            }
+
+            return [
+                'state' => 'inventory_sync',
+                'label' => 'Inventory and sync',
+                'note' => 'Authenticated provider inventory and canonical Device synchronization are implemented. Topology and event collection are not inferred when their contracts are absent.',
+            ];
+        }
+
+        return [
+            'state' => 'connection_health_only',
+            'label' => 'Connection check only',
+            'note' => $provider === 'queclink'
+                ? 'The cloud adapter can test authentication only. Cloud inventory, sync, and event collection remain unavailable; native TCP monitoring and governed Device Management continue separately.'
+                : 'The provider adapter can test authentication only. Inventory, synchronization, topology, and event collection remain unavailable until their typed contracts are implemented.',
         ];
     }
 

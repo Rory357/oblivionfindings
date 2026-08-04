@@ -2,6 +2,10 @@
 
 namespace App\Services\Integration;
 
+use App\Domain\Monitoring\Enums\MonitorKind;
+use App\Domain\Monitoring\Enums\MonitorState;
+use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\SecurityDevices\Enums\AssignmentType;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
@@ -12,13 +16,17 @@ use App\Models\LocationHardware;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Services\Sites\SiteTypePlanPinStatusService;
-use App\Support\LegacyStorageContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class UnifiOperationalBridgeService
 {
+    private const MONITORING_PROFILE_NAME = 'UniFi Network provider status';
+
+    private const WAN_MONITORING_PROFILE_NAME = 'UniFi WAN performance';
+
     /**
      * @return array{device: Device, created: bool}
      */
@@ -28,6 +36,9 @@ class UnifiOperationalBridgeService
 
         if ($providerEntityId === null) {
             throw new \InvalidArgumentException('UniFi payload is missing a provider entity id.');
+        }
+        if (mb_strlen($providerEntityId) > 255) {
+            throw new \InvalidArgumentException('UniFi provider identity is invalid.');
         }
 
         $legacyCategory = $this->resolveLegacyCategory($payload);
@@ -47,9 +58,11 @@ class UnifiOperationalBridgeService
         $externalRef = is_array($device->external_ref) ? $device->external_ref : [];
         $meta = is_array($device->meta) ? $device->meta : [];
         $productLine = strtolower((string) ($payload['productLine'] ?? ''));
+        $isNetworkDevice = $productLine === 'network'
+            || ($domain === 'it_infrastructure' && $category === 'network');
+        $sourceApp = $productLine !== '' ? $productLine : ($isNetworkDevice ? 'network' : null);
 
         $device->fill([
-            'tenant_id' => LegacyStorageContext::id(),
             'name' => $this->resolveDeviceName($payload),
             'domain' => $domain,
             'category' => $category,
@@ -71,7 +84,7 @@ class UnifiOperationalBridgeService
                 'model' => $payload['model'] ?? null,
                 'firmware' => $payload['version'] ?? $payload['firmware_version'] ?? null,
                 'ip' => $payload['ip'] ?? null,
-                'source_app' => $productLine !== '' ? $productLine : null,
+                'source_app' => $sourceApp,
                 'host_id' => $payload['_resolved_host_id'] ?? null,
             ]),
             'meta' => array_merge($meta, [
@@ -88,6 +101,20 @@ class UnifiOperationalBridgeService
 
         $assignment = $this->ensureInventoryPlacement($device, $siteConfig->site_id);
         $roomId = $assignment->assignable_type === DeviceAssignment::TARGET_ROOM ? $assignment->assignable_id : null;
+        if ($isNetworkDevice) {
+            $this->ensureProviderMonitor($device, $providerEntityId);
+        }
+        if ($category === 'network' && $subcategory === 'router') {
+            $hostId = is_scalar($payload['_resolved_host_id'] ?? null)
+                ? trim((string) $payload['_resolved_host_id'])
+                : '';
+            $externalSiteId = is_scalar($siteConfig->mapped_external_site_id)
+                ? trim((string) $siteConfig->mapped_external_site_id)
+                : '';
+            if ($hostId !== '' && $externalSiteId !== '') {
+                $this->ensureWanMonitor($device, $hostId, $externalSiteId);
+            }
+        }
 
         // Phase 1 (PR P): legacy location_hardware shadow writes are disabled.
         // The canonical Device above is the source of truth; provenance now
@@ -104,6 +131,181 @@ class UnifiOperationalBridgeService
             'device' => $device->fresh(),
             'created' => $created,
         ];
+    }
+
+    public function monitorTargetFor(string $providerEntityId): string
+    {
+        $providerEntityId = trim($providerEntityId);
+        if ($providerEntityId === '' || mb_strlen($providerEntityId) > 255) {
+            throw new \InvalidArgumentException('UniFi monitor identity is invalid.');
+        }
+
+        return 'provider:unifi:'.hash('sha256', $providerEntityId);
+    }
+
+    public function wanMonitorTargetFor(string $consoleId, string $externalSiteId): string
+    {
+        $consoleId = trim($consoleId);
+        $externalSiteId = trim($externalSiteId);
+        if ($consoleId === '' || mb_strlen($consoleId) > 255
+            || $externalSiteId === '' || mb_strlen($externalSiteId) > 255) {
+            throw new \InvalidArgumentException('UniFi WAN monitor identity is invalid.');
+        }
+
+        return 'provider:unifi:wan:'.hash('sha256', $consoleId.'|'.$externalSiteId);
+    }
+
+    private function ensureProviderMonitor(Device $device, string $providerEntityId): void
+    {
+        $target = $this->monitorTargetFor($providerEntityId);
+        $profile = $this->monitoringProfile();
+
+        DB::transaction(function () use ($device, $target, $profile): void {
+            Device::query()->lockForUpdate()->findOrFail($device->id);
+            $matches = Monitor::query()
+                ->where('device_id', $device->id)
+                ->where('kind', MonitorKind::Provider->value)
+                ->where('target', $target)
+                ->lockForUpdate()
+                ->get();
+
+            if ($matches->count() > 1) {
+                throw new \RuntimeException('UniFi provider monitor identity is ambiguous.');
+            }
+
+            $existing = $matches->first();
+            if ($existing !== null) {
+                $config = is_array($existing->config) ? $existing->config : [];
+                if (($config['provider'] ?? null) !== 'unifi'
+                    || ($config['collection'] ?? null) !== 'device_status') {
+                    throw new \RuntimeException('UniFi provider monitor contract is inconsistent.');
+                }
+
+                return;
+            }
+
+            Monitor::query()->create([
+                'device_id' => $device->id,
+                'profile_id' => $profile->id,
+                'kind' => MonitorKind::Provider,
+                'name' => 'UniFi connectivity and performance',
+                'target' => $target,
+                'config' => [
+                    'provider' => 'unifi',
+                    'collection' => 'device_status',
+                ],
+                'current_state' => MonitorState::Unknown,
+                'effective_state' => MonitorState::Unknown,
+                'affects_availability' => true,
+                'is_enabled' => true,
+            ]);
+        }, 3);
+    }
+
+    private function monitoringProfile(): MonitoringProfile
+    {
+        try {
+            return MonitoringProfile::query()->firstOrCreate(
+                ['name' => self::MONITORING_PROFILE_NAME],
+                [
+                    'description' => 'Current UniFi Network connectivity and bounded performance statistics.',
+                    'interval_seconds' => 60,
+                    'failure_confirmations' => 3,
+                    'failure_duration_seconds' => 0,
+                    'recovery_confirmations' => 2,
+                    'recovery_duration_seconds' => 0,
+                    'stale_after_seconds' => 180,
+                    'is_active' => true,
+                ],
+            );
+        } catch (QueryException $exception) {
+            $profile = MonitoringProfile::query()
+                ->where('name', self::MONITORING_PROFILE_NAME)
+                ->first();
+            if ($profile === null) {
+                throw $exception;
+            }
+
+            return $profile;
+        }
+    }
+
+    private function ensureWanMonitor(Device $device, string $consoleId, string $externalSiteId): void
+    {
+        $target = $this->wanMonitorTargetFor($consoleId, $externalSiteId);
+        $profile = $this->wanMonitoringProfile();
+
+        DB::transaction(function () use ($device, $target, $profile): void {
+            Device::query()->lockForUpdate()->findOrFail($device->id);
+            $matches = Monitor::query()
+                ->where('kind', MonitorKind::Provider->value)
+                ->where('target', $target)
+                ->lockForUpdate()
+                ->get();
+            if ($matches->count() > 1) {
+                throw new \RuntimeException('UniFi WAN monitor identity is ambiguous.');
+            }
+
+            $existing = $matches->first();
+            if ($existing !== null) {
+                $config = is_array($existing->config) ? $existing->config : [];
+                if (($config['provider'] ?? null) !== 'unifi'
+                    || ($config['collection'] ?? null) !== 'isp_metrics') {
+                    throw new \RuntimeException('UniFi WAN monitor contract is inconsistent.');
+                }
+
+                return;
+            }
+
+            Monitor::query()->create([
+                'device_id' => $device->id,
+                'profile_id' => $profile->id,
+                'kind' => MonitorKind::Provider,
+                'name' => 'UniFi WAN performance',
+                'target' => $target,
+                'config' => [
+                    'provider' => 'unifi',
+                    'collection' => 'isp_metrics',
+                    'warning_uptime_percent' => 99,
+                    'warning_packet_loss_percent' => 5,
+                    'warning_average_latency_ms' => 250,
+                    'failure_uptime_percent' => 1,
+                    'failure_downtime_seconds' => 300,
+                ],
+                'current_state' => MonitorState::Unknown,
+                'effective_state' => MonitorState::Unknown,
+                'affects_availability' => true,
+                'is_enabled' => true,
+            ]);
+        }, 3);
+    }
+
+    private function wanMonitoringProfile(): MonitoringProfile
+    {
+        try {
+            return MonitoringProfile::query()->firstOrCreate(
+                ['name' => self::WAN_MONITORING_PROFILE_NAME],
+                [
+                    'description' => 'Five-minute UniFi Site WAN uptime, loss, latency, and throughput.',
+                    'interval_seconds' => 300,
+                    'failure_confirmations' => 2,
+                    'failure_duration_seconds' => 0,
+                    'recovery_confirmations' => 2,
+                    'recovery_duration_seconds' => 0,
+                    'stale_after_seconds' => 900,
+                    'is_active' => true,
+                ],
+            );
+        } catch (QueryException $exception) {
+            $profile = MonitoringProfile::query()
+                ->where('name', self::WAN_MONITORING_PROFILE_NAME)
+                ->first();
+            if ($profile === null) {
+                throw $exception;
+            }
+
+            return $profile;
+        }
     }
 
     public function syncRoomAssignment(
@@ -244,7 +446,6 @@ class UnifiOperationalBridgeService
 
             Log::debug('UnifiOperationalBridgeService::upsertLegacyShadow is a no-op (PR P Phase 1): legacy location_hardware writes disabled.', [
                 'device_id' => $device->id,
-                'tenant_id' => $device->tenant_id,
                 'site_id' => $siteId,
                 'room_id' => $roomId,
                 'legacy_category' => $legacyCategory,

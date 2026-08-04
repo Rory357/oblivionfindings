@@ -8,6 +8,7 @@ use App\Models\ItTicketLink;
 use App\Models\ItWorkTask;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\LegacyStorageContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 
@@ -15,7 +16,7 @@ uses(RefreshDatabase::class);
 
 it('provides the shared service management persistence contract', function () {
     expect(Schema::hasColumns('it_teams', [
-        'tenant_id',
+        LegacyStorageContext::column(),
         'manager_user_id',
         'name',
         'description',
@@ -27,7 +28,7 @@ it('provides the shared service management persistence contract', function () {
             'role',
         ]))->toBeTrue()
         ->and(Schema::hasColumns('it_queues', [
-            'tenant_id',
+            LegacyStorageContext::column(),
             'team_id',
             'key',
             'name',
@@ -35,7 +36,7 @@ it('provides the shared service management persistence contract', function () {
             'is_active',
         ]))->toBeTrue()
         ->and(Schema::hasColumns('it_services', [
-            'tenant_id',
+            LegacyStorageContext::column(),
             'owner_user_id',
             'key',
             'name',
@@ -44,7 +45,7 @@ it('provides the shared service management persistence contract', function () {
             'is_active',
         ]))->toBeTrue()
         ->and(Schema::hasColumns('it_work_tasks', [
-            'tenant_id',
+            LegacyStorageContext::column(),
             'ticket_id',
             'parent_task_id',
             'team_id',
@@ -78,19 +79,16 @@ it('relates application-owned teams queues services tasks and canonical ticket o
     $member = User::factory()->create();
     $requester = User::factory()->create();
     $requestedFor = User::factory()->create();
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $team = ItTeam::factory()->create([
-        'tenant_id' => 1,
         'manager_user_id' => $manager->id,
     ]);
     $team->members()->attach($member->id, ['role' => 'member']);
-    $queue = ItQueue::factory()->for($team, 'team')->create(['tenant_id' => 1]);
+    $queue = ItQueue::factory()->for($team, 'team')->create();
     $service = ItService::factory()->create([
-        'tenant_id' => 1,
         'owner_user_id' => $manager->id,
     ]);
     $ticket = ItTicket::factory()->create([
-        'tenant_id' => 1,
         'requester_user_id' => $requester->id,
         'requested_for_user_id' => $requestedFor->id,
         'owner_user_id' => $manager->id,
@@ -106,12 +104,10 @@ it('relates application-owned teams queues services tasks and canonical ticket o
         'due_at' => now()->addDay(),
     ]);
     $parentTask = ItWorkTask::factory()->for($ticket, 'ticket')->create([
-        'tenant_id' => 1,
         'team_id' => $team->id,
         'is_required' => true,
     ]);
     $childTask = ItWorkTask::factory()->for($ticket, 'ticket')->create([
-        'tenant_id' => 1,
         'parent_task_id' => $parentTask->id,
         'assigned_to_user_id' => $member->id,
     ]);

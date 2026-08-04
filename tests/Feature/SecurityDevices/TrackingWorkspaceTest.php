@@ -43,12 +43,12 @@ class TrackingWorkspaceTest extends TestCase
     {
         $site = $this->site('Kauri House');
         $client = Client::factory()->create([
-            'organization_id' => 42,
+
             'site_id' => $site->id,
             'preferred_name' => 'Mere',
         ]);
         $consent = $this->trackingConsent($client);
-        $worker = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
+        $worker = User::factory()->create(['approved_at' => now()]);
         $vehicle = Asset::factory()->vehicle()->forSite($site)->create(['name' => 'Community van']);
         $asset = Asset::factory()->forSite($site)->create([
             'name' => 'Portable hoist',
@@ -60,7 +60,7 @@ class TrackingWorkspaceTest extends TestCase
         $fleetTracker = $this->trackingDevice('Van tracker', ['category' => 'vehicle_tracker']);
         $assetTracker = $this->trackingDevice('Hoist tag', ['category' => 'asset_tracker']);
         $unassignedTag = $this->trackingDevice('Spare tag', ['category' => 'asset_tracker']);
-        $foreign = $this->trackingDevice('Foreign tracker', ['tenant_id' => 77]);
+        $unrelated = $this->trackingDevice('Unrelated tracker', []);
 
         $this->assign($clientTracker, DeviceAssignment::TARGET_CLIENT, $client->id, $consent->id);
         $this->assign($staffTracker, DeviceAssignment::TARGET_STAFF, $worker->id);
@@ -71,7 +71,7 @@ class TrackingWorkspaceTest extends TestCase
         $this->actingAs($this->admin)
             ->get('/security-devices/tracking')
             ->assertOk()
-            ->assertInertia(function ($page) use ($foreign): void {
+            ->assertInertia(function ($page) use ($unrelated): void {
                 $tracking = $page->toArray()['props']['trackingWorkspace'];
 
                 $this->assertSame([
@@ -83,7 +83,7 @@ class TrackingWorkspaceTest extends TestCase
                 $this->assertSame(2, $tracking['overview']['attention']['unassigned']);
                 $this->assertSame(5, $tracking['activeTab']['inventoryTotal']);
                 $this->assertContains(
-                    $foreign->id,
+                    $unrelated->id,
                     collect($tracking['activeTab']['devices'])->pluck('id')->all(),
                 );
                 $this->assertSame(
@@ -98,7 +98,7 @@ class TrackingWorkspaceTest extends TestCase
         Device::factory()
             ->count(101)
             ->tracking()
-            ->create(['tenant_id' => 42]);
+            ->create([]);
 
         $this->actingAs($this->admin)
             ->get('/security-devices/tracking')
@@ -115,7 +115,7 @@ class TrackingWorkspaceTest extends TestCase
     {
         $site = $this->site('Miro House');
         $client = Client::factory()->create([
-            'organization_id' => 42,
+
             'site_id' => $site->id,
             'preferred_name' => 'Ani',
             'first_name' => 'Anahera',
@@ -141,13 +141,14 @@ class TrackingWorkspaceTest extends TestCase
             ->assertOk()
             ->assertInertia(function ($page) use ($client, $device): void {
                 $props = $page->toArray()['props'];
-                $row = $props['trackingWorkspace']['activeTab']['devices'][0];
+                $activeTab = $props['trackingWorkspace']['activeTab'];
+                $row = $activeTab['devices'][0];
 
                 $this->assertSame($device->id, $row['id']);
                 $this->assertSame([
                     'id' => $client->id,
                     'displayName' => 'Ani',
-                    'href' => "/clients/{$client->id}",
+                    'href' => "/operations/clients/{$client->id}",
                 ], $row['person']);
                 $this->assertSame('client', $row['personalSafety']['personType']);
                 $this->assertSame('active', $row['privacy']['state']);
@@ -156,6 +157,7 @@ class TrackingWorkspaceTest extends TestCase
                 $this->assertSame(-36.8485, $row['location']['latitude']);
                 $this->assertSame(174.7633, $row['location']['longitude']);
                 $this->assertSame("/operations/clients/{$client->id}?tab=location", $row['canonicalHref']);
+                $this->assertSame('active', $activeTab['markers'][0]['status']);
 
                 $payload = json_encode($props, JSON_THROW_ON_ERROR);
                 foreach (['Private-Surname-Sentinel', 'TRACK-NHI-SENTINEL', 'RAW-PERSON-LOCATION-SENTINEL'] as $forbidden) {
@@ -216,7 +218,7 @@ class TrackingWorkspaceTest extends TestCase
     {
         $site = $this->site('Totara House');
         $worker = User::factory()->create([
-            'organization_id' => 42,
+
             'approved_at' => now(),
             'name' => 'Aroha Worker',
         ]);
@@ -245,9 +247,11 @@ class TrackingWorkspaceTest extends TestCase
             'hazards.view',
             'healthSafety.viewAllSites',
             'staff.viewAny',
+            'hr.employees.viewAny',
             'assets.telemetry.view',
         ]);
         $this->assignViewerToSite($worker, $site);
+        $this->assignViewerToSite($viewer, $site);
 
         $technicalViewer = $this->viewerWithPermissions([
             'securityDevices.viewAny',
@@ -270,8 +274,10 @@ class TrackingWorkspaceTest extends TestCase
             ->assertOk()
             ->assertInertia(function ($page) use ($session, $worker): void {
                 $row = $page->toArray()['props']['trackingWorkspace']['activeTab']['devices'][0];
+                $profileId = $worker->hrEmployeeProfile()->value('id');
 
                 $this->assertSame($worker->id, $row['person']['id']);
+                $this->assertSame("/hr/people/{$profileId}", $row['person']['href']);
                 $this->assertSame('staff', $row['personalSafety']['personType']);
                 $this->assertSame('active_lone_worker_session', $row['privacy']['basis']);
                 $this->assertSame('active', $row['privacy']['state']);
@@ -292,6 +298,58 @@ class TrackingWorkspaceTest extends TestCase
                 $this->assertSame('none', $row['privacy']['basis']);
                 $this->assertFalse($row['privacy']['locationAllowed']);
                 $this->assertNull($row['location']);
+            });
+    }
+
+    public function test_security_all_sites_does_not_expand_hr_staff_profile_links_beyond_hr_site_scope(): void
+    {
+        $localSite = $this->site('Local support office');
+        $remoteSite = $this->site('Remote security site');
+        $worker = User::factory()->create([
+            'approved_at' => now(),
+            'name' => 'Remote Security Worker',
+        ]);
+        $this->assignViewerToSite($worker, $remoteSite);
+
+        $device = $this->trackingDevice('Remote worker tracker', [
+            'category' => 'personal_tracker',
+            'subcategory' => 'lone_worker',
+        ]);
+        $this->assign($device, DeviceAssignment::TARGET_STAFF, $worker->id);
+
+        $viewer = $this->viewerWithPermissions([
+            'securityDevices.viewAny',
+            'securityDevices.devices.view',
+            'securityDevices.devices.viewAllSites',
+            'hazards.view',
+            'staff.viewAny',
+            'hr.employees.viewAny',
+            'assets.telemetry.view',
+        ]);
+        $this->assignViewerToSite($viewer, $localSite);
+
+        $this->actingAs($viewer)
+            ->get('/security-devices/tracking?tab=personal-safety')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($device, $worker): void {
+                $row = collect($page->toArray()['props']['trackingWorkspace']['activeTab']['devices'])
+                    ->firstWhere('id', $device->id);
+
+                $this->assertNotNull($row);
+                $this->assertSame($worker->id, $row['person']['id']);
+                $this->assertSame('Remote Security Worker', $row['person']['displayName']);
+                $this->assertNull($row['person']['href']);
+            });
+
+        $this->actingAs($viewer)
+            ->get("/security-devices/devices/{$device->id}")
+            ->assertOk()
+            ->assertInertia(function ($page): void {
+                $location = $page->toArray()['props']['profile']['header']['location'];
+
+                $this->assertSame('staff', $location['type']);
+                $this->assertSame('Remote Security Worker', $location['name']);
+                $this->assertNull($location['href']);
             });
     }
 
@@ -358,7 +416,7 @@ class TrackingWorkspaceTest extends TestCase
         $site = $this->site('Pohutukawa Base');
         $vehicle = Asset::factory()->vehicle()->forSite($site)->create(['name' => 'Pohutukawa van']);
         $client = Client::factory()->create([
-            'organization_id' => 42,
+
             'site_id' => $site->id,
             'preferred_name' => 'Ria',
         ]);
@@ -421,6 +479,10 @@ class TrackingWorkspaceTest extends TestCase
                 $tracking = $page->toArray()['props']['trackingWorkspace'];
                 $events = collect($tracking['activeTab']['history']);
                 $this->assertEqualsCanonicalizing(['vehicle-current', 'client-current'], $events->pluck('eventType')->all());
+                $this->assertSame(
+                    ['historical'],
+                    collect($tracking['activeTab']['markers'])->pluck('status')->unique()->values()->all(),
+                );
                 $this->assertSame((int) config('fleet.retention.telemetry_days', 365), $tracking['activeTab']['retentionDays']);
                 $payload = json_encode($tracking, JSON_THROW_ON_ERROR);
                 $this->assertStringNotContainsString('RAW-HISTORY-PAYLOAD-SENTINEL', $payload);
@@ -447,7 +509,7 @@ class TrackingWorkspaceTest extends TestCase
 
     private function viewerWithRole(string $role): User
     {
-        $viewer = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
+        $viewer = User::factory()->create(['approved_at' => now()]);
         $viewer->roles()->attach(Role::query()->where('name', $role)->firstOrFail());
 
         return $viewer;
@@ -456,7 +518,7 @@ class TrackingWorkspaceTest extends TestCase
     /** @param array<int, string> $permissions */
     private function viewerWithPermissions(array $permissions): User
     {
-        $viewer = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
+        $viewer = User::factory()->create(['approved_at' => now()]);
         $role = Role::create([
             'name' => 'tracking_workspace_'.str()->uuid(),
             'label' => 'Tracking workspace test',
@@ -477,7 +539,7 @@ class TrackingWorkspaceTest extends TestCase
 
     private function site(string $name): Site
     {
-        return Site::factory()->create(['tenant_id' => 42, 'name' => $name, 'is_active' => true]);
+        return Site::factory()->create(['name' => $name, 'is_active' => true]);
     }
 
     private function assignViewerToSite(User $viewer, Site $site): void
@@ -493,7 +555,6 @@ class TrackingWorkspaceTest extends TestCase
     private function trackingDevice(string $name, array $attributes = []): Device
     {
         return Device::factory()->tracking()->create([
-            'tenant_id' => 42,
             'name' => $name,
             ...$attributes,
         ]);

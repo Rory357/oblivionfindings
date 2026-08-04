@@ -2,23 +2,56 @@
 
 namespace App\Services\Integration\Adapters;
 
+use App\Domain\Monitoring\Enums\MonitorKind;
+use App\Domain\Monitoring\Enums\MonitorState;
+use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
+use App\Domain\SecurityDevices\Models\Device;
 use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\LocationHardware;
+use App\Services\Integration\Contracts\ConnectionHealthCapability;
+use App\Services\Integration\Contracts\DeviceSyncCapability;
+use App\Services\Integration\Contracts\EventCollectionCapability;
+use App\Services\Integration\Contracts\InventoryDiscoveryCapability;
+use App\Services\Integration\Contracts\ObservationCollectionCapability;
+use App\Services\Integration\Contracts\SnapshotCollectionCapability;
+use App\Services\Integration\Contracts\TopologyCollectionCapability;
+use App\Services\Integration\Contracts\WebhookVerificationCapability;
+use App\Services\Integration\Data\ProviderEventPage;
+use App\Services\Integration\Data\ProviderObservationPage;
+use App\Services\Integration\Data\ProviderSnapshotPage;
+use App\Services\Integration\Data\ProviderTopologyPage;
+use App\Services\Integration\Data\ProviderWebhookRequest;
+use App\Services\Integration\Data\VerifiedProviderEvent;
+use App\Services\Integration\Data\VerifiedProviderEventBatch;
+use App\Services\Integration\Exceptions\WebhookRejected;
 use App\Services\Integration\IntegrationAdapterInterface;
 use App\Services\Integration\IntegrationDiscoveryException;
 use App\Services\Integration\SyncResult;
 use App\Services\Integration\UnifiOperationalBridgeService;
 use App\Support\SafeOperationalData;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class UnifiAdapter implements IntegrationAdapterInterface
+class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, EventCollectionCapability, IntegrationAdapterInterface, InventoryDiscoveryCapability, ObservationCollectionCapability, SnapshotCollectionCapability, TopologyCollectionCapability, WebhookVerificationCapability
 {
     private const BASE_URL = 'https://api.ui.com/v1';
+
+    private const NETWORK_API_MAX_PAGE_SIZE = 200;
+
+    private const OBSERVATION_MAX_PAGE_SIZE = 25;
+
+    private const OBSERVATION_CURSOR_PREFIX = 'unifi-health-v1:';
+
+    private const SNAPSHOT_CURSOR_PREFIX = 'unifi-network-config-v1:';
+
+    private const TOPOLOGY_CURSOR_MAX = 1000000000;
 
     private const SITE_IDENTIFIER_MAX_LENGTH = 255;
 
@@ -32,8 +65,19 @@ class UnifiAdapter implements IntegrationAdapterInterface
 
     private const HOST_CONTROLLER_COUNT_MAX = 100;
 
+    private const ACCESS_EVENT_CURSOR_PREFIX = 'access-v1:';
+
+    private const ACCESS_EVENT_DEFAULT_LOOKBACK_SECONDS = 172800;
+
+    private const ACCESS_EVENT_MAX_WINDOW_SECONDS = 2592000;
+
+    private const ACCESS_EVENT_MAX_PAGE = 10000;
+
+    private const ACCESS_EVENT_MAX_TOTAL = 1000000;
+
     public function __construct(
         private readonly UnifiOperationalBridgeService $runtime,
+        private readonly CanonicalDeviceSiteResolver $siteResolver,
     ) {}
 
     /**
@@ -60,7 +104,161 @@ class UnifiAdapter implements IntegrationAdapterInterface
 
     public function capabilities(): array
     {
-        return ['device_inventory', 'device_health', 'motion_events_webhook', 'access_events'];
+        return [
+            ConnectionHealthCapability::class,
+            InventoryDiscoveryCapability::class,
+            DeviceSyncCapability::class,
+            ObservationCollectionCapability::class,
+            SnapshotCollectionCapability::class,
+            EventCollectionCapability::class,
+            TopologyCollectionCapability::class,
+            WebhookVerificationCapability::class,
+        ];
+    }
+
+    public function verifyWebhook(
+        IntegrationProviderConnection $connection,
+        ProviderWebhookRequest $request,
+    ): VerifiedProviderEventBatch {
+        if (strlen($request->body) < 2 || strlen($request->body) > 262144) {
+            throw new WebhookRejected('body_size', 413);
+        }
+
+        try {
+            $secret = Crypt::decryptString($connection->secret_encrypted);
+        } catch (\Throwable) {
+            throw new WebhookRejected('credentials_unavailable');
+        }
+
+        $integrationKey = $request->header('X-Integration-Key');
+        if (! is_string($integrationKey) || ! hash_equals($secret, $integrationKey)) {
+            throw new WebhookRejected('authentication');
+        }
+
+        $timestamp = $request->header('X-Webhook-Timestamp');
+        if (! is_string($timestamp) || preg_match('/^\d{10}$/', $timestamp) !== 1
+            || abs($request->receivedAt->timestamp - (int) $timestamp) > (int) config('integration-capabilities.webhook.maximum_skew_seconds', 300)) {
+            throw new WebhookRejected('timestamp');
+        }
+
+        $nonce = $request->header('X-Webhook-Nonce');
+        if (! is_string($nonce) || preg_match('/^[A-Za-z0-9._:-]{16,128}$/', $nonce) !== 1) {
+            throw new WebhookRejected('nonce');
+        }
+
+        $signature = $request->header('X-Webhook-Signature');
+        if (! is_string($signature) || preg_match('/^sha256=([a-f0-9]{64})$/i', $signature, $matches) !== 1) {
+            throw new WebhookRejected('signature');
+        }
+
+        $expected = hash_hmac('sha256', $timestamp.'.'.$nonce.'.'.$request->body, $secret);
+        if (! hash_equals($expected, strtolower($matches[1]))) {
+            throw new WebhookRejected('signature');
+        }
+
+        try {
+            $payload = json_decode($request->body, true, 32, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            throw new WebhookRejected('payload', 422);
+        }
+
+        if (! is_array($payload)) {
+            throw new WebhookRejected('payload', 422);
+        }
+
+        $externalSiteId = $this->boundedWebhookText($payload['site_id'] ?? $payload['siteId'] ?? null, 255);
+        $sourceEventId = $this->boundedWebhookText($payload['_id'] ?? $payload['event_id'] ?? $payload['id'] ?? null, 255);
+        $eventType = $this->boundedWebhookText($payload['key'] ?? $payload['type'] ?? null, 255);
+        if ($externalSiteId === null || $sourceEventId === null || $eventType === null) {
+            throw new WebhookRejected('payload', 422);
+        }
+
+        $siteConfig = IntegrationSiteConfig::query()
+            ->forProvider($this->provider())
+            ->active()
+            ->where('mapped_external_site_id', $externalSiteId)
+            ->whereHas('site')
+            ->first();
+        if ($siteConfig === null) {
+            throw new WebhookRejected('site_identity', 422);
+        }
+        $siteId = (int) $siteConfig->site_id;
+
+        $occurredAt = $this->webhookOccurredAt($payload['time'] ?? $payload['timestamp'] ?? null, $request->receivedAt);
+        $severity = match (strtolower((string) ($payload['severity'] ?? 'info'))) {
+            'critical', 'emergency', 'fatal', 'urgent' => 'critical',
+            'warn', 'warning', 'high', 'major' => 'warn',
+            default => 'info',
+        };
+
+        $replayStore = (string) (config('integration-capabilities.webhook.replay_store') ?: config('cache.default'));
+        $replayDriver = config("cache.stores.{$replayStore}.driver");
+        $allowLocalReplay = app()->environment('testing')
+            && (bool) config('integration-capabilities.webhook.allow_local_replay_store_for_tests', false);
+        if ($replayDriver !== 'redis' && ! $allowLocalReplay) {
+            throw new WebhookRejected('replay_store_unavailable', 503);
+        }
+
+        $cacheKey = 'monitoring:provider-webhook-replay:'.hash('sha256', $connection->id.':'.$nonce);
+        try {
+            $reserved = Cache::store($replayStore)
+                ->add($cacheKey, true, (int) config('integration-capabilities.webhook.replay_ttl_seconds', 600));
+        } catch (\Throwable) {
+            throw new WebhookRejected('replay_store_unavailable', 503);
+        }
+
+        if (! $reserved) {
+            throw new WebhookRejected('replay');
+        }
+
+        return new VerifiedProviderEventBatch([
+            new VerifiedProviderEvent(
+                siteId: $siteId,
+                sourceApp: 'unifi',
+                sourceEventId: $sourceEventId,
+                occurredAt: $occurredAt,
+                severity: $severity,
+                eventType: $eventType,
+                normalizedPayload: array_filter([
+                    'summary' => $this->boundedWebhookText($payload['msg'] ?? $payload['message'] ?? null, 1000),
+                    'subsystem' => $this->boundedWebhookText($payload['subsystem'] ?? null, 100),
+                    'device_identifier' => $this->boundedWebhookText($payload['mac'] ?? $payload['device_id'] ?? null, 255),
+                ], static fn (mixed $value): bool => $value !== null),
+                bodyHash: hash('sha256', $request->body),
+            ),
+        ]);
+    }
+
+    private function boundedWebhookText(mixed $value, int $maximum): ?string
+    {
+        if (! is_string($value) && ! is_int($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value !== '' && mb_strlen($value) <= $maximum ? $value : null;
+    }
+
+    private function webhookOccurredAt(mixed $value, CarbonImmutable $fallback): CarbonImmutable
+    {
+        try {
+            if ((is_int($value) || is_string($value)) && preg_match('/^\d{13}$/', (string) $value) === 1) {
+                return CarbonImmutable::createFromTimestampMs((int) $value)->utc();
+            }
+
+            if ((is_int($value) || is_string($value)) && preg_match('/^\d{10}$/', (string) $value) === 1) {
+                return CarbonImmutable::createFromTimestamp((int) $value)->utc();
+            }
+
+            if (is_string($value) && strlen($value) <= 64) {
+                return CarbonImmutable::parse($value)->utc();
+            }
+        } catch (\Throwable) {
+            // The verified receipt time is the safe fallback for invalid provider clocks.
+        }
+
+        return $fallback->utc();
     }
 
     public function testConnection(IntegrationProviderConnection $connection): bool
@@ -438,7 +636,6 @@ class UnifiAdapter implements IntegrationAdapterInterface
                         }
                     } catch (\Throwable $e) {
                         Log::warning('UniFi syncDevices: error processing device', SafeOperationalData::logContext([
-                            'tenant_id' => $siteConfig->tenant_id,
                             'site_id' => $siteConfig->site_id,
                             'error_category' => SafeOperationalData::failureCategory($e),
                         ]));
@@ -455,7 +652,6 @@ class UnifiAdapter implements IntegrationAdapterInterface
             );
         } catch (\Throwable $e) {
             Log::error('UniFi syncDevices failed', SafeOperationalData::logContext([
-                'tenant_id' => $siteConfig->tenant_id,
                 'site_id' => $siteConfig->site_id,
                 'error_category' => SafeOperationalData::failureCategory($e),
             ]));
@@ -464,87 +660,1389 @@ class UnifiAdapter implements IntegrationAdapterInterface
         }
     }
 
+    public function collectTopology(
+        IntegrationSiteConfig $siteConfig,
+        IntegrationProviderConnection $providerConnection,
+        ?string $cursor,
+        int $limit,
+    ): ProviderTopologyPage {
+        if ($siteConfig->provider !== $this->provider()
+            || $providerConnection->provider !== $this->provider()
+            || $limit < 1
+            || $limit > self::NETWORK_API_MAX_PAGE_SIZE) {
+            throw new \InvalidArgumentException('UniFi topology request is invalid.');
+        }
+
+        try {
+            $offset = $this->topologyOffset($cursor);
+            $apiKey = Crypt::decryptString($providerConnection->secret_encrypted);
+            $headers = [
+                'Accept' => 'application/json',
+                'X-API-Key' => $apiKey,
+            ];
+            $sitesResponse = Http::withHeaders($headers)
+                ->connectTimeout(5)
+                ->timeout(30)
+                ->get(self::BASE_URL.'/sites');
+            if ($sitesResponse->status() === 429) {
+                return $this->deferredTopologyPage($sitesResponse->header('Retry-After'));
+            }
+            if (! $sitesResponse->successful()) {
+                throw IntegrationDiscoveryException::forHttpStatus($sitesResponse->status());
+            }
+
+            $sites = $sitesResponse->json('data');
+            if (! is_array($sites) || ! array_is_list($sites) || count($sites) > 10000
+                || collect($sites)->contains(fn (mixed $site): bool => ! is_array($site))) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $externalSiteId = $this->normalizeRequiredSiteIdentifier($siteConfig->mapped_external_site_id);
+            $hostId = $this->resolveHostId($sites, $externalSiteId);
+            if (! is_string($hostId) && ! is_int($hostId)) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $consoleId = $this->normalizeRequiredSiteIdentifier($hostId);
+            $siteBaseUrl = self::BASE_URL.'/connector/consoles/'.rawurlencode($consoleId)
+                .'/proxy/network/integration/v1/sites/'.rawurlencode($externalSiteId);
+
+            $devicesResponse = Http::withHeaders($headers)
+                ->connectTimeout(5)
+                ->timeout(30)
+                ->get($siteBaseUrl.'/devices', [
+                    'offset' => $offset,
+                    'limit' => $limit,
+                ]);
+            if ($devicesResponse->status() === 429) {
+                return $this->deferredTopologyPage($devicesResponse->header('Retry-After'));
+            }
+            if (! $devicesResponse->successful()) {
+                throw IntegrationDiscoveryException::forHttpStatus($devicesResponse->status());
+            }
+
+            $page = $devicesResponse->json();
+            if (! is_array($page) || ! is_array($page['data'] ?? null) || ! array_is_list($page['data'])
+                || count($page['data']) > $limit) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $reportedOffset = $this->boundedTopologyInteger($page['offset'] ?? null, self::TOPOLOGY_CURSOR_MAX);
+            $reportedLimit = $this->boundedTopologyInteger($page['limit'] ?? null, self::NETWORK_API_MAX_PAGE_SIZE);
+            $reportedCount = $this->boundedTopologyInteger($page['count'] ?? null, self::NETWORK_API_MAX_PAGE_SIZE);
+            $totalCount = $this->boundedTopologyInteger($page['totalCount'] ?? null, self::TOPOLOGY_CURSOR_MAX);
+            $devices = $page['data'];
+            if ($reportedOffset !== $offset
+                || $reportedLimit < 1
+                || $reportedLimit > $limit
+                || $reportedCount !== count($devices)
+                || $totalCount < $offset + $reportedCount
+                || ($reportedCount === 0 && $totalCount > $offset)) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+
+            $nodes = [];
+            $edges = [];
+            foreach ($devices as $device) {
+                if (! is_array($device)) {
+                    throw IntegrationDiscoveryException::invalidResponse();
+                }
+                $deviceId = $this->normalizeRequiredSiteIdentifier($device['id'] ?? null);
+                $deviceKey = $this->unifiTopologyNodeKey($deviceId);
+                $nodes[$deviceKey] = $this->unifiTopologyNode($deviceId, $device);
+
+                $detailResponse = Http::withHeaders($headers)
+                    ->connectTimeout(5)
+                    ->timeout(30)
+                    ->get($siteBaseUrl.'/devices/'.rawurlencode($deviceId));
+                if ($detailResponse->status() === 429) {
+                    return $this->deferredTopologyPage($detailResponse->header('Retry-After'));
+                }
+                if (! $detailResponse->successful()) {
+                    throw IntegrationDiscoveryException::forHttpStatus($detailResponse->status());
+                }
+                $detail = $detailResponse->json();
+                if (! is_array($detail)
+                    || $this->normalizeRequiredSiteIdentifier($detail['id'] ?? null) !== $deviceId) {
+                    throw IntegrationDiscoveryException::invalidResponse();
+                }
+                $uplink = $detail['uplink'] ?? null;
+                if ($uplink === null) {
+                    continue;
+                }
+                if (! is_array($uplink)) {
+                    throw IntegrationDiscoveryException::invalidResponse();
+                }
+                $parentId = $this->normalizeRequiredSiteIdentifier($uplink['deviceId'] ?? null);
+                if ($parentId === $deviceId) {
+                    continue;
+                }
+                $parentKey = $this->unifiTopologyNodeKey($parentId);
+                $nodes[$parentKey] ??= $this->unifiTopologyNode($parentId);
+                $edges[$deviceKey.':'.$parentKey] = [
+                    'from' => $deviceKey,
+                    'to' => $parentKey,
+                    'source' => 'provider',
+                    'kind' => 'uplink',
+                    'local_port' => null,
+                    'remote_port' => null,
+                    'confidence' => 0.99,
+                    'evidence' => [
+                        'protocol' => 'unifi_network_api',
+                        'relationship' => 'reported_uplink',
+                    ],
+                ];
+            }
+
+            $nextOffset = $offset + $reportedCount;
+
+            return new ProviderTopologyPage(
+                nodes: array_values($nodes),
+                edges: array_values($edges),
+                nextCursor: $nextOffset < $totalCount ? (string) $nextOffset : null,
+            );
+        } catch (\InvalidArgumentException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            $failure = IntegrationDiscoveryException::fromThrowable($exception);
+            Log::error('UniFi topology collection failed', SafeOperationalData::logContext([
+                'site_id' => $siteConfig->site_id,
+                'provider_connection_id' => $providerConnection->id,
+                'error_category' => $failure->failureCategory(),
+            ]));
+
+            throw $failure;
+        }
+    }
+
+    public function collectObservations(
+        IntegrationSiteConfig $siteConfig,
+        IntegrationProviderConnection $providerConnection,
+        ?string $cursor,
+        int $limit,
+    ): ProviderObservationPage {
+        $externalSiteId = $this->normalizeRequiredSiteIdentifier($siteConfig->mapped_external_site_id);
+        if ($siteConfig->provider !== $this->provider()
+            || $providerConnection->provider !== $this->provider()
+            || $limit < 1
+            || $limit > self::NETWORK_API_MAX_PAGE_SIZE) {
+            throw new \InvalidArgumentException('UniFi observation request is invalid.');
+        }
+        $offset = $this->observationOffset($cursor);
+        $pageLimit = min($limit, self::OBSERVATION_MAX_PAGE_SIZE);
+
+        try {
+            $apiKey = Crypt::decryptString($providerConnection->secret_encrypted);
+            $headers = [
+                'Accept' => 'application/json',
+                'X-API-Key' => $apiKey,
+            ];
+            $sitesResponse = Http::withHeaders($headers)
+                ->connectTimeout(5)
+                ->timeout(30)
+                ->get(self::BASE_URL.'/sites');
+            if ($sitesResponse->status() === 429) {
+                return $this->deferredObservationPage($cursor, $sitesResponse->header('Retry-After'));
+            }
+            if (! $sitesResponse->successful()) {
+                throw IntegrationDiscoveryException::forHttpStatus($sitesResponse->status());
+            }
+
+            $sites = $sitesResponse->json('data');
+            if (! is_array($sites) || ! array_is_list($sites) || count($sites) > 10000
+                || collect($sites)->contains(fn (mixed $site): bool => ! is_array($site))) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $hostId = $this->resolveHostId($sites, $externalSiteId);
+            if (! is_string($hostId) && ! is_int($hostId)) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $consoleId = $this->normalizeRequiredSiteIdentifier($hostId);
+            $siteBaseUrl = self::BASE_URL.'/connector/consoles/'.rawurlencode($consoleId)
+                .'/proxy/network/integration/v1/sites/'.rawurlencode($externalSiteId);
+            $devicesResponse = Http::withHeaders($headers)
+                ->connectTimeout(5)
+                ->timeout(30)
+                ->get($siteBaseUrl.'/devices', [
+                    'offset' => $offset,
+                    'limit' => $pageLimit,
+                ]);
+            if ($devicesResponse->status() === 429) {
+                return $this->deferredObservationPage($cursor, $devicesResponse->header('Retry-After'));
+            }
+            if (! $devicesResponse->successful()) {
+                throw IntegrationDiscoveryException::forHttpStatus($devicesResponse->status());
+            }
+
+            $page = $devicesResponse->json();
+            if (! is_array($page) || ! is_array($page['data'] ?? null) || ! array_is_list($page['data'])
+                || count($page['data']) > $pageLimit) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $reportedOffset = $this->boundedTopologyInteger($page['offset'] ?? null, self::TOPOLOGY_CURSOR_MAX);
+            $reportedLimit = $this->boundedTopologyInteger($page['limit'] ?? null, self::OBSERVATION_MAX_PAGE_SIZE);
+            $reportedCount = $this->boundedTopologyInteger($page['count'] ?? null, self::OBSERVATION_MAX_PAGE_SIZE);
+            $totalCount = $this->boundedTopologyInteger($page['totalCount'] ?? null, self::TOPOLOGY_CURSOR_MAX);
+            $devices = $page['data'];
+            if ($reportedOffset !== $offset
+                || $reportedLimit < 1
+                || $reportedLimit > $pageLimit
+                || $reportedCount !== count($devices)
+                || $totalCount < $offset + $reportedCount
+                || ($reportedCount === 0 && $totalCount > $offset)) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+
+            $items = [];
+            $exceptions = [];
+            $collectedAt = CarbonImmutable::now('UTC')->startOfSecond();
+            $nextOffset = $offset;
+            $seen = [];
+
+            foreach ($devices as $index => $payload) {
+                if (! is_array($payload)) {
+                    throw IntegrationDiscoveryException::invalidResponse();
+                }
+                $providerEntityId = $this->normalizeRequiredSiteIdentifier($payload['id'] ?? null);
+                if (isset($seen[$providerEntityId])) {
+                    throw IntegrationDiscoveryException::invalidResponse();
+                }
+                $seen[$providerEntityId] = true;
+                $state = $this->observationConnectivity($payload['state'] ?? null);
+                [$device, $monitor, $scopeException] = $this->observationScope(
+                    $siteConfig,
+                    $consoleId,
+                    $providerEntityId,
+                );
+                if ($scopeException !== null) {
+                    $exceptions[] = $scopeException;
+
+                    break;
+                }
+
+                $statisticsResponse = Http::withHeaders($headers)
+                    ->connectTimeout(5)
+                    ->timeout(30)
+                    ->get($siteBaseUrl.'/devices/'.rawurlencode($providerEntityId).'/statistics/latest');
+                if ($statisticsResponse->status() === 429) {
+                    $exceptions[] = [
+                        'code' => 'provider_rate_limited',
+                        'item_reference' => null,
+                    ];
+
+                    return new ProviderObservationPage(
+                        items: $items,
+                        nextCursor: self::OBSERVATION_CURSOR_PREFIX.$nextOffset,
+                        partial: true,
+                        retryAfterSeconds: $this->accessRetryAfter($statisticsResponse->header('Retry-After')),
+                        exceptions: $exceptions,
+                    );
+                }
+                if ($statisticsResponse->status() === 404) {
+                    $statistics = null;
+                } elseif (! $statisticsResponse->successful()) {
+                    throw IntegrationDiscoveryException::forHttpStatus($statisticsResponse->status());
+                } else {
+                    $statistics = $statisticsResponse->json();
+                    if (! is_array($statistics) || array_is_list($statistics)) {
+                        throw IntegrationDiscoveryException::invalidResponse();
+                    }
+                }
+
+                $absoluteIndex = $offset + $index;
+                $candidateNextOffset = $absoluteIndex + 1 >= $totalCount ? 0 : $absoluteIndex + 1;
+                $items[] = $this->observationItem(
+                    $siteConfig,
+                    $device,
+                    $monitor,
+                    $providerEntityId,
+                    $state,
+                    $statistics,
+                    $collectedAt,
+                    self::OBSERVATION_CURSOR_PREFIX.$candidateNextOffset,
+                );
+                $nextOffset = $candidateNextOffset;
+            }
+
+            if ($exceptions === [] && $offset === 0) {
+                [$wanDevice, $wanMonitor, $wanScopeException] = $this->wanObservationScope(
+                    $siteConfig,
+                    $consoleId,
+                    $externalSiteId,
+                );
+                if ($wanScopeException !== null) {
+                    $exceptions[] = $wanScopeException;
+                } elseif ($wanDevice !== null && $wanMonitor !== null) {
+                    $wanResponse = Http::withHeaders($headers)
+                        ->connectTimeout(5)
+                        ->timeout(30)
+                        ->get(self::BASE_URL.'/isp-metrics/5m', [
+                            'beginTimestamp' => $collectedAt->subMinutes(10)->toIso8601String(),
+                            'endTimestamp' => $collectedAt->toIso8601String(),
+                        ]);
+                    if ($wanResponse->status() === 429) {
+                        $exceptions[] = [
+                            'code' => 'provider_rate_limited',
+                            'item_reference' => null,
+                        ];
+
+                        return new ProviderObservationPage(
+                            items: $items,
+                            nextCursor: self::OBSERVATION_CURSOR_PREFIX.$nextOffset,
+                            partial: true,
+                            retryAfterSeconds: $this->accessRetryAfter($wanResponse->header('Retry-After')),
+                            exceptions: $exceptions,
+                        );
+                    }
+                    if (! $wanResponse->successful()) {
+                        throw IntegrationDiscoveryException::forHttpStatus($wanResponse->status());
+                    }
+                    $wanPage = $wanResponse->json();
+                    if (! is_array($wanPage) || array_is_list($wanPage)) {
+                        throw IntegrationDiscoveryException::invalidResponse();
+                    }
+                    [$wanItem, $wanException] = $this->wanObservationItem(
+                        $siteConfig,
+                        $wanDevice,
+                        $wanMonitor,
+                        $consoleId,
+                        $externalSiteId,
+                        $wanPage,
+                        $collectedAt,
+                        self::OBSERVATION_CURSOR_PREFIX.$nextOffset,
+                    );
+                    if ($wanItem !== null) {
+                        $items[] = $wanItem;
+                    }
+                    if ($wanException !== null) {
+                        $exceptions[] = $wanException;
+                    }
+                }
+            }
+
+            return new ProviderObservationPage(
+                items: $items,
+                nextCursor: self::OBSERVATION_CURSOR_PREFIX.$nextOffset,
+                partial: $exceptions !== [],
+                exceptions: $exceptions,
+            );
+        } catch (\InvalidArgumentException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            $failure = IntegrationDiscoveryException::fromThrowable($exception);
+            Log::error('UniFi observation collection failed', SafeOperationalData::logContext([
+                'site_id' => $siteConfig->site_id,
+                'provider_connection_id' => $providerConnection->id,
+                'error_category' => $failure->failureCategory(),
+            ]));
+
+            throw $failure;
+        }
+    }
+
+    public function collectSnapshots(
+        IntegrationSiteConfig $siteConfig,
+        IntegrationProviderConnection $providerConnection,
+        ?string $cursor,
+        int $limit,
+    ): ProviderSnapshotPage {
+        if ($siteConfig->provider !== $this->provider()
+            || $providerConnection->provider !== $this->provider()
+            || $limit < 1
+            || $limit > self::NETWORK_API_MAX_PAGE_SIZE) {
+            throw new \InvalidArgumentException('UniFi configuration snapshot request is invalid.');
+        }
+        $safeCursor = $this->snapshotCursor($cursor);
+
+        try {
+            $externalSiteId = $this->normalizeRequiredSiteIdentifier($siteConfig->mapped_external_site_id);
+            $apiKey = Crypt::decryptString($providerConnection->secret_encrypted);
+            $headers = [
+                'Accept' => 'application/json',
+                'X-API-Key' => $apiKey,
+            ];
+            $sitesResponse = Http::withHeaders($headers)
+                ->connectTimeout(5)
+                ->timeout(30)
+                ->get(self::BASE_URL.'/sites');
+            if ($sitesResponse->status() === 429) {
+                return $this->deferredSnapshotPage($safeCursor, $sitesResponse->header('Retry-After'));
+            }
+            if (! $sitesResponse->successful()) {
+                throw IntegrationDiscoveryException::forHttpStatus($sitesResponse->status());
+            }
+
+            $sites = $sitesResponse->json('data');
+            if (! is_array($sites) || ! array_is_list($sites) || count($sites) > 10000
+                || collect($sites)->contains(fn (mixed $site): bool => ! is_array($site))) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $hostId = $this->resolveHostId($sites, $externalSiteId);
+            if (! is_string($hostId) && ! is_int($hostId)) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $consoleId = $this->normalizeRequiredSiteIdentifier($hostId);
+            [$device, $monitor, $scopeException] = $this->wanObservationScope(
+                $siteConfig,
+                $consoleId,
+                $externalSiteId,
+            );
+            if ($scopeException !== null) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            if ($device === null || $monitor === null) {
+                return new ProviderSnapshotPage(items: [], nextCursor: $safeCursor);
+            }
+
+            $siteBaseUrl = self::BASE_URL.'/connector/consoles/'.rawurlencode($consoleId)
+                .'/proxy/network/integration/v1/sites/'.rawurlencode($externalSiteId);
+            $wanResponse = Http::withHeaders($headers)
+                ->connectTimeout(5)
+                ->timeout(30)
+                ->get($siteBaseUrl.'/wans', ['offset' => 0, 'limit' => $limit]);
+            if ($wanResponse->status() === 429) {
+                return $this->deferredSnapshotPage($safeCursor, $wanResponse->header('Retry-After'));
+            }
+            if (! $wanResponse->successful()) {
+                throw IntegrationDiscoveryException::forHttpStatus($wanResponse->status());
+            }
+            $tunnelResponse = Http::withHeaders($headers)
+                ->connectTimeout(5)
+                ->timeout(30)
+                ->get($siteBaseUrl.'/vpn/site-to-site-tunnels', ['offset' => 0, 'limit' => $limit]);
+            if ($tunnelResponse->status() === 429) {
+                return $this->deferredSnapshotPage($safeCursor, $tunnelResponse->header('Retry-After'));
+            }
+            if (! $tunnelResponse->successful()) {
+                throw IntegrationDiscoveryException::forHttpStatus($tunnelResponse->status());
+            }
+
+            $configuration = [
+                'schema' => 'unifi_network_site_configuration_v1',
+                'site_to_site_vpn_tunnels' => $this->snapshotTunnels(
+                    $this->snapshotPageItems($tunnelResponse->json(), $limit),
+                ),
+                'wan_interfaces' => $this->snapshotWanInterfaces(
+                    $this->snapshotPageItems($wanResponse->json(), $limit),
+                ),
+            ];
+            $fingerprint = hash('sha256', json_encode(
+                $configuration,
+                JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES,
+            ));
+            $nextCursor = self::SNAPSHOT_CURSOR_PREFIX.$fingerprint;
+            if ($safeCursor !== null && hash_equals($safeCursor, $nextCursor)) {
+                return new ProviderSnapshotPage(items: [], nextCursor: $safeCursor);
+            }
+
+            return new ProviderSnapshotPage(
+                items: [[
+                    'cursor' => $nextCursor,
+                    'site_id' => (int) $siteConfig->site_id,
+                    'device_id' => (int) $device->id,
+                    'captured_at' => CarbonImmutable::now('UTC')->startOfSecond()->toIso8601String(),
+                    'payload' => ['configuration' => $configuration],
+                ]],
+                nextCursor: $nextCursor,
+            );
+        } catch (\InvalidArgumentException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            $failure = IntegrationDiscoveryException::fromThrowable($exception);
+            Log::error('UniFi configuration snapshot collection failed', SafeOperationalData::logContext([
+                'site_id' => $siteConfig->site_id,
+                'provider_connection_id' => $providerConnection->id,
+                'error_category' => $failure->failureCategory(),
+            ]));
+
+            throw $failure;
+        }
+    }
+
+    private function observationOffset(?string $cursor): int
+    {
+        if ($cursor === null) {
+            return 0;
+        }
+
+        $pattern = '/^'.preg_quote(self::OBSERVATION_CURSOR_PREFIX, '/').'(0|[1-9]\d{0,9})$/';
+        if (preg_match($pattern, $cursor, $matches) !== 1) {
+            throw new \InvalidArgumentException('UniFi observation request is invalid.');
+        }
+
+        $offset = (int) $matches[1];
+        if ($offset > self::TOPOLOGY_CURSOR_MAX) {
+            throw new \InvalidArgumentException('UniFi observation request is invalid.');
+        }
+
+        return $offset;
+    }
+
+    private function snapshotCursor(?string $cursor): ?string
+    {
+        if ($cursor === null) {
+            return null;
+        }
+        if (preg_match('/^'.preg_quote(self::SNAPSHOT_CURSOR_PREFIX, '/').'[a-f0-9]{64}$/', $cursor) !== 1) {
+            throw new \InvalidArgumentException('UniFi configuration snapshot request is invalid.');
+        }
+
+        return $cursor;
+    }
+
+    private function deferredSnapshotPage(?string $cursor, mixed $retryAfter): ProviderSnapshotPage
+    {
+        return new ProviderSnapshotPage(
+            items: [],
+            nextCursor: $cursor,
+            partial: true,
+            retryAfterSeconds: $this->accessRetryAfter($retryAfter),
+        );
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function snapshotPageItems(mixed $page, int $limit): array
+    {
+        if (! is_array($page) || array_is_list($page)
+            || ! is_array($page['data'] ?? null) || ! array_is_list($page['data'])
+            || count($page['data']) > $limit) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+        $offset = $this->boundedTopologyInteger($page['offset'] ?? null, self::TOPOLOGY_CURSOR_MAX);
+        $reportedLimit = $this->boundedTopologyInteger($page['limit'] ?? null, self::NETWORK_API_MAX_PAGE_SIZE);
+        $count = $this->boundedTopologyInteger($page['count'] ?? null, self::NETWORK_API_MAX_PAGE_SIZE);
+        $total = $this->boundedTopologyInteger($page['totalCount'] ?? null, self::TOPOLOGY_CURSOR_MAX);
+        if ($offset !== 0
+            || $reportedLimit < 1
+            || $reportedLimit > $limit
+            || $count !== count($page['data'])
+            || $total !== $count) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        return $page['data'];
+    }
+
+    /** @param list<array<string, mixed>> $items @return list<array<string, string>> */
+    private function snapshotWanInterfaces(array $items): array
+    {
+        $normalized = [];
+        $seen = [];
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $id = $this->normalizeRequiredSiteIdentifier($item['id'] ?? null);
+            if (isset($seen[$id])) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $seen[$id] = true;
+            $normalized[] = [
+                'name' => $this->snapshotText($item['name'] ?? null, 255),
+                'reference' => hash('sha256', $id),
+            ];
+        }
+        usort($normalized, fn (array $left, array $right): int => strcmp($left['reference'], $right['reference']));
+
+        return $normalized;
+    }
+
+    /** @param list<array<string, mixed>> $items @return list<array<string, string>> */
+    private function snapshotTunnels(array $items): array
+    {
+        $normalized = [];
+        $seen = [];
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $id = $this->normalizeRequiredSiteIdentifier($item['id'] ?? null);
+            if (isset($seen[$id])) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $seen[$id] = true;
+            $metadata = $item['metadata'] ?? [];
+            if (! is_array($metadata) || array_is_list($metadata)) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $tunnel = [
+                'name' => $this->snapshotText($item['name'] ?? null, 255),
+            ];
+            if (array_key_exists('origin', $metadata)) {
+                $tunnel['origin'] = $this->snapshotText($metadata['origin'], 128);
+            }
+            $tunnel['reference'] = hash('sha256', $id);
+            $tunnel['type'] = $this->snapshotText($item['type'] ?? null, 128);
+            $normalized[] = $tunnel;
+        }
+        usort($normalized, fn (array $left, array $right): int => strcmp($left['reference'], $right['reference']));
+
+        return $normalized;
+    }
+
+    private function snapshotText(mixed $value, int $maximum): string
+    {
+        if (! is_string($value)) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+        $value = trim($value);
+        if ($value === '' || mb_strlen($value) > $maximum
+            || preg_match('/[\x00-\x1f\x7f]/', $value) === 1) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        return $value;
+    }
+
+    private function deferredObservationPage(?string $cursor, mixed $retryAfter): ProviderObservationPage
+    {
+        return new ProviderObservationPage(
+            items: [],
+            nextCursor: $cursor ?? self::OBSERVATION_CURSOR_PREFIX.'0',
+            partial: true,
+            retryAfterSeconds: $this->accessRetryAfter($retryAfter),
+            exceptions: [[
+                'code' => 'provider_rate_limited',
+                'item_reference' => null,
+            ]],
+        );
+    }
+
+    private function observationConnectivity(mixed $value): string
+    {
+        if (! is_string($value)) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        $state = strtoupper(trim($value));
+        if ($state === '' || strlen($state) > 64 || preg_match('/^[A-Z][A-Z0-9_]*$/', $state) !== 1) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        return strtolower($state);
+    }
+
+    /**
+     * @return array{
+     *     0: ?Device,
+     *     1: ?Monitor,
+     *     2: null|array{code: string, item_reference: ?string}
+     * }
+     */
+    private function observationScope(
+        IntegrationSiteConfig $siteConfig,
+        string $consoleId,
+        string $providerEntityId,
+    ): array {
+        $reference = hash('sha256', $providerEntityId);
+        $devices = Device::query()
+            ->byProvider($this->provider())
+            ->where('external_ref->provider_entity_id', $providerEntityId)
+            ->get();
+        if ($devices->isEmpty()) {
+            return [null, null, ['code' => 'identity_unresolved', 'item_reference' => $reference]];
+        }
+        if ($devices->count() !== 1) {
+            return [null, null, ['code' => 'identity_ambiguous', 'item_reference' => $reference]];
+        }
+
+        /** @var Device $device */
+        $device = $devices->first();
+        try {
+            $siteId = $this->siteResolver->resolve((int) $device->id);
+        } catch (\Throwable) {
+            return [null, null, ['code' => 'site_scope_mismatch', 'item_reference' => $reference]];
+        }
+        if ($siteId !== (int) $siteConfig->site_id
+            || strtolower((string) data_get($device->external_ref, 'source_app')) !== 'network'
+            || (string) data_get($device->external_ref, 'host_id') !== $consoleId) {
+            return [null, null, ['code' => 'site_scope_mismatch', 'item_reference' => $reference]];
+        }
+
+        $target = $this->runtime->monitorTargetFor($providerEntityId);
+        $monitors = Monitor::query()
+            ->with('profile')
+            ->where('device_id', $device->id)
+            ->where('kind', MonitorKind::Provider->value)
+            ->where('target', $target)
+            ->get();
+        if ($monitors->count() !== 1) {
+            return [null, null, [
+                'code' => $monitors->isEmpty() ? 'monitor_unavailable' : 'monitor_ambiguous',
+                'item_reference' => $reference,
+            ]];
+        }
+
+        /** @var Monitor $monitor */
+        $monitor = $monitors->first();
+        $monitorConfig = is_array($monitor->config) ? $monitor->config : [];
+        if (! $monitor->is_enabled
+            || $monitor->profile === null
+            || ! $monitor->profile->is_active
+            || ($monitorConfig['provider'] ?? null) !== $this->provider()
+            || ($monitorConfig['collection'] ?? null) !== 'device_status') {
+            return [null, null, ['code' => 'monitor_unavailable', 'item_reference' => $reference]];
+        }
+
+        return [$device, $monitor, null];
+    }
+
+    /**
+     * @return array{
+     *     0: ?Device,
+     *     1: ?Monitor,
+     *     2: null|array{code: string, item_reference: ?string}
+     * }
+     */
+    private function wanObservationScope(
+        IntegrationSiteConfig $siteConfig,
+        string $consoleId,
+        string $externalSiteId,
+    ): array {
+        $target = $this->runtime->wanMonitorTargetFor($consoleId, $externalSiteId);
+        $reference = hash('sha256', $consoleId.'|'.$externalSiteId);
+        $monitors = Monitor::query()
+            ->with(['device', 'profile'])
+            ->where('kind', MonitorKind::Provider->value)
+            ->where('target', $target)
+            ->get();
+        if ($monitors->isEmpty()) {
+            return [null, null, null];
+        }
+        if ($monitors->count() !== 1) {
+            return [null, null, ['code' => 'monitor_ambiguous', 'item_reference' => $reference]];
+        }
+
+        /** @var Monitor $monitor */
+        $monitor = $monitors->first();
+        $device = $monitor->device;
+        $config = is_array($monitor->config) ? $monitor->config : [];
+        if ($device === null
+            || $device->provider !== $this->provider()
+            || ! $monitor->is_enabled
+            || $monitor->profile === null
+            || ! $monitor->profile->is_active
+            || ($config['provider'] ?? null) !== $this->provider()
+            || ($config['collection'] ?? null) !== 'isp_metrics') {
+            return [null, null, ['code' => 'monitor_unavailable', 'item_reference' => $reference]];
+        }
+        try {
+            $siteId = $this->siteResolver->resolve((int) $device->id);
+        } catch (\Throwable) {
+            return [null, null, ['code' => 'site_scope_mismatch', 'item_reference' => $reference]];
+        }
+        if ($siteId !== (int) $siteConfig->site_id) {
+            return [null, null, ['code' => 'site_scope_mismatch', 'item_reference' => $reference]];
+        }
+
+        return [$device, $monitor, null];
+    }
+
+    /**
+     * @param  array<string, mixed>  $page
+     * @return array{
+     *     0: null|array<string, mixed>,
+     *     1: null|array{code: string, item_reference: ?string}
+     * }
+     */
+    private function wanObservationItem(
+        IntegrationSiteConfig $siteConfig,
+        Device $device,
+        Monitor $monitor,
+        string $consoleId,
+        string $externalSiteId,
+        array $page,
+        CarbonImmutable $collectedAt,
+        string $cursor,
+    ): array {
+        $reference = hash('sha256', $consoleId.'|'.$externalSiteId);
+        $entries = $page['data'] ?? null;
+        if (! is_array($entries) || ! array_is_list($entries) || count($entries) > 10000) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        $matches = [];
+        foreach ($entries as $entry) {
+            if (! is_array($entry)) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $hostId = $this->normalizeRequiredSiteIdentifier($entry['hostId'] ?? null);
+            $siteId = $this->normalizeRequiredSiteIdentifier($entry['siteId'] ?? null);
+            $metricType = $this->normalizeOptionalProjectedText($entry['metricType'] ?? null, 16);
+            if ($hostId === $consoleId && $siteId === $externalSiteId && $metricType === '5m') {
+                $matches[] = $entry;
+            }
+        }
+        if ($matches === []) {
+            return [null, ['code' => 'wan_metrics_unavailable', 'item_reference' => $reference]];
+        }
+        if (count($matches) !== 1) {
+            return [null, ['code' => 'wan_metrics_ambiguous', 'item_reference' => $reference]];
+        }
+
+        $periods = $matches[0]['periods'] ?? null;
+        if (! is_array($periods) || ! array_is_list($periods) || $periods === [] || count($periods) > 1000) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+        $latest = null;
+        $seenTimes = [];
+        foreach ($periods as $period) {
+            if (! is_array($period)
+                || ! is_string($period['metricTime'] ?? null)
+                || strlen($period['metricTime']) > 64
+                || ! is_array(data_get($period, 'data.wan'))) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            try {
+                $metricTime = CarbonImmutable::parse($period['metricTime'])->utc();
+            } catch (\Throwable) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            if ($metricTime->isAfter($collectedAt->addMinutes(5))) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $timeKey = $metricTime->toIso8601String();
+            if (isset($seenTimes[$timeKey])) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $seenTimes[$timeKey] = true;
+            if ($latest === null || $metricTime->isAfter($latest['time'])) {
+                $latest = [
+                    'time' => $metricTime,
+                    'wan' => data_get($period, 'data.wan'),
+                ];
+            }
+        }
+        if ($latest === null) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        $wan = $latest['wan'];
+        $required = [
+            'avgLatency',
+            'download_kbps',
+            'downtime',
+            'maxLatency',
+            'packetLoss',
+            'upload_kbps',
+            'uptime',
+        ];
+        if (! is_array($wan) || array_diff($required, array_keys($wan)) !== []) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+        $uptime = $this->observationNumber($wan['uptime'], 0, 100);
+        $downtime = $this->observationNumber($wan['downtime'], 0, 86400);
+        $packetLoss = $this->observationNumber($wan['packetLoss'], 0, 100);
+        $averageLatency = $this->observationNumber($wan['avgLatency'], 0, 86400000);
+        $maximumLatency = $this->observationNumber($wan['maxLatency'], 0, 86400000);
+        $download = $this->observationNumber($wan['download_kbps'], 0, 1000000000000);
+        $upload = $this->observationNumber($wan['upload_kbps'], 0, 1000000000000);
+        $ispAsn = $this->normalizeOptionalProjectedText($wan['ispAsn'] ?? null, 64);
+        $ispName = $this->normalizeOptionalProjectedText($wan['ispName'] ?? null, 255);
+        $freshness = max(0, (int) floor($latest['time']->diffInSeconds($collectedAt, false)));
+        $metrics = [
+            'provider' => $this->provider(),
+            'scope' => 'wan',
+            'interval' => '5m',
+            'uptime_percent' => $uptime,
+            'downtime_seconds' => $downtime,
+            'packet_loss_percent' => $packetLoss,
+            'average_latency_ms' => $averageLatency,
+            'maximum_latency_ms' => $maximumLatency,
+            'download_kbps' => $download,
+            'upload_kbps' => $upload,
+        ];
+        if ($ispAsn !== null) {
+            $metrics['isp_asn'] = $ispAsn;
+        }
+        if ($ispName !== null) {
+            $metrics['isp_name'] = $ispName;
+        }
+        $metrics['freshness_age_seconds'] = $freshness;
+        [$state, $message] = $this->wanObservationState(
+            $monitor,
+            $uptime,
+            $downtime,
+            $packetLoss,
+            $averageLatency,
+            $freshness,
+        );
+        $sourceFingerprint = hash('sha256', json_encode([
+            'host_id' => $consoleId,
+            'site_id' => $externalSiteId,
+            'metric_time' => $latest['time']->toIso8601String(),
+            'metrics' => array_diff_key($metrics, ['freshness_age_seconds' => true]),
+        ], JSON_THROW_ON_ERROR));
+
+        return [[
+            'cursor' => $cursor,
+            'monitor_id' => (int) $monitor->id,
+            'device_id' => (int) $device->id,
+            'site_id' => (int) $siteConfig->site_id,
+            'source_key' => 'unifi:wan:'.$sourceFingerprint,
+            'state' => $state->value,
+            'observed_at' => $latest['time']->toIso8601String(),
+            'value' => $uptime,
+            'unit' => 'percent',
+            'latency_ms' => (int) round((float) $averageLatency),
+            'message' => $message,
+            'metrics' => $metrics,
+        ], null];
+    }
+
+    /** @return array{MonitorState, string} */
+    private function wanObservationState(
+        Monitor $monitor,
+        int|float $uptime,
+        int|float $downtime,
+        int|float $packetLoss,
+        int|float $averageLatency,
+        int $freshness,
+    ): array {
+        $config = is_array($monitor->config) ? $monitor->config : [];
+        $failureUptime = $this->observationNumber($config['failure_uptime_percent'] ?? null, 0, 100);
+        $failureDowntime = $this->observationNumber($config['failure_downtime_seconds'] ?? null, 1, 86400);
+        $warningUptime = $this->observationNumber($config['warning_uptime_percent'] ?? null, 0, 100);
+        $warningPacketLoss = $this->observationNumber($config['warning_packet_loss_percent'] ?? null, 0, 100);
+        $warningLatency = $this->observationNumber($config['warning_average_latency_ms'] ?? null, 1, 86400000);
+
+        if ($uptime < $failureUptime || $downtime >= $failureDowntime) {
+            return [MonitorState::Failed, 'wan_unavailable'];
+        }
+        if ($freshness > max(1, (int) $monitor->profile->stale_after_seconds)) {
+            return [MonitorState::Stale, 'provider_stale'];
+        }
+        if ($uptime < $warningUptime || $downtime > 0
+            || $packetLoss >= $warningPacketLoss
+            || $averageLatency >= $warningLatency) {
+            return [MonitorState::Degraded, 'wan_degraded'];
+        }
+
+        return [MonitorState::Healthy, 'wan_healthy'];
+    }
+
+    /** @param null|array<string, mixed> $statistics @return array<string, mixed> */
+    private function observationItem(
+        IntegrationSiteConfig $siteConfig,
+        Device $device,
+        Monitor $monitor,
+        string $providerEntityId,
+        string $connectivity,
+        ?array $statistics,
+        CarbonImmutable $collectedAt,
+        string $cursor,
+    ): array {
+        $metrics = [
+            'provider' => $this->provider(),
+            'connectivity' => $connectivity,
+            'statistics_available' => $statistics !== null,
+        ];
+        $heartbeat = null;
+        $statisticsMetrics = [];
+        if ($statistics !== null) {
+            [$heartbeat, $statisticsMetrics] = $this->observationStatistics($statistics, $collectedAt);
+        }
+
+        $freshness = $heartbeat === null
+            ? null
+            : max(0, (int) floor($heartbeat->diffInSeconds($collectedAt, false)));
+        if ($freshness !== null) {
+            $metrics['freshness_age_seconds'] = $freshness;
+        }
+        $metrics = [...$metrics, ...$statisticsMetrics];
+        [$state, $value, $message] = $this->observationState(
+            $connectivity,
+            $freshness,
+            max(1, (int) $monitor->profile->stale_after_seconds),
+        );
+        $sourceFingerprint = hash('sha256', json_encode([
+            'provider_entity_id' => $providerEntityId,
+            'connectivity' => $connectivity,
+            'heartbeat' => $heartbeat?->toIso8601String(),
+            'metrics' => array_diff_key($metrics, ['freshness_age_seconds' => true]),
+        ], JSON_THROW_ON_ERROR));
+
+        return [
+            'cursor' => $cursor,
+            'monitor_id' => (int) $monitor->id,
+            'device_id' => (int) $device->id,
+            'site_id' => (int) $siteConfig->site_id,
+            'source_key' => 'unifi:health:'.$sourceFingerprint,
+            'state' => $state->value,
+            'observed_at' => $collectedAt->toIso8601String(),
+            'value' => $value,
+            'unit' => 'online',
+            'latency_ms' => null,
+            'message' => $message,
+            'metrics' => $metrics,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $statistics
+     * @return array{CarbonImmutable, array<string, int|float>}
+     */
+    private function observationStatistics(array $statistics, CarbonImmutable $collectedAt): array
+    {
+        $required = [
+            'uptimeSec',
+            'lastHeartbeatAt',
+            'loadAverage1Min',
+            'loadAverage5Min',
+            'loadAverage15Min',
+            'cpuUtilizationPct',
+            'memoryUtilizationPct',
+            'interfaces',
+        ];
+        if (array_diff($required, array_keys($statistics)) !== []
+            || ! is_array($statistics['interfaces'])
+            || ! is_string($statistics['lastHeartbeatAt'])
+            || trim($statistics['lastHeartbeatAt']) === ''
+            || strlen($statistics['lastHeartbeatAt']) > 64) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        try {
+            $heartbeat = CarbonImmutable::parse((string) $statistics['lastHeartbeatAt'])->utc();
+            if ($heartbeat->isAfter($collectedAt->addMinutes(5))) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            if (array_key_exists('nextHeartbeatAt', $statistics)) {
+                if (! is_string($statistics['nextHeartbeatAt'])
+                    || trim($statistics['nextHeartbeatAt']) === ''
+                    || strlen($statistics['nextHeartbeatAt']) > 64) {
+                    throw IntegrationDiscoveryException::invalidResponse();
+                }
+                CarbonImmutable::parse($statistics['nextHeartbeatAt'])->utc();
+            }
+        } catch (IntegrationDiscoveryException $exception) {
+            throw $exception;
+        } catch (\Throwable) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        $metrics = [
+            'uptime_seconds' => $this->observationNumber($statistics['uptimeSec'], 0, 3153600000, true),
+            'cpu_utilization_percent' => $this->observationNumber($statistics['cpuUtilizationPct'], 0, 100),
+            'memory_utilization_percent' => $this->observationNumber($statistics['memoryUtilizationPct'], 0, 100),
+            'load_average_1m' => $this->observationNumber($statistics['loadAverage1Min'], 0, 1000000),
+            'load_average_5m' => $this->observationNumber($statistics['loadAverage5Min'], 0, 1000000),
+            'load_average_15m' => $this->observationNumber($statistics['loadAverage15Min'], 0, 1000000),
+        ];
+        if (array_key_exists('uplink', $statistics)) {
+            $uplink = $statistics['uplink'];
+            if (! is_array($uplink)) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            if (array_key_exists('txRateBps', $uplink)) {
+                $metrics['uplink_tx_bps'] = $this->observationNumber($uplink['txRateBps'], 0, 1000000000000000);
+            }
+            if (array_key_exists('rxRateBps', $uplink)) {
+                $metrics['uplink_rx_bps'] = $this->observationNumber($uplink['rxRateBps'], 0, 1000000000000000);
+            }
+        }
+
+        return [$heartbeat, $metrics];
+    }
+
+    private function observationNumber(
+        mixed $value,
+        int|float $minimum,
+        int|float $maximum,
+        bool $integer = false,
+    ): int|float {
+        if ((! is_int($value) && ! is_float($value))
+            || ! is_finite((float) $value)
+            || $value < $minimum
+            || $value > $maximum
+            || ($integer && ! is_int($value))) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        return $value;
+    }
+
+    /** @return array{MonitorState, null|int, string} */
+    private function observationState(string $connectivity, ?int $freshness, int $staleAfter): array
+    {
+        if (in_array($connectivity, ['offline', 'connection_interrupted', 'isolated'], true)) {
+            return [MonitorState::Failed, 0, 'provider_offline'];
+        }
+        if ($connectivity === 'online' && $freshness !== null && $freshness > $staleAfter) {
+            return [MonitorState::Stale, null, 'provider_stale'];
+        }
+        if ($connectivity === 'online') {
+            return [MonitorState::Healthy, 1, 'provider_online'];
+        }
+        if (in_array($connectivity, [
+            'pending_adoption',
+            'updating',
+            'getting_ready',
+            'adopting',
+            'deleting',
+        ], true)) {
+            return [MonitorState::Unknown, null, 'provider_state_transitional'];
+        }
+
+        return [MonitorState::Unknown, null, 'provider_status_unknown'];
+    }
+
     public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): array
     {
-        // TODO: Implement pullHealth via UniFi Cloud API device status endpoint
         return [];
     }
 
     public function pullEvents(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection, ?\DateTimeInterface $since = null): array
     {
+        $page = $this->collectEvents(
+            $siteConfig,
+            $providerConnection,
+            $since ? CarbonImmutable::instance($since)->utc()->toIso8601String() : null,
+            200,
+        );
+
+        return array_map(static function (array $event): array {
+            $normalized = $event['normalized_payload'];
+
+            return [
+                'source_event_id' => $event['source_event_id'],
+                'occurred_at' => Carbon::parse($event['occurred_at']),
+                'event_type' => $event['event_type'],
+                'summary' => $normalized['summary'] ?? null,
+                'door_name' => $normalized['door_name'] ?? null,
+                'user_name' => $normalized['actor_name'] ?? null,
+                'direction' => $normalized['direction'] ?? null,
+            ];
+        }, $page->items);
+    }
+
+    public function collectEvents(
+        IntegrationSiteConfig $siteConfig,
+        IntegrationProviderConnection $providerConnection,
+        ?string $cursor,
+        int $limit,
+    ): ProviderEventPage {
+        if ($siteConfig->provider !== $this->provider()
+            || $providerConnection->provider !== $this->provider()
+            || $limit < 1
+            || $limit > 200) {
+            throw new \InvalidArgumentException('UniFi Access event request is invalid.');
+        }
+
+        $accessSecret = IntegrationSiteSecret::query()
+            ->where('site_id', $siteConfig->site_id)
+            ->where('provider', $this->provider())
+            ->where('capability', 'access_api')
+            ->where('is_enabled', true)
+            ->first();
+
+        if (! $accessSecret || empty($accessSecret->base_url) || empty($accessSecret->secret_encrypted)) {
+            throw new \RuntimeException('UniFi Access API credentials are unavailable for this Site.');
+        }
+
         try {
-            $accessSecret = IntegrationSiteSecret::query()
-                ->where('site_id', $siteConfig->site_id)
-                ->where('provider', $this->provider())
-                ->where('capability', 'access_api')
-                ->where('is_enabled', true)
-                ->first();
-
-            if (! $accessSecret || empty($accessSecret->base_url)) {
-                return [];
-            }
-
+            [$since, $until, $pageNumber] = $this->accessEventWindow($cursor);
             $apiKey = Crypt::decryptString($accessSecret->secret_encrypted);
-            $baseUrl = rtrim($accessSecret->base_url, '/');
-
-            $response = Http::withHeaders([
-                'Accept' => 'application/json',
-                'Authorization' => "Bearer {$apiKey}",
-            ])
-                ->withOptions(['verify' => false])
-                ->get($baseUrl.'/api/v1/developer/system/logs', [
-                    'limit' => 200,
-                    'offset' => 0,
-                    'topics' => 'door_openings',
+            $baseUrl = $this->accessBaseUrl($accessSecret->base_url);
+            $url = $baseUrl.'/api/v1/developer/system/logs?'.http_build_query([
+                'page_size' => $limit,
+                'page_num' => $pageNumber,
+            ], '', '&', PHP_QUERY_RFC3986);
+            $response = Http::withToken($apiKey)
+                ->acceptJson()
+                ->connectTimeout(5)
+                ->timeout(15)
+                ->post($url, [
+                    'topic' => 'door_openings',
+                    'since' => $since->timestamp,
+                    'until' => $until->timestamp,
                 ]);
 
+            if ($response->status() === 429) {
+                return new ProviderEventPage(
+                    items: [],
+                    nextCursor: $this->encodeAccessEventCursor($since, $until, $pageNumber),
+                    partial: true,
+                    retryAfterSeconds: $this->accessRetryAfter($response->header('Retry-After')),
+                );
+            }
             if (! $response->successful()) {
-                $status = $response->status();
-                Log::warning('UniFi Access pullEvents failed', [
-                    'tenant_id' => $siteConfig->tenant_id,
-                    'site_id' => $siteConfig->site_id,
-                    'status' => $status,
-                ]);
-
-                throw new \RuntimeException("UniFi Access API returned HTTP {$status}.");
+                throw IntegrationDiscoveryException::forHttpStatus($response->status());
             }
 
-            $sinceAt = $since ? Carbon::instance($since) : null;
-            $entries = $response->json('data', []);
-            $events = [];
-
-            foreach ($entries as $entry) {
-                if (! is_array($entry)) {
-                    continue;
-                }
-
-                $normalized = $this->normalizeAccessLogEntry($entry);
-                if (! $normalized) {
-                    continue;
-                }
-
-                if ($sinceAt && $normalized['occurred_at']->lt($sinceAt)) {
-                    continue;
-                }
-
-                $events[] = $normalized;
+            $payload = $response->json();
+            $data = is_array($payload) ? ($payload['data'] ?? null) : null;
+            $hits = is_array($data) ? ($data['hits'] ?? null) : null;
+            $reportedPage = is_array($data) ? ($data['page'] ?? null) : null;
+            $total = is_array($data) ? ($data['total'] ?? null) : null;
+            if (($payload['code'] ?? null) !== 'SUCCESS'
+                || ! is_array($data)
+                || ! is_array($hits)
+                || ! array_is_list($hits)
+                || count($hits) > $limit
+                || ! is_numeric($reportedPage)
+                || (int) $reportedPage !== $pageNumber
+                || ! is_numeric($total)
+                || (int) $total < 0
+                || (int) $total > self::ACCESS_EVENT_MAX_TOTAL
+                || ($hits === [] && $pageNumber * $limit < (int) $total)) {
+                throw IntegrationDiscoveryException::invalidResponse();
             }
 
-            return $events;
-        } catch (\Throwable $e) {
-            Log::warning('UniFi Access pullEvents error', SafeOperationalData::logContext([
-                'tenant_id' => $siteConfig->tenant_id,
+            $items = [];
+            foreach ($hits as $hit) {
+                if (! is_array($hit)) {
+                    throw IntegrationDiscoveryException::invalidResponse();
+                }
+                $items[] = $this->normalizeAccessLogEntry($hit, (int) $siteConfig->site_id);
+            }
+
+            $nextCursor = $pageNumber * $limit < (int) $total
+                ? $this->encodeAccessEventCursor($since, $until, $pageNumber + 1)
+                : $until->toIso8601String();
+
+            return new ProviderEventPage(items: $items, nextCursor: $nextCursor);
+        } catch (\InvalidArgumentException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            $failure = IntegrationDiscoveryException::fromThrowable($exception);
+            Log::warning('UniFi Access event collection failed', SafeOperationalData::logContext([
                 'site_id' => $siteConfig->site_id,
-                'error_category' => SafeOperationalData::failureCategory($e),
+                'provider_connection_id' => $providerConnection->id,
+                'error_category' => $failure->failureCategory(),
             ]));
 
-            throw $e;
+            throw $failure;
         }
     }
 
     /* ---------------------------------------------------------------
      * Private helpers
      * ------------------------------------------------------------- */
+
+    private function topologyOffset(?string $cursor): int
+    {
+        if ($cursor === null) {
+            return 0;
+        }
+        if (preg_match('/^(0|[1-9]\d{0,9})$/', $cursor) !== 1) {
+            throw new \InvalidArgumentException('UniFi topology cursor is invalid.');
+        }
+        $offset = (int) $cursor;
+        if ($offset > self::TOPOLOGY_CURSOR_MAX) {
+            throw new \InvalidArgumentException('UniFi topology cursor is invalid.');
+        }
+
+        return $offset;
+    }
+
+    private function boundedTopologyInteger(mixed $value, int $maximum): int
+    {
+        if ((! is_int($value) && ! is_string($value))
+            || preg_match('/^(0|[1-9]\d*)$/', (string) $value) !== 1) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+        $normalized = (int) $value;
+        if ($normalized < 0 || $normalized > $maximum) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        return $normalized;
+    }
+
+    private function deferredTopologyPage(mixed $retryAfter): ProviderTopologyPage
+    {
+        $seconds = (is_int($retryAfter) || is_string($retryAfter))
+            && preg_match('/^[1-9]\d{0,4}$/', (string) $retryAfter) === 1
+            ? min(86400, (int) $retryAfter)
+            : 60;
+
+        return new ProviderTopologyPage(
+            nodes: [],
+            edges: [],
+            partial: true,
+            retryAfterSeconds: $seconds,
+        );
+    }
+
+    /** @param array<string, mixed> $device @return array<string, mixed> */
+    private function unifiTopologyNode(string $deviceId, array $device = []): array
+    {
+        $identity = [
+            'provider' => $this->provider(),
+            'provider_id' => $deviceId,
+        ];
+        $mac = $this->optionalTopologyMac($device['macAddress'] ?? null);
+        if ($mac !== null) {
+            $identity['mac_addresses'] = [$mac];
+        }
+        $address = $this->optionalTopologyAddress($device['ipAddress'] ?? null);
+        if ($address !== null) {
+            $identity['addresses'] = [$address];
+        }
+        $hostname = $this->optionalTopologyText($device['name'] ?? null, 255);
+        if ($hostname !== null) {
+            $identity['hostname'] = $hostname;
+        }
+
+        return [
+            'key' => $this->unifiTopologyNodeKey($deviceId),
+            'identity' => $identity,
+        ];
+    }
+
+    private function unifiTopologyNodeKey(string $deviceId): string
+    {
+        return 'device:'.hash('sha256', $deviceId);
+    }
+
+    private function optionalTopologyMac(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (! is_string($value)) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+        $hex = strtolower((string) preg_replace('/[^a-fA-F0-9]/', '', trim($value)));
+        if (strlen($hex) !== 12) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        return implode(':', str_split($hex, 2));
+    }
+
+    private function optionalTopologyAddress(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (! is_string($value)) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+        $value = trim($value);
+        if (filter_var($value, FILTER_VALIDATE_IP) === false) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        return strtolower($value);
+    }
+
+    private function optionalTopologyText(mixed $value, int $maximum): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (! is_string($value)) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+        if (mb_strlen($value) > $maximum || preg_match('/[\x00-\x1F\x7F]/', $value) === 1) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        return $value;
+    }
 
     /**
      * Resolve our hardware category from a UniFi device type or model string.
@@ -840,63 +2338,222 @@ class UnifiAdapter implements IntegrationAdapterInterface
         return $category === LocationHardware::CATEGORY_CAMERA;
     }
 
-    private function normalizeAccessLogEntry(array $entry): ?array
+    /** @return array{0: CarbonImmutable, 1: CarbonImmutable, 2: int} */
+    private function accessEventWindow(?string $cursor): array
     {
-        $eventId = (string) ($entry['id'] ?? $entry['_id'] ?? '');
-        if ($eventId === '') {
-            return null;
+        $now = CarbonImmutable::now('UTC')->startOfSecond();
+        if ($cursor === null) {
+            return [$now->subSeconds(self::ACCESS_EVENT_DEFAULT_LOOKBACK_SECONDS), $now, 1];
         }
 
-        $occurredAt = $this->parseAccessTimestamp($entry['time'] ?? null);
-        if (! $occurredAt) {
-            return null;
+        if (str_starts_with($cursor, self::ACCESS_EVENT_CURSOR_PREFIX)) {
+            $encoded = substr($cursor, strlen(self::ACCESS_EVENT_CURSOR_PREFIX));
+            if ($encoded === '' || strlen($encoded) > 1024 || preg_match('/^[A-Za-z0-9_-]+$/', $encoded) !== 1) {
+                throw new \InvalidArgumentException('UniFi Access event cursor is invalid.');
+            }
+            $padding = (4 - strlen($encoded) % 4) % 4;
+            $decoded = base64_decode(strtr($encoded, '-_', '+/').str_repeat('=', $padding), true);
+            try {
+                $state = is_string($decoded)
+                    ? json_decode($decoded, true, 8, JSON_THROW_ON_ERROR)
+                    : null;
+            } catch (\JsonException) {
+                $state = null;
+            }
+            if (! is_array($state)
+                || array_keys($state) !== ['since', 'until', 'page']
+                || ! is_int($state['since'])
+                || ! is_int($state['until'])
+                || ! is_int($state['page'])) {
+                throw new \InvalidArgumentException('UniFi Access event cursor is invalid.');
+            }
+            $since = CarbonImmutable::createFromTimestampUTC($state['since']);
+            $until = CarbonImmutable::createFromTimestampUTC($state['until']);
+            $page = $state['page'];
+        } else {
+            try {
+                $since = CarbonImmutable::parse($cursor)->utc()->startOfSecond();
+            } catch (\Throwable $exception) {
+                throw new \InvalidArgumentException('UniFi Access event cursor is invalid.', previous: $exception);
+            }
+            $until = $now;
+            $page = 1;
         }
 
-        $doorName = data_get($entry, 'door.name') ?? data_get($entry, 'details.doorName');
-        $userName = data_get($entry, 'user.name') ?? data_get($entry, 'actor.name');
-        $direction = data_get($entry, 'details.direction') ?? data_get($entry, 'details.reason');
-        $topic = (string) ($entry['topic'] ?? $entry['type'] ?? 'door_openings');
+        if ($page < 1
+            || $page > self::ACCESS_EVENT_MAX_PAGE
+            || $since->timestamp > $until->timestamp
+            || $until->timestamp > $now->addMinutes(5)->timestamp
+            || $until->timestamp - $since->timestamp > self::ACCESS_EVENT_MAX_WINDOW_SECONDS) {
+            throw new \InvalidArgumentException('UniFi Access event cursor is invalid.');
+        }
 
-        $summary = $this->formatAccessSummary($userName, $doorName, $direction);
+        return [$since, $until, $page];
+    }
+
+    private function encodeAccessEventCursor(CarbonImmutable $since, CarbonImmutable $until, int $page): string
+    {
+        $json = json_encode([
+            'since' => $since->timestamp,
+            'until' => $until->timestamp,
+            'page' => $page,
+        ], JSON_THROW_ON_ERROR);
+
+        return self::ACCESS_EVENT_CURSOR_PREFIX.rtrim(strtr(base64_encode($json), '+/', '-_'), '=');
+    }
+
+    private function accessBaseUrl(mixed $candidate): string
+    {
+        $parts = is_string($candidate) ? parse_url($candidate) : false;
+        if (! is_array($parts)
+            || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+            || ! is_string($parts['host'] ?? null)
+            || trim($parts['host']) === ''
+            || isset($parts['user'])
+            || isset($parts['pass'])
+            || isset($parts['query'])
+            || isset($parts['fragment'])) {
+            throw new \InvalidArgumentException('UniFi Access endpoint configuration is invalid.');
+        }
+
+        return rtrim($candidate, '/');
+    }
+
+    private function accessRetryAfter(mixed $value): int
+    {
+        return (is_int($value) || is_string($value))
+            && preg_match('/^[1-9]\d{0,4}$/', (string) $value) === 1
+            ? min(86400, (int) $value)
+            : 60;
+    }
+
+    /** @return array<string, mixed> */
+    private function normalizeAccessLogEntry(array $entry, int $siteId): array
+    {
+        $source = $entry['_source'] ?? null;
+        $event = is_array($source) ? ($source['event'] ?? null) : null;
+        $targets = is_array($source) ? ($source['target'] ?? []) : null;
+        if (! is_array($source)
+            || ! is_array($event)
+            || ! is_array($targets)
+            || ! array_is_list($targets)
+            || count($targets) > 50) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        $occurredAt = $this->parseAccessTimestamp($event['published'] ?? ($entry['@timestamp'] ?? null));
+        $providerType = $this->normalizeOptionalProjectedText($event['type'] ?? null, 255);
+        if ($occurredAt === null || $providerType === null) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+
+        $actor = $source['actor'] ?? null;
+        if ($actor !== null && ! is_array($actor)) {
+            throw IntegrationDiscoveryException::invalidResponse();
+        }
+        $actorName = is_array($actor)
+            ? $this->normalizeOptionalProjectedText($actor['display_name'] ?? null, 255)
+            : null;
+        $doorName = null;
+        foreach ($targets as $target) {
+            if (! is_array($target)) {
+                throw IntegrationDiscoveryException::invalidResponse();
+            }
+            $targetType = $this->normalizeOptionalProjectedText($target['type'] ?? null, 64);
+            if (strtolower((string) $targetType) === 'door') {
+                $doorName = $this->normalizeOptionalProjectedText($target['display_name'] ?? null, 255);
+                break;
+            }
+        }
+
+        $result = $this->normalizeOptionalProjectedText($event['result'] ?? null, 64);
+        $direction = $this->normalizeOptionalProjectedText(
+            data_get($source, 'device_config.door_entry_method') ?? ($event['reason'] ?? null),
+            64,
+        );
+        $displayMessage = $this->normalizeOptionalProjectedText($event['display_message'] ?? null, 512);
+        $eventType = $this->accessEventType($providerType, $result, $displayMessage);
+        $summary = $displayMessage ?? $this->formatAccessSummary($actorName, $doorName, $direction);
+        $encoded = json_encode($entry, JSON_THROW_ON_ERROR);
+        $providerId = $this->normalizeOptionalProjectedText($entry['_id'] ?? null, 255) ?? hash('sha256', $encoded);
 
         return [
-            'source_event_id' => $eventId,
-            'occurred_at' => $occurredAt,
-            'event_type' => $topic,
-            'summary' => $summary,
-            'door_name' => $doorName,
-            'user_name' => $userName,
-            'direction' => $direction,
-            'raw' => $entry,
+            'site_id' => $siteId,
+            'provider' => $this->provider(),
+            'source_app' => 'access',
+            'source_event_id' => 'access-log-'.hash('sha256', $siteId.'|'.$providerId),
+            'occurred_at' => $occurredAt->utc()->toIso8601String(),
+            'severity' => $this->accessEventSeverity($eventType, $result),
+            'event_type' => $eventType,
+            'normalized_payload' => array_filter([
+                'summary' => $summary,
+                'door_name' => $doorName,
+                'actor_name' => $actorName,
+                'direction' => $direction,
+                'result' => $result,
+                'provider_event_type' => $providerType,
+            ], static fn (mixed $value): bool => $value !== null),
+            'body_hash' => hash('sha256', $encoded),
         ];
+    }
+
+    private function accessEventType(string $providerType, ?string $result, ?string $message): string
+    {
+        $haystack = strtolower($providerType.' '.($result ?? '').' '.($message ?? ''));
+        if (str_contains($haystack, 'forced') || str_contains($haystack, 'unauthorized open')) {
+            return 'door_forced_open';
+        }
+        if (preg_match('/\b(blocked|denied|reject|failed|failure)\b/', $haystack) === 1) {
+            return 'door_access_denied';
+        }
+        if ($providerType === 'access.door.unlock') {
+            return 'door_opened';
+        }
+
+        $normalized = trim((string) preg_replace('/[^a-z0-9]+/', '_', strtolower($providerType)), '_');
+
+        return $normalized !== '' ? mb_substr($normalized, 0, 255) : 'access_event';
+    }
+
+    private function accessEventSeverity(string $eventType, ?string $result): string
+    {
+        if ($eventType === 'door_forced_open') {
+            return 'critical';
+        }
+
+        return $eventType === 'door_access_denied'
+            || in_array(strtoupper((string) $result), ['BLOCKED', 'DENIED', 'FAILED', 'FAILURE'], true)
+            ? 'warn'
+            : 'info';
     }
 
     private function formatAccessSummary(?string $userName, ?string $doorName, ?string $direction): string
     {
         $who = $userName ?: 'Unknown user';
         $where = $doorName ? " at {$doorName}" : '';
-        $dir = $direction ? strtoupper((string) $direction) : 'ACCESS';
+        $action = $direction ? strtoupper($direction) : 'ACCESS';
 
-        return "{$dir}: {$who}{$where}";
+        return "{$action}: {$who}{$where}";
     }
 
-    private function parseAccessTimestamp(mixed $value): ?Carbon
+    private function parseAccessTimestamp(mixed $value): ?CarbonImmutable
     {
         if ($value === null || $value === '') {
             return null;
         }
 
-        if (is_numeric($value)) {
-            $numeric = (int) $value;
-            if ($numeric > 1000000000000) {
-                return Carbon::createFromTimestamp($numeric / 1000);
+        try {
+            if (is_numeric($value)) {
+                $numeric = (int) $value;
+
+                return $numeric > 1000000000000
+                    ? CarbonImmutable::createFromTimestampMs($numeric, 'UTC')
+                    : CarbonImmutable::createFromTimestampUTC($numeric);
             }
 
-            return Carbon::createFromTimestamp($numeric);
-        }
-
-        try {
-            return Carbon::parse($value);
+            return is_string($value) && strlen($value) <= 64
+                ? CarbonImmutable::parse($value)->utc()
+                : null;
         } catch (\Throwable) {
             return null;
         }

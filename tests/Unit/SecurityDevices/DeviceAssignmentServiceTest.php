@@ -129,7 +129,7 @@ class DeviceAssignmentServiceTest extends TestCase
         $user = User::factory()->create();
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('consent_id');
+        $this->expectExceptionMessage('assignment-linked location-tracking consent');
 
         $this->service->assign(
             $device,
@@ -146,7 +146,10 @@ class DeviceAssignmentServiceTest extends TestCase
         $user = User::factory()->create();
         $consent = ClientConsent::create([
             'client_id' => $client->id,
-            'consent_type_id' => ConsentType::factory()->create()->id,
+            'consent_type_id' => ConsentType::factory()->create([
+                'name' => 'Personal Tracker (Wandering Risk)',
+                'purpose' => 'Client personal safety tracking',
+            ])->id,
             'status' => 'given',
             'given_at' => now(),
             'given_by_user_id' => $user->id,

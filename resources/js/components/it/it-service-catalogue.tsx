@@ -43,8 +43,21 @@ export interface CatalogItem {
     form_schema: { fields?: CatalogField[] };
 }
 
+export interface CatalogFieldOption {
+    id: number;
+    name: string;
+    detail: string | null;
+}
+
+export type CatalogEntityFieldType = 'employee' | 'user' | 'asset';
+export type CatalogFieldOptions = Record<
+    CatalogEntityFieldType,
+    CatalogFieldOption[]
+>;
+
 interface Props {
     items: CatalogItem[];
+    fieldOptions: CatalogFieldOptions;
 }
 
 const humanize = (value: string) =>
@@ -69,7 +82,7 @@ function initialValues(item: CatalogItem): Record<string, CatalogValue> {
     );
 }
 
-export function ItServiceCatalogue({ items }: Props) {
+export function ItServiceCatalogue({ items, fieldOptions }: Props) {
     const [query, setQuery] = useState('');
     const [selected, setSelected] = useState<CatalogItem | null>(null);
     const form = useForm<{
@@ -245,6 +258,11 @@ export function ItServiceCatalogue({ items }: Props) {
                                         <CatalogFieldControl
                                             key={field.key}
                                             field={field}
+                                            options={
+                                                fieldOptions[
+                                                    field.type as CatalogEntityFieldType
+                                                ] ?? []
+                                            }
                                             value={form.data.values[field.key]}
                                             error={
                                                 form.errors[
@@ -263,12 +281,14 @@ export function ItServiceCatalogue({ items }: Props) {
                                 <Button
                                     type="button"
                                     variant="outline"
+                                    className="min-h-11"
                                     onClick={close}
                                 >
                                     Cancel
                                 </Button>
                                 <Button
                                     type="submit"
+                                    className="min-h-11"
                                     disabled={form.processing}
                                 >
                                     <Send
@@ -296,11 +316,13 @@ function optionLabel(option: CatalogOption): string {
 
 function CatalogFieldControl({
     field,
+    options,
     value,
     error,
     onChange,
 }: {
     field: CatalogField;
+    options: CatalogFieldOption[];
     value: CatalogValue | undefined;
     error?: string;
     onChange: (value: CatalogValue) => void;
@@ -387,6 +409,30 @@ function CatalogFieldControl({
                 })}
             </div>
         );
+    } else if (['employee', 'user', 'asset'].includes(field.type ?? '')) {
+        const noun = humanize(field.type ?? 'record').toLocaleLowerCase();
+        control = (
+            <select
+                {...shared}
+                className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+                value={String(value ?? '')}
+                onChange={(event) =>
+                    onChange(
+                        event.target.value === ''
+                            ? ''
+                            : Number(event.target.value),
+                    )
+                }
+            >
+                <option value="">Choose a {noun}</option>
+                {options.map((option) => (
+                    <option key={option.id} value={option.id}>
+                        {option.name}
+                        {option.detail ? ` — ${option.detail}` : ''}
+                    </option>
+                ))}
+            </select>
+        );
     } else if (field.type === 'boolean') {
         control = (
             <label htmlFor={id} className="flex min-h-11 items-center gap-2">
@@ -400,13 +446,7 @@ function CatalogFieldControl({
             </label>
         );
     } else {
-        const numeric = [
-            'integer',
-            'number',
-            'user',
-            'asset',
-            'employee',
-        ].includes(field.type ?? '');
+        const numeric = ['integer', 'number'].includes(field.type ?? '');
         control = (
             <Input
                 {...shared}

@@ -2,12 +2,16 @@
 
 namespace App\Domain\SecurityDevices\Models;
 
+use App\Domain\Monitoring\Discovery\Models\DeviceIdentityEvidence;
+use App\Domain\Monitoring\Discovery\Models\DiscoveryCandidate;
+use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Models\AssetTracker;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Database\Factories\DeviceFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,6 +19,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
@@ -25,9 +30,9 @@ use Illuminate\Support\Str;
  * - legacy_location_hardware_id: temporarily retained for integration event
  *   backfill plus the narrow LocationHardware compatibility shadow that still
  *   supports integration event provenance and UniFi bridge metadata
- * - legacy_asset_tracker_id: retained for telemetry lineage backfill,
- *   compatibility fallback, and migration metadata while fleet runtime paths
- *   move to canonical device identity
+ * - legacy_asset_tracker_id: retained only for optional historical telemetry
+ *   lineage, consent compatibility, and migration metadata; it is not an
+ *   ownership binding
  *
  * Removed in PR26:
  * - legacy_control_room_device_id: superseded by the surviving
@@ -38,6 +43,7 @@ class Device extends Model
     use AuditableChanges;
     use HasFactory;
     use SoftDeletes;
+    use WritesLegacyStorageContext;
 
     protected $table = 'devices';
 
@@ -180,17 +186,33 @@ class Device extends Model
         return $this->hasMany(Monitor::class);
     }
 
+    public function configurationSnapshots(): HasMany
+    {
+        return $this->hasMany(ConfigurationSnapshot::class, 'device_id');
+    }
+
+    public function latestConfigurationSnapshot(): HasOne
+    {
+        return $this->hasOne(ConfigurationSnapshot::class, 'device_id')
+            ->ofMany(['captured_at' => 'max', 'id' => 'max']);
+    }
+
+    public function identityEvidence(): HasMany
+    {
+        return $this->hasMany(DeviceIdentityEvidence::class, 'canonical_device_id');
+    }
+
+    public function discoveryCandidates(): HasMany
+    {
+        return $this->hasMany(DiscoveryCandidate::class, 'canonical_device_id');
+    }
+
     public function documents(): HasMany
     {
         return $this->hasMany(DeviceDocument::class);
     }
 
     // ── Scopes ────────────────────────────────────────────────────
-
-    public function scopeForTenant($query, int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeByDomain($query, string|DeviceDomain $domain)
     {

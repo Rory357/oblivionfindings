@@ -6,6 +6,7 @@ use App\Domain\Monitoring\Data\RuntimeEnvelope;
 use App\Domain\Monitoring\Exceptions\RuntimePayloadInvalid;
 use App\Domain\Monitoring\Exceptions\RuntimeScopeViolation;
 use App\Domain\Monitoring\Exceptions\RuntimeSiteScopeViolation;
+use App\Domain\Monitoring\Exceptions\UnsupportedRuntimeContractVersion;
 use App\Domain\Monitoring\Models\MonitoringConsumerCheckpoint;
 use App\Domain\Monitoring\Models\MonitoringDeadLetter;
 use App\Domain\Monitoring\Models\MonitoringInbox;
@@ -107,7 +108,18 @@ final class MonitoringEnvelopeConsumer
             }
 
             try {
-                $this->handlers->for($envelope->type)->handle($envelope, $trustedSiteId);
+                $this->handlers->for($envelope->type, $envelope->payloadVersion)->handle($envelope, $trustedSiteId);
+            } catch (UnsupportedRuntimeContractVersion) {
+                $this->park(
+                    $consumer,
+                    $envelope,
+                    $encoded,
+                    $trustedSiteId,
+                    'unsupported_version',
+                    'Envelope payload version is unsupported.',
+                );
+
+                return;
             } catch (RuntimePayloadInvalid) {
                 $this->park(
                     $consumer,

@@ -2,14 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ItChange extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     public const TYPES = ['standard', 'normal', 'emergency'];
 
@@ -18,7 +18,6 @@ class ItChange extends Model
     public const VALIDATION_RESULTS = ['successful', 'failed', 'inconclusive'];
 
     protected $fillable = [
-        'tenant_id',
         'ticket_id',
         'change_type',
         'risk_level',
@@ -83,11 +82,6 @@ class ItChange extends Model
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by_user_id');
-    }
-
-    public function scopeForTenant(Builder $query, int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 
     public function needsApproval(): bool

@@ -1,10 +1,12 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Controllers\Settings\ItMailboxSettingsController;
 use App\Http\Requests\Settings\UpdateItMailboxRequest;
 use App\Jobs\PollItMailboxJob;
 use App\Models\ItMailboxConnection;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Queue;
@@ -42,7 +44,6 @@ test('the delegated mailbox mutation uses its dedicated form request', function 
 function itSettingsConnection(array $overrides = []): ItMailboxConnection
 {
     return ItMailboxConnection::create(array_merge([
-        'tenant_id' => 1,
         'provider' => ItMailboxConnection::PROVIDER_MICROSOFT,
         'status' => ItMailboxConnection::STATUS_CONNECTED,
         'access_token' => 'access-123',
@@ -70,17 +71,27 @@ test('the mailbox settings surface is admin-gated', function () {
 });
 
 test('the support mailbox connection is an application-wide setting', function () {
-    $this->admin->forceFill(['organization_id' => 99])->save();
+    $otherSite = Site::factory()->create();
+    $otherAdmin = itMailboxSettingsUser('admin');
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $otherAdmin->id,
+        'primary_site_id' => $otherSite->id,
+        'secondary_site_ids' => [],
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'created_by' => $otherAdmin->id,
+        'updated_by' => $otherAdmin->id,
+    ]);
     itSettingsConnection();
 
-    $this->actingAs($this->admin)
+    $this->actingAs($otherAdmin)
         ->get('/settings/it-mailbox')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('connections.microsoft.status', ItMailboxConnection::STATUS_CONNECTED)
             ->where('connections.microsoft.account_email', 'admin@example.test'));
 
-    $this->actingAs($this->admin)
+    $this->actingAs($otherAdmin)
         ->put('/settings/it-mailbox/mailbox/microsoft', ['mailbox_email' => 'helpdesk@example.test'])
         ->assertRedirect(route('settings.it-mailbox'));
 

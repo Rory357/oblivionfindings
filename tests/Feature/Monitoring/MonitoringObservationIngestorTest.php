@@ -11,7 +11,6 @@ use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\Site;
 use App\Models\SiteRoom;
-use App\Support\LegacyStorageContext;
 use Carbon\CarbonImmutable;
 
 function monitoringObservation(string $sourceKey, MonitorState $state): ObservationInput
@@ -105,7 +104,7 @@ it('deduplicates a runtime observation without incrementing confirmation', funct
         ->and($monitor->fresh()->pending_count)->toBe(1);
 });
 
-it('moves to unknown immediately without treating missing evidence as healthy', function () {
+it('keeps a confirmed failure when a later observation is unknown', function () {
     $monitor = Monitor::factory()->create([
         'current_state' => MonitorState::Failed,
         'pending_state' => MonitorState::Healthy,
@@ -121,8 +120,8 @@ it('moves to unknown immediately without treating missing evidence as healthy', 
         null,
     );
 
-    expect($result->stateChanged)->toBeTrue()
-        ->and($monitor->fresh()->current_state)->toBe(MonitorState::Unknown)
+    expect($result->stateChanged)->toBeFalse()
+        ->and($monitor->fresh()->current_state)->toBe(MonitorState::Failed)
         ->and($monitor->fresh()->pending_state)->toBeNull()
         ->and($monitor->fresh()->pending_count)->toBe(0)
         ->and(DeviceEvent::where('device_id', $monitor->device_id)->count())->toBe(0);
@@ -219,7 +218,6 @@ it('snapshots canonical device site and collector evidence and rejects a wrong s
 it('snapshots a canonical site inherited through a room assignment', function () {
     $site = Site::factory()->create();
     $room = SiteRoom::create([
-        ...LegacyStorageContext::attributes(),
         'site_id' => $site->id,
         'name' => 'Network cabinet',
     ]);

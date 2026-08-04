@@ -15,22 +15,31 @@ class SecurityDevicesPermissionsTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * All 13 permission keys that must exist after seeding.
+     * All permission keys that must exist after seeding.
      */
     private const ALL_KEYS = [
         'securityDevices.viewAny',
         'securityDevices.devices.view',
+        'securityDevices.devices.viewAllSites',
+        'securityDevices.devices.viewUnassigned',
         'securityDevices.devices.create',
         'securityDevices.devices.update',
         'securityDevices.devices.delete',
         'securityDevices.devices.assign',
         'securityDevices.groups.manage',
         'securityDevices.events.view',
+        'securityDevices.cctv.media.view',
         'securityDevices.maintenance.view',
         'securityDevices.maintenance.manage',
         'securityDevices.integrations.view',
         'securityDevices.integrations.manage',
         'securityDevices.reports.view',
+        'securityDevices.commands.observe',
+        'securityDevices.commands.operate',
+        'securityDevices.commands.manage',
+        'securityDevices.commands.control',
+        'securityDevices.commands.approve',
+        'securityDevices.commands.admin',
     ];
 
     protected function setUp(): void
@@ -54,11 +63,11 @@ class SecurityDevicesPermissionsTest extends TestCase
         }
     }
 
-    public function test_exactly_13_security_devices_permissions(): void
+    public function test_exactly_22_security_devices_permissions(): void
     {
         $count = Permission::where('key', 'like', 'securityDevices.%')->count();
 
-        $this->assertEquals(13, $count);
+        $this->assertEquals(22, $count);
     }
 
     public function test_permissions_have_correct_group_and_module(): void
@@ -93,6 +102,11 @@ class SecurityDevicesPermissionsTest extends TestCase
         foreach (self::ALL_KEYS as $key) {
             $this->assertTrue($user->canDo($key), "IT Manager should have '{$key}'.");
         }
+
+        $this->assertTrue($user->canDo('it.view'));
+        $this->assertTrue($user->canDo('it.manage'));
+        $this->assertFalse($user->canDo('it.viewSensitive'));
+        $this->assertFalse($user->canDo('it.organisationWide'));
     }
 
     // ── Provider Manager gets scoped subset ───────────────────────
@@ -109,6 +123,8 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.events.view',
             'securityDevices.maintenance.view',
             'securityDevices.reports.view',
+            'securityDevices.commands.observe',
+            'securityDevices.commands.operate',
         ];
         $denied = [
             'securityDevices.devices.create',
@@ -118,6 +134,10 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.maintenance.manage',
             'securityDevices.integrations.view',
             'securityDevices.integrations.manage',
+            'securityDevices.commands.manage',
+            'securityDevices.commands.control',
+            'securityDevices.commands.approve',
+            'securityDevices.commands.admin',
         ];
 
         foreach ($expected as $key) {
@@ -151,6 +171,12 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.integrations.view',
             'securityDevices.integrations.manage',
             'securityDevices.reports.view',
+            'securityDevices.commands.observe',
+            'securityDevices.commands.operate',
+            'securityDevices.commands.manage',
+            'securityDevices.commands.control',
+            'securityDevices.commands.approve',
+            'securityDevices.commands.admin',
         ];
 
         foreach ($expected as $key) {
@@ -173,12 +199,18 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.devices.view',
             'securityDevices.events.view',
             'securityDevices.maintenance.view',
+            'securityDevices.commands.observe',
         ];
         $denied = [
             'securityDevices.devices.create',
             'securityDevices.devices.delete',
             'securityDevices.groups.manage',
             'securityDevices.integrations.manage',
+            'securityDevices.commands.operate',
+            'securityDevices.commands.manage',
+            'securityDevices.commands.control',
+            'securityDevices.commands.approve',
+            'securityDevices.commands.admin',
         ];
 
         foreach ($expected as $key) {
@@ -206,11 +238,17 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.maintenance.manage',
             'securityDevices.integrations.view',
             'securityDevices.reports.view',
+            'securityDevices.commands.observe',
+            'securityDevices.commands.operate',
+            'securityDevices.commands.manage',
         ];
         $denied = [
             'securityDevices.devices.delete',
             'securityDevices.groups.manage',
             'securityDevices.integrations.manage',
+            'securityDevices.commands.control',
+            'securityDevices.commands.approve',
+            'securityDevices.commands.admin',
         ];
 
         foreach ($expected as $key) {
@@ -233,6 +271,7 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.devices.view',
             'securityDevices.events.view',
             'securityDevices.reports.view',
+            'securityDevices.commands.observe',
         ];
         $denied = [
             'securityDevices.devices.create',
@@ -241,6 +280,11 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.devices.assign',
             'securityDevices.maintenance.manage',
             'securityDevices.integrations.manage',
+            'securityDevices.commands.operate',
+            'securityDevices.commands.manage',
+            'securityDevices.commands.control',
+            'securityDevices.commands.approve',
+            'securityDevices.commands.admin',
         ];
 
         foreach ($expected as $key) {
@@ -333,10 +377,14 @@ class SecurityDevicesPermissionsTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_category_pages_accessible_with_view_any(): void
+    public function test_legacy_category_pages_redirect_with_module_and_explicit_all_sites_access(): void
     {
         $user = User::factory()->create();
         $user->roles()->attach(Role::where('name', 'support_worker')->first());
+        $allSitesPermission = Permission::query()
+            ->where('key', 'securityDevices.devices.viewAllSites')
+            ->firstOrFail();
+        $user->permissionOverrides()->attach($allSitesPermission->id, ['allowed' => true]);
 
         $categoryRoutes = [
             '/security-devices/alarms',
@@ -349,7 +397,7 @@ class SecurityDevicesPermissionsTest extends TestCase
         foreach ($categoryRoutes as $route) {
             $this->actingAs($user)
                 ->get($route)
-                ->assertOk();
+                ->assertRedirect();
         }
     }
 }

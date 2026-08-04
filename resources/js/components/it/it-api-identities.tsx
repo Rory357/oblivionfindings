@@ -66,7 +66,7 @@ const ABILITIES = [
     ['work:comment', 'Append public evidence or comments'],
     ['work:transition', 'Send lifecycle status callbacks'],
     ['work:sensitive', 'Access explicitly sensitive work'],
-    ['work:organisation-wide', 'Access explicit organisation-wide work'],
+    ['work:organisation-wide', 'Access explicit application-wide work'],
 ] as const;
 const WORK_TYPES = [
     ['incident', 'Incidents'],
@@ -83,7 +83,7 @@ const CREATE_FIELDS = [
     ['urgency', 'Urgency'],
     ['work_type', 'Work type'],
     ['site_id', 'Site link'],
-    ['is_organisation_wide', 'Organisation-wide scope marker'],
+    ['is_organisation_wide', 'Application-wide scope marker'],
     ['it_service_id', 'Service link'],
     ['asset_id', 'Asset link'],
 ] as const;
@@ -347,7 +347,7 @@ export function ItApiIdentities({
                                 <p className="mb-2 text-xs text-muted-foreground">
                                     With no sites selected, this identity cannot
                                     use Site-linked work. Explicit
-                                    organisation-wide work also needs its
+                                    application-wide work also needs its
                                     separate operation and scope marker.
                                 </p>
                                 <div className="grid max-h-48 gap-1 overflow-y-auto sm:grid-cols-2">

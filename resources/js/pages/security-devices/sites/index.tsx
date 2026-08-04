@@ -119,7 +119,7 @@ export default function SiteTechnologyIndex({
                     <EmptyState
                         icon={Building2}
                         title="No accessible sites"
-                        description="No active sites are available within your current organisation and site access."
+                        description="No active Sites are available within your approved Site access."
                     />
                 ) : (
                     <div className="grid gap-4 xl:grid-cols-2">

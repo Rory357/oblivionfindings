@@ -22,8 +22,7 @@ function reportsProfile(Site $site, ?User $user = null): HrEmployeeProfile
 {
     $user ??= User::factory()->create();
 
-    return HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
+    return HrEmployeeProfile::factory()->create([
         'user_id' => $user->id,
         'employee_number' => 'EMP-RPT-'.$user->id,
         'work_email' => $user->email,
@@ -65,7 +64,6 @@ test('reports are agent-only and an empty installation gets a zeroed well-formed
 
 test('the report aggregates tickets and provisioning across the range', function () {
     $mk = fn (array $attrs) => ItTicket::factory()->create(array_merge([
-        'tenant_id' => 1,
         'site_id' => $this->site->id,
         'requester_user_id' => $this->worker->id,
         'category' => 'hardware',
@@ -92,9 +90,9 @@ test('the report aggregates tickets and provisioning across the range', function
 
     // Provisioning: 2 pending raised + 1 done fulfilled 2 days after raising.
     $profile = reportsProfile($this->site);
-    ItProvisioningRequest::query()->create(['tenant_id' => 1, 'employee_profile_id' => $profile->id, 'type' => 'account', 'item' => 'Email', 'status' => 'pending']);
-    ItProvisioningRequest::query()->create(['tenant_id' => 1, 'employee_profile_id' => $profile->id, 'type' => 'access', 'item' => 'VPN', 'status' => 'pending']);
-    $done = ItProvisioningRequest::query()->create(['tenant_id' => 1, 'employee_profile_id' => $profile->id, 'type' => 'account', 'item' => 'AD', 'status' => 'done']);
+    ItProvisioningRequest::query()->create(['employee_profile_id' => $profile->id, 'type' => 'account', 'item' => 'Email', 'status' => 'pending']);
+    ItProvisioningRequest::query()->create(['employee_profile_id' => $profile->id, 'type' => 'access', 'item' => 'VPN', 'status' => 'pending']);
+    $done = ItProvisioningRequest::query()->create(['employee_profile_id' => $profile->id, 'type' => 'account', 'item' => 'AD', 'status' => 'done']);
     $done->forceFill(['created_at' => now()->subDays(2), 'fulfilled_at' => now()])->save();
 
     $json = $this->actingAs($this->agent)->getJson('/it/reports/data')->assertOk()->json();
@@ -143,7 +141,6 @@ test('per-card CSV export is agent-only, correct and injection-guarded', functio
     $evil = itReportsUser('support_worker');
     $evil->forceFill(['name' => '=cmd|calc'])->save();
     ItTicket::factory()->create([
-        'tenant_id' => 1,
         'site_id' => $this->site->id,
         'requester_user_id' => $evil->id,
         'status' => 'open',

@@ -23,7 +23,6 @@ function apiBoundaryUser(): User
     $user = User::factory()->create([
         'role' => 'hr',
         'approved_at' => now(),
-        'organization_id' => 1,
     ]);
     $user->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->firstOrFail()->id,

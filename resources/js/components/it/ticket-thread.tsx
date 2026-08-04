@@ -11,18 +11,32 @@ import { useForm } from '@inertiajs/react';
 import {
     Activity,
     BookOpen,
-    Flag,
-    Lightbulb,
-    Lock,
-    MessageSquare,
-    Paperclip,
-    Send,
-    UserCog,
+    CheckCircle2,
+    Clock3,
     Eye,
     EyeOff,
-    RotateCcw,
-    CheckCircle2,
+    Flag,
+    GitMerge,
+    Lightbulb,
+    Link2,
+    ListChecks,
+    Lock,
+    Mail,
+    MessageSquare,
+    Paperclip,
+    Pencil,
     PlusCircle,
+    Radio,
+    RotateCcw,
+    Route,
+    Send,
+    ShieldCheck,
+    Siren,
+    Star,
+    Unlink,
+    UserCog,
+    Webhook,
+    Wrench,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -79,7 +93,9 @@ function AttachmentChips({ attachments }: { attachments: ThreadAttachment[] }) {
                 >
                     <Paperclip className="h-3 w-3 flex-none" />
                     <span className="min-w-0 truncate">{a.name}</span>
-                    <span className="flex-none text-muted-foreground">{formatFileSize(a.size)}</span>
+                    <span className="flex-none text-muted-foreground">
+                        {formatFileSize(a.size)}
+                    </span>
                 </a>
             ))}
         </div>
@@ -96,8 +112,20 @@ function eventLine(e: ThreadEvent): string {
             return p.to ? 'assigned the ticket' : 'unassigned the ticket';
         case 'status_changed':
             return `moved ${label(String(p.from ?? '?'))} → ${label(String(p.to ?? '?'))}`;
+        case 'workflow_transitioned':
+            return `moved ${label(String(p.from_workflow_state ?? p.from ?? '?'))} → ${label(String(p.to_workflow_state ?? p.to ?? '?'))}`;
         case 'priority_changed':
             return `set priority ${label(String(p.from ?? '?'))} → ${label(String(p.to ?? '?'))}`;
+        case 'properties_updated':
+            return 'updated ticket properties';
+        case 'waiting_updated':
+            return `updated the wait to ${label(String(p.waiting_party ?? 'another dependency'))}`;
+        case 'first_response_recorded':
+            return 'recorded the first public response';
+        case 'csat_submitted':
+            return 'submitted a satisfaction rating';
+        case 'csat_updated':
+            return 'updated the satisfaction rating';
         case 'watcher_added':
             return 'started watching';
         case 'watcher_removed':
@@ -108,6 +136,54 @@ function eventLine(e: ThreadEvent): string {
             return 'resolved the ticket';
         case 'closed':
             return 'closed the ticket';
+        case 'problem_updated':
+            return 'updated the problem investigation';
+        case 'change_updated':
+            return 'updated the change plan';
+        case 'major_incident_updated':
+            return 'updated major incident command';
+        case 'major_incident_update_published':
+            return `published a ${label(String(p.audience ?? 'stakeholder'))} major incident update`;
+        case 'approval_requested':
+            return 'requested approval';
+        case 'approval_approved':
+            return 'approved the request';
+        case 'approval_rejected':
+            return 'rejected the request';
+        case 'routing_applied':
+            return 'updated queue routing';
+        case 'merged':
+            return p.direction === 'from'
+                ? `merged ${String(p.source_reference ?? 'another ticket')} into this ticket`
+                : `merged this ticket into ${String(p.target_reference ?? 'the surviving ticket')}`;
+        case 'email_received':
+            return 'received a public reply by email';
+        case 'api_public_comment':
+            return 'added a public update through an approved API';
+        case 'context_linked':
+            return p.device_name
+                ? `linked affected Device ${String(p.device_name)}`
+                : 'linked an affected Device';
+        case 'context_unlinked':
+            return p.device_name
+                ? `removed affected Device ${String(p.device_name)}`
+                : 'removed an affected Device';
+        case 'work_task_created':
+            return p.title
+                ? `added work task ${String(p.title)}`
+                : 'added a work task';
+        case 'work_task_updated':
+            return p.title
+                ? `updated work task ${String(p.title)}`
+                : 'updated a work task';
+        case 'work_task_completed':
+            return p.title
+                ? `completed work task ${String(p.title)}`
+                : 'completed a work task';
+        case 'work_task_reopened':
+            return p.title
+                ? `reopened work task ${String(p.title)}`
+                : 'reopened a work task';
         default:
             return label(e.type);
     }
@@ -120,9 +196,19 @@ function eventIcon(type: string) {
         case 'assigned':
             return UserCog;
         case 'status_changed':
+        case 'workflow_transitioned':
             return RotateCcw;
         case 'priority_changed':
             return Flag;
+        case 'properties_updated':
+            return Pencil;
+        case 'waiting_updated':
+            return Clock3;
+        case 'first_response_recorded':
+            return MessageSquare;
+        case 'csat_submitted':
+        case 'csat_updated':
+            return Star;
         case 'watcher_added':
             return Eye;
         case 'watcher_removed':
@@ -130,6 +216,37 @@ function eventIcon(type: string) {
         case 'resolved':
         case 'closed':
             return CheckCircle2;
+        case 'problem_updated':
+        case 'change_updated':
+            return Wrench;
+        case 'major_incident_updated':
+            return Siren;
+        case 'major_incident_update_published':
+            return Radio;
+        case 'approval_requested':
+        case 'approval_approved':
+        case 'approval_rejected':
+            return ShieldCheck;
+        case 'routing_applied':
+            return Route;
+        case 'merged':
+            return GitMerge;
+        case 'email_received':
+            return Mail;
+        case 'api_public_comment':
+            return Webhook;
+        case 'context_linked':
+            return Link2;
+        case 'context_unlinked':
+            return Unlink;
+        case 'work_task_created':
+            return ListChecks;
+        case 'work_task_updated':
+            return Pencil;
+        case 'work_task_completed':
+            return CheckCircle2;
+        case 'work_task_reopened':
+            return RotateCcw;
         default:
             return Activity;
     }
@@ -143,6 +260,8 @@ export function TicketThread({
     comments,
     events,
     canInternal,
+    canReply = true,
+    replyUnavailableReason,
     kbSuggestions = [],
     compact = false,
     onPosted,
@@ -155,15 +274,23 @@ export function TicketThread({
     comments: ThreadComment[];
     events: ThreadEvent[];
     canInternal: boolean;
+    canReply?: boolean;
+    replyUnavailableReason?: string | null;
     /** Published articles for the composer's "Suggest from Knowledge" (agents only). */
     kbSuggestions?: ThreadKbHint[];
     compact?: boolean;
     /** Drawer hosts pass a refetch — their snapshot doesn't refresh via Inertia props. */
     onPosted?: () => void;
 }) {
-    const [lane, setLane] = useState<'conversation' | 'activity'>('conversation');
+    const [lane, setLane] = useState<'conversation' | 'activity'>(
+        'conversation',
+    );
     const fileInput = useRef<HTMLInputElement>(null);
-    const form = useForm<{ body: string; is_internal: boolean; attachments: File[] }>({
+    const form = useForm<{
+        body: string;
+        is_internal: boolean;
+        attachments: File[];
+    }>({
         body: '',
         is_internal: false,
         attachments: [],
@@ -172,12 +299,15 @@ export function TicketThread({
     // §I deflection: as the agent types, match published articles on the words
     // they're using (≥3-letter tokens) and surface the closest few for
     // insertion. Empty for requesters — the server never sends them the list.
-    const bodyTokens = form.data.body.toLowerCase().match(/[a-z0-9]{3,}/g) ?? [];
+    const bodyTokens =
+        form.data.body.toLowerCase().match(/[a-z0-9]{3,}/g) ?? [];
     const kbHints = bodyTokens.length
         ? kbSuggestions
               .map((a) => ({
                   a,
-                  score: bodyTokens.filter((t) => a.title.toLowerCase().includes(t)).length,
+                  score: bodyTokens.filter((t) =>
+                      a.title.toLowerCase().includes(t),
+                  ).length,
               }))
               .filter((x) => x.score > 0)
               .sort((x, y) => y.score - x.score)
@@ -200,7 +330,11 @@ export function TicketThread({
             preserveScroll: true,
             forceFormData: true,
             onSuccess: () => {
-                toast.success(form.data.is_internal ? 'Internal note added.' : 'Reply sent.');
+                toast.success(
+                    form.data.is_internal
+                        ? 'Internal note added.'
+                        : 'Reply sent.',
+                );
                 form.reset('body', 'attachments');
                 onPosted?.();
             },
@@ -209,7 +343,10 @@ export function TicketThread({
 
     const stageFiles = (list: FileList | null) => {
         if (!list?.length) return;
-        form.setData('attachments', [...form.data.attachments, ...Array.from(list)].slice(0, 5));
+        form.setData(
+            'attachments',
+            [...form.data.attachments, ...Array.from(list)].slice(0, 5),
+        );
         if (fileInput.current) fileInput.current.value = '';
     };
 
@@ -219,7 +356,11 @@ export function TicketThread({
             <div className="flex items-center gap-1 border-b border-border bg-muted px-3 py-2">
                 {(
                     [
-                        { id: 'conversation', l: 'Conversation', icon: MessageSquare },
+                        {
+                            id: 'conversation',
+                            l: 'Conversation',
+                            icon: MessageSquare,
+                        },
                         { id: 'activity', l: 'Activity', icon: Activity },
                     ] as const
                 ).map((o) => {
@@ -265,9 +406,13 @@ export function TicketThread({
                                     {requesterName} — original report
                                 </div>
                                 {description ? (
-                                    <p className="mt-1 text-[13px] whitespace-pre-wrap">{description}</p>
+                                    <p className="mt-1 text-[13px] whitespace-pre-wrap">
+                                        {description}
+                                    </p>
                                 ) : null}
-                                <AttachmentChips attachments={ticketAttachments} />
+                                <AttachmentChips
+                                    attachments={ticketAttachments}
+                                />
                             </div>
                         ) : null}
 
@@ -281,135 +426,200 @@ export function TicketThread({
                                 }
                             >
                                 <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
-                                    <span className="text-foreground">{c.author.name}</span>
-                                    <span>· {c.author.is_requester ? 'requester' : 'IT'}</span>
+                                    <span className="text-foreground">
+                                        {c.author.name}
+                                    </span>
+                                    <span>
+                                        ·{' '}
+                                        {c.author.is_requester
+                                            ? 'requester'
+                                            : 'IT'}
+                                    </span>
                                     {c.is_internal ? (
-                                        <StatusBadge variant="warning" size="sm">
-                                            <Lock className="mr-1 h-3 w-3" /> Internal
+                                        <StatusBadge
+                                            variant="warning"
+                                            size="sm"
+                                        >
+                                            <Lock className="mr-1 h-3 w-3" />{' '}
+                                            Internal
                                         </StatusBadge>
                                     ) : null}
-                                    <span className="ml-auto">{c.at_human}</span>
+                                    <span className="ml-auto">
+                                        {c.at_human}
+                                    </span>
                                 </div>
-                                <p className="mt-1 text-[13px] whitespace-pre-wrap">{c.body}</p>
+                                <p className="mt-1 text-[13px] whitespace-pre-wrap">
+                                    {c.body}
+                                </p>
                                 <AttachmentChips attachments={c.attachments} />
                             </div>
                         ))}
 
                         {comments.length === 0 && !description ? (
                             <p className="py-6 text-center text-[12.5px] text-muted-foreground">
-                                No messages yet — start the conversation below.
+                                {canReply
+                                    ? 'No messages yet — start the conversation below.'
+                                    : 'No replies have been added to this conversation.'}
                             </p>
                         ) : null}
                     </div>
 
                     {/* Composer */}
-                    <div className="border-t border-border px-4.5 py-3.5">
-                        {canInternal ? (
-                            <div className="mb-2 inline-flex gap-1 rounded-lg bg-muted p-1">
-                                {[
-                                    { v: false, l: 'Reply' },
-                                    { v: true, l: 'Internal note' },
-                                ].map((o) => (
-                                    // eslint-disable-next-line no-restricted-syntax -- segmented-control option, not button chrome
-                                    <button
-                                        key={o.l}
-                                        type="button"
-                                        aria-pressed={form.data.is_internal === o.v}
-                                        onClick={() => form.setData('is_internal', o.v)}
-                                        className={
-                                            form.data.is_internal === o.v
-                                                ? 'rounded-md bg-card px-3 py-1 text-[12.5px] font-semibold shadow-sm'
-                                                : 'rounded-md px-3 py-1 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground'
-                                        }
-                                    >
-                                        {o.l}
-                                    </button>
-                                ))}
-                            </div>
-                        ) : null}
-                        <Textarea
-                            value={form.data.body}
-                            onChange={(e) => form.setData('body', e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) send();
-                            }}
-                            placeholder={
-                                form.data.is_internal
-                                    ? 'Add an internal note — the requester never sees these…'
-                                    : 'Write a reply — the requester is emailed a heads-up…'
-                            }
-                            rows={compact ? 2 : 3}
-                        />
-                        {kbHints.length ? (
-                            <div className="mt-2 rounded-xl border border-primary/20 bg-primary/5 px-2.5 py-2">
-                                <div className="flex items-center gap-1.5 text-[10.5px] font-bold tracking-wide text-primary uppercase">
-                                    <Lightbulb className="h-3 w-3" /> Suggest from Knowledge
-                                </div>
-                                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                    {kbHints.map((a) => (
-                                        // eslint-disable-next-line no-restricted-syntax -- KB suggestion chip, inserts a reference; not button chrome
+                    {canReply ? (
+                        <div className="border-t border-border px-4.5 py-3.5">
+                            {canInternal ? (
+                                <div className="mb-2 inline-flex gap-1 rounded-lg bg-muted p-1">
+                                    {[
+                                        { v: false, l: 'Reply' },
+                                        { v: true, l: 'Internal note' },
+                                    ].map((o) => (
+                                        // eslint-disable-next-line no-restricted-syntax -- segmented-control option, not button chrome
                                         <button
-                                            key={a.id}
+                                            key={o.l}
                                             type="button"
-                                            onClick={() => insertArticle(a.title)}
-                                            title={`Insert a reference to "${a.title}"`}
-                                            className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/30 bg-card px-2 py-0.5 text-[11.5px] font-semibold text-primary hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                                            aria-pressed={
+                                                form.data.is_internal === o.v
+                                            }
+                                            onClick={() =>
+                                                form.setData('is_internal', o.v)
+                                            }
+                                            className={
+                                                form.data.is_internal === o.v
+                                                    ? 'rounded-md bg-card px-3 py-1 text-[12.5px] font-semibold shadow-sm'
+                                                    : 'rounded-md px-3 py-1 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground'
+                                            }
                                         >
-                                            <BookOpen className="h-3 w-3 flex-none" />
-                                            <span className="min-w-0 truncate">{a.title}</span>
+                                            {o.l}
                                         </button>
                                     ))}
                                 </div>
-                            </div>
-                        ) : null}
-                        {form.data.attachments.length ? (
-                            <div className="mt-2 flex flex-col gap-1.5">
-                                {form.data.attachments.map((file, i) => (
-                                    <StagedFileCard
-                                        key={`${file.name}-${i}`}
-                                        file={file}
-                                        onRemove={() =>
-                                            form.setData(
-                                                'attachments',
-                                                form.data.attachments.filter((_, j) => j !== i),
-                                            )
+                            ) : null}
+                            <Textarea
+                                value={form.data.body}
+                                onChange={(e) =>
+                                    form.setData('body', e.target.value)
+                                }
+                                onKeyDown={(e) => {
+                                    if (
+                                        e.key === 'Enter' &&
+                                        (e.ctrlKey || e.metaKey)
+                                    )
+                                        send();
+                                }}
+                                placeholder={
+                                    form.data.is_internal
+                                        ? 'Add an internal note — the requester never sees these…'
+                                        : 'Write a reply — the requester is emailed a heads-up…'
+                                }
+                                rows={compact ? 2 : 3}
+                            />
+                            {kbHints.length ? (
+                                <div className="mt-2 rounded-xl border border-primary/20 bg-primary/5 px-2.5 py-2">
+                                    <div className="flex items-center gap-1.5 text-[10.5px] font-bold tracking-wide text-primary uppercase">
+                                        <Lightbulb className="h-3 w-3" />{' '}
+                                        Suggest from Knowledge
+                                    </div>
+                                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                        {kbHints.map((a) => (
+                                            // eslint-disable-next-line no-restricted-syntax -- KB suggestion chip, inserts a reference; not button chrome
+                                            <button
+                                                key={a.id}
+                                                type="button"
+                                                onClick={() =>
+                                                    insertArticle(a.title)
+                                                }
+                                                title={`Insert a reference to "${a.title}"`}
+                                                className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/30 bg-card px-2 py-0.5 text-[11.5px] font-semibold text-primary hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                                            >
+                                                <BookOpen className="h-3 w-3 flex-none" />
+                                                <span className="min-w-0 truncate">
+                                                    {a.title}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : null}
+                            {form.data.attachments.length ? (
+                                <div className="mt-2 flex flex-col gap-1.5">
+                                    {form.data.attachments.map((file, i) => (
+                                        <StagedFileCard
+                                            key={`${file.name}-${i}`}
+                                            file={file}
+                                            onRemove={() =>
+                                                form.setData(
+                                                    'attachments',
+                                                    form.data.attachments.filter(
+                                                        (_, j) => j !== i,
+                                                    ),
+                                                )
+                                            }
+                                        />
+                                    ))}
+                                </div>
+                            ) : null}
+                            <div className="mt-2 flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        ref={fileInput}
+                                        type="file"
+                                        multiple
+                                        className="hidden"
+                                        accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx"
+                                        onChange={(e) =>
+                                            stageFiles(e.target.files)
                                         }
                                     />
-                                ))}
-                            </div>
-                        ) : null}
-                        <div className="mt-2 flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                                <input
-                                    ref={fileInput}
-                                    type="file"
-                                    multiple
-                                    className="hidden"
-                                    accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx"
-                                    onChange={(e) => stageFiles(e.target.files)}
-                                />
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() =>
+                                            fileInput.current?.click()
+                                        }
+                                        disabled={
+                                            form.data.attachments.length >= 5
+                                        }
+                                    >
+                                        <Paperclip className="h-3.5 w-3.5" />{' '}
+                                        Attach
+                                    </Button>
+                                    <span className="text-[11.5px] text-muted-foreground">
+                                        Ctrl+Enter to send
+                                    </span>
+                                </div>
                                 <Button
                                     size="sm"
-                                    variant="ghost"
-                                    onClick={() => fileInput.current?.click()}
-                                    disabled={form.data.attachments.length >= 5}
+                                    onClick={send}
+                                    disabled={
+                                        form.processing ||
+                                        !form.data.body.trim()
+                                    }
                                 >
-                                    <Paperclip className="h-3.5 w-3.5" /> Attach
+                                    <Send className="h-3.5 w-3.5" />
+                                    {form.data.is_internal
+                                        ? 'Add note'
+                                        : 'Send reply'}
                                 </Button>
-                                <span className="text-[11.5px] text-muted-foreground">
-                                    Ctrl+Enter to send
-                                </span>
                             </div>
-                            <Button
-                                size="sm"
-                                onClick={send}
-                                disabled={form.processing || !form.data.body.trim()}
-                            >
-                                <Send className="h-3.5 w-3.5" />
-                                {form.data.is_internal ? 'Add note' : 'Send reply'}
-                            </Button>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="border-t border-border bg-muted/40 px-4.5 py-4">
+                            <div className="flex items-start gap-2.5">
+                                <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-muted text-muted-foreground">
+                                    <Lock className="h-4 w-4" />
+                                </span>
+                                <div className="min-w-0">
+                                    <p className="text-[13px] font-semibold">
+                                        This conversation is read-only
+                                    </p>
+                                    <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                        {replyUnavailableReason ??
+                                            'This ticket cannot accept another reply.'}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </>
             ) : (
                 <div
@@ -435,8 +645,12 @@ export function TicketThread({
                                         <Icon className="h-3.5 w-3.5" />
                                     </span>
                                     <div className="min-w-0 text-[12.5px]">
-                                        <span className="font-semibold">{e.actor ?? 'System'}</span>{' '}
-                                        <span className="text-muted-foreground">{eventLine(e)}</span>
+                                        <span className="font-semibold">
+                                            {e.actor ?? 'System'}
+                                        </span>{' '}
+                                        <span className="text-muted-foreground">
+                                            {eventLine(e)}
+                                        </span>
                                         <span className="ml-2 text-[11px] text-muted-foreground">
                                             {e.at_human}
                                         </span>

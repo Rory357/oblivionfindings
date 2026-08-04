@@ -158,7 +158,7 @@ export function FilterSelect({
 }) {
     return (
         <Select value={value || 'all'} onValueChange={onChange}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger aria-label={placeholder} className="w-[150px]">
                 <SelectValue placeholder={placeholder} />
             </SelectTrigger>
             <SelectContent>

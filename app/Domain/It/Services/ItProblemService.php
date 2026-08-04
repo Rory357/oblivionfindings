@@ -8,7 +8,7 @@ use App\Models\ItProblem;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\User;
-use App\Support\LegacyStorageContext;
+use App\Services\AuditLogger;
 use DomainException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -33,9 +33,7 @@ class ItProblemService
                 throw new DomainException('Choose an approved Site or authorised organisation-wide scope.');
             }
 
-            $storageContextId = LegacyStorageContext::id();
             $ticket = ItTicket::createWithReference([
-                'tenant_id' => $storageContextId,
                 'title' => $data['title'],
                 'description' => $data['description'] ?? null,
                 'requester_user_id' => $actor->id,
@@ -56,7 +54,6 @@ class ItProblemService
             ItTicketEvent::record($ticket, 'created', $actor->id, ['source' => 'problem_management']);
 
             $problem = ItProblem::query()->create([
-                'tenant_id' => $storageContextId,
                 'ticket_id' => $ticket->id,
                 ...Arr::only($data, ['impact_summary', 'root_cause', 'workaround', 'corrective_action']),
                 'created_by_user_id' => $actor->id,
@@ -70,6 +67,13 @@ class ItProblemService
                 reason: 'Problem investigation opened',
                 source: 'problem_management',
             ));
+            AuditLogger::logOrFail('it.problem.created', $ticket, [
+                'actor_id' => $actor->id,
+                'problem_id' => $problem->id,
+                'site_id' => $ticket->site_id,
+                'is_organisation_wide' => (bool) $ticket->is_organisation_wide,
+                'application_scope' => 'single_application',
+            ]);
 
             return $problem->fresh('ticket');
         });
@@ -102,6 +106,14 @@ class ItProblemService
                 'ticket_fields' => $ticketChanged,
                 'problem_fields' => $problemChanged,
                 'links_updated' => array_key_exists('incident_ids', $data) || array_key_exists('permanent_fix_change_id', $data),
+            ]);
+            AuditLogger::logOrFail('it.problem.updated', $ticket, [
+                'actor_id' => $actor->id,
+                'problem_id' => $problem->id,
+                'ticket_fields' => $ticketChanged,
+                'problem_fields' => $problemChanged,
+                'links_updated' => array_key_exists('incident_ids', $data) || array_key_exists('permanent_fix_change_id', $data),
+                'application_scope' => 'single_application',
             ]);
 
             return $problem->fresh('ticket');

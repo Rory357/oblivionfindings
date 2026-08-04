@@ -210,7 +210,7 @@ export default function DevicesIndex({
                                 onClick={() => applyFilters({ view: view.key })}
                             >
                                 {view.label}
-                                <span className="ml-2 rounded-full bg-background/20 px-2 py-0.5 text-xs">
+                                <span className="ml-2 rounded-full border border-current/25 px-2 py-0.5 text-xs font-medium">
                                     {view.count}
                                 </span>
                             </Button>

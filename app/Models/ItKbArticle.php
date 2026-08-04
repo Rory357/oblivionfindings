@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,7 +16,7 @@ use Illuminate\Support\Str;
  */
 class ItKbArticle extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     /** Reuses the ticket categories (§P.7). */
     public const CATEGORIES = ItTicket::CATEGORIES;
@@ -25,7 +26,6 @@ class ItKbArticle extends Model
     public const AUDIENCES = ['all_staff', 'specific_sites', 'it_agents'];
 
     protected $fillable = [
-        'tenant_id',
         'title',
         'slug',
         'category',
@@ -83,11 +83,6 @@ class ItKbArticle extends Model
     public function interactions(): HasMany
     {
         return $this->hasMany(ItKbInteraction::class, 'it_kb_article_id');
-    }
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 
     public function scopePublished($query)

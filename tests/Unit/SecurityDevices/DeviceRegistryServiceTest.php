@@ -52,7 +52,6 @@ class DeviceRegistryServiceTest extends TestCase
     {
         $site = Site::factory()->create();
         $room = SiteRoom::create([
-            'tenant_id' => 1,
             'site_id' => $site->id,
             'name' => 'Server Room',
         ]);
@@ -179,7 +178,6 @@ class DeviceRegistryServiceTest extends TestCase
     public function test_for_group_returns_group_members(): void
     {
         $group = DeviceGroup::create([
-            'tenant_id' => 1,
             'name' => 'Auckland Office',
             'type' => 'location',
         ]);
@@ -195,10 +193,49 @@ class DeviceRegistryServiceTest extends TestCase
         $this->assertEquals($member->id, $results->first()->id);
     }
 
-    public function test_legacy_partition_values_do_not_split_the_application_registry(): void
+    public function test_asset_and_device_registry_queries_return_only_active_canonical_links(): void
     {
-        Device::factory()->create(['tenant_id' => 1]);
-        Device::factory()->create(['tenant_id' => 2]);
+        $activeAsset = Asset::factory()->create();
+        $releasedAsset = Asset::factory()->create();
+        $unrelatedAsset = Asset::factory()->create();
+        $device = Device::factory()->create();
+        $unrelatedDevice = Device::factory()->create();
+
+        DeviceAssetLink::create([
+            'device_id' => $device->id,
+            'asset_id' => $activeAsset->id,
+            'link_type' => LinkType::InstalledIn,
+            'linked_at' => now()->subDays(2),
+        ]);
+        DeviceAssetLink::create([
+            'device_id' => $device->id,
+            'asset_id' => $releasedAsset->id,
+            'link_type' => LinkType::InstalledIn,
+            'linked_at' => now()->subDays(10),
+            'unlinked_at' => now()->subDay(),
+        ]);
+        DeviceAssetLink::create([
+            'device_id' => $unrelatedDevice->id,
+            'asset_id' => $unrelatedAsset->id,
+            'link_type' => LinkType::InstalledIn,
+            'linked_at' => now(),
+        ]);
+
+        $this->assertSame(
+            [$activeAsset->id],
+            $this->service->assetsForDevice($device->id)->pluck('id')->all(),
+        );
+        $this->assertSame(
+            [$device->id],
+            $this->service->linkedToAsset($activeAsset->id)->pluck('id')->all(),
+        );
+        $this->assertFalse($this->service->linkedToAsset($releasedAsset->id)->exists());
+    }
+
+    public function test_application_registry_query_returns_all_devices(): void
+    {
+        Device::factory()->create([]);
+        Device::factory()->create([]);
 
         $this->assertCount(2, $this->service->query()->get());
     }

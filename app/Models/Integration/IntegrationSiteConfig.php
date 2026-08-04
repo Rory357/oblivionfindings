@@ -3,6 +3,7 @@
 namespace App\Models\Integration;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\Site;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,17 +13,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class IntegrationSiteConfig extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
+    use WritesLegacyStorageContext;
 
-    public const STATUS_TENANT_ONLY = 'tenant_only';
+    public const STATUS_LOCAL_ONLY = 'local_only';
+
     public const STATUS_HYBRID = 'hybrid';
+
     public const STATUS_DISCONNECTED = 'disconnected';
 
     protected $table = 'integration_site_configs';
 
     protected $fillable = [
-        'tenant_id',
         'site_id',
         'provider',
         'status',
@@ -55,11 +58,6 @@ class IntegrationSiteConfig extends Model
     /* ---------------------------------------------------------------
      * Scopes
      * ------------------------------------------------------------- */
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeActive(Builder $query): Builder
     {

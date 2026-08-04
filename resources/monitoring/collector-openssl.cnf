@@ -1,0 +1,13 @@
+[ req ]
+distinguished_name = collector_distinguished_name
+prompt = no
+
+[ collector_distinguished_name ]
+CN = Oblivion Findings monitoring collector
+
+[ v3_collector ]
+basicConstraints = critical, CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = critical, clientAuth
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer

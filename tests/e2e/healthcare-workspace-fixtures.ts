@@ -12,15 +12,13 @@ export function seedHealthcareWorkspaceReadinessFixtures() {
         clinicalSentinel: string;
     }>(`
 $admin = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->firstOrFail();
-$tenantId = (int) ($admin->organization_id ?? 1);
 $site = \\App\\Models\\Site::query()
-    ->where('tenant_id', $tenantId)
     ->where('archived', false)
     ->orderBy('id')
     ->firstOrFail();
 
 $client = \\App\\Models\\Client::withTrashed()
-    ->where('organization_id', $tenantId)
+    ->where('site_id', $site->id)
     ->where('first_name', 'Playwright')
     ->where('last_name', 'Healthcare')
     ->first();
@@ -30,7 +28,6 @@ if (! $client) {
     $client->restore();
 }
 $client->forceFill([
-    'organization_id' => $tenantId,
     'site_id' => $site->id,
     'first_name' => 'Playwright',
     'last_name' => 'Healthcare',
@@ -41,14 +38,12 @@ $client->forceFill([
     'key_worker_id' => $admin->id,
 ])->save();
 
-$upsertDevice = function (string $uid, array $attributes, string $targetType, int $targetId, string $assignmentType = 'shared') use ($tenantId) {
+$upsertDevice = function (string $uid, array $attributes, string $targetType, int $targetId, string $assignmentType = 'shared') {
     $device = \\App\\Domain\\SecurityDevices\\Models\\Device::withTrashed()
-        ->where('tenant_id', $tenantId)
         ->where('device_uid', $uid)
         ->first();
     if (! $device) {
         $device = new \\App\\Domain\\SecurityDevices\\Models\\Device([
-            'tenant_id' => $tenantId,
             'device_uid' => $uid,
         ]);
     } elseif ($device->trashed()) {
@@ -169,12 +164,10 @@ $calibrationDescription = 'Playwright annual calibration';
 );
 
 $ticket = \\App\\Models\\ItTicket::query()
-    ->where('tenant_id', $tenantId)
     ->where('title', 'Playwright restore healthcare delivery')
     ->first();
 if (! $ticket) {
     $ticket = \\App\\Models\\ItTicket::createWithReference([
-        'tenant_id' => $tenantId,
         'title' => 'Playwright restore healthcare delivery',
         'description' => 'Deterministic healthcare workspace browser fixture.',
         'requester_user_id' => $admin->id,
@@ -197,7 +190,6 @@ if (! $ticket) {
         'linkable_id' => $clientDevice->id,
     ],
     [
-        'tenant_id' => $tenantId,
         'created_by_user_id' => $admin->id,
     ],
 );

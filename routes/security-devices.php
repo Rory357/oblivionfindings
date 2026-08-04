@@ -1,7 +1,9 @@
 <?php
 
+use App\Domain\SecurityDevices\Credentials\Http\Controllers\CredentialReferenceController;
 use App\Domain\SecurityDevices\Http\Controllers\AlertsEventsController;
 use App\Domain\SecurityDevices\Http\Controllers\CategoryPageController;
+use App\Domain\SecurityDevices\Http\Controllers\ConfigurationSnapshotController;
 use App\Domain\SecurityDevices\Http\Controllers\DashboardController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceAssignmentController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceController;
@@ -15,10 +17,21 @@ use App\Domain\SecurityDevices\Http\Controllers\Integrations\UnifiController;
 use App\Domain\SecurityDevices\Http\Controllers\IntegrationsHubController;
 use App\Domain\SecurityDevices\Http\Controllers\MaintenanceHealthController;
 use App\Domain\SecurityDevices\Http\Controllers\MaintenanceOperationsController;
+use App\Domain\SecurityDevices\Http\Controllers\MonitoringDeadLetterController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringOperationsController;
+use App\Domain\SecurityDevices\Http\Controllers\MonitoringRuntimeHealthController;
 use App\Domain\SecurityDevices\Http\Controllers\ReportsController;
 use App\Domain\SecurityDevices\Http\Controllers\SettingsAuditController;
 use App\Domain\SecurityDevices\Http\Controllers\SiteTechnologyController;
+use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandApprovalController;
+use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandBatchController;
+use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandBatchDecisionController;
+use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandBatchExecutionController;
+use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandBreakGlassReviewController;
+use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandController;
+use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandEvidenceController;
+use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandExecutionController;
+use App\Domain\SecurityDevices\Management\Http\Middleware\AuditDeniedDeviceCommandRequest;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -64,6 +77,60 @@ Route::middleware([
     Route::patch('/devices/{device}/fields', [DeviceController::class, 'patchFields'])
         ->middleware('permission:securityDevices.devices.update')
         ->name('security-devices.devices.patch-fields');
+
+    Route::get('/devices/{device}/commands/confirm-identity', [DeviceCommandController::class, 'confirmIdentity'])
+        ->middleware('permission:securityDevices.commands.operate|securityDevices.commands.manage|securityDevices.commands.control|securityDevices.commands.admin')
+        ->name('security-devices.devices.commands.confirm-identity');
+
+    Route::post('/devices/{device}/commands', [DeviceCommandController::class, 'store'])
+        ->middleware([
+            AuditDeniedDeviceCommandRequest::class,
+            'permission:securityDevices.commands.operate|securityDevices.commands.manage|securityDevices.commands.control|securityDevices.commands.admin',
+        ])
+        ->name('security-devices.devices.commands.store');
+
+    Route::post('/commands/{command}/decision', [DeviceCommandApprovalController::class, 'store'])
+        ->middleware('permission:securityDevices.commands.approve')
+        ->name('security-devices.commands.decision');
+
+    Route::post('/commands/{command}/dispatch', [DeviceCommandExecutionController::class, 'store'])
+        ->middleware('permission:securityDevices.commands.operate|securityDevices.commands.manage|securityDevices.commands.control|securityDevices.commands.admin')
+        ->name('security-devices.commands.dispatch');
+
+    Route::post('/commands/{command}/break-glass-review', DeviceCommandBreakGlassReviewController::class)
+        ->middleware('permission:securityDevices.commands.admin')
+        ->name('security-devices.commands.break-glass-review');
+
+    Route::get('/devices/{device}/commands/{command}/evidence', DeviceCommandEvidenceController::class)
+        ->middleware('permission:securityDevices.commands.observe|securityDevices.commands.operate|securityDevices.commands.manage|securityDevices.commands.control|securityDevices.commands.admin')
+        ->name('security-devices.devices.commands.evidence');
+
+    Route::get('/command-batches/confirm-identity', [DeviceCommandBatchController::class, 'confirmIdentity'])
+        ->middleware('permission:securityDevices.commands.operate|securityDevices.commands.manage|securityDevices.commands.control|securityDevices.commands.admin')
+        ->name('security-devices.command-batches.confirm-identity');
+
+    Route::post('/command-batches', [DeviceCommandBatchController::class, 'store'])
+        ->middleware([
+            AuditDeniedDeviceCommandRequest::class,
+            'permission:securityDevices.commands.operate|securityDevices.commands.manage|securityDevices.commands.control|securityDevices.commands.admin',
+        ])
+        ->name('security-devices.command-batches.store');
+
+    Route::get('/command-batches/{batch}', [DeviceCommandBatchController::class, 'show'])
+        ->middleware('permission:securityDevices.commands.observe|securityDevices.commands.operate|securityDevices.commands.manage|securityDevices.commands.control|securityDevices.commands.admin')
+        ->name('security-devices.command-batches.show');
+
+    Route::get('/command-batches/{batch}/export', [DeviceCommandBatchController::class, 'export'])
+        ->middleware('permission:securityDevices.commands.observe|securityDevices.commands.operate|securityDevices.commands.manage|securityDevices.commands.control|securityDevices.commands.admin')
+        ->name('security-devices.command-batches.export');
+
+    Route::post('/command-batches/{batch}/decision', [DeviceCommandBatchDecisionController::class, 'store'])
+        ->middleware('permission:securityDevices.commands.approve')
+        ->name('security-devices.command-batches.decision');
+
+    Route::post('/command-batches/{batch}/dispatch', [DeviceCommandBatchExecutionController::class, 'store'])
+        ->middleware('permission:securityDevices.commands.operate|securityDevices.commands.manage|securityDevices.commands.control|securityDevices.commands.admin')
+        ->name('security-devices.command-batches.dispatch');
 
     // ── Device Assignments ────────────────────────────────────────
 
@@ -113,6 +180,13 @@ Route::middleware([
     Route::delete('/devices/{device}/documents/{document}', [DeviceDocumentController::class, 'destroy'])
         ->middleware('permission:securityDevices.devices.update')
         ->name('security-devices.devices.documents.destroy');
+
+    Route::get(
+        '/devices/{device}/configuration-snapshots/{snapshot}',
+        ConfigurationSnapshotController::class,
+    )
+        ->middleware('permission:securityDevices.devices.view')
+        ->name('security-devices.devices.configuration-snapshots.download');
 
     // ── Approved grouped-navigation destinations ─────────────────
     // These canonical routes reuse today's production-backed controllers.
@@ -187,6 +261,10 @@ Route::middleware([
         ->middleware('permission:securityDevices.groups.manage')
         ->name('security-devices.device-groups.store');
 
+    Route::post('/device-groups/auto-rules/preview', [DeviceGroupController::class, 'previewDraftAutoRules'])
+        ->middleware('permission:securityDevices.groups.manage')
+        ->name('security-devices.device-groups.auto-rules.preview-draft');
+
     Route::get('/device-groups/{group}', [DeviceGroupController::class, 'show'])
         ->middleware('permission:securityDevices.groups.manage')
         ->name('security-devices.device-groups.show');
@@ -230,6 +308,19 @@ Route::middleware([
         ->middleware('permission:securityDevices.events.view')
         ->name('security-devices.monitoring');
 
+    Route::get('/runtime-health', MonitoringRuntimeHealthController::class)
+        ->middleware('permission:securityDevices.events.view')
+        ->name('security-devices.runtime-health');
+
+    Route::prefix('/monitoring/dead-letters')
+        ->middleware('permission:securityDevices.integrations.manage')
+        ->group(function () {
+            Route::post('/{deadLetter}/replay', [MonitoringDeadLetterController::class, 'replay'])
+                ->name('security-devices.monitoring.dead-letters.replay');
+            Route::post('/{deadLetter}/discard', [MonitoringDeadLetterController::class, 'discard'])
+                ->name('security-devices.monitoring.dead-letters.discard');
+        });
+
     Route::get('/maintenance-health', [MaintenanceHealthController::class, 'index'])
         ->middleware('permission:securityDevices.maintenance.view')
         ->name('security-devices.maintenance-health');
@@ -261,9 +352,22 @@ Route::middleware([
     Route::get('/settings', SettingsAuditController::class)
         ->name('security-devices.settings');
 
+    Route::prefix('/settings/credential-references')
+        ->middleware('permission:securityDevices.commands.admin')
+        ->group(function () {
+            Route::post('/', [CredentialReferenceController::class, 'store'])
+                ->name('security-devices.credential-references.store');
+            Route::post('/{credentialReference}/test', [CredentialReferenceController::class, 'test'])
+                ->name('security-devices.credential-references.test');
+            Route::post('/{credentialReference}/rotate', [CredentialReferenceController::class, 'rotate'])
+                ->name('security-devices.credential-references.rotate');
+            Route::post('/{credentialReference}/revoke', [CredentialReferenceController::class, 'revoke'])
+                ->name('security-devices.credential-references.revoke');
+        });
+
     // ── UniFi provider configuration ─────────────────────────────
     // Was previously at /settings/integrations/unifi; kept behind the
-    // module-scoped permission plus a fallback to the legacy tenant-secrets
+    // module-scoped permission plus a fallback to the legacy provider-secrets
     // permission inside the controller to preserve existing admin access.
     Route::prefix('/integrations/unifi')
         ->middleware('permission:securityDevices.integrations.manage')
@@ -291,8 +395,8 @@ Route::middleware([
         });
 
     // ── Queclink integration hub ─────────────────────────────────
-    // Direct device-to-server TCP intake is the primary path; IMS cloud
-    // credentials (kept for parity) live under /key on the same prefix.
+    // Direct device-to-server TCP intake is the primary path. No Queclink
+    // cloud API capability is exposed until a verified public contract exists.
     Route::prefix('/integrations/queclink')
         ->middleware('permission:securityDevices.integrations.manage')
         ->group(function () {
@@ -336,8 +440,6 @@ Route::middleware([
                 ->name('security-devices.integrations.queclink.configuration.resident-safety-profile');
             Route::post('/commands/{command}/cancel', [QueclinkHubController::class, 'cancelCommand'])
                 ->name('security-devices.integrations.queclink.commands.cancel');
-            Route::post('/commands/{command}/retry', [QueclinkHubController::class, 'retryCommand'])
-                ->name('security-devices.integrations.queclink.commands.retry');
             Route::post('/bulk', [QueclinkHubController::class, 'bulkAction'])
                 ->name('security-devices.integrations.queclink.bulk');
 
@@ -349,20 +451,12 @@ Route::middleware([
             Route::delete('/presets/{preset}', [QueclinkHubController::class, 'destroyPreset'])
                 ->name('security-devices.integrations.queclink.presets.destroy');
 
-            // IMS cloud credential management (legacy scaffold endpoints).
-            Route::post('/key', [QueclinkController::class, 'saveKey'])
-                ->name('security-devices.integrations.queclink.key');
-            Route::post('/test', [QueclinkController::class, 'testKey'])
-                ->name('security-devices.integrations.queclink.test');
-            Route::post('/rotate', [QueclinkController::class, 'rotateKey'])
-                ->name('security-devices.integrations.queclink.rotate');
+            // Cleanup-only route for credentials saved by the retired cloud scaffold.
             Route::delete('/key', [QueclinkController::class, 'removeKey'])
                 ->name('security-devices.integrations.queclink.remove');
         });
 
-    // ── Milesight provider configuration (scaffold) ──────────────
-    // LoRaWAN credentials and connection testing are live; gateway /
-    // application mapping + LoRaWAN sensor import ship in PR D1.
+    // ── Milesight Development Platform ───────────────────────────
     Route::prefix('/integrations/milesight')
         ->middleware('permission:securityDevices.integrations.manage')
         ->group(function () {
@@ -374,8 +468,20 @@ Route::middleware([
                 ->name('security-devices.integrations.milesight.test');
             Route::post('/rotate', [MilesightController::class, 'rotateKey'])
                 ->name('security-devices.integrations.milesight.rotate');
+            Route::post('/webhook', [MilesightController::class, 'saveWebhook'])
+                ->name('security-devices.integrations.milesight.webhook.save');
+            Route::delete('/webhook', [MilesightController::class, 'removeWebhook'])
+                ->name('security-devices.integrations.milesight.webhook.remove');
             Route::delete('/key', [MilesightController::class, 'removeKey'])
                 ->name('security-devices.integrations.milesight.remove');
+            Route::post('/applications/sync', [MilesightController::class, 'syncApplications'])
+                ->name('security-devices.integrations.milesight.applications.sync');
+            Route::post('/applications/map', [MilesightController::class, 'mapApplication'])
+                ->name('security-devices.integrations.milesight.applications.map');
+            Route::delete('/applications/{siteConfig}', [MilesightController::class, 'removeApplicationMapping'])
+                ->name('security-devices.integrations.milesight.applications.remove');
+            Route::post('/devices/sync', [MilesightController::class, 'syncDevices'])
+                ->name('security-devices.integrations.milesight.devices.sync');
         });
 
     // ── Reports ──────────────────────────────────────────────────

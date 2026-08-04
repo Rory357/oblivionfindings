@@ -34,9 +34,17 @@ vi.mock('@/components/leaflet-map', () => ({
 
 beforeEach(() => {
     inertiaMocks.post.mockClear();
+    vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({ active: true, export_allowed: false }),
+        }),
+    );
 });
 
-it('renders the unified resident sidebar and queues Locate Now', () => {
+it('renders the unified resident sidebar and queues Locate Now', async () => {
     render(
         <ClientLocationTab
             clientId={9012}
@@ -44,6 +52,7 @@ it('renders the unified resident sidebar and queues Locate Now', () => {
             clientHouse="Harbour Respite"
             clientPhoto={null}
             location={{
+                privacyStatusUrl: '/privacy-status',
                 canManage: true,
                 tracker: {
                     id: 12,
@@ -86,7 +95,7 @@ it('renders the unified resident sidebar and queues Locate Now', () => {
         />,
     );
 
-    expect(screen.getByText('Panic not currently active')).toBeVisible();
+    expect(await screen.findByText('Panic not currently active')).toBeVisible();
     expect(screen.getByText('No panic events recorded')).toBeVisible();
     expect(screen.getAllByText(/Charging/i).length).toBeGreaterThan(0);
     expect(screen.getByText('Acknowledged')).toBeVisible();
@@ -103,7 +112,7 @@ it('renders the unified resident sidebar and queues Locate Now', () => {
     );
 });
 
-it('shows the active panic banner and acknowledges it', () => {
+it('shows the active panic banner and acknowledges it', async () => {
     render(
         <ClientLocationTab
             clientId={42}
@@ -111,6 +120,7 @@ it('shows the active panic banner and acknowledges it', () => {
             clientHouse="House 1"
             clientPhoto={null}
             location={{
+                privacyStatusUrl: '/privacy-status',
                 canManage: true,
                 tracker: {
                     id: 1,
@@ -149,7 +159,7 @@ it('shows the active panic banner and acknowledges it', () => {
         />,
     );
 
-    expect(screen.getByText('SOS received')).toBeVisible();
+    expect(await screen.findByText('SOS received')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /Acknowledge/i }));
     expect(inertiaMocks.post).toHaveBeenCalledWith(
         '/operations/clients/42/location/acknowledge-panic',
@@ -158,7 +168,7 @@ it('shows the active panic banner and acknowledges it', () => {
     );
 });
 
-it('does not expose tracker commands when the server omits management URLs', () => {
+it('does not expose tracker commands when the server omits management URLs', async () => {
     render(
         <ClientLocationTab
             clientId={43}
@@ -166,6 +176,7 @@ it('does not expose tracker commands when the server omits management URLs', () 
             clientHouse="House 2"
             clientPhoto={null}
             location={{
+                privacyStatusUrl: '/privacy-status',
                 canManage: false,
                 tracker: {
                     id: 2,
@@ -198,7 +209,9 @@ it('does not expose tracker commands when the server omits management URLs', () 
         />,
     );
 
-    expect(screen.getByRole('button', { name: /Locate Now/i })).toBeDisabled();
+    expect(
+        await screen.findByRole('button', { name: /Locate Now/i }),
+    ).toBeDisabled();
     expect(
         screen.queryByRole('button', { name: /Acknowledge/i }),
     ).not.toBeInTheDocument();
@@ -207,7 +220,7 @@ it('does not expose tracker commands when the server omits management URLs', () 
     expect(inertiaMocks.post).not.toHaveBeenCalled();
 });
 
-it('does not offer tracker assignment to a read-only location viewer', () => {
+it('does not offer tracker assignment to a read-only location viewer', async () => {
     render(
         <ClientLocationTab
             clientId={44}
@@ -215,6 +228,7 @@ it('does not offer tracker assignment to a read-only location viewer', () => {
             clientHouse="House 3"
             clientPhoto={null}
             location={{
+                privacyStatusUrl: '/privacy-status',
                 canManage: false,
                 tracker: null,
                 currentLocation: null,
@@ -225,13 +239,21 @@ it('does not offer tracker assignment to a read-only location viewer', () => {
         />,
     );
 
-    expect(screen.getByText('No Personal Tracker Assigned')).toBeVisible();
+    expect(
+        await screen.findByText('No Personal Tracker Assigned'),
+    ).toBeVisible();
     expect(
         screen.queryByRole('link', { name: /Assign Tracker/i }),
     ).not.toBeInTheDocument();
 });
 
-it('shows only the inactive-consent state when tracking data is restricted', () => {
+it('shows only the inactive-consent state when tracking data is restricted', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ active: false, export_allowed: false }),
+    } as Response);
+
     render(
         <ClientLocationTab
             clientId={45}
@@ -239,6 +261,7 @@ it('shows only the inactive-consent state when tracking data is restricted', () 
             clientHouse="House 4"
             clientPhoto={null}
             location={{
+                privacyStatusUrl: '/privacy-status',
                 trackingRestricted: true,
                 canManage: false,
                 tracker: null,
@@ -251,7 +274,7 @@ it('shows only the inactive-consent state when tracking data is restricted', () 
     );
 
     expect(
-        screen.getByText('Location Tracking Consent Not Active'),
+        await screen.findByText('Location access is not active'),
     ).toBeVisible();
     expect(
         screen.queryByText('No Personal Tracker Assigned'),

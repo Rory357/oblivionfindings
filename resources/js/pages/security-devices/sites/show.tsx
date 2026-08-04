@@ -5,6 +5,7 @@ import {
     OperationalStateBadge,
 } from '@/components/security-devices/estate-operations';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
@@ -12,6 +13,7 @@ import { formatDateTime, formatRelative } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 import {
     Activity,
+    ArrowUpRight,
     BellRing,
     Building2,
     Cable,
@@ -236,6 +238,12 @@ export default function SiteTechnologyShow({
                     ]}
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
+                            <Button asChild variant="outline" size="sm">
+                                <Link href={`/sites/${site.id}`}>
+                                    Open Site profile
+                                    <ArrowUpRight className="ml-2 h-4 w-4" />
+                                </Link>
+                            </Button>
                             <OperationalStateBadge state={summary.health} />
                             {site.type ? (
                                 <Badge variant="outline">

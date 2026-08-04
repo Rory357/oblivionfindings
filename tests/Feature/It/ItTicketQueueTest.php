@@ -1,6 +1,8 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\ItQueue;
+use App\Models\ItTeam;
 use App\Models\ItTicket;
 use App\Models\Role;
 use App\Models\Site;
@@ -140,6 +142,63 @@ test('saved views filter the queue server-side', function () {
         ->assertInertia(fn ($page) => $page->where('filters.view', null));
 });
 
+test('routed ownership is visible and drives owned and team work views', function () {
+    $team = ItTeam::factory()->create(['manager_user_id' => null]);
+    $team->members()->attach($this->hr->id, ['role' => 'member']);
+    $queue = ItQueue::factory()->create(['team_id' => $team->id]);
+    $other = User::factory()->create();
+
+    $owned = ItTicket::factory()->create([
+        'site_id' => $this->site->id,
+        'title' => 'Owned service request',
+        'requester_user_id' => $other->id,
+        'owner_user_id' => $this->hr->id,
+        'team_id' => $team->id,
+        'queue_id' => $queue->id,
+    ]);
+    $teamTicket = ItTicket::factory()->create([
+        'site_id' => $this->site->id,
+        'title' => 'Team incident',
+        'requester_user_id' => $other->id,
+        'owner_user_id' => $other->id,
+        'team_id' => $team->id,
+        'queue_id' => $queue->id,
+    ]);
+    $unrelated = ItTicket::factory()->create([
+        'site_id' => $this->site->id,
+        'title' => 'Unrelated incident',
+        'requester_user_id' => $other->id,
+    ]);
+
+    $this->actingAs($this->hr)
+        ->get('/it?view=owned_by_me')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('tickets.data', 1)
+            ->where('tickets.data.0.title', 'Owned service request')
+            ->where('tickets.data.0.routing.queue.name', $queue->name)
+            ->where('tickets.data.0.routing.team.name', $team->name)
+            ->where('tickets.data.0.routing.owner.name', $this->hr->name)
+            ->where('filters.view', 'owned_by_me')
+            ->where('summary.tickets.views.owned_by_me', 1)
+            ->where('summary.tickets.views.my_team', 2));
+
+    $this->actingAs($this->hr)
+        ->get('/it?view=my_team')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('tickets.data', 2)
+            ->where('filters.view', 'my_team'));
+
+    // These setup records influence future routing by design. Remove this
+    // test's rule explicitly so the later activity-feed scenario remains
+    // independent even when a database driver cannot roll back setup tables.
+    ItTicket::query()->whereKey([$owned->id, $teamTicket->id, $unrelated->id])->delete();
+    $team->members()->detach();
+    $queue->delete();
+    $team->delete();
+});
+
 test('the summary counts the whole table, not the page', function () {
     $me = $this->hr;
     $other = User::factory()->create();
@@ -225,6 +284,8 @@ test('the overview board serves agents needs-attention lanes and hides from requ
 
 test('the overview activity feed surfaces recent ticket events for agents', function () {
     // Raise a ticket through the real write path → a `created` event lands.
+    // A configured queue may also add a legitimate `routing_applied` event,
+    // so the feed contract is presence rather than a brittle exact size.
     $this->actingAs($this->hr)
         ->post('/it/tickets', [
             'title' => 'Feed fixture',
@@ -238,8 +299,8 @@ test('the overview activity feed surfaces recent ticket events for agents', func
         ->get('/it')
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->has('overview.recent_activity', 1)
-            ->where('overview.recent_activity.0.type', 'created')
-            ->where('overview.recent_activity.0.actor', $this->hr->name)
-            ->where('overview.recent_activity.0.reference', 'IT-000001'));
+            ->where('overview.recent_activity', fn ($activity) => collect($activity)
+                ->contains(fn ($event) => $event['type'] === 'created'
+                    && $event['actor'] === $this->hr->name
+                    && $event['reference'] === 'IT-000001')));
 });

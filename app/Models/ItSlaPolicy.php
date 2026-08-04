@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class ItSlaPolicy extends Model
 {
+    use WritesLegacyStorageContext;
+
     /**
      * §G defaults, minutes: [first_response, resolution].
      *
@@ -25,7 +28,6 @@ class ItSlaPolicy extends Model
     ];
 
     protected $fillable = [
-        'tenant_id',
         'priority',
         'first_response_minutes',
         'resolution_minutes',

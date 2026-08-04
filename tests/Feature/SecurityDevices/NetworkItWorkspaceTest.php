@@ -34,7 +34,7 @@ class NetworkItWorkspaceTest extends TestCase
         $this->seed(SecurityDevicesPermissionsSeeder::class);
 
         $this->admin = User::factory()->create([
-            'organization_id' => 42,
+
             'approved_at' => now(),
         ]);
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
@@ -43,7 +43,6 @@ class NetworkItWorkspaceTest extends TestCase
     public function test_overview_reconciles_sites_wan_monitoring_evidence_and_open_it_work(): void
     {
         $site = Site::factory()->create([
-            'tenant_id' => 42,
             'name' => 'Kauri House',
             'is_active' => true,
         ]);
@@ -55,7 +54,7 @@ class NetworkItWorkspaceTest extends TestCase
             'category' => 'network',
             'subcategory' => 'managed_switch',
         ]);
-        $foreign = $this->networkDevice('Foreign gateway', ['tenant_id' => 77]);
+        $unrelated = $this->networkDevice('Unrelated gateway', []);
         $this->assignToSite($gateway, $site);
         $this->assignToSite($switch, $site);
 
@@ -73,13 +72,11 @@ class NetworkItWorkspaceTest extends TestCase
             'relationship_type' => 'uplinks_to',
         ]);
         $ticket = ItTicket::factory()->create([
-            'tenant_id' => 42,
             'requester_user_id' => $this->admin->id,
             'title' => 'Investigate Kauri uplink capacity',
             'status' => 'open',
         ]);
         ItTicketLink::create([
-            'tenant_id' => 42,
             'ticket_id' => $ticket->id,
             'relationship' => 'affected_device',
             'linkable_type' => Device::class,
@@ -90,7 +87,7 @@ class NetworkItWorkspaceTest extends TestCase
         $this->actingAs($this->admin)
             ->get('/security-devices/network-it')
             ->assertOk()
-            ->assertInertia(function ($page) use ($foreign, $site): void {
+            ->assertInertia(function ($page) use ($unrelated, $site): void {
                 $network = $page->toArray()['props']['networkItWorkspace'];
 
                 $this->assertSame('Native monitoring, honest evidence', $network['boundary']['title']);
@@ -111,7 +108,7 @@ class NetworkItWorkspaceTest extends TestCase
                 );
                 $this->assertSame('Investigate Kauri uplink capacity', $network['overview']['itWork'][0]['title']);
                 $this->assertContains(
-                    $foreign->id,
+                    $unrelated->id,
                     collect($network['activeTab']['devices'])->pluck('id')->all(),
                 );
             });
@@ -119,11 +116,11 @@ class NetworkItWorkspaceTest extends TestCase
 
     public function test_network_map_uses_only_known_visible_relationships_and_labels_partial_topology(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42, 'name' => 'Miro House']);
+        $site = Site::factory()->create(['name' => 'Miro House']);
         $gateway = $this->networkDevice('Miro edge gateway');
         $switch = $this->networkDevice('Miro switch');
         $accessPoint = $this->networkDevice('Miro access point');
-        $foreign = $this->networkDevice('Foreign switch', ['tenant_id' => 77]);
+        $unrelated = $this->networkDevice('Unrelated switch', []);
         foreach ([$gateway, $switch, $accessPoint] as $device) {
             $this->assignToSite($device, $site);
         }
@@ -137,7 +134,7 @@ class NetworkItWorkspaceTest extends TestCase
         ]);
         DeviceRelationship::create([
             'parent_device_id' => $gateway->id,
-            'child_device_id' => $foreign->id,
+            'child_device_id' => $unrelated->id,
             'relationship_type' => 'connected_to',
         ]);
 
@@ -302,13 +299,11 @@ class NetworkItWorkspaceTest extends TestCase
     {
         $device = $this->networkDevice('Restricted work device');
         $ticket = ItTicket::factory()->create([
-            'tenant_id' => 42,
             'requester_user_id' => $this->admin->id,
             'title' => 'Private technical work',
             'status' => 'open',
         ]);
         ItTicketLink::create([
-            'tenant_id' => 42,
             'ticket_id' => $ticket->id,
             'relationship' => 'affected_device',
             'linkable_type' => Device::class,
@@ -341,7 +336,6 @@ class NetworkItWorkspaceTest extends TestCase
     private function networkDevice(string $name, array $attributes = []): Device
     {
         return Device::factory()->itInfrastructure()->create([
-            'tenant_id' => 42,
             'name' => $name,
             ...$attributes,
         ]);
@@ -366,7 +360,6 @@ class NetworkItWorkspaceTest extends TestCase
         array $attributes = [],
     ): Monitor {
         return Monitor::factory()->create([
-            'tenant_id' => 42,
             'device_id' => $device->id,
             'name' => $name,
             'kind' => $kind,
@@ -379,7 +372,6 @@ class NetworkItWorkspaceTest extends TestCase
     private function observe(Monitor $monitor, array $metrics): MonitorObservation
     {
         return MonitorObservation::factory()->create([
-            'tenant_id' => 42,
             'monitor_id' => $monitor->id,
             'state' => $monitor->current_state,
             'metrics' => $metrics,

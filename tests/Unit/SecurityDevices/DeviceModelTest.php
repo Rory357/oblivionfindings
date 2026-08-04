@@ -6,8 +6,8 @@ use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
-use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceGroup;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
@@ -24,7 +24,6 @@ class DeviceModelTest extends TestCase
     public function test_device_uid_is_auto_generated_on_create(): void
     {
         $device = Device::create([
-            'tenant_id' => 1,
             'name' => 'Test Camera',
             'domain' => 'security',
             'category' => 'cctv',
@@ -37,7 +36,6 @@ class DeviceModelTest extends TestCase
     public function test_device_uid_is_not_overridden_if_provided(): void
     {
         $device = Device::create([
-            'tenant_id' => 1,
             'device_uid' => 'CUSTOM-UID-001',
             'name' => 'Test Camera',
             'domain' => 'security',
@@ -86,13 +84,12 @@ class DeviceModelTest extends TestCase
         $this->assertDatabaseHas('devices', ['id' => $device->id]);
     }
 
-    public function test_for_tenant_scope(): void
+    public function test_registry_query_returns_all_devices(): void
     {
-        Device::factory()->create(['tenant_id' => 1]);
-        Device::factory()->create(['tenant_id' => 2]);
+        $first = Device::factory()->create([]);
+        $second = Device::factory()->create([]);
 
-        $this->assertCount(1, Device::forTenant(1)->get());
-        $this->assertCount(1, Device::forTenant(2)->get());
+        $this->assertEqualsCanonicalizing([$first->id, $second->id], Device::query()->pluck('id')->all());
     }
 
     public function test_by_domain_scope(): void
@@ -192,7 +189,6 @@ class DeviceModelTest extends TestCase
     {
         $device = Device::factory()->create();
         $group = DeviceGroup::create([
-            'tenant_id' => 1,
             'name' => 'Test Group',
             'type' => 'custom',
         ]);

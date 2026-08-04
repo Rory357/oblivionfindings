@@ -1,11 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
     ClaimDialog,
+    CloudIntegrationTab,
     DebugConsoleTab,
     DeviceSettingsTab,
+    GovernedCommandHandoff,
+    OverviewTab,
     default as QueclinkHub,
     RejectedTab,
 } from '@/pages/security-devices/integrations/queclink-hub';
@@ -20,7 +23,9 @@ const inertiaMocks = vi.hoisted(() => ({
     router: {
         post: vi.fn(),
         get: vi.fn(),
+        delete: vi.fn(),
     },
+    formPost: vi.fn(),
     formErrors: {} as Record<string, string>,
 }));
 
@@ -42,7 +47,7 @@ vi.mock('@inertiajs/react', () => ({
     useForm: (initial: Record<string, unknown>) => ({
         data: initial,
         setData: vi.fn(),
-        post: vi.fn(),
+        post: inertiaMocks.formPost,
         processing: false,
         errors: inertiaMocks.formErrors,
         reset: vi.fn(),
@@ -51,6 +56,7 @@ vi.mock('@inertiajs/react', () => ({
 
 beforeEach(() => {
     inertiaMocks.formErrors = {};
+    inertiaMocks.formPost.mockReset();
 });
 
 const recentFrame = {
@@ -65,10 +71,13 @@ const recentFrame = {
 
 class EventSourceStub {
     static instances: EventSourceStub[] = [];
+    static CLOSED = 2;
 
+    onopen: (() => void) | null = null;
     onmessage: ((event: MessageEvent) => void) | null = null;
     onerror: (() => void) | null = null;
     close = vi.fn();
+    readyState = 0;
 
     constructor(public url: string) {
         EventSourceStub.instances.push(this);
@@ -118,6 +127,7 @@ describe('QueclinkHub debug console', () => {
     it('loads recent frames when the debug console opens instead of showing an empty stream', async () => {
         renderHub();
 
+        expect(screen.getByRole('status')).toHaveTextContent('Connecting');
         expect(await screen.findByText('RESP frame received')).toBeVisible();
         expect(fetch).toHaveBeenCalledWith(
             '/security-devices/integrations/queclink/frames',
@@ -127,10 +137,206 @@ describe('QueclinkHub debug console', () => {
                 }),
             }),
         );
+
+        act(() => {
+            const source = EventSourceStub.instances[0];
+            source.readyState = 1;
+            source.onopen?.();
+        });
+        expect(screen.getByRole('status')).toHaveTextContent('Live');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+        expect(screen.getByRole('status')).toHaveTextContent('Paused');
+    });
+
+    it('never labels failed or reconnecting frame transports as live', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+
+        renderHub();
+
+        expect(await screen.findByRole('alert')).toHaveTextContent(
+            'Recent frames could not be loaded',
+        );
+
+        act(() => {
+            const source = EventSourceStub.instances[0];
+            source.readyState = 0;
+            source.onerror?.();
+        });
+        expect(screen.getByRole('status')).toHaveTextContent('Reconnecting');
+        expect(screen.getByRole('alert')).toHaveTextContent(
+            'reconnecting automatically',
+        );
+        expect(screen.getByRole('status')).not.toHaveTextContent('Live');
+
+        act(() => {
+            const source = EventSourceStub.instances[0];
+            source.readyState = EventSourceStub.CLOSED;
+            source.onerror?.();
+        });
+        expect(screen.getByRole('status')).toHaveTextContent('Unavailable');
+        expect(screen.getByRole('button', { name: 'Reconnect' })).toBeVisible();
+        expect(screen.getByText('Live frames are unavailable.')).toBeVisible();
+    });
+
+    it('keeps the debug console usable when no tracker is paired yet', () => {
+        render(<DebugConsoleTab devices={[]} can={{ manage: true }} />);
+
+        expect(screen.getByRole('status')).toHaveTextContent('Connecting');
+        expect(screen.getByText('Pick a paired device…')).toBeVisible();
+        expect(
+            screen.getByRole('button', {
+                name: 'Review governed location refresh',
+            }),
+        ).toBeDisabled();
+        expect(
+            screen.getByRole('button', { name: 'Review governed restart' }),
+        ).toBeDisabled();
     });
 });
 
 describe('QueclinkHub page chrome', () => {
+    const overviewProps: React.ComponentProps<typeof OverviewTab> = {
+        listener: {
+            port: 8090,
+            endpoint_configured: true,
+            service_state: 'active',
+            connected_count: 0,
+        },
+        devices: {
+            paired: [],
+            pending: [],
+            rejected: [],
+            total: 0,
+        },
+        statistics: { frames_last_hour: 0, last_frame_at: null },
+        can: { manage: true },
+    };
+
+    it('describes protected provisioning readiness without promising a raw command', () => {
+        render(<OverviewTab {...overviewProps} />);
+
+        expect(
+            screen.getByRole('heading', { name: 'Provisioning readiness' }),
+        ).toBeVisible();
+        expect(
+            screen.getByText(/protected server configuration/i),
+        ).toBeVisible();
+        expect(
+            screen.getByText(/existing hostname remains protected/i),
+        ).toBeVisible();
+        expect(
+            screen.queryByText('Provisioning string'),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByText(/AT\+GTSRI/i)).not.toBeInTheDocument();
+    });
+
+    it('shows readiness failures inline without a browser alert', async () => {
+        const browserAlert = vi.fn();
+        vi.stubGlobal('alert', browserAlert);
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({
+                ok: false,
+                status: 422,
+                json: async () => ({
+                    error: 'Set the public hostname under Listener settings first.',
+                }),
+            }),
+        );
+
+        render(<OverviewTab {...overviewProps} />);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Check readiness' }),
+        );
+
+        expect(await screen.findByRole('alert')).toHaveTextContent(
+            'Set the public hostname under Listener settings first.',
+        );
+        expect(browserAlert).not.toHaveBeenCalled();
+    });
+
+    it('presents a successful readiness result in plain language', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    state: 'ready_for_secure_provisioning',
+                    family: 'vehicle_tracker',
+                    instructions: [
+                        'Use the approved secure device-management process.',
+                    ],
+                }),
+            }),
+        );
+
+        render(<OverviewTab {...overviewProps} />);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Check readiness' }),
+        );
+
+        expect(
+            await screen.findByText('Ready for secure provisioning'),
+        ).toBeVisible();
+        expect(
+            screen.queryByText('ready_for_secure_provisioning'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('shows the native-only cloud boundary and offers only legacy credential removal', () => {
+        inertiaMocks.router.delete.mockClear();
+        vi.stubGlobal(
+            'confirm',
+            vi.fn(() => true),
+        );
+
+        render(
+            <CloudIntegrationTab
+                cloudIntegration={{
+                    status: 'unavailable',
+                    legacy_credential_stored: true,
+                    legacy_credential_last4: '0042',
+                }}
+                can={{ manage: true }}
+            />,
+        );
+
+        expect(screen.getByText('Cloud API unavailable')).toBeVisible();
+        expect(
+            screen.getByText(/Direct TCP intake remains the primary path/i),
+        ).toBeVisible();
+        expect(
+            screen.getByText(/Legacy cloud credential ending in 0042/i),
+        ).toBeVisible();
+        expect(
+            screen.queryByRole('button', { name: /Save IMS credentials/i }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: /Test connection/i }),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/API key/i)).not.toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Remove legacy cloud credential',
+            }),
+        );
+        expect(
+            screen.getByRole('heading', {
+                name: 'Remove legacy Queclink cloud credential?',
+            }),
+        ).toBeVisible();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Remove legacy credential' }),
+        );
+        expect(inertiaMocks.router.delete).toHaveBeenCalledWith(
+            '/security-devices/integrations/queclink/key',
+            expect.objectContaining({ preserveScroll: true }),
+        );
+    });
+
     it('renders rejected devices with restore and rejected pagination controls', () => {
         inertiaMocks.router.post.mockClear();
         inertiaMocks.router.get.mockClear();
@@ -171,6 +377,14 @@ describe('QueclinkHub page chrome', () => {
 
         expect(screen.getByText('Rejected devices')).toBeVisible();
         fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+        expect(
+            screen.getByRole('heading', {
+                name: 'Restore tracker to pending?',
+            }),
+        ).toBeVisible();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Restore tracker' }),
+        );
         expect(inertiaMocks.router.post).toHaveBeenCalledWith(
             '/security-devices/integrations/queclink/devices/91/restore',
             {},
@@ -450,7 +664,11 @@ describe('QueclinkHub page chrome', () => {
                     },
                 }}
                 statistics={{ frames_last_hour: 0, last_frame_at: null }}
-                providerConnection={null}
+                cloudIntegration={{
+                    status: 'unavailable',
+                    legacy_credential_stored: false,
+                    legacy_credential_last4: null,
+                }}
                 siteCredentials={[]}
                 targets={{ vehicles: [], staff: [], clients: [] }}
                 presets={[]}
@@ -515,7 +733,11 @@ describe('QueclinkHub page chrome', () => {
                     frames_last_hour: 12,
                     last_frame_at: '2026-05-18T02:07:01Z',
                 }}
-                providerConnection={null}
+                cloudIntegration={{
+                    status: 'unavailable',
+                    legacy_credential_stored: false,
+                    legacy_credential_last4: null,
+                }}
                 siteCredentials={[]}
                 targets={{
                     vehicles: [],
@@ -532,7 +754,9 @@ describe('QueclinkHub page chrome', () => {
         // not the former bespoke gradient banner.
         expect(screen.getByText('Back to APIs & Integrations')).toBeVisible();
         expect(screen.getByText('Paired devices')).toBeVisible();
-        expect(screen.getByTestId('queclink-tab-list')).toHaveClass('border-b');
+        expect(screen.getByTestId('queclink-tab-list'))
+            .toHaveClass('border-b', 'flex-wrap')
+            .not.toHaveClass('overflow-x-auto');
     });
 });
 
@@ -553,6 +777,7 @@ describe('QueclinkHub device settings', () => {
                 devices={[
                     {
                         id: 2,
+                        canonical_device_id: 42,
                         reference: 'Tracker ending 6998',
                         status: 'paired',
                         model_hint: 'GL30MEU',
@@ -580,8 +805,10 @@ describe('QueclinkHub device settings', () => {
                                 created_at: '2026-05-18T03:16:00Z',
                                 sent_at: null,
                                 acked_at: null,
+                                fulfilled_at: null,
                                 cancelled_at: null,
                                 expires_at: '2026-05-18T03:21:00Z',
+                                governed: false,
                                 failure_category: null,
                             },
                             {
@@ -591,8 +818,10 @@ describe('QueclinkHub device settings', () => {
                                 created_at: '2026-05-18T03:17:00Z',
                                 sent_at: '2026-05-18T03:17:10Z',
                                 acked_at: null,
+                                fulfilled_at: null,
                                 cancelled_at: null,
                                 expires_at: '2026-05-18T03:22:00Z',
+                                governed: false,
                                 failure_category: 'provider_failure',
                             },
                         ],
@@ -612,6 +841,30 @@ describe('QueclinkHub device settings', () => {
         expect(screen.getByText('Read one section')).toBeVisible();
         expect(screen.getByText('Advanced GL30 sections')).toBeVisible();
         expect(screen.getByText('Resident safety profile')).toBeVisible();
+        expect(
+            screen.getByText(
+                /configuration profiles governed through Device Management/i,
+            ),
+        ).toBeVisible();
+        expect(
+            screen.getByText(
+                'Legacy provider-console command · cancellation only · content protected',
+            ),
+        ).toBeVisible();
+        expect(
+            screen.getByText(
+                'Legacy provider-console history · read only · content protected',
+            ),
+        ).toBeVisible();
+        expect(
+            screen.getByRole('link', { name: 'Open Device Management' }),
+        ).toHaveAttribute(
+            'href',
+            '/security-devices/devices/42?section=management',
+        );
+        expect(
+            screen.queryByRole('button', { name: 'Retry' }),
+        ).not.toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: 'Server' }));
 
@@ -623,7 +876,7 @@ describe('QueclinkHub device settings', () => {
 
         fireEvent.click(
             screen.getByRole('button', {
-                name: 'Queue Watchdog auto-reboot',
+                name: 'Review Watchdog auto-reboot',
             }),
         );
 
@@ -643,14 +896,6 @@ describe('QueclinkHub device settings', () => {
             { preserveScroll: true },
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-
-        expect(inertiaMocks.router.post).toHaveBeenCalledWith(
-            '/security-devices/integrations/queclink/commands/45/retry',
-            {},
-            { preserveScroll: true },
-        );
-
         fireEvent.click(
             screen.getByRole('button', {
                 name: 'Resident safety profile',
@@ -661,6 +906,64 @@ describe('QueclinkHub device settings', () => {
             '/security-devices/integrations/queclink/devices/2/configuration/resident-safety-profile',
             {},
             { preserveScroll: true },
+        );
+    });
+});
+
+describe('QueclinkHub governed command handoff', () => {
+    it('offers governed location and restart handoffs without raw commands', () => {
+        render(
+            <GovernedCommandHandoff
+                can={{ manage: true }}
+                devices={[
+                    {
+                        id: 2,
+                        reference: 'Tracker ending 6998',
+                        status: 'paired',
+                        model_hint: 'GL30MEU',
+                        protocol_version: '970204',
+                        firmware_version: null,
+                        connection_state: 'connected',
+                        first_seen_at: null,
+                        last_seen_at: '2026-05-18T02:07:01Z',
+                        last_frame_at: '2026-05-18T02:07:01Z',
+                        assignment: {
+                            type: 'client',
+                            assigned_at: '2026-05-18T02:00:00Z',
+                            label: 'Amelia Wilson',
+                        },
+                    },
+                ]}
+            />,
+        );
+
+        expect(screen.getByText('Governed device actions')).toBeVisible();
+        expect(
+            screen
+                .getByText('Governed device actions')
+                .closest('[data-slot="card"]'),
+        ).toHaveClass('order-first', '2xl:order-last');
+        expect(screen.getByText(/Raw and configuration-change/)).toBeVisible();
+        expect(screen.queryByText(/Raw AT/i)).not.toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Review governed location refresh',
+            }),
+        );
+
+        expect(inertiaMocks.formPost).toHaveBeenCalledWith(
+            '/security-devices/integrations/queclink/devices/2/command',
+        );
+
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Review governed restart',
+            }),
+        );
+        expect(inertiaMocks.formPost).toHaveBeenCalledTimes(2);
+        expect(inertiaMocks.formPost).toHaveBeenLastCalledWith(
+            '/security-devices/integrations/queclink/devices/2/command',
         );
     });
 });

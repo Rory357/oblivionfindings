@@ -1,6 +1,8 @@
 <?php
 
+use App\Models\AuditLog;
 use App\Models\ItKbArticle;
+use App\Models\ItKbInteraction;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -33,7 +35,11 @@ test('an agent creates a KB article with an application-unique slug', function (
     expect($article->status)->toBe('draft');
     expect($article->category)->toBe('account');
     expect((int) $article->author_user_id)->toBe($this->hr->id);
-    expect((int) $article->tenant_id)->toBe(1);
+    expect(AuditLog::query()
+        ->where('action', 'it.knowledge.created')
+        ->where('auditable_type', $article->getMorphClass())
+        ->where('auditable_id', $article->id)
+        ->count())->toBe(1);
 
     $this->actingAs($this->hr)->post("/it/kb/{$article->id}/submit-review")->assertRedirect();
     $this->actingAs($this->hr)->post("/it/kb/{$article->id}/publish")->assertRedirect();
@@ -79,28 +85,50 @@ test('agents edit articles and use the governed publish lifecycle while the slug
         ->and($article->fresh()->slug)->toBe($slug);
 });
 
-test('KB authoring is agent-only and application-wide', function () {
+test('KB authoring is agent-only while deletion is reasoned and draft-only', function () {
     $worker = kbUser('support_worker');
-    $mine = ItKbArticle::factory()->create(['tenant_id' => 1]);
-    $shared = ItKbArticle::factory()->create(['tenant_id' => 2]);
+    $first = ItKbArticle::factory()->create();
+    $second = ItKbArticle::factory()->create();
 
     // Self-service requesters (no it.manage) cannot author, edit or delete.
     $this->actingAs($worker)->post('/it/kb', [
         'title' => 'Nope', 'category' => 'other', 'body' => 'x',
     ])->assertForbidden();
-    $this->actingAs($worker)->patch("/it/kb/{$mine->id}", ['title' => 'Nope'])->assertForbidden();
-    $this->actingAs($worker)->delete("/it/kb/{$mine->id}")->assertForbidden();
+    $this->actingAs($worker)->patch("/it/kb/{$first->id}", ['title' => 'Nope'])->assertForbidden();
+    $this->actingAs($worker)->delete("/it/kb/{$first->id}")->assertForbidden();
 
-    // Legacy storage markers never partition the single application library.
-    $this->actingAs($this->hr)->patch("/it/kb/{$shared->id}", ['title' => 'Shared guidance'])->assertRedirect();
-    $this->actingAs($this->hr)->post("/it/kb/{$shared->id}/submit-review")->assertRedirect();
-    expect($shared->fresh()->status)->toBe('in_review');
-    $this->actingAs($this->hr)->delete("/it/kb/{$shared->id}")->assertRedirect();
-    expect(ItKbArticle::query()->find($shared->id))->toBeNull();
+    // One authorised agent governs the whole application library, but review
+    // and published history cannot be destroyed through the draft action.
+    $this->actingAs($this->hr)->patch("/it/kb/{$second->id}", ['title' => 'Shared guidance'])->assertRedirect();
+    $this->actingAs($this->hr)->post("/it/kb/{$second->id}/submit-review")->assertRedirect();
+    expect($second->fresh()->status)->toBe('in_review');
+    $this->actingAs($this->hr)
+        ->delete("/it/kb/{$second->id}", ['reason' => 'This review is obsolete.'])
+        ->assertRedirect()
+        ->assertSessionHas('error', 'Return this article to draft before deleting it.');
+    expect(ItKbArticle::query()->find($second->id))->not->toBeNull();
 
-    // The agent can also delete the other application article.
-    $this->actingAs($this->hr)->delete("/it/kb/{$mine->id}")->assertRedirect();
-    expect(ItKbArticle::query()->find($mine->id))->toBeNull();
+    $this->actingAs($this->hr)->post("/it/kb/{$second->id}/publish")->assertRedirect();
+    $this->actingAs($this->hr)
+        ->delete("/it/kb/{$second->id}", ['reason' => 'This published guide is obsolete.'])
+        ->assertRedirect()
+        ->assertSessionHas('error', 'Retire published knowledge so its history remains available.');
+    expect(ItKbArticle::query()->find($second->id))->not->toBeNull();
+
+    // A draft needs an operational reason and leaves an immutable audit.
+    $this->actingAs($this->hr)
+        ->delete("/it/kb/{$first->id}")
+        ->assertSessionHasErrors('reason');
+    $this->actingAs($this->hr)
+        ->delete("/it/kb/{$first->id}", ['reason' => 'Duplicate draft created during authoring.'])
+        ->assertRedirect();
+    expect(ItKbArticle::query()->find($first->id))->toBeNull();
+    expect(AuditLog::query()
+        ->where('action', 'it.knowledge.draft.deleted')
+        ->where('auditable_type', $first->getMorphClass())
+        ->where('auditable_id', $first->id)
+        ->where('meta->reason', 'Duplicate draft created during authoring.')
+        ->count())->toBe(1);
 });
 
 test('the knowledge catalogue reaches agents but never a self-service payload', function () {
@@ -136,7 +164,7 @@ test('pure requesters browse only published articles; agents get the full catalo
         ->assertInertia(fn ($page) => $page->has('kbArticles', 2)->has('kbPublished', 0));
 });
 
-test('a requester reads and votes on a published article; the tallies climb', function () {
+test('a requester read is recorded while helpful feedback is one canonical vote per user', function () {
     $article = ItKbArticle::factory()->published()->create();
     $worker = kbUser('support_worker');
 
@@ -144,10 +172,27 @@ test('a requester reads and votes on a published article; the tallies climb', fu
     expect($article->fresh()->view_count)->toBe(1);
 
     $this->actingAs($worker)->post("/it/kb/{$article->id}/helpful", ['helpful' => true])->assertRedirect();
+    $this->actingAs($worker)->post("/it/kb/{$article->id}/helpful", ['helpful' => true])->assertRedirect();
     $this->actingAs($worker)->post("/it/kb/{$article->id}/helpful", ['helpful' => false])->assertRedirect();
     $article->refresh();
     expect($article->helpful_yes)->toBe(1);
-    expect($article->helpful_no)->toBe(1);
+    expect($article->helpful_no)->toBe(0);
+    expect($article->deflection_count)->toBe(1);
+    expect(ItKbInteraction::query()
+        ->where('it_kb_article_id', $article->id)
+        ->where('user_id', $worker->id)
+        ->whereIn('event_type', ['helpful', 'not_helpful'])
+        ->count())->toBe(1);
+
+    $otherWorker = kbUser('support_worker');
+    $this->actingAs($otherWorker)
+        ->post("/it/kb/{$article->id}/helpful", ['helpful' => false])
+        ->assertRedirect();
+    expect($article->fresh()->helpful_no)->toBe(1);
+
+    $this->actingAs($worker)
+        ->get('/it')
+        ->assertInertia(fn ($page) => $page->where('kbPublished.0.user_vote', true));
 });
 
 test('browse endpoints never touch a draft article', function () {

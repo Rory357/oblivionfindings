@@ -4,6 +4,10 @@ namespace App\Domain\SecurityDevices\Presenters;
 
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringProfile;
+use App\Domain\Monitoring\Models\MonitoringRetentionPolicy;
+use App\Domain\Monitoring\Services\MonitoringRuntimeHealthService;
+use App\Domain\SecurityDevices\Credentials\Models\CredentialLeaseGrant;
+use App\Domain\SecurityDevices\Credentials\Models\CredentialReference;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -16,6 +20,7 @@ use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\Integration\IntegrationSyncLog;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
@@ -47,7 +52,10 @@ class SettingsAuditPresenter
         'last_observation_at', 'last_tested_at', 'last_synced_at', 'rotated_at', 'secret_last4',
     ];
 
-    public function __construct(private readonly SecurityDevicesAccessService $access) {}
+    public function __construct(
+        private readonly SecurityDevicesAccessService $access,
+        private readonly MonitoringRuntimeHealthService $runtimeHealth,
+    ) {}
 
     /** @return array<string, mixed> */
     public function present(User $viewer): array
@@ -57,6 +65,7 @@ class SettingsAuditPresenter
         $siteIds = $this->access->accessibleSiteIds($viewer);
         $canReport = $viewer->canDo('securityDevices.reports.view');
         $canManageIntegrations = $viewer->canDo('securityDevices.integrations.manage');
+        $canManageCredentialReferences = $viewer->canDo('securityDevices.commands.admin');
         $canViewAllSites = $this->access->canViewAllSites($viewer);
 
         $providerDefaults = $canManageIntegrations
@@ -90,6 +99,11 @@ class SettingsAuditPresenter
                 'note' => 'No application classification-default record exists. Devices use the current Security & Devices taxonomy and explicit record values.',
             ],
             'providerOperationalDefaults' => $providerDefaults,
+            'credentialReferences' => $this->credentialReferences(
+                $viewer,
+                $siteIds,
+                $canManageCredentialReferences,
+            ),
             'monitoringProfiles' => MonitoringProfile::query()->orderBy('name')->get()->map(fn (MonitoringProfile $profile): array => [
                 'id' => $profile->id,
                 'name' => $profile->name,
@@ -100,6 +114,45 @@ class SettingsAuditPresenter
                 'stale_after_seconds' => $profile->stale_after_seconds,
                 'state' => $profile->is_active ? 'active' : 'inactive',
             ])->all(),
+            'monitoringRetention' => [
+                'policies' => MonitoringRetentionPolicy::query()
+                    ->where('is_active', true)
+                    ->where(function ($query) use ($canViewAllSites, $deviceIds, $siteIds): void {
+                        $query->where('scope_kind', 'application');
+                        if ($canViewAllSites) {
+                            $query->orWhereNotNull('site_id')->orWhereNotNull('device_id');
+                        } else {
+                            if ($siteIds !== []) {
+                                $query->orWhereIn('site_id', $siteIds);
+                            }
+                            if ($deviceIds->isNotEmpty()) {
+                                $query->orWhereIn('device_id', $deviceIds);
+                            }
+                        }
+                    })
+                    ->orderBy('id')
+                    ->get()
+                    ->map(fn (MonitoringRetentionPolicy $policy): array => [
+                        'id' => $policy->id,
+                        'name' => $policy->name,
+                        'scope' => $policy->scope_kind,
+                        'site_id' => $policy->site_id,
+                        'device_id' => $policy->device_id,
+                        'data_class' => $policy->data_class,
+                        'privacy_class' => $policy->privacy_class,
+                        'raw_days' => $policy->raw_days,
+                        'hourly_days' => $policy->hourly_days,
+                        'daily_days' => $policy->daily_days,
+                        'legal_hold' => $policy->legal_hold,
+                    ])->values()->all(),
+                'application_defaults' => [
+                    'raw_days' => (int) config('monitoring.retention.raw_days', 14),
+                    'hourly_days' => (int) config('monitoring.retention.hourly_days', 180),
+                    'daily_days' => (int) config('monitoring.retention.daily_days', 1825),
+                ],
+                'rule' => 'The most restrictive matching policy applies; legal hold preserves matching evidence.',
+            ],
+            'monitoringRuntime' => $this->runtimeHealth->present($viewer),
             'dataQuality' => [
                 'visible_devices' => $visibleDevices->count(),
                 'unassigned_devices' => Device::query()->whereIn('id', $deviceIds)->whereDoesntHave('assignments', fn ($query) => $query->active())->count(),
@@ -110,7 +163,10 @@ class SettingsAuditPresenter
                 'classification_taxonomy' => ['state' => 'supported', 'note' => 'Current code-defined device taxonomy.'],
                 'monitoring_profiles' => ['state' => 'supported', 'note' => 'Current application monitoring profile records.'],
                 'integration_site_mapping' => ['state' => 'supported', 'note' => 'Current provider site configuration records.'],
-                'discovery_candidates' => ['state' => 'unsupported', 'note' => 'No canonical discovery-candidate records exist yet.'],
+                'discovery_candidates' => ['state' => 'supported', 'note' => 'Governed immutable discovery runs and reviewable candidate evidence are available.'],
+                'monitoring_retention' => ['state' => 'supported', 'note' => 'External time-series tiers, private snapshots, legal hold, and value-free deletion evidence are governed.'],
+                'provider_capabilities' => ['state' => 'supported', 'note' => 'Typed provider manifests expose explicit bounds and absent capabilities.'],
+                'credential_leases' => ['state' => $this->credentialDriverState(), 'note' => 'External secret references are Site-scoped, tested before activation, and delivered as short-lived one-use leases. Reusable material is never projected here.'],
                 'database_audit_immutability' => ['state' => 'unsupported', 'note' => 'The application exposes read-only append-only evidence; database-level immutability is not claimed.'],
             ],
             'audit' => [
@@ -120,6 +176,87 @@ class SettingsAuditPresenter
                 'limit' => 50,
             ],
         ];
+    }
+
+    /** @param list<int> $siteIds @return array<string, mixed> */
+    private function credentialReferences(User $viewer, array $siteIds, bool $canManage): array
+    {
+        if (! $canManage) {
+            return [
+                'visible' => false,
+                'can_manage' => false,
+                'driver_state' => 'restricted',
+                'driver_note' => 'Credential references require device-command administration permission.',
+                'sites' => [],
+                'rows' => [],
+            ];
+        }
+        $rows = CredentialReference::query()
+            ->with('site:id,name')
+            ->withCount([
+                'leaseGrants as live_lease_count' => fn ($query) => $query
+                    ->where('status', CredentialLeaseGrant::STATUS_ISSUED),
+                'leaseGrants as pending_revoke_count' => fn ($query) => $query
+                    ->where('status', CredentialLeaseGrant::STATUS_REVOKE_PENDING),
+            ])
+            ->whereIn('site_id', $siteIds)
+            ->orderBy('site_id')
+            ->orderBy('provider')
+            ->orderBy('reference_key')
+            ->get()
+            ->map(fn (CredentialReference $reference): array => [
+                'reference_uuid' => $reference->reference_uuid,
+                'reference_key' => $reference->reference_key,
+                'site_id' => (int) $reference->site_id,
+                'site_name' => $reference->site?->name ?? 'Site unavailable',
+                'provider' => $reference->provider,
+                'purpose' => $reference->purpose,
+                'capabilities' => $reference->capabilities ?? [],
+                'status' => $reference->status->value,
+                'rotation_status' => $reference->rotation_status->value,
+                'test_status' => $reference->test_status->value,
+                'version' => $reference->version,
+                'live_lease_count' => (int) $reference->live_lease_count,
+                'pending_revoke_count' => (int) $reference->pending_revoke_count,
+                'last_tested_at' => $reference->last_tested_at?->toISOString(),
+                'last_rotated_at' => $reference->last_rotated_at?->toISOString(),
+                'revoked_at' => $reference->revoked_at?->toISOString(),
+            ])->values()->all();
+
+        return [
+            'visible' => true,
+            'can_manage' => true,
+            'driver_state' => $this->credentialDriverState(),
+            'driver_note' => $this->credentialDriverNote(),
+            'sites' => Site::query()
+                ->whereIn('id', $siteIds)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (Site $site): array => ['id' => (int) $site->id, 'name' => $site->name])
+                ->all(),
+            'rows' => $rows,
+        ];
+    }
+
+    private function credentialDriverState(): string
+    {
+        if ((string) config('monitoring.credentials.driver', 'unavailable') !== 'vault') {
+            return 'unavailable';
+        }
+
+        return trim((string) config('monitoring.credentials.vault.url')) !== ''
+            && trim((string) config('monitoring.credentials.vault.token')) !== ''
+                ? 'configured'
+                : 'misconfigured';
+    }
+
+    private function credentialDriverNote(): string
+    {
+        return match ($this->credentialDriverState()) {
+            'configured' => 'The external Vault lease issuer is configured. Each reference must still pass its own live test.',
+            'misconfigured' => 'Vault is selected but its HTTPS endpoint or bootstrap token is unavailable. References remain suspended.',
+            default => 'No external credential issuer is configured. References may be recorded, but tests and runtime leases fail closed.',
+        };
     }
 
     private function areas(User $viewer): array

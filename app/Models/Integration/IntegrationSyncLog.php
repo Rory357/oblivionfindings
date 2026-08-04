@@ -3,6 +3,7 @@
 namespace App\Models\Integration;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\Site;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,18 +12,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class IntegrationSyncLog extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
+    use WritesLegacyStorageContext;
 
     public const STATUS_STARTED = 'started';
+
     public const STATUS_SUCCESS = 'success';
+
     public const STATUS_PARTIAL = 'partial';
+
     public const STATUS_FAILED = 'failed';
 
     protected $table = 'integration_sync_logs';
 
     protected $fillable = [
-        'tenant_id',
         'provider',
         'site_id',
         'action',
@@ -57,11 +61,6 @@ class IntegrationSyncLog extends Model
     /* ---------------------------------------------------------------
      * Scopes
      * ------------------------------------------------------------- */
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeForProvider(Builder $query, string $provider): Builder
     {

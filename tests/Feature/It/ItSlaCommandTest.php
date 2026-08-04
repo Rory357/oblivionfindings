@@ -232,7 +232,6 @@ test('a growing waiting pause relaxes a breached ticket without re-paging anyone
 test('a business-hours SLA neither risks nor breaches over a weekend, then fires on the next working day', function () {
     Notification::fake();
     ItSlaPolicy::query()->create([
-        'tenant_id' => 1,
         'priority' => 'normal',
         'first_response_minutes' => 6000, // parked ~11 working days out; the resolution clock binds
         'resolution_minutes' => 120,       // two working hours

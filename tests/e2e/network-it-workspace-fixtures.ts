@@ -16,22 +16,18 @@ export function seedNetworkItWorkspaceReadinessFixtures() {
 
     const output = runLaravelPhp(`
 $admin = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->firstOrFail();
-$tenantId = (int) ($admin->organization_id ?? 1);
 $site = \\App\\Models\\Site::query()
-    ->where('tenant_id', $tenantId)
     ->where('archived', false)
     ->orderBy('id')
     ->firstOrFail();
 
 $rawSentinel = 'PW-NETWORK-RAW-PROVIDER-SECRET-MUST-NOT-RENDER';
-$upsertDevice = function (string $uid, string $name, string $subcategory, array $attributes = []) use ($tenantId, $admin, $site) {
+$upsertDevice = function (string $uid, string $name, string $subcategory, array $attributes = []) use ($admin, $site) {
     $device = \\App\\Domain\\SecurityDevices\\Models\\Device::withTrashed()
-        ->where('tenant_id', $tenantId)
         ->where('device_uid', $uid)
         ->first();
     if (! $device) {
         $device = new \\App\\Domain\\SecurityDevices\\Models\\Device([
-            'tenant_id' => $tenantId,
             'device_uid' => $uid,
         ]);
     } elseif ($device->trashed()) {
@@ -186,14 +182,12 @@ $observe($interface, 'degraded', [
 
 $ticketTitle = 'Playwright investigate Kauri WAN capacity';
 $ticket = \\App\\Models\\ItTicket::query()
-    ->where('tenant_id', $tenantId)
     ->where('title', $ticketTitle)
     ->first();
 if (! $ticket) {
     $ticket = new \\App\\Models\\ItTicket();
 }
 $ticket->forceFill([
-    'tenant_id' => $tenantId,
     'title' => $ticketTitle,
     'description' => 'Linked browser evidence for the Network & IT workspace.',
     'requester_user_id' => $admin->id,
@@ -207,7 +201,6 @@ $ticket->forceFill([
 ])->save();
 \\App\\Models\\ItTicketLink::query()->updateOrCreate(
     [
-        'tenant_id' => $tenantId,
         'ticket_id' => $ticket->id,
         'relationship' => 'affected_device',
         'linkable_type' => \\App\\Domain\\SecurityDevices\\Models\\Device::class,

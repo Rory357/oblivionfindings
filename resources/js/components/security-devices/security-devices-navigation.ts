@@ -38,6 +38,18 @@ export interface SecurityDevicesNavigationGroup {
     items: SecurityDevicesNavigationItem[];
 }
 
+const domainHrefs: Record<string, string> = {
+    security: '/security-devices/security',
+    tracking: '/security-devices/tracking',
+    iot_healthcare: '/security-devices/healthcare',
+    it_infrastructure: '/security-devices/network-it',
+    facilities: '/security-devices/facilities-iot',
+};
+
+export function securityDevicesDomainHref(domain: string): string {
+    return domainHrefs[domain] ?? '/security-devices/devices';
+}
+
 const navigationGroups: SecurityDevicesNavigationGroup[] = [
     {
         label: 'Overview',

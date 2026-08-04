@@ -87,7 +87,7 @@ function deliveryConsumer(RuntimeEnvelopeHandler $handler): MonitoringEnvelopeCo
     app()->instance(
         RuntimeEnvelopeHandlerRegistry::class,
         new RuntimeEnvelopeHandlerRegistry([
-            RuntimeMessageType::Observation->value => $handler,
+            RuntimeMessageType::Observation->value => [1 => $handler, 2 => $handler],
         ]),
     );
 
@@ -160,7 +160,7 @@ it('parks unsupported versions and invalid signatures without trusting payload s
         '018f0000-0000-7000-8000-000000000031',
         payload: ['site_id' => 999999],
     );
-    $unsupported = str_replace('"schema_version":1', '"schema_version":2', $valid);
+    $unsupported = str_replace('"schema_version":1', '"schema_version":99', $valid);
     $invalidSignature = str_replace('"site_id":999999', '"site_id":999998', $valid);
 
     $consumer->consume('observation-projector', $unsupported);
@@ -175,6 +175,32 @@ it('parks unsupported versions and invalid signatures without trusting payload s
         ->toBe(collect([$site->id, $otherSite->id])->sort()->values()->all())
         ->and(MonitoringDeadLetter::where('reason_code', 'invalid_signature')->firstOrFail()->evidence_fingerprint)
         ->toBe(hash('sha256', $invalidSignature));
+});
+
+it('parks an authenticated but unsupported payload contract version for operator recovery', function () {
+    $handler = Mockery::mock(RuntimeEnvelopeHandler::class);
+    $handler->shouldNotReceive('handle');
+    $consumer = deliveryConsumer($handler);
+    $now = CarbonImmutable::parse('2026-07-21T01:02:03.456789Z');
+    $encoded = app(RuntimeEnvelopeCodec::class)->encode(new RuntimeEnvelope(
+        schemaVersion: 2,
+        messageId: '018f0000-0000-7000-8000-000000000032',
+        type: RuntimeMessageType::Observation,
+        source: 'central:checks',
+        sequence: 1,
+        occurredAt: $now,
+        ingestedAt: $now,
+        idempotencyKey: 'unsupported-payload:1',
+        traceId: '018f0000-0000-7000-8000-000000000033',
+        payload: ['state' => 'healthy'],
+        payloadVersion: 99,
+    ));
+
+    $consumer->consume('observation-projector', $encoded);
+
+    expect(MonitoringDeadLetter::where('reason_code', 'unsupported_version')->count())->toBe(1)
+        ->and(MonitoringDeadLetter::firstOrFail()->reason_message)
+        ->toBe('Envelope payload version is unsupported.');
 });
 
 it('uses deterministic malformed evidence identity and verifies exact bytes on a dedupe conflict', function () {
@@ -247,7 +273,7 @@ it('classifies semantic observation payload errors as payload invalid', function
 it('replays exact signed bytes after the missing sequence arrives', function () {
     Queue::fake();
     $site = Site::factory()->create();
-    $actor = User::factory()->create(['organization_id' => 1]);
+    $actor = User::factory()->create();
     $permission = Permission::query()->where('key', 'securityDevices.integrations.manage')->firstOrFail();
     $actor->permissionOverrides()->attach($permission->id, ['allowed' => true]);
     $handler = Mockery::mock(RuntimeEnvelopeHandler::class);
@@ -290,7 +316,7 @@ it('replays exact signed bytes after the missing sequence arrives', function () 
 
 it('discards without deleting and audits the explicit actor and reason', function () {
     $site = Site::factory()->create();
-    $actor = User::factory()->create(['organization_id' => 1]);
+    $actor = User::factory()->create();
     $permission = Permission::query()->where('key', 'securityDevices.integrations.manage')->firstOrFail();
     $actor->permissionOverrides()->attach($permission->id, ['allowed' => true]);
     $encoded = deliveryEnvelope(4, '018f0000-0000-7000-8000-000000000061');
@@ -586,7 +612,7 @@ it('rejects a valid signed envelope whose identity does not match its outbox row
 
 it('requires an explicit CLI actor before replaying a dead letter', function () {
     Queue::fake();
-    $actor = User::factory()->create(['organization_id' => 1]);
+    $actor = User::factory()->create();
     $permission = Permission::query()->where('key', 'securityDevices.integrations.manage')->firstOrFail();
     $actor->permissionOverrides()->attach($permission->id, ['allowed' => true]);
     $encoded = deliveryEnvelope(1, '018f0000-0000-7000-8000-000000000091');

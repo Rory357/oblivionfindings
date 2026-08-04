@@ -40,7 +40,7 @@ type SecurityDevice = {
     lastSeenAt: string | null;
     deviceHref: string;
     site: { id: number; name: string; href: string } | null;
-    assignment: { type: string; label: string } | null;
+    assignment: { type: string; label: string; href: string | null } | null;
     monitoring: { state: string; count: number };
     observed: Record<string, unknown>;
     maintenance: {
@@ -362,6 +362,26 @@ function DeviceEvidence({ device }: { device: SecurityDevice }) {
                             : 'Never observed'}
                     </span>
                 </div>
+                {device.assignment &&
+                ['client', 'staff'].includes(device.assignment.type) ? (
+                    <div className="space-y-1 sm:col-span-2">
+                        <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                            Assigned person
+                        </p>
+                        {device.assignment.href ? (
+                            <Link
+                                href={device.assignment.href}
+                                className="frontline-focus inline-flex rounded-sm font-medium text-primary hover:underline"
+                            >
+                                {device.assignment.label}
+                            </Link>
+                        ) : (
+                            <span className="text-muted-foreground">
+                                {device.assignment.label}
+                            </span>
+                        )}
+                    </div>
+                ) : null}
             </div>
 
             <div className="mt-4 border-t border-border pt-3">

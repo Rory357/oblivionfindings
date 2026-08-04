@@ -20,7 +20,6 @@ function itTransitionAgent(?Site $site = null): User
     $user = User::factory()->create([
         'role' => 'hr',
         'approved_at' => now(),
-        'organization_id' => 1,
     ]);
     $user->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->firstOrFail()->id,
@@ -171,7 +170,6 @@ it('blocks settlement until approvals required tasks and resolution evidence are
     ))->toThrow(DomainException::class, 'approval');
 
     ItTicketApproval::create([
-        'tenant_id' => 1,
         'it_ticket_id' => $ticket->id,
         'requested_by' => User::factory()->create()->id,
         'approver_id' => $agent->id,
@@ -179,7 +177,6 @@ it('blocks settlement until approvals required tasks and resolution evidence are
         'decided_at' => now(),
     ]);
     $task = ItWorkTask::factory()->for($ticket, 'ticket')->create([
-        'tenant_id' => 1,
         'is_required' => true,
         'status' => 'pending',
     ]);
@@ -225,17 +222,15 @@ it('blocks settlement until approvals required tasks and resolution evidence are
         ->and($result->resolved_at)->not->toBeNull();
 });
 
-it('authorizes the canonical Site independently of the legacy storage context', function () {
+it('authorizes transitions through the canonical Site boundary', function () {
     $site = Site::factory()->create();
     $otherSite = Site::factory()->create();
     $agent = itTransitionAgent($site);
     $allowed = ItTicket::factory()->create([
-        'tenant_id' => 202,
         'site_id' => $site->id,
         'workflow_state' => 'submitted',
     ]);
     $denied = ItTicket::factory()->create([
-        'tenant_id' => 202,
         'site_id' => $otherSite->id,
         'workflow_state' => 'submitted',
     ]);
@@ -261,7 +256,7 @@ it('authorizes the canonical Site independently of the legacy storage context', 
 });
 
 it('allows an owning requester reply to resume waiting work without manage permission', function () {
-    $requester = User::factory()->create(['organization_id' => 1]);
+    $requester = User::factory()->create();
     $ticket = ItTicket::factory()->create([
         'requester_user_id' => $requester->id,
         'work_type' => 'incident',

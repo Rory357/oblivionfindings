@@ -4,6 +4,7 @@ namespace Tests\Feature\Queclink;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController;
+use App\Domain\SecurityDevices\Management\Models\DeviceConfigurationProfile;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\QueclinkIntegrationAccessService;
@@ -27,6 +28,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Support\SafeOperationalData;
+use Database\Seeders\QueclinkPresetSeeder;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Database\Events\QueryExecuted;
@@ -34,6 +36,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -52,6 +55,31 @@ class QueclinkHubControllerTest extends TestCase
         $this->seed(SecurityDevicesPermissionsSeeder::class);
         $this->admin = User::factory()->create();
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+    }
+
+    private function pairedCanonicalGl30(string $imei): QueclinkDevice
+    {
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $canonical = Device::factory()->tracking()->create([
+            'provider' => 'queclink',
+            'category' => 'personal_tracker',
+            'imei' => $imei,
+            'device_uid' => $imei,
+        ]);
+        DeviceAssignment::query()->create([
+            'device_id' => $canonical->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now(),
+        ]);
+
+        return QueclinkDevice::query()->create([
+            'tenant_id' => 1,
+            'imei' => $imei,
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'model_hint' => 'GL30MEU',
+            'device_id' => $canonical->id,
+        ]);
     }
 
     public function test_hub_page_renders_for_authorised_admin()
@@ -363,14 +391,7 @@ class QueclinkHubControllerTest extends TestCase
             'raw_command' => 'AT+GTRTO=gl30,1,,,,,,0001$', 'serial_number' => '0001',
             'status' => QueclinkPendingCommand::STATUS_QUEUED, 'expires_at' => now()->addMinute(),
         ]);
-        $cancelled = QueclinkPendingCommand::create([
-            'tenant_id' => 77, 'queclink_device_id' => $foreignPaired->id,
-            'imei' => $foreignPaired->imei, 'command_word' => 'GTRTO',
-            'raw_command' => 'AT+GTRTO=gl30,1,,,,,,0002$', 'serial_number' => '0002',
-            'status' => QueclinkPendingCommand::STATUS_CANCELLED, 'expires_at' => now()->addMinute(),
-        ]);
         $this->actingAs($viewer)->post("/security-devices/integrations/queclink/commands/{$queued->id}/cancel")->assertNotFound();
-        $this->actingAs($viewer)->post("/security-devices/integrations/queclink/commands/{$cancelled->id}/retry")->assertNotFound();
 
         $ownCanonical = Device::factory()->tracking()->create(['tenant_id' => 77, 'provider' => 'queclink']);
         DeviceAssignment::create([
@@ -400,7 +421,7 @@ class QueclinkHubControllerTest extends TestCase
             'device_ids' => [$ownDevice->id, $foreignPaired->id],
             'action' => 'resident_safety_profile',
         ])->assertNotFound();
-        $this->assertSame($before + 2, QueclinkPendingCommand::query()->count());
+        $this->assertSame($before, QueclinkPendingCommand::query()->count());
         $this->assertSame(QueclinkDevice::STATUS_PENDING, $foreignPending->fresh()->status);
         $this->assertSame(QueclinkDevice::STATUS_PENDING, $foreignReject->fresh()->status);
         $this->assertSame(QueclinkDevice::STATUS_PAIRED, $foreignRelease->fresh()->status);
@@ -454,7 +475,7 @@ class QueclinkHubControllerTest extends TestCase
         $this->assertSame(0, Device::query()->where('tenant_id', 42)->where('device_uid', 'COLLISION-IMEI')->count());
     }
 
-    public function test_claim_rejects_existing_tracker_assets_outside_canonical_site_access(): void
+    public function test_claim_ignores_historical_tracker_assets_outside_canonical_site_access(): void
     {
         $ownSite = Site::factory()->create(['tenant_id' => 42]);
         $foreignSite = Site::factory()->create(['tenant_id' => 77]);
@@ -496,14 +517,19 @@ class QueclinkHubControllerTest extends TestCase
                     'pairing_type' => 'vehicle',
                     'target_id' => $target->id,
                 ])
-                ->assertNotFound();
+                ->assertRedirect();
 
             $this->assertSame($collisionAsset->id, $tracker->fresh()->asset_id);
-            $this->assertSame(QueclinkDevice::STATUS_PENDING, $pending->fresh()->status);
-            $this->assertNull($pending->fresh()->device_id);
+            $this->assertSame('paired', $tracker->fresh()->status);
+            $this->assertSame(QueclinkDevice::STATUS_PAIRED, $pending->fresh()->status);
+            $this->assertNotNull($pending->fresh()->device_id);
         }
 
-        $this->assertSame(0, DeviceAssignment::query()->count());
+        $this->assertSame(2, DeviceAssignment::query()
+            ->where('assignable_type', DeviceAssignment::TARGET_VEHICLE)
+            ->where('assignable_id', $target->id)
+            ->active()
+            ->count());
     }
 
     public function test_claim_rejects_a_hidden_site_personal_asset_found_by_global_staff_lookup(): void
@@ -578,7 +604,8 @@ class QueclinkHubControllerTest extends TestCase
             ->assertRedirect();
 
         $this->assertNotNull($assignment->fresh()->released_at);
-        $this->assertSame('unpaired', $tracker->fresh()->status);
+        $this->assertSame('paired', $tracker->fresh()->status);
+        $this->assertNull($tracker->fresh()->unpaired_at);
         $this->assertSame(QueclinkDevice::STATUS_PENDING, $queclink->fresh()->status);
         $this->assertNull($queclink->fresh()->device_id);
     }
@@ -898,7 +925,7 @@ class QueclinkHubControllerTest extends TestCase
             ->assertSessionHasErrors('port');
     }
 
-    public function test_claim_pending_device_as_vehicle_creates_assignment_and_asset_tracker()
+    public function test_claim_pending_device_as_vehicle_creates_canonical_device_link_and_assignment()
     {
         $site = Site::factory()->create(['tenant_id' => 1]);
         $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle']);
@@ -919,11 +946,19 @@ class QueclinkHubControllerTest extends TestCase
         $device->refresh();
         $this->assertSame(QueclinkDevice::STATUS_PAIRED, $device->status);
 
-        $this->assertDatabaseHas('asset_trackers', [
-            'asset_id' => $asset->id,
+        $this->assertDatabaseMissing('asset_trackers', [
             'vendor' => 'queclink',
-            'device_uid' => '864696060004173',
-            'status' => 'paired',
+            'device_uid' => $device->imei,
+        ]);
+        $this->assertDatabaseHas('devices', [
+            'id' => $device->device_id,
+            'provider' => 'queclink',
+            'device_uid' => $device->imei,
+        ]);
+        $this->assertDatabaseHas('device_asset_links', [
+            'device_id' => $device->device_id,
+            'asset_id' => $asset->id,
+            'unlinked_at' => null,
         ]);
 
         $this->assertDatabaseHas('device_assignments', [
@@ -1126,11 +1161,10 @@ class QueclinkHubControllerTest extends TestCase
             ->where('device_id', $device->fresh()->device_id)
             ->where('assignable_type', 'client')
             ->value('consent_id'));
-
-        $this->assertSame($consent->id, AssetTracker::query()
-            ->where('vendor', 'queclink')
-            ->where('device_uid', $device->imei)
-            ->value('consent_id'));
+        $this->assertDatabaseMissing('asset_trackers', [
+            'vendor' => 'queclink',
+            'device_uid' => $device->imei,
+        ]);
     }
 
     public function test_reject_pending_device_marks_status_rejected()
@@ -1183,7 +1217,7 @@ class QueclinkHubControllerTest extends TestCase
             ->where('device_id', $device->fresh()->device_id)
             ->active()
             ->count());
-        $this->assertSame('paired', AssetTracker::query()->where('device_uid', $device->imei)->value('status'));
+        $this->assertDatabaseMissing('asset_trackers', ['device_uid' => $device->imei]);
     }
 
     public function test_rejected_devices_are_searchable_pageable_and_can_only_be_restored_from_rejected(): void
@@ -1415,7 +1449,8 @@ class QueclinkHubControllerTest extends TestCase
 
         $assetIds = Asset::query()->where('category', 'personal_tracker')->where('primary_driver_user_id', $staff->id)->pluck('id');
         $this->assertCount(1, $assetIds);
-        $this->assertSame(1, AssetTracker::query()->whereIn('asset_id', $assetIds)->where('status', 'paired')->count());
+        $this->assertSame(1, DB::table('device_asset_links')->whereIn('asset_id', $assetIds)->whereNull('unlinked_at')->count());
+        $this->assertSame(0, AssetTracker::query()->whereIn('asset_id', $assetIds)->count());
         $this->assertSame(1, DeviceAssignment::query()->forTarget('staff', $staff->id)->active()->count());
         $this->assertSame(QueclinkDevice::STATUS_PENDING, $devices[1]->fresh()->status);
     }
@@ -1453,12 +1488,13 @@ class QueclinkHubControllerTest extends TestCase
 
         $assetIds = Asset::query()->where('category', 'personal_tracker')->where('client_id', $client->id)->pluck('id');
         $this->assertCount(1, $assetIds);
-        $this->assertSame(1, AssetTracker::query()->whereIn('asset_id', $assetIds)->where('status', 'paired')->count());
+        $this->assertSame(1, DB::table('device_asset_links')->whereIn('asset_id', $assetIds)->whereNull('unlinked_at')->count());
+        $this->assertSame(0, AssetTracker::query()->whereIn('asset_id', $assetIds)->count());
         $this->assertSame(1, DeviceAssignment::query()->forTarget('client', $client->id)->active()->count());
         $this->assertSame(QueclinkDevice::STATUS_PENDING, $devices[1]->fresh()->status);
     }
 
-    public function test_personal_claim_rejects_multiple_active_paired_tracker_rows_even_when_the_first_matches(): void
+    public function test_personal_claim_ignores_multiple_historical_tracker_rows_and_preserves_them(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1]);
         $staff = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
@@ -1503,7 +1539,7 @@ class QueclinkHubControllerTest extends TestCase
                 'pairing_type' => 'staff',
                 'target_id' => $staff->id,
             ])
-            ->assertStatus(409);
+            ->assertRedirect();
 
         $this->assertEquals($before, AssetTracker::query()->whereIn('id', [$matching->id, $mismatched->id])
             ->orderBy('id')
@@ -1512,20 +1548,20 @@ class QueclinkHubControllerTest extends TestCase
                 'id', 'asset_id', 'vendor', 'device_uid', 'imei', 'status', 'paired_at', 'unpaired_at', 'consent_id',
             ]))
             ->all());
-        $this->assertSame(QueclinkDevice::STATUS_PENDING, $device->fresh()->status);
-        $this->assertNull($device->fresh()->device_id);
-        $this->assertSame(0, DeviceAssignment::query()->forTarget('staff', $staff->id)->active()->count());
-        $this->assertDatabaseMissing('devices', [
+        $this->assertSame(QueclinkDevice::STATUS_PAIRED, $device->fresh()->status);
+        $this->assertNotNull($device->fresh()->device_id);
+        $this->assertSame(1, DeviceAssignment::query()->forTarget('staff', $staff->id)->active()->count());
+        $this->assertDatabaseHas('devices', [
             'provider' => 'queclink',
             'device_uid' => $device->imei,
         ]);
-        $this->assertDatabaseMissing('queclink_audit_events', [
+        $this->assertDatabaseHas('queclink_audit_events', [
             'queclink_device_id' => $device->id,
             'event_type' => 'claim',
         ]);
     }
 
-    public function test_personal_claim_accepts_exactly_one_active_paired_row_for_the_same_tracker(): void
+    public function test_personal_claim_preserves_one_historical_tracker_row_without_locking_it(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1]);
         $staff = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
@@ -1565,10 +1601,11 @@ class QueclinkHubControllerTest extends TestCase
         $this->assertForUpdateQuery($queries, 'users');
         $this->assertForUpdateQuery($queries, 'assets');
         $this->assertForUpdateQuery($queries, 'device_assignments');
-        $this->assertForUpdateQuery($queries, 'asset_trackers', 2);
+        $this->assertFalse($queries->contains(fn (string $sql): bool => str_contains($sql, 'asset_trackers')));
         $this->assertSame(QueclinkDevice::STATUS_PAIRED, $device->fresh()->status);
         $this->assertSame(1, AssetTracker::query()->where('asset_id', $asset->id)->where('status', 'paired')->count());
         $this->assertSame($device->imei, $tracker->fresh()->device_uid);
+        $this->assertNull($tracker->fresh()->unpaired_at);
         $this->assertSame(1, DeviceAssignment::query()->forTarget('staff', $staff->id)->active()->count());
     }
 
@@ -1582,7 +1619,7 @@ class QueclinkHubControllerTest extends TestCase
             'status' => QueclinkDevice::STATUS_PENDING,
         ]);
 
-        // First pair it properly so a tracker + assignment exist
+        // First pair it properly so canonical link and assignment records exist.
         $this->actingAs($this->admin)
             ->post("/security-devices/integrations/queclink/devices/{$device->id}/claim", [
                 'pairing_type' => 'vehicle',
@@ -1768,19 +1805,35 @@ class QueclinkHubControllerTest extends TestCase
         });
 
         $this->assertNotNull($assignment->fresh()->released_at);
-        $this->assertSame('unpaired', AssetTracker::query()->where('device_uid', $queclink->imei)->value('status'));
+        $this->assertDatabaseMissing('asset_trackers', ['device_uid' => $queclink->imei]);
         $this->assertSame(QueclinkDevice::STATUS_PENDING, $queclink->fresh()->status);
         $this->assertNull($queclink->fresh()->device_id);
     }
 
-    public function test_send_command_queues_a_pending_command()
+    public function test_location_command_hands_off_to_governed_device_management_without_queueing_provider_work()
     {
-        $asset = Asset::factory()->create();
+        $site = Site::factory()->create([
+            'is_active' => true,
+            'archived' => false,
+            'archived_at' => null,
+        ]);
+        $canonicalDevice = Device::factory()->tracking()->create([
+            'provider' => 'queclink',
+            'imei' => '864696060004173',
+            'device_uid' => '864696060004173',
+        ]);
+        DeviceAssignment::query()->create([
+            'device_id' => $canonicalDevice->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now(),
+        ]);
         $device = QueclinkDevice::create([
             'tenant_id' => 1,
             'imei' => '864696060004173',
             'status' => QueclinkDevice::STATUS_PAIRED,
             'model_hint' => 'GV500CG',
+            'device_id' => $canonicalDevice->id,
         ]);
 
         $this->actingAs($this->admin)
@@ -1788,61 +1841,129 @@ class QueclinkHubControllerTest extends TestCase
                 'mode' => 'preset',
                 'preset' => 'request_location',
             ])
-            ->assertRedirect();
+            ->assertRedirect("/security-devices/devices/{$canonicalDevice->id}?section=management&action=tracking.location_refresh");
 
-        $this->assertSame(1, QueclinkPendingCommand::query()->where('queclink_device_id', $device->id)->count());
-        $cmd = QueclinkPendingCommand::first();
-        $this->assertSame('GTRTO', $cmd->command_word);
-        $this->assertStringStartsWith('AT+GTRTO=gv500cg,1,', $cmd->raw_command);
-        $this->assertStringEndsWith('$', $cmd->raw_command);
+        $this->assertDatabaseCount('queclink_pending_commands', 0);
     }
 
-    public function test_read_device_configuration_queues_gl30_read_all_command()
+    public function test_provider_console_rejects_raw_and_interval_commands(): void
     {
+        $device = QueclinkDevice::create([
+            'tenant_id' => 1,
+            'imei' => '864696060004173',
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'model_hint' => 'GV500CG',
+        ]);
+
+        foreach ([
+            ['mode' => 'raw', 'raw' => 'AT+GTRTO=gv500cg,1,,,,,,0001$'],
+            ['mode' => 'preset', 'preset' => 'set_interval', 'interval_seconds' => 30],
+        ] as $payload) {
+            $this->actingAs($this->admin)
+                ->from('/security-devices/integrations/queclink?tab=debug')
+                ->post("/security-devices/integrations/queclink/devices/{$device->id}/command", $payload)
+                ->assertRedirect('/security-devices/integrations/queclink?tab=debug')
+                ->assertSessionHasErrors('command');
+        }
+
+        $this->assertDatabaseCount('queclink_pending_commands', 0);
+    }
+
+    public function test_restart_hands_off_to_governed_device_management_without_provider_work(): void
+    {
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $canonical = Device::factory()->tracking()->create([
+            'provider' => 'queclink',
+            'imei' => '864696060004179',
+            'device_uid' => '864696060004179',
+        ]);
+        DeviceAssignment::query()->create([
+            'device_id' => $canonical->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now(),
+        ]);
+        $device = QueclinkDevice::create([
+            'tenant_id' => 1,
+            'imei' => '864696060004179',
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'model_hint' => 'GV500CG',
+            'device_id' => $canonical->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/integrations/queclink/devices/{$device->id}/command", [
+                'mode' => 'preset',
+                'preset' => 'reboot',
+            ])
+            ->assertRedirect("/security-devices/devices/{$canonical->id}?section=management&action=device.reboot");
+
+        $this->assertDatabaseCount('queclink_pending_commands', 0);
+    }
+
+    public function test_read_device_configuration_hands_off_to_governed_refresh_without_provider_work()
+    {
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $canonical = Device::factory()->tracking()->create([
+            'provider' => 'queclink',
+            'imei' => '867963069916998',
+            'device_uid' => '867963069916998',
+        ]);
+        DeviceAssignment::query()->create([
+            'device_id' => $canonical->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now(),
+        ]);
         $device = QueclinkDevice::create([
             'tenant_id' => 1,
             'imei' => '867963069916998',
             'status' => QueclinkDevice::STATUS_PAIRED,
             'model_hint' => 'GL30MEU',
+            'device_id' => $canonical->id,
         ]);
 
         $this->actingAs($this->admin)
             ->post("/security-devices/integrations/queclink/devices/{$device->id}/configuration/read", [
                 'section' => 'all',
             ])
-            ->assertRedirect();
+            ->assertRedirect("/security-devices/devices/{$canonical->id}?section=management&action=configuration.refresh&command_section=all");
 
-        $cmd = QueclinkPendingCommand::first();
-        $this->assertSame('GTRTO', $cmd->command_word);
-        $this->assertMatchesRegularExpression('/^AT\+GTRTO=gl30,2,,,,,,[0-9A-F]{4}\$$/', $cmd->raw_command);
+        $this->assertDatabaseCount('queclink_pending_commands', 0);
     }
 
-    public function test_per_section_read_queues_only_that_gl30_section()
+    public function test_per_section_read_hands_the_exact_section_to_governed_refresh()
     {
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $canonical = Device::factory()->tracking()->create([
+            'provider' => 'queclink',
+            'imei' => '867963069916998',
+            'device_uid' => '867963069916998',
+        ]);
+        DeviceAssignment::query()->create([
+            'device_id' => $canonical->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now(),
+        ]);
         $device = QueclinkDevice::create([
             'tenant_id' => 1,
             'imei' => '867963069916998',
             'status' => QueclinkDevice::STATUS_PAIRED,
             'model_hint' => 'GL30MEU',
+            'device_id' => $canonical->id,
         ]);
 
         $this->actingAs($this->admin)
             ->post("/security-devices/integrations/queclink/devices/{$device->id}/configuration/server/read")
-            ->assertRedirect();
+            ->assertRedirect("/security-devices/devices/{$canonical->id}?section=management&action=configuration.refresh&command_section=SRI");
 
-        $cmd = QueclinkPendingCommand::first();
-        $this->assertSame('GTRTO', $cmd->command_word);
-        $this->assertMatchesRegularExpression('/^AT\+GTRTO=gl30,2,SRI,,,,,[0-9A-F]{4}\$$/', $cmd->raw_command);
+        $this->assertDatabaseCount('queclink_pending_commands', 0);
     }
 
-    public function test_generic_section_update_can_queue_watchdog_and_records_audit_event()
+    public function test_generic_section_update_authors_protected_profile_and_hands_off()
     {
-        $device = QueclinkDevice::create([
-            'tenant_id' => 1,
-            'imei' => '867963069916998',
-            'status' => QueclinkDevice::STATUS_PAIRED,
-            'model_hint' => 'GL30MEU',
-        ]);
+        $device = $this->pairedCanonicalGl30('867963069916998');
 
         $this->actingAs($this->admin)
             ->post("/security-devices/integrations/queclink/devices/{$device->id}/configuration/server", [
@@ -1854,25 +1975,25 @@ class QueclinkHubControllerTest extends TestCase
                 'unit' => 0,
                 'send_failure_timeout' => 60,
             ])
-            ->assertRedirect();
+            ->assertRedirectContains('/security-devices/devices/'.$device->device_id)
+            ->assertRedirectContains('action=configuration.apply');
 
-        $cmd = QueclinkPendingCommand::first();
-        $this->assertSame('GTDOG', $cmd->command_word);
-        $this->assertStringContainsString('AT+GTDOG=gl30,1,,1,0130,,1,,0,,,60,', $cmd->raw_command);
+        $this->assertDatabaseCount('queclink_pending_commands', 0);
         $this->assertDatabaseHas('queclink_audit_events', [
             'queclink_device_id' => $device->id,
-            'event_type' => 'config_write',
+            'event_type' => 'configuration_profile_authored',
             'section' => 'server',
             'raw_command' => null,
             'imei' => null,
         ]);
+        $profile = DeviceConfigurationProfile::query()->sole();
         $this->assertStringNotContainsString(
             '0130',
-            json_encode(QueclinkAuditEvent::query()->latest('id')->value('payload_after'), JSON_THROW_ON_ERROR),
+            (string) DB::table('device_configuration_profiles')->where('id', $profile->id)->value('encrypted_payload'),
         );
     }
 
-    public function test_command_queue_cancel_and_retry_are_audited()
+    public function test_command_queue_cancel_is_audited_and_the_legacy_retry_shortcut_is_not_routable()
     {
         $device = QueclinkDevice::create([
             'tenant_id' => 1,
@@ -1899,58 +2020,40 @@ class QueclinkHubControllerTest extends TestCase
         $this->assertSame(QueclinkPendingCommand::STATUS_CANCELLED, $command->fresh()->status);
         $this->assertNotNull($command->fresh()->cancelled_at);
 
+        $this->assertFalse(Route::has('security-devices.integrations.queclink.commands.retry'));
         $this->actingAs($this->admin)
             ->post("/security-devices/integrations/queclink/commands/{$command->id}/retry")
-            ->assertRedirect();
+            ->assertNotFound();
 
-        $this->assertSame(2, QueclinkPendingCommand::query()->count());
-        $retry = QueclinkPendingCommand::query()->latest('id')->first();
-        $this->assertSame(QueclinkPendingCommand::STATUS_QUEUED, $retry->status);
-        $this->assertSame($command->raw_command, $retry->raw_command);
+        $this->assertSame(1, QueclinkPendingCommand::query()->count());
         $this->assertDatabaseHas('queclink_audit_events', [
             'queclink_device_id' => $device->id,
             'event_type' => 'cancel',
         ]);
-        $this->assertDatabaseHas('queclink_audit_events', [
-            'queclink_device_id' => $device->id,
+        $this->assertDatabaseMissing('queclink_audit_events', [
             'event_type' => 'retry',
         ]);
     }
 
-    public function test_bulk_action_queues_commands_for_selected_paired_devices_and_audits_each()
+    public function test_bulk_action_hands_all_selected_devices_to_governed_bulk_management()
     {
-        $devices = collect(range(1, 5))->map(fn (int $index) => QueclinkDevice::create([
-            'tenant_id' => 1,
-            'imei' => '86796306991699'.$index,
-            'status' => QueclinkDevice::STATUS_PAIRED,
-            'model_hint' => 'GL30MEU',
-        ]));
+        $this->seed(QueclinkPresetSeeder::class);
+        $devices = collect(range(1, 5))->map(fn (int $index) => $this->pairedCanonicalGl30('86796306991699'.$index));
 
         $this->actingAs($this->admin)
             ->post('/security-devices/integrations/queclink/bulk', [
                 'device_ids' => $devices->pluck('id')->all(),
                 'action' => 'resident_safety_profile',
             ])
-            ->assertRedirect();
+            ->assertRedirectContains('/security-devices/tracking')
+            ->assertRedirectContains('bulk_action=configuration.apply');
 
-        $this->assertSame(5, QueclinkPendingCommand::query()->count());
-        $this->assertSame(5, QueclinkPendingCommand::query()
-            ->where('command_word', 'GTCFG')
-            ->where('status', QueclinkPendingCommand::STATUS_QUEUED)
-            ->count());
-        $this->assertSame(5, QueclinkAuditEvent::query()
-            ->where('event_type', 'bulk_apply')
-            ->count());
+        $this->assertDatabaseCount('queclink_pending_commands', 0);
     }
 
-    public function test_update_server_registration_queues_gl30_sri_command()
+    public function test_update_server_registration_authors_profile_without_provider_work()
     {
-        $device = QueclinkDevice::create([
-            'tenant_id' => 1,
-            'imei' => '867963069916998',
-            'status' => QueclinkDevice::STATUS_PAIRED,
-            'model_hint' => 'GL30MEU',
-        ]);
+        $device = $this->pairedCanonicalGl30('867963069916998');
 
         $this->actingAs($this->admin)
             ->post("/security-devices/integrations/queclink/devices/{$device->id}/configuration/server", [
@@ -1967,21 +2070,18 @@ class QueclinkHubControllerTest extends TestCase
                 'psm_network_hold_time_seconds' => 30,
                 'protocol_format' => 0,
             ])
-            ->assertRedirect();
+            ->assertRedirectContains('action=configuration.apply');
 
-        $cmd = QueclinkPendingCommand::first();
-        $this->assertSame('GTSRI', $cmd->command_word);
-        $this->assertStringContainsString('AT+GTSRI=gl30,3,0,1,oblivionfindings.com,8090,oblivionfindings.com,8090,,5,1,0,30,0,0,', $cmd->raw_command);
+        $this->assertDatabaseCount('queclink_pending_commands', 0);
+        $this->assertStringNotContainsString(
+            'oblivionfindings.com',
+            (string) DB::table('device_configuration_profiles')->value('encrypted_payload'),
+        );
     }
 
-    public function test_update_global_configuration_queues_gl30_cfg_command()
+    public function test_update_global_configuration_authors_profile_without_provider_work()
     {
-        $device = QueclinkDevice::create([
-            'tenant_id' => 1,
-            'imei' => '867963069916998',
-            'status' => QueclinkDevice::STATUS_PAIRED,
-            'model_hint' => 'GL30MEU',
-        ]);
+        $device = $this->pairedCanonicalGl30('867963069916998');
 
         $this->actingAs($this->admin)
             ->post("/security-devices/integrations/queclink/devices/{$device->id}/configuration/global", [
@@ -2004,29 +2104,22 @@ class QueclinkHubControllerTest extends TestCase
                 'led_on' => 1,
                 'charge_standby_mode' => 0,
             ])
-            ->assertRedirect();
+            ->assertRedirectContains('action=configuration.apply');
 
-        $cmd = QueclinkPendingCommand::first();
-        $this->assertSame('GTCFG', $cmd->command_word);
-        $this->assertStringContainsString('AT+GTCFG=gl30,,GL30MEU,150,08E3,006F,1,30,,0,1200,,1,,,,1,1,0000,,,10,1,,1,2,1,0,', $cmd->raw_command);
+        $this->assertDatabaseCount('queclink_pending_commands', 0);
+        $this->assertDatabaseCount('device_configuration_profiles', 1);
     }
 
-    public function test_resident_safety_profile_queues_gl30_cfg_command()
+    public function test_resident_safety_profile_hands_off_without_provider_work()
     {
-        $device = QueclinkDevice::create([
-            'tenant_id' => 1,
-            'imei' => '867963069916998',
-            'status' => QueclinkDevice::STATUS_PAIRED,
-            'model_hint' => 'GL30MEU',
-        ]);
+        $this->seed(QueclinkPresetSeeder::class);
+        $device = $this->pairedCanonicalGl30('867963069916998');
 
         $this->actingAs($this->admin)
             ->post("/security-devices/integrations/queclink/devices/{$device->id}/configuration/resident-safety-profile")
-            ->assertRedirect();
+            ->assertRedirectContains('action=configuration.apply');
 
-        $cmd = QueclinkPendingCommand::first();
-        $this->assertSame('GTCFG', $cmd->command_word);
-        $this->assertStringContainsString('AT+GTCFG=gl30,,GL30MEU,150,08E3,006F,1,30,,0,1200,,1,,,,1,1,0000,,,20,1,,1,2,1,0,', $cmd->raw_command);
+        $this->assertDatabaseCount('queclink_pending_commands', 0);
     }
 
     public function test_update_global_configuration_rejects_invalid_short_gl30_interval()
@@ -2065,13 +2158,24 @@ class QueclinkHubControllerTest extends TestCase
         $this->assertDatabaseCount('queclink_pending_commands', 0);
     }
 
-    public function test_personal_tracker_command_uses_gl30_family_when_model_hint_is_blank()
+    public function test_personal_tracker_with_blank_model_still_hands_off_to_governed_management()
     {
+        $site = Site::factory()->create([
+            'is_active' => true,
+            'archived' => false,
+            'archived_at' => null,
+        ]);
         $canonicalDevice = Device::factory()->tracking()->create([
             'provider' => 'queclink',
             'imei' => '867963069916998',
             'device_uid' => '867963069916998',
             'model' => null,
+        ]);
+        DeviceAssignment::query()->create([
+            'device_id' => $canonicalDevice->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now(),
         ]);
         $device = QueclinkDevice::create([
             'tenant_id' => 1,
@@ -2086,12 +2190,9 @@ class QueclinkHubControllerTest extends TestCase
                 'mode' => 'preset',
                 'preset' => 'request_location',
             ])
-            ->assertRedirect();
+            ->assertRedirect("/security-devices/devices/{$canonicalDevice->id}?section=management&action=tracking.location_refresh");
 
-        $cmd = QueclinkPendingCommand::first();
-        $this->assertSame('GTRTO', $cmd->command_word);
-        $this->assertStringStartsWith('AT+GTRTO=gl30,1,', $cmd->raw_command);
-        $this->assertStringEndsWith('$', $cmd->raw_command);
+        $this->assertDatabaseCount('queclink_pending_commands', 0);
     }
 
     public function test_frames_endpoint_returns_paged_json_for_authorised_user()
@@ -2168,11 +2269,40 @@ class QueclinkHubControllerTest extends TestCase
 
     public function test_provisioning_string_requires_hostname_setting()
     {
+        config(['services.queclink.public_hostname' => null]);
+
         $response = $this->actingAs($this->admin)
             ->getJson('/security-devices/integrations/queclink/provisioning?family=gv500cg');
 
         $response->assertStatus(422)
             ->assertJsonPath('error', 'Set the public hostname under Listener settings first.');
+    }
+
+    public function test_provisioning_readiness_accepts_the_configured_environment_hostname_without_disclosing_it()
+    {
+        config(['services.queclink.public_hostname' => 'tracking.example.co.nz']);
+
+        $response = $this->actingAs($this->admin)
+            ->getJson('/security-devices/integrations/queclink/provisioning?family=gv500cg');
+
+        $response->assertOk()
+            ->assertJsonPath('state', 'ready_for_secure_provisioning')
+            ->assertJsonPath('family', 'vehicle_tracker');
+
+        $encoded = json_encode($response->json(), JSON_THROW_ON_ERROR);
+        $this->assertStringNotContainsString('tracking.example.co.nz', $encoded);
+        $this->assertStringNotContainsString('AT+GT', $encoded);
+    }
+
+    public function test_provisioning_readiness_rejects_an_unknown_device_family()
+    {
+        AppSetting::create(['key' => 'queclink.public_hostname', 'value' => 'tracking.example.co.nz']);
+
+        $this->actingAs($this->admin)
+            ->getJson('/security-devices/integrations/queclink/provisioning?family=unknown-family')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('family')
+            ->assertJsonMissingPath('state');
     }
 
     public function test_provisioning_readiness_never_returns_provider_target_or_raw_command()

@@ -275,7 +275,7 @@ class HealthcareWorkspacePresenter
             : Client::query()
                 ->whereIn('id', $clientIds)
                 ->with('keyWorker:id,name')
-                ->get(['id', 'first_name', 'preferred_name', 'key_worker_id'])
+                ->get(['id', 'site_id', 'first_name', 'preferred_name', 'key_worker_id'])
                 ->filter(fn (Client $client): bool => Gate::forUser($viewer)->allows('view', $client))
                 ->keyBy('id');
         $sites = $siteIds->isEmpty()

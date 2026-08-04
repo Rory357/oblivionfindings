@@ -24,6 +24,7 @@ final readonly class RuntimeEnvelope
         public array $payload,
         public string $keyId = '',
         public string $signature = '',
+        public int $payloadVersion = 1,
     ) {}
 
     /**
@@ -35,11 +36,17 @@ final readonly class RuntimeEnvelope
         int $sequence,
         string $idempotencyKey,
         array $payload,
+        ?int $payloadVersion = null,
     ): self {
         $now = CarbonImmutable::now('UTC');
+        $schemaVersion = (int) config('monitoring.contracts.current', 1);
+        $payloadVersion ??= (int) config(
+            "monitoring.contracts.payloads.{$type->value}.current",
+            1,
+        );
 
         return new self(
-            schemaVersion: 1,
+            schemaVersion: $schemaVersion,
             messageId: (string) Str::orderedUuid(),
             type: $type,
             source: $source,
@@ -49,6 +56,7 @@ final readonly class RuntimeEnvelope
             idempotencyKey: $idempotencyKey,
             traceId: (string) Str::orderedUuid(),
             payload: $payload,
+            payloadVersion: $payloadVersion,
         );
     }
 }

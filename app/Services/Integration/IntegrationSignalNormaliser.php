@@ -198,7 +198,6 @@ class IntegrationSignalNormaliser
             }
 
             Log::warning('IntegrationSignalNormaliser: mapped signal type not found in DB', SafeOperationalData::logContext([
-                'tenant_id' => $event->tenant_id,
                 'event_type' => $eventType,
                 'mapped_code' => $code,
                 'provider' => $event->provider,
@@ -213,7 +212,6 @@ class IntegrationSignalNormaliser
 
         // 3. Fallback to catch-all
         Log::info('IntegrationSignalNormaliser: using fallback signal type', SafeOperationalData::logContext([
-            'tenant_id' => $event->tenant_id,
             'event_type' => $eventType,
             'tried_codes' => [self::SIGNAL_TYPE_MAP[$eventType] ?? null, $generatedCode],
             'fallback' => self::FALLBACK_SIGNAL_TYPE,
@@ -253,7 +251,6 @@ class IntegrationSignalNormaliser
 
         // 3. Unrecognised provider severity — log and default
         Log::warning('IntegrationSignalNormaliser: unrecognised provider severity', SafeOperationalData::logContext([
-            'tenant_id' => $event->tenant_id,
             'severity' => $event->severity,
             'event_type' => $eventType,
             'integration_event_id' => $event->id,
@@ -357,7 +354,6 @@ class IntegrationSignalNormaliser
             'resolved_severity' => $canonicalSeverity,
 
             // Location context
-            'tenant_id' => $event->tenant_id,
             'site_id' => $event->site_id,
             'room_id' => $event->room_id,
             'hardware_id' => $event->hardware_id,

@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ItApiRequest extends Model
 {
+    use WritesLegacyStorageContext;
+
     protected $fillable = [
-        'tenant_id',
         'service_identity_id',
         'ticket_id',
         'method',
@@ -35,10 +36,5 @@ class ItApiRequest extends Model
     public function ticket(): BelongsTo
     {
         return $this->belongsTo(ItTicket::class, 'ticket_id');
-    }
-
-    public function scopeForTenant(Builder $query, int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 }

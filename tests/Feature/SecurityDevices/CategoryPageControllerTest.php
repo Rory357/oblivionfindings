@@ -159,17 +159,14 @@ class CategoryPageControllerTest extends TestCase
 
     public function test_category_inventory_stats_and_providers_cover_the_single_application_registry(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
 
         Device::factory()->itInfrastructure()->create([
-            'tenant_id' => 42,
-            'name' => 'Tenant switch',
-            'provider' => 'tenant-provider',
+            'name' => 'Primary switch',
+            'provider' => 'primary-provider',
         ]);
         Device::factory()->itInfrastructure()->create([
-            'tenant_id' => 77,
-            'name' => 'Foreign switch',
-            'provider' => 'foreign-provider',
+            'name' => 'Unrelated switch',
+            'provider' => 'unrelated-provider',
         ]);
 
         $response = $this->actingAs($this->admin)->get('/security-devices/network-it');
@@ -177,7 +174,7 @@ class CategoryPageControllerTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->has('devices.data', 2)
             ->where('stats.total', 2)
-            ->where('filterOptions.providers', ['foreign-provider', 'tenant-provider'])
+            ->where('filterOptions.providers', ['primary-provider', 'unrelated-provider'])
         );
     }
 

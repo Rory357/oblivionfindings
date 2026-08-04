@@ -2,17 +2,23 @@
 
 namespace App\Domain\SecurityDevices\Presenters;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Models\Asset;
+use App\Models\Client;
 use App\Models\ControlRoomAlert;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
 class SecurityWorkspacePresenter
@@ -27,6 +33,11 @@ class SecurityWorkspacePresenter
         'perimeter' => ['alarm_state', 'sensor_state', 'zones'],
         'access_control' => ['door_state', 'lock_state', 'reader_state', 'panel_state', 'credential_count', 'schedule_count'],
     ];
+
+    public function __construct(
+        private readonly SecurityDevicesAccessService $access,
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
 
     public function present(User $viewer, Builder $securityScope, array $activeTab): array
     {
@@ -43,7 +54,10 @@ class SecurityWorkspacePresenter
 
         $activeDevices = (clone $activeScope)
             ->with([
-                'assignments' => fn ($query) => $query->active(),
+                'assignments' => fn ($query) => $query
+                    ->active()
+                    ->where('assigned_at', '<=', now())
+                    ->latest('assigned_at'),
                 'maintenanceRecords' => fn ($query) => $query
                     ->whereNotIn('status', ['completed', 'cancelled'])
                     ->orderBy('scheduled_for'),
@@ -52,7 +66,7 @@ class SecurityWorkspacePresenter
             ->orderBy('name')
             ->limit(self::DEVICE_LIMIT)
             ->get();
-        $siteContext = $this->siteContext($activeDevices);
+        $assignmentContext = $this->assignmentContext($viewer, $activeDevices);
 
         $events = $canViewEvents
             ? DeviceEvent::query()
@@ -85,6 +99,7 @@ class SecurityWorkspacePresenter
                 'cctv_media' => $canViewMedia,
             ],
             'overview' => $this->overview(
+                $viewer,
                 $securityScope,
                 $canViewEvents,
                 $canViewMaintenance,
@@ -102,7 +117,7 @@ class SecurityWorkspacePresenter
                     ? []
                     : $activeDevices->map(fn (Device $device) => $this->mapDevice(
                         $device,
-                        $siteContext,
+                        $assignmentContext,
                         $canViewMaintenance,
                         $canViewMedia,
                     ))->values(),
@@ -117,6 +132,7 @@ class SecurityWorkspacePresenter
     }
 
     private function overview(
+        User $viewer,
         Builder $scope,
         bool $canViewEvents,
         bool $canViewMaintenance,
@@ -132,7 +148,7 @@ class SecurityWorkspacePresenter
         $unmonitoredDevices = (clone $scope)
             ->whereDoesntHave('monitors', fn (Builder $monitor) => $monitor->where('is_enabled', true))
             ->count();
-        $affectedSites = $this->affectedSiteCount(clone $attention);
+        $affectedSites = $this->affectedSiteCount($viewer, clone $attention);
 
         $unprocessedEvents = $canViewEvents
             ? DeviceEvent::query()
@@ -220,45 +236,188 @@ class SecurityWorkspacePresenter
         return compact('key', 'label', 'count', 'description', 'href');
     }
 
-    private function affectedSiteCount(Builder $attention): int
+    private function affectedSiteCount(User $viewer, Builder $attention): int
     {
-        $directSiteIds = DeviceAssignment::query()
+        $assignments = DeviceAssignment::query()
             ->active()
-            ->where('assignable_type', DeviceAssignment::TARGET_SITE)
+            ->where('assigned_at', '<=', now())
             ->whereIn('device_id', (clone $attention)->select('devices.id'))
-            ->pluck('assignable_id');
-        $roomIds = DeviceAssignment::query()
-            ->active()
-            ->where('assignable_type', DeviceAssignment::TARGET_ROOM)
-            ->whereIn('device_id', (clone $attention)->select('devices.id'))
-            ->pluck('assignable_id');
-        $roomSiteIds = $roomIds->isEmpty()
-            ? collect()
-            : SiteRoom::query()->whereIn('id', $roomIds)->pluck('site_id');
+            ->get(['assignable_type', 'assignable_id']);
+        $context = $this->assignmentSiteContext($viewer, $assignments);
 
-        return $directSiteIds->merge($roomSiteIds)->unique()->count();
+        return $assignments
+            ->map(fn (DeviceAssignment $assignment): ?int => $this->siteIdForAssignment($assignment, $context))
+            ->filter(fn (?int $siteId): bool => $siteId !== null && $context['sites']->has($siteId))
+            ->unique()
+            ->count();
     }
 
     /** @param Collection<int, Device> $devices */
-    private function siteContext(Collection $devices): array
+    private function assignmentContext(User $viewer, Collection $devices): array
     {
         $assignments = $devices->flatMap->assignments;
-        $siteIds = $assignments
+        $clientIds = $assignments
+            ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+            ->pluck('assignable_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values();
+        $staffIds = $assignments
+            ->where('assignable_type', DeviceAssignment::TARGET_STAFF)
+            ->pluck('assignable_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values();
+
+        $canOpenClientProfiles = $viewer->canDo('clients.viewAny')
+            || $viewer->canDo('clients.viewAssigned');
+        $clients = $clientIds->isEmpty() || ! $canOpenClientProfiles
+            ? collect()
+            : Client::query()
+                ->whereKey($clientIds)
+                ->get(['id', 'site_id', 'first_name', 'last_name', 'preferred_name'])
+                ->filter(fn (Client $client): bool => Gate::forUser($viewer)->allows('view', $client))
+                ->keyBy('id');
+        $staff = $staffIds->isEmpty()
+            ? collect()
+            : $this->access->assignableStaff($viewer)
+                ->whereKey($staffIds)
+                ->get(['id', 'name'])
+                ->keyBy('id');
+
+        $staffProfiles = collect();
+        if ($viewer->canDo('hr.employees.viewAny') && $staff->isNotEmpty()) {
+            $profileQuery = HrEmployeeProfile::withTrashed()
+                ->whereIn('user_id', $staff->keys());
+            $this->siteAccess->applyHistoricalStaffProfileScope($profileQuery, $viewer);
+            $staffProfiles = $profileQuery
+                ->get(['id', 'user_id'])
+                ->keyBy('user_id');
+        }
+
+        return [
+            ...$this->assignmentSiteContext($viewer, $assignments),
+            'clients' => $clients,
+            'staff' => $staff,
+            'staffProfiles' => $staffProfiles,
+        ];
+    }
+
+    /** @param Collection<int, DeviceAssignment> $assignments */
+    private function assignmentSiteContext(User $viewer, Collection $assignments): array
+    {
+        $accessibleSiteIds = $this->access->accessibleSiteIds($viewer);
+        $directSiteIds = $assignments
             ->where('assignable_type', DeviceAssignment::TARGET_SITE)
             ->pluck('assignable_id')
+            ->filter(fn (mixed $id): bool => is_numeric($id))
+            ->map(fn (mixed $id): int => (int) $id)
             ->unique();
         $roomIds = $assignments
             ->where('assignable_type', DeviceAssignment::TARGET_ROOM)
             ->pluck('assignable_id')
+            ->filter(fn (mixed $id): bool => is_numeric($id))
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique();
+        $clientIds = $assignments
+            ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+            ->pluck('assignable_id')
+            ->filter(fn (mixed $id): bool => is_numeric($id))
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique();
+        $staffIds = $assignments
+            ->where('assignable_type', DeviceAssignment::TARGET_STAFF)
+            ->pluck('assignable_id')
+            ->filter(fn (mixed $id): bool => is_numeric($id))
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique();
+        $vehicleIds = $assignments
+            ->where('assignable_type', DeviceAssignment::TARGET_VEHICLE)
+            ->pluck('assignable_id')
+            ->filter(fn (mixed $id): bool => is_numeric($id))
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique();
+
+        $rooms = $roomIds->isEmpty()
+            ? collect()
+            : SiteRoom::query()
+                ->whereIn('id', $roomIds)
+                ->whereIn('site_id', $accessibleSiteIds)
+                ->with('site:id,name')
+                ->get()
+                ->keyBy('id');
+        $roomSiteIds = $rooms->map(fn (SiteRoom $room): int => (int) $room->site_id);
+        $clientSiteIds = $clientIds->isEmpty()
+            ? collect()
+            : Client::query()
+                ->whereKey($clientIds)
+                ->where('status', 'active')
+                ->whereIn('site_id', $accessibleSiteIds)
+                ->pluck('site_id', 'id')
+                ->map(fn (mixed $id): int => (int) $id);
+        $staffSiteIds = $staffIds->isEmpty()
+            ? collect()
+            : HrEmployeeProfile::query()
+                ->whereIn('user_id', $staffIds)
+                ->where('is_active', true)
+                ->where(fn (Builder $query): Builder => $query
+                    ->whereNull('start_date')
+                    ->orWhereDate('start_date', '<=', today()))
+                ->where(fn (Builder $query): Builder => $query
+                    ->whereNull('end_date')
+                    ->orWhereDate('end_date', '>=', today()))
+                ->whereIn('primary_site_id', $accessibleSiteIds)
+                ->pluck('primary_site_id', 'user_id')
+                ->map(fn (mixed $id): int => (int) $id);
+        $accessibleVehicleIds = collect($this->access->accessibleAssetIds($viewer));
+        $vehicleSiteIds = $vehicleIds->isEmpty() || $accessibleVehicleIds->isEmpty()
+            ? collect()
+            : Asset::query()
+                ->whereKey($vehicleIds->intersect($accessibleVehicleIds)->values()->all())
+                ->where('status', 'active')
+                ->with(['categoryRef:id,slug', 'client:id,site_id,status'])
+                ->get(['id', 'category', 'asset_category_id', 'site_id', 'home_site_id', 'client_id'])
+                ->filter(fn (Asset $asset): bool => strcasecmp((string) $asset->category, 'vehicle') === 0
+                    || $asset->categoryRef?->slug === 'vehicle')
+                ->mapWithKeys(function (Asset $asset) use ($accessibleSiteIds): array {
+                    $siteIds = collect([
+                        $asset->site_id,
+                        $asset->home_site_id,
+                        $asset->client?->status === 'active' ? $asset->client?->site_id : null,
+                    ])->filter(fn (mixed $id): bool => is_numeric($id)
+                        && in_array((int) $id, $accessibleSiteIds, true))
+                        ->map(fn (mixed $id): int => (int) $id)
+                        ->unique();
+
+                    return $siteIds->count() === 1 ? [$asset->id => $siteIds->first()] : [];
+                });
+        $siteIds = collect([
+            $directSiteIds,
+            $roomSiteIds->values(),
+            $clientSiteIds->values(),
+            $staffSiteIds->values(),
+            $vehicleSiteIds->values(),
+        ])->flatten()
+            ->filter(fn (mixed $id): bool => is_numeric($id)
+                && in_array((int) $id, $accessibleSiteIds, true))
+            ->map(fn (mixed $id): int => (int) $id)
             ->unique();
 
         return [
             'sites' => $siteIds->isEmpty()
                 ? collect()
-                : Site::query()->whereIn('id', $siteIds)->get(['id', 'name'])->keyBy('id'),
-            'rooms' => $roomIds->isEmpty()
-                ? collect()
-                : SiteRoom::query()->whereIn('id', $roomIds)->with('site:id,name')->get()->keyBy('id'),
+                : Site::query()
+                    ->whereIn('id', $siteIds)
+                    ->where('is_active', true)
+                    ->where('archived', false)
+                    ->whereNull('archived_at')
+                    ->get(['id', 'name'])
+                    ->keyBy('id'),
+            'rooms' => $rooms,
+            'roomSiteIds' => $roomSiteIds,
+            'clientSiteIds' => $clientSiteIds,
+            'staffSiteIds' => $staffSiteIds,
+            'vehicleSiteIds' => $vehicleSiteIds,
         ];
     }
 
@@ -287,6 +446,7 @@ class SecurityWorkspacePresenter
             'assignment' => $assignment ? [
                 'type' => $assignment->assignable_type,
                 'label' => $this->assignmentLabel($assignment, $siteContext),
+                'href' => $this->assignmentHref($assignment, $siteContext),
             ] : null,
             'monitoring' => [
                 'state' => $device->monitors->isEmpty() ? 'unmonitored' : 'configured',
@@ -320,11 +480,8 @@ class SecurityWorkspacePresenter
             return null;
         }
 
-        $site = match ($assignment->assignable_type) {
-            DeviceAssignment::TARGET_SITE => $context['sites']->get($assignment->assignable_id),
-            DeviceAssignment::TARGET_ROOM => $context['rooms']->get($assignment->assignable_id)?->site,
-            default => null,
-        };
+        $siteId = $this->siteIdForAssignment($assignment, $context);
+        $site = $siteId === null ? null : $context['sites']->get($siteId);
 
         return $site ? [
             'id' => $site->id,
@@ -333,14 +490,47 @@ class SecurityWorkspacePresenter
         ] : null;
     }
 
+    private function siteIdForAssignment(DeviceAssignment $assignment, array $context): ?int
+    {
+        $siteId = match ($assignment->assignable_type) {
+            DeviceAssignment::TARGET_SITE => $assignment->assignable_id,
+            DeviceAssignment::TARGET_ROOM => $context['roomSiteIds']->get($assignment->assignable_id),
+            DeviceAssignment::TARGET_CLIENT => $context['clientSiteIds']->get($assignment->assignable_id),
+            DeviceAssignment::TARGET_STAFF => $context['staffSiteIds']->get($assignment->assignable_id),
+            DeviceAssignment::TARGET_VEHICLE => $context['vehicleSiteIds']->get($assignment->assignable_id),
+            default => null,
+        };
+
+        return is_numeric($siteId) ? (int) $siteId : null;
+    }
+
     private function assignmentLabel(DeviceAssignment $assignment, array $context): string
     {
         return match ($assignment->assignable_type) {
             DeviceAssignment::TARGET_SITE => $context['sites']->get($assignment->assignable_id)?->name
-                ?? "Site #{$assignment->assignable_id}",
+                ?? 'Assigned Site',
             DeviceAssignment::TARGET_ROOM => $context['rooms']->get($assignment->assignable_id)?->name
-                ?? "Room #{$assignment->assignable_id}",
-            default => Str::headline($assignment->assignable_type)." #{$assignment->assignable_id}",
+                ?? 'Assigned room',
+            DeviceAssignment::TARGET_CLIENT => ($client = $context['clients']->get($assignment->assignable_id))
+                ? ($client->preferred_name ?: $client->first_name)
+                : 'Assigned client',
+            DeviceAssignment::TARGET_STAFF => $context['staff']->get($assignment->assignable_id)?->name
+                ?? 'Assigned staff member',
+            DeviceAssignment::TARGET_VEHICLE => 'Assigned vehicle',
+            default => Str::headline($assignment->assignable_type),
+        };
+    }
+
+    private function assignmentHref(DeviceAssignment $assignment, array $context): ?string
+    {
+        return match ($assignment->assignable_type) {
+            DeviceAssignment::TARGET_CLIENT => ($client = $context['clients']->get($assignment->assignable_id))
+                ? route('operations.clients.show', $client, false)
+                : null,
+            DeviceAssignment::TARGET_STAFF => ($profile = $context['staffProfiles']->get($assignment->assignable_id))
+                ? route('hr.people.show', $profile, false)
+                : null,
+            default => null,
         };
     }
 

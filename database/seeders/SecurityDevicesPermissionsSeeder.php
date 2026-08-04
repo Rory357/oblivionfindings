@@ -38,6 +38,12 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             ['key' => 'securityDevices.integrations.view', 'description' => 'View integration status and synced devices', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.integrations.manage', 'description' => 'Manage device sync and discovery', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.reports.view', 'description' => 'View hardware and compliance reports', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.commands.observe', 'description' => 'View authorised device command history', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.commands.operate', 'description' => 'Run approved low-risk device diagnostics and actions', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.commands.manage', 'description' => 'Run standard state-changing device management', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.commands.control', 'description' => 'Request safety, security, privacy, or availability-affecting controls', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.commands.approve', 'description' => 'Independently approve or reject governed device commands', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.commands.admin', 'description' => 'Administer command policy, adapters, and secret references', 'group' => 'security_devices', 'module' => 'Security & Devices'],
         ];
 
         // ── 1. Create permission records ──────────────────────────
@@ -76,6 +82,9 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             'securityDevices.maintenance.manage',
             'securityDevices.integrations.view',
             'securityDevices.reports.view',
+            'securityDevices.commands.observe',
+            'securityDevices.commands.operate',
+            'securityDevices.commands.manage',
         ]);
 
         $this->attachToRole('provider_manager', [
@@ -85,6 +94,8 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             'securityDevices.events.view',
             'securityDevices.maintenance.view',
             'securityDevices.reports.view',
+            'securityDevices.commands.observe',
+            'securityDevices.commands.operate',
         ]);
 
         $this->attachToRole('fleet_manager', [
@@ -93,6 +104,8 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             'securityDevices.devices.viewUnassigned',
             'securityDevices.devices.assign',
             'securityDevices.events.view',
+            'securityDevices.commands.observe',
+            'securityDevices.commands.operate',
         ]);
 
         $this->attachToRole('coordinator', [
@@ -100,6 +113,7 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             'securityDevices.devices.view',
             'securityDevices.events.view',
             'securityDevices.maintenance.view',
+            'securityDevices.commands.observe',
         ]);
 
         $this->attachToRole('maintenance_coordinator', [
@@ -108,6 +122,9 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             'securityDevices.maintenance.view',
             'securityDevices.maintenance.manage',
             'securityDevices.reports.view',
+            'securityDevices.commands.observe',
+            'securityDevices.commands.operate',
+            'securityDevices.commands.manage',
         ]);
 
         $this->attachToRole('health_safety_officer', [
@@ -115,6 +132,7 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             'securityDevices.devices.view',
             'securityDevices.events.view',
             'securityDevices.reports.view',
+            'securityDevices.commands.observe',
         ]);
 
         $this->attachToRole('team_lead', [
@@ -132,6 +150,7 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             'securityDevices.devices.view',
             'securityDevices.events.view',
             'securityDevices.reports.view',
+            'securityDevices.commands.observe',
         ]);
     }
 

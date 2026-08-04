@@ -9,6 +9,7 @@ use App\Domain\SecurityDevices\Config\WorkspaceConfig;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
+use App\Domain\SecurityDevices\Management\Services\BulkDeviceCommandPresenter;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Presenters\FacilitiesWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\HealthcareWorkspacePresenter;
@@ -37,6 +38,7 @@ class CategoryPageController extends Controller
         private readonly SecurityWorkspacePresenter $securityWorkspacePresenter,
         private readonly HealthcareWorkspacePresenter $healthcareWorkspacePresenter,
         private readonly TrackingWorkspacePresenter $trackingWorkspacePresenter,
+        private readonly BulkDeviceCommandPresenter $bulkDeviceCommandPresenter,
     ) {}
 
     public function networkIt(Request $request)
@@ -254,6 +256,12 @@ class CategoryPageController extends Controller
             'trackingWorkspace' => $slug === 'tracking'
                 ? $this->trackingWorkspacePresenter->present($user, clone $baseScope, $activeTab)
                 : null,
+            'bulkManagement' => $activeTab['key'] === 'management'
+                && collect($activeTab['requiredAnyPermission'] ?? [])->contains(
+                    fn (string $permission): bool => $user->canDo($permission),
+                )
+                    ? $this->bulkDeviceCommandPresenter->present($user, clone $baseScope, $slug)
+                    : null,
         ]);
     }
 

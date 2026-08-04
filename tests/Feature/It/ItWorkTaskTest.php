@@ -1,8 +1,10 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\ItTeam;
 use App\Models\ItTicket;
+use App\Models\ItTicketEvent;
 use App\Models\ItWorkTask;
 use App\Models\Role;
 use App\Models\Site;
@@ -14,7 +16,6 @@ function workTaskUser(string $role, ?Site $site = null): User
     $user = User::factory()->create([
         'role' => $role,
         'approved_at' => now(),
-        'organization_id' => 1,
     ]);
     $user->roles()->syncWithoutDetaching([
         Role::query()->where('name', $role)->first()->id,
@@ -42,14 +43,13 @@ beforeEach(function () {
     $this->agent = workTaskUser('hr', $this->site);
     $this->requester = workTaskUser('support_worker');
     $this->ticket = ItTicket::factory()->create([
-        'tenant_id' => 202,
         'site_id' => $this->site->id,
         'requester_user_id' => $this->requester->id,
     ]);
 });
 
 test('agents create ordered required and optional tasks with dependencies and assignments', function () {
-    $team = ItTeam::factory()->create(['tenant_id' => 1]);
+    $team = ItTeam::factory()->create();
     $assignee = workTaskUser('hr', $this->site);
 
     $this->actingAs($this->agent)
@@ -80,7 +80,11 @@ test('agents create ordered required and optional tasks with dependencies and as
         ->and((int) $accountTask->assigned_to_user_id)->toBe($assignee->id)
         ->and($accountTask->due_at)->not->toBeNull()
         ->and($accountTask->dependencies()->whereKey($approvalTask->id)->exists())->toBeTrue()
-        ->and($this->ticket->events()->where('type', 'work_task_created')->count())->toBe(2);
+        ->and($this->ticket->events()->where('type', 'work_task_created')->count())->toBe(2)
+        ->and(AuditLog::query()
+            ->where('action', 'it.ticket.task.created')
+            ->where('auditable_id', $this->ticket->id)
+            ->count())->toBe(2);
 
     $this->actingAs($this->agent)
         ->getJson("/it/tickets/{$this->ticket->id}")
@@ -89,24 +93,38 @@ test('agents create ordered required and optional tasks with dependencies and as
         ->assertJsonPath('linked_context.tasks.0.team.name', $team->name)
         ->assertJsonPath('linked_context.tasks.0.assignee.name', $assignee->name)
         ->assertJsonPath('linked_context.tasks.0.dependencies.0.id', $approvalTask->id)
-        ->assertJsonPath('linked_context.tasks.1.id', $approvalTask->id);
+        ->assertJsonPath('linked_context.tasks.1.id', $approvalTask->id)
+        ->assertJsonPath('teamOptions.0.id', $team->id)
+        ->assertJsonPath('teamOptions.0.name', $team->name);
+
+    ItTicketEvent::record($this->ticket, 'status_changed', $this->agent->id, [
+        'from' => 'open',
+        'to' => 'in_progress',
+        'reason' => 'Internal triage evidence that must not reach the requester.',
+        'via' => 'agent_triage',
+    ]);
 
     $this->actingAs($this->requester)
         ->getJson("/it/tickets/{$this->ticket->id}")
         ->assertOk()
-        ->assertJsonCount(0, 'linked_context.tasks');
+        ->assertJsonCount(0, 'linked_context.tasks')
+        ->assertJsonCount(0, 'teamOptions')
+        ->assertJsonCount(1, 'events')
+        ->assertJsonPath('events.0.type', 'status_changed')
+        ->assertJsonPath('events.0.payload.from', 'open')
+        ->assertJsonPath('events.0.payload.to', 'in_progress')
+        ->assertJsonMissingPath('events.0.payload.reason')
+        ->assertJsonMissingPath('events.0.payload.via');
 });
 
 test('dependencies and evidence gate completion while optional tasks do not gate resolution', function () {
     $prerequisite = ItWorkTask::factory()->create([
         'ticket_id' => $this->ticket->id,
-        'tenant_id' => 1,
         'title' => 'Capture approval evidence',
         'evidence_required' => true,
     ]);
     $dependent = ItWorkTask::factory()->create([
         'ticket_id' => $this->ticket->id,
-        'tenant_id' => 1,
         'title' => 'Apply the change',
     ]);
     $dependent->dependencies()->attach($prerequisite->id);
@@ -141,7 +159,6 @@ test('dependencies and evidence gate completion while optional tasks do not gate
 
     ItWorkTask::factory()->create([
         'ticket_id' => $this->ticket->id,
-        'tenant_id' => 1,
         'title' => 'Optional follow-up',
         'is_required' => false,
     ]);
@@ -157,7 +174,6 @@ test('dependencies and evidence gate completion while optional tasks do not gate
 test('task updates and reopening are governed and recorded on the ticket timeline', function () {
     $task = ItWorkTask::factory()->create([
         'ticket_id' => $this->ticket->id,
-        'tenant_id' => 1,
     ]);
 
     $this->actingAs($this->agent)
@@ -187,7 +203,69 @@ test('task updates and reopening are governed and recorded on the ticket timelin
         ->and($task->evidence)->toBeNull()
         ->and($this->ticket->events()->where('type', 'work_task_updated')->count())->toBe(1)
         ->and($this->ticket->events()->where('type', 'work_task_completed')->count())->toBe(1)
-        ->and($this->ticket->events()->where('type', 'work_task_reopened')->count())->toBe(1);
+        ->and($this->ticket->events()->where('type', 'work_task_reopened')->count())->toBe(1)
+        ->and(AuditLog::query()
+            ->whereIn('action', [
+                'it.ticket.task.updated',
+                'it.ticket.task.completed',
+                'it.ticket.task.reopened',
+            ])
+            ->where('auditable_id', $this->ticket->id)
+            ->count())->toBe(3);
+});
+
+test('task cancellation is reasoned and settled tickets are immutable', function () {
+    $task = ItWorkTask::factory()->create([
+        'ticket_id' => $this->ticket->id,
+        'is_required' => true,
+    ]);
+
+    $this->actingAs($this->agent)
+        ->patch("/it/tickets/{$this->ticket->id}/tasks/{$task->id}", [
+            'status' => 'cancelled',
+            'is_required' => false,
+        ])
+        ->assertSessionHasErrors('reason');
+    expect($task->fresh()->status)->toBe('pending');
+
+    $this->actingAs($this->agent)
+        ->patch("/it/tickets/{$this->ticket->id}/tasks/{$task->id}", [
+            'status' => 'cancelled',
+            'reason' => 'No longer needed',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('error', 'Required tasks cannot be cancelled. Make the task optional or complete it.');
+
+    $this->actingAs($this->agent)
+        ->patch("/it/tickets/{$this->ticket->id}/tasks/{$task->id}", [
+            'status' => 'cancelled',
+            'is_required' => false,
+            'reason' => 'The approved design no longer requires this optional check.',
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $task->refresh();
+    expect($task->status)->toBe('cancelled')
+        ->and($task->is_required)->toBeFalse()
+        ->and(AuditLog::query()
+            ->where('action', 'it.ticket.task.updated')
+            ->where('auditable_id', $this->ticket->id)
+            ->where('meta->reason', 'The approved design no longer requires this optional check.')
+            ->exists())->toBeTrue();
+
+    $this->actingAs($this->agent)
+        ->post("/it/tickets/{$this->ticket->id}/tasks/{$task->id}/complete")
+        ->assertRedirect()
+        ->assertSessionHas('error', 'Restore this cancelled task before completing it.');
+
+    $this->ticket->update(['status' => 'resolved']);
+    $this->actingAs($this->agent)
+        ->post("/it/tickets/{$this->ticket->id}/tasks", ['title' => 'Late mutation'])
+        ->assertRedirect()
+        ->assertSessionHas('error', 'Reopen this ticket before changing its work tasks.');
+
+    expect(ItWorkTask::query()->where('title', 'Late mutation')->exists())->toBeFalse();
 });
 
 test('task routes reject requesters other Site technicians and cross-ticket dependencies', function () {
@@ -201,9 +279,8 @@ test('task routes reject requesters other Site technicians and cross-ticket depe
         ->post("/it/tickets/{$this->ticket->id}/tasks", ['title' => 'Other Site task'])
         ->assertNotFound();
 
-    $otherTicket = ItTicket::factory()->create(['tenant_id' => 202, 'site_id' => $this->site->id]);
+    $otherTicket = ItTicket::factory()->create(['site_id' => $this->site->id]);
     $otherTask = ItWorkTask::factory()->create([
-        'tenant_id' => 1,
         'ticket_id' => $otherTicket->id,
     ]);
     $this->actingAs($this->agent)
@@ -214,8 +291,8 @@ test('task routes reject requesters other Site technicians and cross-ticket depe
         ->assertRedirect()
         ->assertSessionHas('error');
 
-    $first = ItWorkTask::factory()->create(['tenant_id' => 1, 'ticket_id' => $this->ticket->id]);
-    $second = ItWorkTask::factory()->create(['tenant_id' => 1, 'ticket_id' => $this->ticket->id]);
+    $first = ItWorkTask::factory()->create(['ticket_id' => $this->ticket->id]);
+    $second = ItWorkTask::factory()->create(['ticket_id' => $this->ticket->id]);
     $second->dependencies()->attach($first->id);
     $this->actingAs($this->agent)
         ->patch("/it/tickets/{$this->ticket->id}/tasks/{$first->id}", [

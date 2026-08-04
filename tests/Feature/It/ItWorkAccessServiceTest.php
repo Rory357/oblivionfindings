@@ -323,7 +323,6 @@ test('ticket and child policies delegate direct reads and writes to the canonica
     $majorIncident = ItMajorIncident::factory()->create(['ticket_id' => $ticket->id]);
     $task = ItWorkTask::factory()->create(['ticket_id' => $ticket->id]);
     $approval = ItTicketApproval::query()->create([
-        'tenant_id' => 1,
         'it_ticket_id' => $ticket->id,
         'requested_by' => $unrelatedAgent->id,
         'status' => 'pending',
@@ -343,15 +342,25 @@ test('ticket and child policies delegate direct reads and writes to the canonica
         ->and(Gate::forUser($unrelatedAgent)->allows('decide', $approval))->toBeFalse();
 });
 
-test('merge requires canonical work access to both source and target regardless of legacy storage equality', function () {
+test('merge requires canonical work access to both source and target Sites', function () {
     $site = Site::factory()->create();
     $otherSite = Site::factory()->create();
     $agent = itWorkAccessActor(['it.manage']);
     assignItWorkActorToSite($agent, $site);
 
-    $source = ItTicket::factory()->create(['tenant_id' => 101, 'site_id' => $site->id]);
-    $allowedTarget = ItTicket::factory()->create(['tenant_id' => 202, 'site_id' => $site->id]);
-    $deniedTarget = ItTicket::factory()->create(['tenant_id' => 101, 'site_id' => $otherSite->id]);
+    $source = ItTicket::factory()->create(['site_id' => $site->id]);
+    $conversationAudience = [
+        'requester_user_id' => $source->requester_user_id,
+        'requested_for_user_id' => $source->requested_for_user_id,
+    ];
+    $allowedTarget = ItTicket::factory()->create([
+        'site_id' => $site->id,
+        ...$conversationAudience,
+    ]);
+    $deniedTarget = ItTicket::factory()->create([
+        'site_id' => $otherSite->id,
+        ...$conversationAudience,
+    ]);
 
     expect(Gate::forUser($agent)->allows('merge', [$source, $allowedTarget]))->toBeTrue()
         ->and(Gate::forUser($agent)->allows('merge', [$source, $deniedTarget]))->toBeFalse();

@@ -6,7 +6,6 @@ use App\Domain\It\ItStaffDirectory;
 use App\Models\ItServiceIdentity;
 use App\Models\User;
 use App\Services\AuditLogger;
-use App\Support\LegacyStorageContext;
 use DomainException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -40,7 +39,6 @@ final class ItServiceIdentityCredentialService
             $secret = Str::random(64);
             $token = "ofi_{$publicId}_{$secret}";
             $identity = ItServiceIdentity::query()->create([
-                'tenant_id' => LegacyStorageContext::id(),
                 'actor_user_id' => (int) $data['actor_user_id'],
                 'created_by_user_id' => $manager->id,
                 'public_id' => $publicId,

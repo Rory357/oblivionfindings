@@ -11,6 +11,7 @@ import { ItOverview, type OverviewPayload } from '@/components/it/it-overview';
 import { ItReports } from '@/components/it/it-reports';
 import {
     ItServiceCatalogue,
+    type CatalogFieldOptions,
     type CatalogItem,
 } from '@/components/it/it-service-catalogue';
 import {
@@ -18,17 +19,30 @@ import {
     KbPreview,
     type AssetOption,
     type AssigneeOption,
+    type DeviceOption,
     type EmployeeOption,
     type ItModal,
     type KbOptions,
     type KbRow,
     type RequestRow,
+    type ServiceOption,
+    type SiteOption,
     type SlaCalendar,
     type SlaPolicyGrid,
     type TicketRow,
 } from '@/components/it/it-wizards';
+import { KnowledgeDraftDeleteDialog } from '@/components/it/knowledge-draft-delete-dialog';
+import { ProvisioningCancelDialog } from '@/components/it/provisioning-cancel-dialog';
 import { SlaChip } from '@/components/it/sla-chip';
+import { TicketAdvancedFilters } from '@/components/it/ticket-advanced-filters';
+import { TicketCloseDialog } from '@/components/it/ticket-close-dialog';
 import { TicketDrawer } from '@/components/it/ticket-drawer';
+import { TicketReopenDialog } from '@/components/it/ticket-reopen-dialog';
+import { TicketRoutingSummary } from '@/components/it/ticket-routing-summary';
+import {
+    TicketWaitingDialog,
+    waitingStatusLabel,
+} from '@/components/it/ticket-waiting-dialog';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -181,6 +195,7 @@ interface MyTicketRow {
     category: string;
     priority: string;
     status: string;
+    waiting_party: 'requester' | 'other' | null;
     assignee: string | null;
     age: string | null;
     resolved: string | null;
@@ -199,6 +214,7 @@ interface KbPublishedRow {
     helpful_yes: number;
     helpful_no: number;
     helpful_percent: number | null;
+    user_vote: boolean | null;
     related_service: string | null;
 }
 
@@ -212,6 +228,12 @@ interface Props {
     employeeOptions?: EmployeeOption[];
     /** Active assets register entries for the Log & triage asset-link picker. */
     assetOptions?: AssetOption[];
+    /** Active approved Sites for explicit Log & triage scope. */
+    siteOptions?: SiteOption[];
+    /** Visible canonical Security & Devices records for affected-device links. */
+    deviceOptions?: DeviceOption[];
+    /** Active catalogue services for ticket classification and queue filtering. */
+    serviceOptions?: ServiceOption[];
     /** Knowledge-base catalogue for the agent Knowledge tab (§I). */
     kbArticles?: KbRow[];
     kbOptions?: KbOptions;
@@ -226,6 +248,7 @@ interface Props {
     myTickets: MyTicketRow[];
     /** Permission-safe, published service requests for the catalogue workspace. */
     catalogItems: CatalogItem[];
+    catalogFieldOptions?: CatalogFieldOptions;
     /** Published KB articles for a requester's browse tab (§I). */
     kbPublished?: KbPublishedRow[];
     summary: Summary;
@@ -330,10 +353,12 @@ const TICKET_VIEWS: { key: string; label: string }[] = [
     { key: 'all_open', label: 'All open' },
     { key: 'unassigned', label: 'Unassigned' },
     { key: 'mine', label: 'Mine' },
+    { key: 'owned_by_me', label: 'Owned by me' },
+    { key: 'my_team', label: "My team's work" },
     { key: 'breaching', label: 'Breaching soon' },
     { key: 'breached', label: 'Breached' },
     { key: 'awaiting_reply', label: 'Awaiting reply' },
-    { key: 'waiting', label: 'Waiting on requester' },
+    { key: 'waiting', label: 'All waiting work' },
     { key: 'recently_resolved', label: 'Recently resolved' },
 ];
 
@@ -359,6 +384,9 @@ export default function ItIndex({
     assignees = [],
     employeeOptions = [],
     assetOptions = [],
+    siteOptions = [],
+    deviceOptions = [],
+    serviceOptions = [],
     kbArticles = [],
     kbOptions = { owners: [], sites: [], services: [] },
     filters,
@@ -367,6 +395,7 @@ export default function ItIndex({
     slaCalendar,
     myTickets,
     catalogItems = [],
+    catalogFieldOptions = { employee: [], user: [], asset: [] },
     kbPublished = [],
     summary,
     can,
@@ -624,14 +653,38 @@ export default function ItIndex({
         );
     };
 
+    const clearAdvancedTicketFilters = () =>
+        navigate({
+            source: undefined,
+            work_type: undefined,
+            service: undefined,
+            age: undefined,
+            missing: undefined,
+            reopened: undefined,
+            first_contact: undefined,
+            open_only: undefined,
+            device_linked: undefined,
+            resolved_from: undefined,
+            resolved_to: undefined,
+        });
+
     /* ---------------- bulk selection (§F2 tickets · §H provisioning) ---------------- */
     // Both queues share one per-page selection hook (useRowSelection, below).
     // Only one tab is visible at a time, so the busy flag is shared.
 
     const ticketSel = useRowSelection((tickets?.data ?? []).map((t) => t.id));
     const reqSel = useRowSelection((requests?.data ?? []).map((r) => r.id));
-    const [confirmBulkClose, setConfirmBulkClose] = useState(false);
+    const [closeSelectedTickets, setCloseSelectedTickets] = useState(false);
+    const [closeTicket, setCloseTicket] = useState<TicketRow | null>(null);
+    const [reopenTicket, setReopenTicket] = useState<{
+        id: number;
+        reference: string | null;
+        audience: 'agent' | 'requester';
+    } | null>(null);
+    const [waitingSelectedTickets, setWaitingSelectedTickets] = useState(false);
+    const [waitingTicket, setWaitingTicket] = useState<TicketRow | null>(null);
     const [confirmBulkFulfil, setConfirmBulkFulfil] = useState(false);
+    const [cancelRequest, setCancelRequest] = useState<RequestRow | null>(null);
     const [bulkBusy, setBulkBusy] = useState(false);
     const [confirmKbDelete, setConfirmKbDelete] = useState<KbRow | null>(null);
     const [confirmKbRetire, setConfirmKbRetire] = useState<KbRow | null>(null);
@@ -643,16 +696,14 @@ export default function ItIndex({
     );
     const [kbSearch, setKbSearch] = useState('');
     const [kbCategory, setKbCategory] = useState<string>(ALL);
-    // One-vote-per-article guard is client-side (localStorage), fine for v1.
-    const [votedKb, setVotedKb] = useState<Set<number>>(() => {
-        try {
-            return new Set<number>(
-                JSON.parse(localStorage.getItem('it.kb.voted') ?? '[]'),
-            );
-        } catch {
-            return new Set<number>();
-        }
-    });
+    // The server is canonical; this local overlay keeps the open reader in
+    // sync while its partial Inertia refresh returns the updated payload.
+    const [submittedKbVotes, setSubmittedKbVotes] = useState<
+        Record<number, boolean>
+    >({});
+    const [submittingKbVoteFor, setSubmittingKbVoteFor] = useState<
+        number | null
+    >(null);
 
     const filteredKb = kbPublished.filter((a) => {
         const q = kbSearch.trim().toLowerCase();
@@ -663,6 +714,14 @@ export default function ItIndex({
                 (a.body ?? '').toLowerCase().includes(q))
         );
     });
+    const currentReaderArticle = readerArticle
+        ? (kbPublished.find((article) => article.id === readerArticle.id) ??
+          readerArticle)
+        : null;
+    const readerVote = currentReaderArticle
+        ? (submittedKbVotes[currentReaderArticle.id] ??
+          currentReaderArticle.user_vote)
+        : null;
 
     /** Open the reader and count the read (server guards publication and access). */
     const openArticle = (a: KbPublishedRow) => {
@@ -679,7 +738,17 @@ export default function ItIndex({
     };
 
     const voteHelpful = (a: KbPublishedRow, helpful: boolean) => {
-        if (votedKb.has(a.id)) return;
+        const serverArticle = kbPublished.find(
+            (article) => article.id === a.id,
+        );
+        if (
+            submittingKbVoteFor !== null ||
+            (submittedKbVotes[a.id] ??
+                serverArticle?.user_vote ??
+                a.user_vote) !== null
+        )
+            return;
+        setSubmittingKbVoteFor(a.id);
         router.post(
             `/it/kb/${a.id}/helpful`,
             { helpful },
@@ -692,16 +761,19 @@ export default function ItIndex({
                         | { success?: string }
                         | undefined;
                     if (flash?.success) toast.success(flash.success);
+                    const canonicalVote = (
+                        page.props.kbPublished as KbPublishedRow[] | undefined
+                    )?.find((article) => article.id === a.id)?.user_vote;
+                    if (typeof canonicalVote === 'boolean') {
+                        setSubmittedKbVotes((current) => ({
+                            ...current,
+                            [a.id]: canonicalVote,
+                        }));
+                    }
                 },
+                onFinish: () => setSubmittingKbVoteFor(null),
             },
         );
-        const next = new Set(votedKb).add(a.id);
-        setVotedKb(next);
-        try {
-            localStorage.setItem('it.kb.voted', JSON.stringify([...next]));
-        } catch {
-            /* private mode — best effort */
-        }
     };
 
     /** POST a selection to a bulk endpoint; surface the flash, then clear it. */
@@ -784,21 +856,6 @@ export default function ItIndex({
             .then(() => toast.success(`${what} copied.`));
     };
 
-    /** Delete a KB article (router.delete has no data arg — its own helper). */
-    const runKbDelete = (a: KbRow) => {
-        router.delete(`/it/kb/${a.id}`, {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                const flash = page.props.flash as
-                    | { error?: string; success?: string }
-                    | undefined;
-                if (flash?.error) toast.error(flash.error);
-                else if (flash?.success) toast.success(flash.success);
-            },
-        });
-        setConfirmKbDelete(null);
-    };
-
     const runKbRetire = () => {
         if (!confirmKbRetire || retirementReason.trim() === '') {
             toast.error('Add a reason so the retirement remains auditable.');
@@ -812,36 +869,67 @@ export default function ItIndex({
     };
 
     const kbMenu = (a: KbRow) => {
-        const lifecycleAction =
+        const lifecycleActions =
             a.status === 'draft'
-                ? {
-                      kind: 'item' as const,
-                      label: 'Send for review',
-                      icon: Send,
-                      onSelect: () =>
-                          act('post', `/it/kb/${a.id}/submit-review`),
-                  }
+                ? [
+                      {
+                          kind: 'item' as const,
+                          label: 'Send for review',
+                          icon: Send,
+                          onSelect: () =>
+                              act('post', `/it/kb/${a.id}/submit-review`),
+                      },
+                  ]
                 : a.status === 'in_review'
-                  ? {
-                        kind: 'item' as const,
-                        label: 'Approve & publish',
-                        icon: CheckCircle2,
-                        tone: 'success' as const,
-                        onSelect: () => act('post', `/it/kb/${a.id}/publish`),
-                    }
+                  ? [
+                        {
+                            kind: 'item' as const,
+                            label: 'Approve & publish',
+                            icon: CheckCircle2,
+                            tone: 'success' as const,
+                            onSelect: () =>
+                                act('post', `/it/kb/${a.id}/publish`),
+                        },
+                        {
+                            kind: 'item' as const,
+                            label: 'Return to draft',
+                            icon: RotateCcw,
+                            onSelect: () =>
+                                act('post', `/it/kb/${a.id}/restore`),
+                        },
+                    ]
                   : a.status === 'published'
-                    ? {
+                    ? [
+                          {
+                              kind: 'item' as const,
+                              label: 'Retire article',
+                              icon: Archive,
+                              onSelect: () => setConfirmKbRetire(a),
+                          },
+                      ]
+                    : [
+                          {
+                              kind: 'item' as const,
+                              label: 'Restore as draft',
+                              icon: RotateCcw,
+                              onSelect: () =>
+                                  act('post', `/it/kb/${a.id}/restore`),
+                          },
+                      ];
+
+        const deleteDraft =
+            a.status === 'draft'
+                ? [
+                      { kind: 'divider' as const },
+                      {
                           kind: 'item' as const,
-                          label: 'Retire article',
-                          icon: Archive,
-                          onSelect: () => setConfirmKbRetire(a),
-                      }
-                    : {
-                          kind: 'item' as const,
-                          label: 'Restore as draft',
-                          icon: RotateCcw,
-                          onSelect: () => act('post', `/it/kb/${a.id}/restore`),
-                      };
+                          label: 'Delete draft',
+                          icon: XCircle,
+                          tone: 'critical' as const,
+                          onSelect: () => setConfirmKbDelete(a),
+                      },
+                  ]
+                : [];
 
         return ctx.open([
             {
@@ -850,15 +938,8 @@ export default function ItIndex({
                 icon: Pencil,
                 onSelect: () => setModal({ type: 'kb', article: a }),
             },
-            lifecycleAction,
-            { kind: 'divider' as const },
-            {
-                kind: 'item' as const,
-                label: 'Delete',
-                icon: XCircle,
-                tone: 'critical' as const,
-                onSelect: () => setConfirmKbDelete(a),
-            },
+            ...lifecycleActions,
+            ...deleteDraft,
         ]);
     };
 
@@ -948,8 +1029,7 @@ export default function ItIndex({
                           label: 'Cancel request',
                           icon: XCircle,
                           tone: 'critical' as const,
-                          onSelect: () =>
-                              act('post', `/it/provisioning/${r.id}/cancel`),
+                          onSelect: () => setCancelRequest(r),
                       },
                   ] as const)
                 : []),
@@ -997,6 +1077,15 @@ export default function ItIndex({
                           onSelect: () =>
                               setModal({ type: 'assign-ticket', ticket: t }),
                       },
+                      {
+                          kind: 'item' as const,
+                          label:
+                              t.status === 'waiting'
+                                  ? 'Edit waiting details…'
+                                  : 'Set waiting…',
+                          icon: Timer,
+                          onSelect: () => setWaitingTicket(t),
+                      },
                       { kind: 'divider' as const },
                       {
                           kind: 'item' as const,
@@ -1019,17 +1108,20 @@ export default function ItIndex({
                 ? [
                       {
                           kind: 'item' as const,
-                          label: 'Close ticket',
+                          label: 'Close ticket…',
                           icon: XCircle,
-                          onSelect: () =>
-                              act('post', `/it/tickets/${t.id}/close`),
+                          onSelect: () => setCloseTicket(t),
                       },
                       {
                           kind: 'item' as const,
-                          label: 'Reopen',
+                          label: 'Reopen…',
                           icon: RotateCcw,
                           onSelect: () =>
-                              act('post', `/it/tickets/${t.id}/reopen`),
+                              setReopenTicket({
+                                  id: t.id,
+                                  reference: t.reference,
+                                  audience: 'agent',
+                              }),
                       },
                   ]
                 : []),
@@ -1037,10 +1129,14 @@ export default function ItIndex({
                 ? [
                       {
                           kind: 'item' as const,
-                          label: 'Reopen',
+                          label: 'Reopen…',
                           icon: RotateCcw,
                           onSelect: () =>
-                              act('post', `/it/tickets/${t.id}/reopen`),
+                              setReopenTicket({
+                                  id: t.id,
+                                  reference: t.reference,
+                                  audience: 'agent',
+                              }),
                       },
                   ]
                 : []),
@@ -1084,10 +1180,14 @@ export default function ItIndex({
                 ? ([
                       {
                           kind: 'item' as const,
-                          label: 'Reopen',
+                          label: 'Reopen…',
                           icon: RotateCcw,
                           onSelect: () =>
-                              act('post', `/it/tickets/${t.id}/reopen`),
+                              setReopenTicket({
+                                  id: t.id,
+                                  reference: t.reference,
+                                  audience: 'requester',
+                              }),
                       },
                   ] as const)
                 : []),
@@ -1112,6 +1212,9 @@ export default function ItIndex({
                 assignees={assignees}
                 employeeOptions={employeeOptions}
                 assetOptions={assetOptions}
+                siteOptions={siteOptions}
+                deviceOptions={deviceOptions}
+                serviceOptions={serviceOptions}
                 slaPolicies={slaPolicies}
                 slaCalendar={slaCalendar}
                 kbSuggestions={kbPublished}
@@ -1157,16 +1260,27 @@ export default function ItIndex({
                                 <span className="text-[13px] font-medium">
                                     Was this helpful?
                                 </span>
-                                {votedKb.has(readerArticle.id) ? (
-                                    <span className="text-[13px] text-muted-foreground">
-                                        Thanks — that helps us tune the
-                                        knowledge base.
+                                {readerVote !== null ? (
+                                    <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                                        {readerVote ? (
+                                            <ThumbsUp className="h-4 w-4" />
+                                        ) : (
+                                            <ThumbsDown className="h-4 w-4" />
+                                        )}
+                                        Feedback recorded:{' '}
+                                        {readerVote ? 'Helpful' : 'Not helpful'}
+                                        .
                                     </span>
                                 ) : (
                                     <>
                                         <Button
                                             size="sm"
                                             variant="outline"
+                                            className="min-h-11"
+                                            disabled={
+                                                submittingKbVoteFor ===
+                                                readerArticle.id
+                                            }
                                             onClick={() =>
                                                 voteHelpful(readerArticle, true)
                                             }
@@ -1177,6 +1291,11 @@ export default function ItIndex({
                                         <Button
                                             size="sm"
                                             variant="outline"
+                                            className="min-h-11"
+                                            disabled={
+                                                submittingKbVoteFor ===
+                                                readerArticle.id
+                                            }
                                             onClick={() =>
                                                 voteHelpful(
                                                     readerArticle,
@@ -1195,31 +1314,64 @@ export default function ItIndex({
                 </DialogContent>
             </Dialog>
 
-            <AlertDialog
-                open={confirmBulkClose}
-                onOpenChange={setConfirmBulkClose}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            Close {ticketSel.selected.size} ticket
-                            {ticketSel.selected.size === 1 ? '' : 's'}?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Closed tickets leave the working queue. Requesters
-                            can still reopen within seven days.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Keep open</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() => runBulk({ action: 'close' })}
-                        >
-                            Close tickets
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            <TicketCloseDialog
+                open={closeSelectedTickets}
+                onOpenChange={setCloseSelectedTickets}
+                scope="bulk"
+                ticketIds={[...ticketSel.selected]}
+                onCompleted={() => ticketSel.clear()}
+            />
+            <TicketCloseDialog
+                open={closeTicket !== null}
+                onOpenChange={(open) => !open && setCloseTicket(null)}
+                scope="single"
+                ticketIds={closeTicket ? [closeTicket.id] : []}
+                ticketReference={closeTicket?.reference}
+            />
+            <TicketReopenDialog
+                open={reopenTicket !== null}
+                onOpenChange={(open) => !open && setReopenTicket(null)}
+                ticketId={reopenTicket?.id ?? null}
+                ticketReference={reopenTicket?.reference}
+                audience={reopenTicket?.audience ?? 'agent'}
+            />
+            <TicketWaitingDialog
+                open={waitingSelectedTickets}
+                onOpenChange={setWaitingSelectedTickets}
+                scope="bulk"
+                ticketIds={[...ticketSel.selected]}
+                onCompleted={() => ticketSel.clear()}
+            />
+            <TicketWaitingDialog
+                open={waitingTicket !== null}
+                onOpenChange={(open) => !open && setWaitingTicket(null)}
+                scope="single"
+                ticketIds={waitingTicket ? [waitingTicket.id] : []}
+                ticketReference={waitingTicket?.reference}
+                current={
+                    waitingTicket?.status === 'waiting'
+                        ? {
+                              party: waitingTicket.waiting_party ?? 'other',
+                              reason: waitingTicket.waiting_reason,
+                              next_action: waitingTicket.next_action,
+                              since: waitingTicket.waiting_since,
+                              since_human: null,
+                          }
+                        : null
+                }
+            />
+
+            <ProvisioningCancelDialog
+                request={cancelRequest}
+                open={cancelRequest !== null}
+                onOpenChange={(open) => !open && setCancelRequest(null)}
+            />
+
+            <KnowledgeDraftDeleteDialog
+                article={confirmKbDelete}
+                open={confirmKbDelete !== null}
+                onOpenChange={(open) => !open && setConfirmKbDelete(null)}
+            />
 
             <AlertDialog
                 open={confirmBulkFulfil}
@@ -1244,33 +1396,6 @@ export default function ItIndex({
                             }
                         >
                             Fulfil requests
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            <AlertDialog
-                open={confirmKbDelete !== null}
-                onOpenChange={(open) => !open && setConfirmKbDelete(null)}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            Delete “{confirmKbDelete?.title}”?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This removes the article from the knowledge base.
-                            This can’t be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Keep it</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() =>
-                                confirmKbDelete && runKbDelete(confirmKbDelete)
-                            }
-                        >
-                            Delete article
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -1995,6 +2120,30 @@ export default function ItIndex({
                                     to={filters?.to ?? ''}
                                     onChange={(k, val) => applyFilter(k, val)}
                                 />
+                                <TicketAdvancedFilters
+                                    values={{
+                                        source: filters?.source ?? null,
+                                        workType: filters?.work_type ?? null,
+                                        service: filters?.service ?? null,
+                                        age: filters?.age ?? null,
+                                        missing: filters?.missing ?? null,
+                                        reopened: filters?.reopened ?? false,
+                                        firstContact:
+                                            filters?.first_contact ?? false,
+                                        openOnly: filters?.open_only ?? false,
+                                        deviceLinked:
+                                            filters?.device_linked ?? false,
+                                        resolvedFrom:
+                                            filters?.resolved_from ?? null,
+                                        resolvedTo:
+                                            filters?.resolved_to ?? null,
+                                    }}
+                                    services={serviceOptions}
+                                    onChange={(key, value) =>
+                                        navigate({ [key]: value })
+                                    }
+                                    onClear={clearAdvancedTicketFilters}
+                                />
                                 <div className="ml-auto flex items-center gap-2">
                                     {can.manage ? (
                                         <Button
@@ -2090,12 +2239,16 @@ export default function ItIndex({
                                     </Select>
                                     <Select
                                         value=""
-                                        onValueChange={(v) =>
+                                        onValueChange={(v) => {
+                                            if (v === 'waiting') {
+                                                setWaitingSelectedTickets(true);
+                                                return;
+                                            }
                                             runBulk({
                                                 action: 'status',
                                                 status: v,
-                                            })
-                                        }
+                                            });
+                                        }}
                                     >
                                         <SelectTrigger
                                             className="h-8 w-[150px]"
@@ -2118,9 +2271,10 @@ export default function ItIndex({
                                     <Button
                                         size="sm"
                                         variant="outline"
+                                        className="min-h-11"
                                         disabled={bulkBusy}
                                         onClick={() =>
-                                            setConfirmBulkClose(true)
+                                            setCloseSelectedTickets(true)
                                         }
                                     >
                                         <XCircle className="h-3.5 w-3.5" />{' '}
@@ -2167,7 +2321,7 @@ export default function ItIndex({
                                         onSort={applySort}
                                     />
                                     <span>Requester</span>
-                                    <span>Assignee</span>
+                                    <span>Ownership</span>
                                     <SortHeader
                                         label="Priority"
                                         col="priority"
@@ -2234,7 +2388,11 @@ export default function ItIndex({
                                                     {t.reference
                                                         ? `${t.reference} · `
                                                         : ''}
-                                                    {label(t.category)}
+                                                    {label(t.work_type)}
+                                                    {t.service
+                                                        ? ` · ${t.service.name}`
+                                                        : ''}
+                                                    {` · ${label(t.category)}`}
                                                     {t.description
                                                         ? ` · ${t.description}`
                                                         : ''}
@@ -2244,8 +2402,15 @@ export default function ItIndex({
                                         <span className="truncate text-[12.5px] text-muted-foreground">
                                             {t.requester}
                                         </span>
-                                        <span className="truncate text-[12.5px] text-muted-foreground">
-                                            {t.assignee?.name ?? 'Unassigned'}
+                                        <span className="min-w-0 text-[12.5px] text-muted-foreground">
+                                            <span className="block truncate">
+                                                {t.assignee?.name ??
+                                                    'Unassigned'}
+                                            </span>
+                                            <TicketRoutingSummary
+                                                routing={t.routing}
+                                                compact
+                                            />
                                         </span>
                                         <span>
                                             <StatusBadge
@@ -2268,7 +2433,11 @@ export default function ItIndex({
                                                 }
                                                 size="sm"
                                             >
-                                                {label(t.status)}
+                                                {t.status === 'waiting'
+                                                    ? waitingStatusLabel(
+                                                          t.waiting_party,
+                                                      )
+                                                    : label(t.status)}
                                             </StatusBadge>
                                         </span>
                                         <span className="min-w-0">
@@ -2329,7 +2498,10 @@ export default function ItIndex({
 
                     {/* ── Service catalogue (everyone with it.request) ── */}
                     {can.request && tab === 'catalog' ? (
-                        <ItServiceCatalogue items={catalogItems} />
+                        <ItServiceCatalogue
+                            items={catalogItems}
+                            fieldOptions={catalogFieldOptions}
+                        />
                     ) : null}
 
                     {/* ── My tickets (everyone with it.request) ── */}
@@ -2469,7 +2641,10 @@ export default function ItIndex({
                                                 size="sm"
                                             >
                                                 {t.status === 'waiting'
-                                                    ? 'Waiting on you'
+                                                    ? waitingStatusLabel(
+                                                          t.waiting_party,
+                                                          true,
+                                                      )
                                                     : label(t.status)}
                                             </StatusBadge>
                                             <StatusDots status={t.status} />

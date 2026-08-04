@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Queclink;
 
-use App\Models\Queclink\QueclinkAuditEvent;
+use App\Domain\SecurityDevices\Models\Device;
 use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkPendingCommand;
 use App\Models\Queclink\QueclinkPreset;
@@ -12,6 +12,7 @@ use Database\Seeders\QueclinkPresetSeeder;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class QueclinkPresetTest extends TestCase
@@ -32,8 +33,16 @@ class QueclinkPresetTest extends TestCase
 
     private function pairedGl30(string $imei = '867963069916998'): QueclinkDevice
     {
+        $device = Device::factory()->tracking()->create([
+            'provider' => 'queclink',
+            'category' => 'personal_tracker',
+            'imei' => $imei,
+            'device_uid' => $imei,
+        ]);
+
         return QueclinkDevice::create([
             'imei' => $imei,
+            'device_id' => $device->id,
             'tenant_id' => 1,
             'status' => QueclinkDevice::STATUS_PAIRED,
             'model_hint' => 'GL30MEU',
@@ -60,33 +69,19 @@ class QueclinkPresetTest extends TestCase
                     && collect($presets)->firstWhere('slug', 'resident-safety')['is_system'] === true));
     }
 
-    public function test_applying_resident_safety_preset_queues_identical_cfg_to_the_button(): void
+    public function test_applying_resident_safety_preset_hands_off_without_queuing_provider_commands(): void
     {
         $device = $this->pairedGl30();
         $preset = QueclinkPreset::where('slug', 'resident-safety')->firstOrFail();
 
         $this->actingAs($this->admin)
             ->post("/security-devices/integrations/queclink/devices/{$device->id}/presets/{$preset->id}/apply")
-            ->assertRedirect();
+            ->assertRedirectContains('/security-devices/devices/'.$device->device_id)
+            ->assertRedirectContains('action=configuration.apply');
 
-        $this->assertSame(1, QueclinkPendingCommand::query()->where('queclink_device_id', $device->id)->count());
-
-        $cmd = QueclinkPendingCommand::first();
-        $this->assertSame('GTCFG', $cmd->command_word);
-        // Byte-for-byte the same payload the one-click resident-safety button emits.
-        $this->assertStringContainsString(
-            'AT+GTCFG=gl30,,GL30MEU,150,08E3,006F,1,30,,0,1200,,1,,,,1,1,0000,,,20,1,,1,2,1,0,',
-            $cmd->raw_command,
-        );
-
-        $this->assertDatabaseHas('queclink_audit_events', [
-            'queclink_device_id' => $device->id,
-            'event_type' => 'preset_apply',
-            'section' => 'tracking',
-            'outcome' => 'succeeded',
-            'raw_command' => null,
-            'notes' => null,
-        ]);
+        $this->assertSame(0, QueclinkPendingCommand::query()->count());
+        $this->assertNotNull($preset->configurationProfile);
+        $this->assertSame([], $preset->payload);
     }
 
     public function test_apply_preset_rejects_unpaired_device(): void
@@ -127,8 +122,16 @@ class QueclinkPresetTest extends TestCase
         $this->assertFalse($preset->is_system);
         $this->assertSame(1, (int) $preset->tenant_id);
         $this->assertSame($this->admin->id, $preset->created_by_user_id);
-        $this->assertEquals(120, $preset->payload['tracking']['continuous_send_interval_seconds']);
-        $this->assertArrayNotHasKey('battery_low_percentage', $preset->payload['tracking']);
+        $this->assertEquals(120, $preset->sectionPayloads()['tracking']['continuous_send_interval_seconds']);
+        $this->assertArrayNotHasKey('battery_low_percentage', $preset->sectionPayloads()['tracking']);
+        $this->assertSame([], $preset->payload);
+        $this->assertNotNull($preset->configurationProfile);
+        $this->assertStringNotContainsString(
+            'continuous_send_interval_seconds',
+            (string) DB::table('device_configuration_profiles')
+                ->where('id', $preset->device_configuration_profile_id)
+                ->value('encrypted_payload'),
+        );
     }
 
     public function test_saving_a_preset_rejects_unknown_sections(): void
@@ -175,14 +178,9 @@ class QueclinkPresetTest extends TestCase
         $this->assertDatabaseMissing('queclink_presets', ['id' => $preset->id]);
     }
 
-    public function test_bulk_apply_preset_queues_one_command_per_section_for_each_device(): void
+    public function test_bulk_apply_preset_hands_off_to_governed_bulk_management(): void
     {
-        $devices = collect(range(1, 3))->map(fn (int $i) => QueclinkDevice::create([
-            'imei' => '86796306991690'.$i,
-            'tenant_id' => 1,
-            'status' => QueclinkDevice::STATUS_PAIRED,
-            'model_hint' => 'GL30MEU',
-        ]));
+        $devices = collect(range(1, 3))->map(fn (int $i) => $this->pairedGl30('86796306991690'.$i));
         $preset = QueclinkPreset::where('slug', 'resident-safety')->firstOrFail();
 
         $this->actingAs($this->admin)
@@ -191,13 +189,9 @@ class QueclinkPresetTest extends TestCase
                 'action' => 'apply_preset',
                 'preset_id' => $preset->id,
             ])
-            ->assertRedirect();
+            ->assertRedirectContains('/security-devices/tracking')
+            ->assertRedirectContains('bulk_action=configuration.apply');
 
-        // resident-safety has one section (tracking) → one GTCFG per device.
-        $this->assertSame(3, QueclinkPendingCommand::query()->where('command_word', 'GTCFG')->count());
-        $this->assertSame(3, QueclinkAuditEvent::query()
-            ->where('event_type', 'bulk_apply')
-            ->where('section', 'tracking')
-            ->count());
+        $this->assertSame(0, QueclinkPendingCommand::query()->count());
     }
 }

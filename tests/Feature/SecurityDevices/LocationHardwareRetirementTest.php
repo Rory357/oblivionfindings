@@ -37,11 +37,11 @@ class LocationHardwareRetirementTest extends TestCase
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
-            'organization_id' => 1,
+
         ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
 
-        $this->site = Site::factory()->create(['tenant_id' => 1]);
+        $this->site = Site::factory()->create([]);
     }
 
     // ── Sites hardware now reads from canonical devices ───────────
@@ -76,7 +76,7 @@ class LocationHardwareRetirementTest extends TestCase
     public function test_client_profile_tracker_reads_from_canonical_devices(): void
     {
         $client = Client::factory()->create([
-            'organization_id' => 1,
+
             'site_id' => $this->site->id,
             'status' => 'active',
         ]);
@@ -84,7 +84,6 @@ class LocationHardwareRetirementTest extends TestCase
         $this->createActiveTrackingConsent($client, 'Asset Location Tracking (Safety)');
 
         $device = Device::factory()->tracking()->create([
-            'tenant_id' => 1,
             'name' => 'Client GPS',
         ]);
         DeviceAssignment::create([
@@ -131,14 +130,13 @@ class LocationHardwareRetirementTest extends TestCase
     public function test_resident_tracking_reads_from_canonical_devices(): void
     {
         $client = Client::factory()->create([
-            'organization_id' => 1,
+
             'site_id' => $this->site->id,
             'status' => 'active',
         ]);
         $consent = $this->createFleetTrackingConsent($client);
 
         $device = Device::factory()->tracking()->create([
-            'tenant_id' => 1,
             'name' => 'Resident Pendant',
         ]);
         DeviceAssignment::create([

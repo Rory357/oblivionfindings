@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\ItTicket;
 use App\Models\ItTicketApproval;
 use App\Models\Role;
@@ -56,7 +57,6 @@ function approvalTicket(array $overrides = []): ItTicket
 function pendingApprovalFor(ItTicket $ticket, User $requester): ItTicketApproval
 {
     return ItTicketApproval::create([
-        'tenant_id' => 1,
         'it_ticket_id' => $ticket->id,
         'requested_by' => $requester->id,
         'status' => 'pending',
@@ -105,7 +105,6 @@ test('an agent cannot approve their own request (separation of duties)', functio
 test('a decided approval cannot be decided again', function () {
     $ticket = approvalTicket(['requires_approval' => true]);
     $approval = ItTicketApproval::create([
-        'tenant_id' => 1,
         'it_ticket_id' => $ticket->id,
         'requested_by' => $this->agent->id,
         'approver_id' => $this->manager->id,
@@ -151,9 +150,31 @@ test('an agent requests approval, notifying the other agents but not themselves'
         ->post("/it/tickets/{$ticket->id}/approvals", ['reason' => 'New starter needs the shared mailbox'])
         ->assertRedirect();
 
-    expect($ticket->approvals()->where('status', 'pending')->count())->toBe(1);
+    expect($ticket->approvals()->where('status', 'pending')->count())->toBe(1)
+        ->and(AuditLog::query()
+            ->where('action', 'it.ticket.approval.requested')
+            ->where('auditable_id', $ticket->id)
+            ->exists())->toBeTrue();
     Notification::assertSentTo($this->manager, TicketApprovalNotification::class);
     Notification::assertNotSentTo($this->agent, TicketApprovalNotification::class);
+});
+
+test('repeating an approval request is explained without creating duplicate work', function () {
+    $ticket = approvalTicket(['requires_approval' => true]);
+
+    $this->actingAs($this->agent)
+        ->post("/it/tickets/{$ticket->id}/approvals", ['reason' => 'Manager sign-off required'])
+        ->assertRedirect();
+
+    $this->actingAs($this->manager)
+        ->from(route('it.tickets.show', $ticket))
+        ->post("/it/tickets/{$ticket->id}/approvals", ['reason' => 'Duplicate request'])
+        ->assertRedirect()
+        ->assertSessionHas('error', 'This ticket already has an active approval decision.');
+
+    expect($ticket->approvals()->count())->toBe(1)
+        ->and($ticket->events()->where('type', 'approval_requested')->count())->toBe(1)
+        ->and(AuditLog::query()->where('action', 'it.ticket.approval.requested')->count())->toBe(1);
 });
 
 test('a manager approves a pending request and the requester is told', function () {
@@ -169,7 +190,43 @@ test('a manager approves a pending request and the requester is told', function 
     expect($approval->status)->toBe('approved');
     expect($approval->approver_id)->toBe($this->manager->id);
     expect($approval->decided_at)->not->toBeNull();
+    expect(AuditLog::query()
+        ->where('action', 'it.ticket.approval.approved')
+        ->where('auditable_id', $ticket->id)
+        ->exists())->toBeTrue();
     Notification::assertSentTo($this->agent, TicketApprovalNotification::class);
+});
+
+test('a decided approval cannot be decided again or emit a contradictory event', function () {
+    $ticket = approvalTicket(['requires_approval' => true]);
+    $approval = pendingApprovalFor($ticket, $this->agent);
+
+    $this->actingAs($this->manager)
+        ->post("/it/approvals/{$approval->id}/decide", ['decision' => 'approve'])
+        ->assertRedirect();
+
+    $this->actingAs($this->worker)
+        ->from(route('it.tickets.show', $ticket))
+        ->post("/it/approvals/{$approval->id}/decide", [
+            'decision' => 'reject',
+            'reason' => 'Conflicting late decision',
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($this->manager)
+        ->from(route('it.tickets.show', $ticket))
+        ->post("/it/approvals/{$approval->id}/decide", [
+            'decision' => 'reject',
+            'reason' => 'Conflicting late decision',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('error', 'This approval has already been decided.');
+
+    expect($approval->refresh()->status)->toBe('approved')
+        ->and($ticket->events()->where('type', 'approval_approved')->count())->toBe(1)
+        ->and($ticket->events()->where('type', 'approval_rejected')->count())->toBe(0)
+        ->and(AuditLog::query()->where('action', 'it.ticket.approval.approved')->count())->toBe(1)
+        ->and(AuditLog::query()->where('action', 'it.ticket.approval.rejected')->count())->toBe(0);
 });
 
 test('rejecting records the verdict and notifies the requester', function () {
@@ -183,6 +240,17 @@ test('rejecting records the verdict and notifies the requester', function () {
 
     expect($approval->refresh()->status)->toBe('rejected');
     Notification::assertSentTo($this->agent, TicketApprovalNotification::class);
+});
+
+test('a rejection requires a reason that the requester can act on', function () {
+    $ticket = approvalTicket(['requires_approval' => true]);
+    $approval = pendingApprovalFor($ticket, $this->agent);
+
+    $this->actingAs($this->manager)
+        ->post("/it/approvals/{$approval->id}/decide", ['decision' => 'reject'])
+        ->assertSessionHasErrors('reason');
+
+    expect($approval->refresh()->status)->toBe('pending');
 });
 
 test('an agent cannot approve their own request through the route', function () {
@@ -208,7 +276,6 @@ function approvedTicket(int $requesterId, int $approverId): ItTicket
         'status' => 'in_progress',
     ]);
     ItTicketApproval::create([
-        'tenant_id' => 1,
         'it_ticket_id' => $ticket->id,
         'requested_by' => $requesterId,
         'approver_id' => $approverId,
@@ -234,7 +301,6 @@ test('a ticket needing approval cannot be resolved until it is approved', functi
     expect($ticket->refresh()->status)->toBe('in_progress');
 
     ItTicketApproval::create([
-        'tenant_id' => 1,
         'it_ticket_id' => $ticket->id,
         'requested_by' => $this->agent->id,
         'approver_id' => $this->manager->id,
@@ -254,7 +320,6 @@ test('a rejected approval still blocks resolution', function () {
         'status' => 'in_progress',
     ]);
     ItTicketApproval::create([
-        'tenant_id' => 1,
         'it_ticket_id' => $ticket->id,
         'requested_by' => $this->agent->id,
         'approver_id' => $this->manager->id,
@@ -278,15 +343,20 @@ test('the update route also refuses to resolve an unapproved ticket', function (
     $this->actingAs($this->agent)
         ->from(route('it.tickets.show', $ticket))
         ->patch("/it/tickets/{$ticket->id}", ['status' => 'resolved'])
-        ->assertSessionHas('error');
+        ->assertSessionHasErrors('status');
     expect($ticket->refresh()->status)->toBe('in_progress');
 });
 
-test('an approved ticket resolves through the update route', function () {
+test('an approved ticket still resolves only through the governed resolution journey', function () {
     $ticket = approvedTicket($this->agent->id, $this->manager->id);
 
     $this->actingAs($this->agent)
         ->patch("/it/tickets/{$ticket->id}", ['status' => 'resolved'])
+        ->assertSessionHasErrors('status');
+    expect($ticket->refresh()->status)->toBe('in_progress');
+
+    $this->actingAs($this->agent)
+        ->post("/it/tickets/{$ticket->id}/resolve", ['note' => 'Approved account access was provisioned and verified.'])
         ->assertRedirect();
     expect($ticket->refresh()->status)->toBe('resolved');
 });

@@ -226,6 +226,17 @@ it('does not perform DNS resolution for a numeric address', function () {
         ->and($resolver->calls)->toBe([]);
 });
 
+it('authorises ICMP by approved network without inventing a transport port', function () {
+    [$policy, $resolver] = taskFourPolicy();
+
+    $authorised = $policy->authorise(9, 81, ProbeTarget::icmp('10.44.1.8'));
+
+    expect($authorised->scheme)->toBe('icmp')
+        ->and($authorised->port)->toBe(0)
+        ->and($authorised->addresses)->toBe(['10.44.1.8'])
+        ->and($resolver->calls)->toBe([]);
+});
+
 it('normalises IDN case and a single trailing root dot', function (string $input, string $normalised) {
     [$policy, $resolver] = taskFourPolicy([$normalised => ['10.44.1.8']]);
 

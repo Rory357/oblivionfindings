@@ -8,7 +8,6 @@ use App\Models\ItMailboxConnection;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\User;
-use App\Support\LegacyStorageContext;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -88,7 +87,6 @@ class InboundEmailIngestor
                 }
 
                 $ticket->comments()->create([
-                    'tenant_id' => LegacyStorageContext::id(),
                     'author_user_id' => $sender->id,
                     'body' => $message['text'] !== '' ? $message['text'] : '(no message body)',
                     'is_internal' => false,
@@ -110,7 +108,6 @@ class InboundEmailIngestor
             }
 
             $ticket = ItTicket::createWithReference([
-                'tenant_id' => LegacyStorageContext::id(),
                 'site_id' => $siteId,
                 'is_organisation_wide' => false,
                 'title' => $this->titleFrom($message['subject'], $sender),
@@ -252,7 +249,6 @@ class InboundEmailIngestor
         ?string $quarantineReason = null,
     ): ItInboundEmail {
         return ItInboundEmail::query()->create([
-            'tenant_id' => LegacyStorageContext::id(),
             'it_ticket_id' => $ticketId,
             'from_email' => $message['from'],
             'subject' => $message['subject'],

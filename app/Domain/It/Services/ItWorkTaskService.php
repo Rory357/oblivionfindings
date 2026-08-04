@@ -8,7 +8,7 @@ use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\ItWorkTask;
 use App\Models\User;
-use App\Support\LegacyStorageContext;
+use App\Services\AuditLogger;
 use DomainException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
@@ -33,7 +33,6 @@ class ItWorkTaskService
 
             $task = $ticket->tasks()->create([
                 ...Arr::except($data, ['dependency_ids']),
-                'tenant_id' => LegacyStorageContext::id(),
                 'status' => 'pending',
                 'is_required' => (bool) ($data['is_required'] ?? true),
                 'evidence_required' => (bool) ($data['evidence_required'] ?? false),
@@ -47,6 +46,14 @@ class ItWorkTaskService
                 'is_required' => $task->is_required,
                 'dependency_ids' => $dependencies->modelKeys(),
             ]);
+            AuditLogger::logOrFail(
+                'it.ticket.task.created',
+                $ticket,
+                $this->auditMeta($ticket, $task, $actor, [
+                    'is_required' => $task->is_required,
+                    'dependency_ids' => $dependencies->modelKeys(),
+                ]),
+            );
 
             return $task->fresh();
         });
@@ -68,7 +75,18 @@ class ItWorkTaskService
                 ? $this->dependencies($ticket, (array) $data['dependency_ids'], $task)
                 : collect();
 
-            $task->fill(Arr::except($data, ['dependency_ids']));
+            $nextStatus = (string) ($data['status'] ?? $task->status);
+            if ($nextStatus === 'cancelled') {
+                $willBeRequired = (bool) ($data['is_required'] ?? $task->is_required);
+                if ($willBeRequired) {
+                    throw new DomainException('Required tasks cannot be cancelled. Make the task optional or complete it.');
+                }
+                if (blank($data['reason'] ?? null)) {
+                    throw new DomainException('Record why this optional task is being cancelled.');
+                }
+            }
+
+            $task->fill(Arr::except($data, ['dependency_ids', 'reason']));
             $changed = array_keys($task->getDirty());
             $task->save();
             if ($dependencyChanged) {
@@ -86,7 +104,17 @@ class ItWorkTaskService
                     'title' => $task->title,
                     'changed_fields' => $changed,
                     'dependency_ids' => $dependencyChanged ? $after : null,
+                    'reason' => $nextStatus === 'cancelled' ? $data['reason'] : null,
                 ]);
+                AuditLogger::logOrFail(
+                    'it.ticket.task.updated',
+                    $ticket,
+                    $this->auditMeta($ticket, $task, $actor, [
+                        'changed_fields' => $changed,
+                        'dependency_ids' => $dependencyChanged ? $after : null,
+                        'reason' => $nextStatus === 'cancelled' ? $data['reason'] : null,
+                    ]),
+                );
             }
 
             return $task->fresh();
@@ -101,6 +129,9 @@ class ItWorkTaskService
             $task = $this->lockedTask($ticket, $task);
             if ($task->status === 'completed') {
                 throw new DomainException('This task is already completed.');
+            }
+            if ($task->status === 'cancelled') {
+                throw new DomainException('Restore this cancelled task before completing it.');
             }
             if ($task->dependencies()->where('status', '!=', 'completed')->exists()) {
                 throw new DomainException('Complete every dependency before completing this task.');
@@ -127,6 +158,13 @@ class ItWorkTaskService
                 'title' => $task->title,
                 'evidence_count' => count($evidence),
             ]);
+            AuditLogger::logOrFail(
+                'it.ticket.task.completed',
+                $ticket,
+                $this->auditMeta($ticket, $task, $actor, [
+                    'evidence_count' => count($evidence),
+                ]),
+            );
 
             return $task->fresh();
         });
@@ -154,6 +192,11 @@ class ItWorkTaskService
                 'title' => $task->title,
                 'reason' => $reason,
             ]);
+            AuditLogger::logOrFail(
+                'it.ticket.task.reopened',
+                $ticket,
+                $this->auditMeta($ticket, $task, $actor, ['reason' => $reason]),
+            );
 
             return $task->fresh();
         });
@@ -168,6 +211,9 @@ class ItWorkTaskService
 
         if (! $this->workAccess->canWork($actor, $locked)) {
             throw new DomainException('You are not allowed to manage IT work tasks.');
+        }
+        if ($locked->isMerged() || ! in_array($locked->status, ItTicket::OPEN_STATUSES, true)) {
+            throw new DomainException('Reopen this ticket before changing its work tasks.');
         }
 
         return $locked;
@@ -248,5 +294,19 @@ class ItWorkTaskService
         }
 
         return false;
+    }
+
+    /** @param array<string, mixed> $extra @return array<string, mixed> */
+    private function auditMeta(ItTicket $ticket, ItWorkTask $task, User $actor, array $extra = []): array
+    {
+        return [
+            'actor_id' => $actor->id,
+            'task_id' => $task->id,
+            'task_status' => $task->status,
+            'site_id' => $ticket->site_id,
+            'is_organisation_wide' => (bool) $ticket->is_organisation_wide,
+            'application_scope' => 'single_application',
+            ...$extra,
+        ];
     }
 }

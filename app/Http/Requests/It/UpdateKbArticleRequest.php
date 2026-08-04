@@ -7,9 +7,9 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Edit a knowledge-base article, or flip its publish state. Fields are
- * `sometimes` so the full editor and a status-only Publish/Unpublish toggle
- * share one request. Agent-only (`it.manage`).
+ * Edit knowledge content and governance metadata. Fields are `sometimes` so
+ * partial editor saves remain valid, while lifecycle status is prohibited and
+ * must use the reviewed transition endpoints. Agent-only (`it.manage`).
  */
 class UpdateKbArticleRequest extends FormRequest
 {

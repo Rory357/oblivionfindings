@@ -11,6 +11,8 @@ enum MonitorKind: string
     case Tls = 'tls';
     case Snmp = 'snmp';
     case SnmpInterface = 'snmp_interface';
+    case SshInventory = 'ssh_inventory';
+    case WinRmInventory = 'winrm_inventory';
     case Provider = 'provider';
     case Collector = 'collector';
 }

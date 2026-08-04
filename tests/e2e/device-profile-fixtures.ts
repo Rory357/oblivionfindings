@@ -15,27 +15,22 @@ export function seedDeviceProfileReadinessFixtures() {
         rawSentinel: string;
     }>(`
 $admin = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->firstOrFail();
-$tenantId = (int) ($admin->organization_id ?? 1);
 $rawSentinel = 'PLAYWRIGHT-DEVICE-PROFILE-RAW-SENTINEL';
 $site = \\App\\Models\\Site::query()
-    ->where('tenant_id', $tenantId)
     ->where('archived', false)
     ->orderBy('id')
     ->first();
 if (! $site) {
     $site = \\App\\Models\\Site::factory()->create([
-        'tenant_id' => $tenantId,
         'name' => 'Playwright device profile site',
     ]);
 }
 
 $device = \\App\\Domain\\SecurityDevices\\Models\\Device::withTrashed()
-    ->where('tenant_id', $tenantId)
     ->where('device_uid', 'PW-DEVICE-PROFILE')
     ->first();
 if (! $device) {
     $device = new \\App\\Domain\\SecurityDevices\\Models\\Device([
-        'tenant_id' => $tenantId,
         'device_uid' => 'PW-DEVICE-PROFILE',
     ]);
 } elseif ($device->trashed()) {
@@ -57,7 +52,12 @@ $device->forceFill([
     'last_seen_at' => now()->subMinutes(20),
     'provider' => 'oblivion_native',
     'external_ref' => ['raw' => $rawSentinel],
-    'config' => ['raw' => $rawSentinel],
+    'config' => [
+        'raw' => $rawSentinel,
+        'management' => [
+            'capabilities' => ['diagnostics.ping', 'device.reboot'],
+        ],
+    ],
     'meta' => ['raw' => $rawSentinel],
     'notes' => 'Primary WAN edge device for the Playwright site.',
     'commissioned_at' => now()->subYear(),
@@ -136,12 +136,10 @@ $monitor = \\App\\Domain\\Monitoring\\Models\\Monitor::query()->updateOrCreate(
 ]);
 
 $ticket = \\App\\Models\\ItTicket::query()
-    ->where('tenant_id', $tenantId)
     ->where('title', 'Investigate Playwright profile edge')
     ->first();
 if (! $ticket) {
     $ticket = \\App\\Models\\ItTicket::factory()->create([
-        'tenant_id' => $tenantId,
         'requester_user_id' => $admin->id,
         'title' => 'Investigate Playwright profile edge',
         'status' => 'open',
@@ -151,7 +149,6 @@ if (! $ticket) {
 }
 \\App\\Models\\ItTicketLink::query()->updateOrCreate(
     [
-        'tenant_id' => $tenantId,
         'ticket_id' => $ticket->id,
         'relationship' => 'affected_device',
         'linkable_type' => \\App\\Domain\\SecurityDevices\\Models\\Device::class,
@@ -164,13 +161,11 @@ if (! $ticket) {
 );
 
 \\App\\Models\\AuditLog::query()
-    ->where('organization_id', $tenantId)
     ->where('auditable_type', \\App\\Domain\\SecurityDevices\\Models\\Device::class)
     ->where('auditable_id', $device->id)
     ->where('action', 'playwright.device.profile')
     ->delete();
 \\App\\Models\\AuditLog::query()->create([
-    'organization_id' => $tenantId,
     'user_id' => $admin->id,
     'action' => 'playwright.device.profile',
     'auditable_type' => \\App\\Domain\\SecurityDevices\\Models\\Device::class,

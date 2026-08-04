@@ -136,13 +136,12 @@ test('knowledge can only enter managed lifecycle states through lifecycle action
 });
 
 test('knowledge follows review publish and retire lifecycle with ownership scope and evidence', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
-    $service = ItService::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
+    $service = ItService::factory()->create();
     $owner = serviceOperationsUser();
     serviceOperationsAssignSite($this->manager, $site);
     serviceOperationsAssignSite($owner, $site);
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'primary_site_id' => $site->id,
     ]);
@@ -198,20 +197,17 @@ test('knowledge follows review publish and retire lifecycle with ownership scope
 });
 
 test('site-scoped and agent-only knowledge never leaks to the wrong requester', function () {
-    $allowed = Site::factory()->create(['tenant_id' => 1]);
-    $other = Site::factory()->create(['tenant_id' => 1]);
+    $allowed = Site::factory()->create();
+    $other = Site::factory()->create();
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'primary_site_id' => $other->id,
     ]);
     ItKbArticle::factory()->published()->create([
-        'tenant_id' => 1,
         'audience' => 'specific_sites',
         'site_scope' => [$allowed->id],
     ]);
     ItKbArticle::factory()->published()->create([
-        'tenant_id' => 1,
         'audience' => 'it_agents',
     ]);
 
@@ -224,7 +220,6 @@ test('public ticket replies create visible outbound delivery records and failed 
     Notification::fake();
     $site = serviceOperationsAssignSite($this->manager);
     $ticket = ItTicket::factory()->create([
-        'tenant_id' => 1,
         'site_id' => $site->id,
         'requester_user_id' => $this->worker->id,
     ]);
@@ -290,11 +285,9 @@ test('every mail-capable IT notification exposes delivery tracking context', fun
 test('provisioning cancellation mail is visible and can be retried safely', function () {
     Notification::fake();
     $profile = HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
     ]);
     $checklist = HrOnboardingChecklist::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'template_key' => 'support_worker:all',
         'status' => 'in_progress',
@@ -311,7 +304,6 @@ test('provisioning cancellation mail is visible and can be retried safely', func
         'status' => 'pending',
     ]);
     $provisioning = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'onboarding_task_id' => $task->id,
         'type' => 'account',
@@ -346,7 +338,6 @@ test('provisioning cancellation mail is visible and can be retried safely', func
 test('local mail acceptance remains distinct from provider delivery and provider events are ordered', function () {
     Notification::fake();
     $ticket = ItTicket::factory()->create([
-        'tenant_id' => 1,
         'requester_user_id' => $this->worker->id,
     ]);
     $deliveries = app(ItEmailDeliveryService::class);
@@ -416,7 +407,6 @@ test('every IT mail type creates a visible delivery and can be retried safely', 
     Notification::fake();
     $site = serviceOperationsAssignSite($this->manager);
     $ticket = ItTicket::factory()->create([
-        'tenant_id' => 1,
         'site_id' => $site->id,
         'requester_user_id' => $this->worker->id,
     ]);
@@ -447,7 +437,7 @@ test('every IT mail type creates a visible delivery and can be retried safely', 
 
 test('the authenticated delivery callback records ordered bounces without exposing other deliveries', function () {
     config(['it.outbound_mail.status_secret' => 'delivery-secret']);
-    $delivery = ItEmailDelivery::factory()->create(['tenant_id' => 1, 'status' => 'queued']);
+    $delivery = ItEmailDelivery::factory()->create(['status' => 'queued']);
 
     $this->postJson('/api/it/email/deliveries/status', [
         'notification_id' => $delivery->notification_uuid,
@@ -529,9 +519,8 @@ test('mailbox polling records the queued job outcome rather than scheduler dispa
 
 test('reports reconcile expanded operations metrics to drill-down filters', function () {
     $site = serviceOperationsAssignSite($this->manager);
-    $service = ItService::factory()->create(['tenant_id' => 1]);
+    $service = ItService::factory()->create();
     ItTicket::factory()->create([
-        'tenant_id' => 1,
         'site_id' => $site->id,
         'status' => 'open',
         'source' => 'email',
@@ -541,7 +530,6 @@ test('reports reconcile expanded operations metrics to drill-down filters', func
         'created_at' => now()->subDays(20),
     ]);
     $resolved = ItTicket::factory()->create([
-        'tenant_id' => 1,
         'site_id' => $site->id,
         'status' => 'resolved',
         'source' => 'portal',
@@ -550,18 +538,15 @@ test('reports reconcile expanded operations metrics to drill-down filters', func
         'reopened_count' => 1,
     ]);
     ItProblem::factory()->create([
-        'tenant_id' => 1,
-        'ticket_id' => ItTicket::factory()->create(['tenant_id' => 1, 'site_id' => $site->id])->id,
+        'ticket_id' => ItTicket::factory()->create(['site_id' => $site->id])->id,
     ]);
     ItChange::factory()->create([
-        'tenant_id' => 1,
-        'ticket_id' => ItTicket::factory()->create(['tenant_id' => 1, 'site_id' => $site->id])->id,
+        'ticket_id' => ItTicket::factory()->create(['site_id' => $site->id])->id,
         'validation_result' => 'successful',
         'validated_at' => now(),
     ]);
     ItMajorIncident::factory()->create([
-        'tenant_id' => 1,
-        'ticket_id' => ItTicket::factory()->create(['tenant_id' => 1, 'site_id' => $site->id])->id,
+        'ticket_id' => ItTicket::factory()->create(['site_id' => $site->id])->id,
         'declared_at' => now(),
         'restored_at' => now(),
     ]);
@@ -595,12 +580,10 @@ test('reports reconcile expanded operations metrics to drill-down filters', func
 test('first contact resolution includes tickets with internal notes and reconciles to its drill down', function () {
     $site = serviceOperationsAssignSite($this->manager);
     $ticket = ItTicket::factory()->resolved()->create([
-        'tenant_id' => 1,
         'site_id' => $site->id,
         'reopened_count' => 0,
     ]);
     ItTicketComment::factory()->internal()->create([
-        'tenant_id' => 1,
         'ticket_id' => $ticket->id,
         'author_user_id' => $this->manager->id,
     ]);
@@ -628,7 +611,6 @@ test('backlog age buckets are half open and never double count boundaries', func
     $this->travelTo($now);
     foreach ([2, 7, 30] as $days) {
         ItTicket::factory()->create([
-            'tenant_id' => 1,
             'site_id' => $site->id,
             'status' => 'open',
             'created_at' => $now->copy()->subDays($days),
@@ -646,13 +628,12 @@ test('backlog age buckets are half open and never double count boundaries', func
 
 test('setup shows an access-safe operations audit for channels automations and configuration gaps', function () {
     $site = serviceOperationsAssignSite($this->manager);
-    $ticket = ItTicket::factory()->create(['tenant_id' => 1, 'site_id' => $site->id]);
+    $ticket = ItTicket::factory()->create(['site_id' => $site->id]);
     ItEmailDelivery::factory()->create([
-        'tenant_id' => 1,
         'it_ticket_id' => $ticket->id,
         'status' => 'bounced',
     ]);
-    ItEmailDelivery::factory()->create(['tenant_id' => 2, 'status' => 'bounced']);
+    ItEmailDelivery::factory()->create(['status' => 'bounced']);
     ItAutomationRun::factory()->create(['automation_key' => 'it.poll-mailbox', 'status' => 'failed']);
 
     $this->actingAs($this->manager)

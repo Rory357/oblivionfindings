@@ -4,6 +4,7 @@ namespace Tests\Feature\SecurityDevices;
 
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\LinkType;
+use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -12,12 +13,14 @@ use App\Models\AssetTracker;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 /**
@@ -41,11 +44,11 @@ class AssetTrackerRetirementTest extends TestCase
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
-            'organization_id' => 1,
+
         ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
 
-        $this->site = Site::factory()->create(['tenant_id' => 1]);
+        $this->site = Site::factory()->create([]);
     }
 
     // ── Fleet devices reads from canonical devices ────────────────
@@ -90,6 +93,102 @@ class AssetTrackerRetirementTest extends TestCase
             'device_id' => $device->id,
             'asset_id' => $vehicle->id,
         ]);
+
+        $this->assertDatabaseCount('asset_trackers', 0);
+    }
+
+    public function test_legacy_asset_tracker_mutation_routes_are_removed(): void
+    {
+        $vehicle = Asset::factory()->vehicle()->create();
+
+        $this->assertFalse(Route::has('assets.trackers.pair'));
+        $this->assertFalse(Route::has('assets.trackers.unpair'));
+
+        $this->actingAs($this->admin)
+            ->post("/assets/{$vehicle->id}/trackers/pair", [
+                'vendor' => 'legacy-provider',
+                'device_uid' => 'LEGACY-RAW-TRACKER',
+                'vendor_metadata' => ['secret' => 'must-not-be-stored'],
+            ])
+            ->assertNotFound();
+
+        $this->assertDatabaseCount('asset_trackers', 0);
+        $this->assertDatabaseCount('devices', 0);
+        $this->assertDatabaseCount('device_asset_links', 0);
+    }
+
+    public function test_asset_index_counts_only_active_visible_canonical_devices(): void
+    {
+        $vehicle = Asset::factory()->vehicle()->create(['name' => 'Canonical Count Vehicle']);
+        $activeDevices = Device::factory()->tracking()->count(2)->create();
+        $releasedDevice = Device::factory()->tracking()->create();
+
+        foreach ($activeDevices as $device) {
+            DeviceAssetLink::create([
+                'device_id' => $device->id,
+                'asset_id' => $vehicle->id,
+                'link_type' => LinkType::InstalledIn,
+                'linked_at' => now(),
+            ]);
+        }
+
+        DeviceAssetLink::create([
+            'device_id' => $releasedDevice->id,
+            'asset_id' => $vehicle->id,
+            'link_type' => LinkType::InstalledIn,
+            'linked_at' => now()->subDay(),
+            'unlinked_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/fleet-assets/assets?search=Canonical%20Count%20Vehicle')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('assets.data', 1)
+                ->where('assets.data.0.id', $vehicle->id)
+                ->where('assets.data.0.tracker_count', 2));
+    }
+
+    public function test_asset_index_marks_technology_restricted_without_device_permission(): void
+    {
+        $vehicle = Asset::factory()->vehicle()->create(['name' => 'Restricted Technology Vehicle']);
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        $viewAssets = Permission::query()->where('key', 'assets.viewAny')->firstOrFail();
+        $viewer->permissionOverrides()->sync([
+            $viewAssets->id => ['allowed' => true],
+        ]);
+
+        $this->actingAs($viewer)
+            ->get('/fleet-assets/assets?search=Restricted%20Technology%20Vehicle')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('assets.data', 1)
+                ->where('assets.data.0.id', $vehicle->id)
+                ->where('assets.data.0.tracker_count', null));
+    }
+
+    public function test_vehicle_operational_payloads_do_not_project_legacy_trackers(): void
+    {
+        $vehicle = Asset::factory()->vehicle()->create(['name' => 'Canonical Vehicle Payload']);
+        AssetTracker::create([
+            'asset_id' => $vehicle->id,
+            'vendor' => 'legacy-provider',
+            'device_uid' => 'LEGACY-ONLY-PAYLOAD',
+            'status' => 'paired',
+            'paired_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/fleet-assets/vehicles/{$vehicle->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->missing('asset.trackers'));
+
+        $this->actingAs($this->admin)
+            ->get('/fleet-assets/vehicles?search=Canonical%20Vehicle%20Payload')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('vehicles.data', 1)
+                ->missing('vehicles.data.0.tracker_count'));
     }
 
     // ── Resident tracking reads from canonical devices ─────────────
@@ -97,13 +196,12 @@ class AssetTrackerRetirementTest extends TestCase
     public function test_resident_tracking_reads_from_canonical_devices(): void
     {
         $client = Client::factory()->create([
-            'organization_id' => 1,
+
             'site_id' => $this->site->id,
             'status' => 'active',
         ]);
         $consent = $this->createFleetTrackingConsent($client);
         $device = Device::factory()->tracking()->create([
-            'tenant_id' => 1,
             'name' => 'Resident Pendant',
         ]);
 
@@ -178,6 +276,17 @@ class AssetTrackerRetirementTest extends TestCase
 
         $this->assertNotFalse($docComment);
         $this->assertStringContainsString('@deprecated', $docComment);
+        $this->assertStringContainsString('historical read-only compatibility projections', $docComment);
+    }
+
+    public function test_queclink_pairing_and_release_do_not_reference_the_legacy_tracker_store(): void
+    {
+        $reflection = new \ReflectionClass(QueclinkHubController::class);
+        $source = file_get_contents($reflection->getFileName());
+
+        $this->assertIsString($source);
+        $this->assertStringNotContainsString('AssetTracker', $source);
+        $this->assertStringNotContainsString('asset_trackers', $source);
     }
 
     // ── Asset.trackers() relationship is marked deprecated ────────

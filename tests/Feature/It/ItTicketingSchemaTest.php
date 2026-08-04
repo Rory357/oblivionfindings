@@ -51,7 +51,7 @@ test('tickets carry the full ticketing schema and tolerate null references', fun
     DB::table('it_tickets')->whereIn('id', $ids)->update(['reference' => null]);
     expect(ItTicket::query()->whereNull('reference')->count())->toBe(2);
 
-    // waiting is now a legal status (per §P.10 — display "Waiting on requester").
+    // Waiting is a legal governed status with explicit ownership.
     expect(ItTicket::STATUSES)->toBe(['open', 'in_progress', 'waiting', 'resolved', 'closed']);
     $ticket->update(['status' => 'waiting', 'waiting_since' => now()]);
     expect($ticket->fresh()->status)->toBe('waiting');
@@ -70,7 +70,11 @@ test('agents can move a ticket to waiting through the update route', function ()
     $ticket = ItTicket::factory()->create(['site_id' => $site->id]);
 
     $this->actingAs($agent)
-        ->patch("/it/tickets/{$ticket->id}", ['status' => 'waiting'])
+        ->patch("/it/tickets/{$ticket->id}", [
+            'status' => 'waiting',
+            'waiting_party' => 'requester',
+            'waiting_reason' => 'Waiting for the requester to confirm the outcome.',
+        ])
         ->assertRedirect();
 
     expect($ticket->fresh()->status)->toBe('waiting');
@@ -119,8 +123,7 @@ test('the polymorphic event trail serves tickets and provisioning requests', fun
     expect($ticket->events()->first()->payload)->toBe(['via' => 'test']);
 
     $profileUser = User::factory()->create();
-    $profile = HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
+    $profile = HrEmployeeProfile::factory()->create([
         'user_id' => $profileUser->id,
         'employee_number' => 'EMP-SCHEMA-'.$profileUser->id,
         'work_email' => $profileUser->email,
@@ -131,7 +134,6 @@ test('the polymorphic event trail serves tickets and provisioning requests', fun
         'is_active' => true,
     ]);
     $request = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'type' => 'account',
         'item' => 'M365 account',
@@ -146,8 +148,7 @@ test('the polymorphic event trail serves tickets and provisioning requests', fun
 
 test('provisioning requests gain priority and due date with safe defaults', function () {
     $profileUser = User::factory()->create();
-    $profile = HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
+    $profile = HrEmployeeProfile::factory()->create([
         'user_id' => $profileUser->id,
         'employee_number' => 'EMP-PRIO-'.$profileUser->id,
         'work_email' => $profileUser->email,
@@ -161,7 +162,6 @@ test('provisioning requests gain priority and due date with safe defaults', func
     // Created without priority (exactly how the onboarding bridge writes) —
     // the DB default must apply.
     $request = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'type' => 'account',
         'item' => 'Payroll portal login',

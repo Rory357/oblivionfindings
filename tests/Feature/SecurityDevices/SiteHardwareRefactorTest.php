@@ -84,7 +84,6 @@ class SiteHardwareRefactorTest extends TestCase
     public function test_returns_devices_assigned_to_rooms_within_site(): void
     {
         $room = SiteRoom::create([
-            'tenant_id' => 1,
             'site_id' => $this->siteA->id,
             'name' => 'Server Room',
         ]);
@@ -218,7 +217,6 @@ class SiteHardwareRefactorTest extends TestCase
     public function test_rooms_and_unifi_data_still_passed_without_legacy_site_hardware_props(): void
     {
         SiteRoom::create([
-            'tenant_id' => 1,
             'site_id' => $this->siteA->id,
             'name' => 'Reception',
         ]);
@@ -249,16 +247,98 @@ class SiteHardwareRefactorTest extends TestCase
         $this->assertTrue(Route::has('sites.hardware.manageRooms'));
     }
 
+    public function test_room_names_are_unique_within_a_site(): void
+    {
+        SiteRoom::create([
+            'site_id' => $this->siteA->id,
+            'name' => 'Network room',
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->postJson("/sites/{$this->siteA->id}/hardware/rooms", [
+                'action' => 'add',
+                'name' => ' Network room ',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('name');
+
+        $this->assertSame(1, SiteRoom::query()
+            ->where('site_id', $this->siteA->id)
+            ->where('name', 'Network room')
+            ->count());
+    }
+
+    public function test_room_reorder_rejects_a_room_from_another_site_without_partial_mutation(): void
+    {
+        $roomA = SiteRoom::create([
+            'site_id' => $this->siteA->id,
+            'name' => 'First room',
+            'sort_order' => 1,
+        ]);
+        $roomB = SiteRoom::create([
+            'site_id' => $this->siteA->id,
+            'name' => 'Second room',
+            'sort_order' => 2,
+        ]);
+        $otherSiteRoom = SiteRoom::create([
+            'site_id' => $this->siteB->id,
+            'name' => 'Private room',
+            'sort_order' => 9,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->postJson("/sites/{$this->siteA->id}/hardware/rooms", [
+                'action' => 'reorder',
+                'rooms' => [
+                    ['id' => $roomA->id, 'sort_order' => 2],
+                    ['id' => $otherSiteRoom->id, 'sort_order' => 1],
+                ],
+            ])
+            ->assertNotFound();
+
+        $this->assertSame(1, $roomA->fresh()->sort_order);
+        $this->assertSame(2, $roomB->fresh()->sort_order);
+        $this->assertSame(9, $otherSiteRoom->fresh()->sort_order);
+    }
+
+    public function test_room_with_a_current_device_assignment_cannot_be_deleted(): void
+    {
+        $room = SiteRoom::create([
+            'site_id' => $this->siteA->id,
+            'name' => 'Occupied room',
+            'sort_order' => 1,
+        ]);
+        $device = Device::factory()->itInfrastructure()->create();
+        $assignment = DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_ROOM,
+            'assignable_id' => $room->id,
+            'assigned_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->postJson("/sites/{$this->siteA->id}/hardware/rooms", [
+                'action' => 'delete',
+                'room_id' => $room->id,
+            ])
+            ->assertStatus(409);
+
+        $this->assertDatabaseHas('site_rooms', ['id' => $room->id]);
+        $this->assertDatabaseHas('device_assignments', [
+            'id' => $assignment->id,
+            'released_at' => null,
+        ]);
+    }
+
     public function test_assign_room_route_updates_canonical_assignment_for_unifi_devices(): void
     {
         $room = SiteRoom::create([
-            'tenant_id' => 1,
             'site_id' => $this->siteA->id,
             'name' => 'Network Closet',
         ]);
 
         $shadow = LocationHardware::create([
-            'tenant_id' => 1,
             'site_id' => $this->siteA->id,
             'provider' => 'unifi',
             'category' => LocationHardware::CATEGORY_SWITCH,
@@ -268,7 +348,6 @@ class SiteHardwareRefactorTest extends TestCase
         ]);
 
         $device = Device::factory()->itInfrastructure()->create([
-            'tenant_id' => 1,
             'provider' => 'unifi',
             'name' => 'Core Switch',
             'legacy_location_hardware_id' => $shadow->id,
@@ -302,24 +381,20 @@ class SiteHardwareRefactorTest extends TestCase
     public function test_assign_room_route_does_not_reveal_missing_or_inaccessible_rooms_or_mutate_state(): void
     {
         config()->set('app.debug', false);
-        $foreignSite = Site::factory()->create(['tenant_id' => 77]);
-        $foreignRoom = SiteRoom::create([
-            'tenant_id' => 77,
-            'site_id' => $foreignSite->id,
-            'name' => 'Foreign tenant room',
+        $unrelatedSite = Site::factory()->create([]);
+        $unrelatedRoom = SiteRoom::create([
+            'site_id' => $unrelatedSite->id,
+            'name' => 'Unrelated Site room',
         ]);
         $wrongSiteRoom = SiteRoom::create([
-            'tenant_id' => 1,
             'site_id' => $this->siteB->id,
             'name' => 'Wrong route site room',
         ]);
         $contradictoryRoom = SiteRoom::create([
-            'tenant_id' => 1,
-            'site_id' => $foreignSite->id,
-            'name' => 'Contradictory tenant and parent site room',
+            'site_id' => $unrelatedSite->id,
+            'name' => 'Contradictory room and parent Site',
         ]);
         $shadow = LocationHardware::create([
-            'tenant_id' => 1,
             'site_id' => $this->siteA->id,
             'provider' => 'unifi',
             'category' => LocationHardware::CATEGORY_SWITCH,
@@ -328,7 +403,6 @@ class SiteHardwareRefactorTest extends TestCase
             'external_ref' => ['provider_entity_id' => 'protected-site-route-switch'],
         ]);
         $device = Device::factory()->itInfrastructure()->create([
-            'tenant_id' => 1,
             'provider' => 'unifi',
             'legacy_location_hardware_id' => $shadow->id,
             'external_ref' => ['provider_entity_id' => 'protected-site-route-switch'],
@@ -346,7 +420,7 @@ class SiteHardwareRefactorTest extends TestCase
         $before = $this->captureRoomAssignmentMutationState($device->id);
         $roomIds = [
             SiteRoom::query()->max('id') + 1000,
-            $foreignRoom->id,
+            $unrelatedRoom->id,
             $wrongSiteRoom->id,
             $contradictoryRoom->id,
         ];
@@ -369,12 +443,10 @@ class SiteHardwareRefactorTest extends TestCase
     public function test_assign_room_route_clears_room_to_the_current_site(): void
     {
         $room = SiteRoom::create([
-            'tenant_id' => 1,
             'site_id' => $this->siteA->id,
             'name' => 'Network Closet',
         ]);
         $device = Device::factory()->itInfrastructure()->create([
-            'tenant_id' => 1,
             'provider' => 'unifi',
         ]);
         DeviceAssignment::create([
@@ -400,17 +472,14 @@ class SiteHardwareRefactorTest extends TestCase
     {
         config()->set('app.debug', false);
         $roomA = SiteRoom::create([
-            'tenant_id' => 1,
             'site_id' => $this->siteA->id,
             'name' => 'Initially authorized room',
         ]);
         $roomB = SiteRoom::create([
-            'tenant_id' => 1,
             'site_id' => $this->siteB->id,
             'name' => 'Concurrently moved room',
         ]);
         $shadow = LocationHardware::create([
-            'tenant_id' => 1,
             'site_id' => $this->siteA->id,
             'provider' => 'unifi',
             'category' => LocationHardware::CATEGORY_AP,
@@ -419,7 +488,6 @@ class SiteHardwareRefactorTest extends TestCase
             'external_ref' => ['provider_entity_id' => 'stale-site-clear-ap'],
         ]);
         $device = Device::factory()->itInfrastructure()->create([
-            'tenant_id' => 1,
             'provider' => 'unifi',
             'legacy_location_hardware_id' => $shadow->id,
             'external_ref' => ['provider_entity_id' => 'stale-site-clear-ap'],
@@ -538,18 +606,15 @@ class SiteHardwareRefactorTest extends TestCase
     public function test_room_move_marks_device_plan_pin_stale(): void
     {
         $roomA = SiteRoom::create([
-            'tenant_id' => 1,
             'site_id' => $this->siteA->id,
             'name' => 'Hallway',
         ]);
         $roomB = SiteRoom::create([
-            'tenant_id' => 1,
             'site_id' => $this->siteA->id,
             'name' => 'Network Closet',
         ]);
 
         $device = Device::factory()->itInfrastructure()->create([
-            'tenant_id' => 1,
             'provider' => 'unifi',
             'name' => 'Access Point',
         ]);
@@ -575,13 +640,13 @@ class SiteHardwareRefactorTest extends TestCase
         $this->assertSame('assignment_replaced', $pin->meta['stale_reason'] ?? null);
     }
 
-    public function test_pin_device_writes_plan_pin_for_current_plan(): void
+    public function test_pin_room_assigned_device_creates_a_draft_without_mutating_the_published_plan(): void
     {
         $planId = DB::table('site_type_plans')->insertGetId([
-            'tenant_id' => $this->siteA->tenant_id,
             'site_id' => $this->siteA->id,
             'site_type' => $this->siteA->type,
             'status' => 'published',
+            'current_slot' => 'published',
             'version' => 1,
             'layout' => json_encode([
                 'schema_version' => 1,
@@ -597,11 +662,15 @@ class SiteHardwareRefactorTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        $room = SiteRoom::create([
+            'site_id' => $this->siteA->id,
+            'name' => 'Reception',
+        ]);
         $device = Device::factory()->security()->create(['name' => 'Front Camera']);
         DeviceAssignment::create([
             'device_id' => $device->id,
-            'assignable_type' => 'site',
-            'assignable_id' => $this->siteA->id,
+            'assignable_type' => DeviceAssignment::TARGET_ROOM,
+            'assignable_id' => $room->id,
             'assigned_at' => now(),
         ]);
 
@@ -615,22 +684,31 @@ class SiteHardwareRefactorTest extends TestCase
             ->assertJsonPath('pin.kind', 'device')
             ->assertJsonPath('pin.device_id', $device->id);
 
+        $draftId = DB::table('site_type_plans')
+            ->where('site_id', $this->siteA->id)
+            ->where('current_slot', 'draft')
+            ->value('id');
+
+        $this->assertNotNull($draftId);
         $this->assertDatabaseHas('site_type_plan_pins', [
-            'tenant_id' => $this->siteA->tenant_id,
-            'site_type_plan_id' => $planId,
+            'site_type_plan_id' => $draftId,
             'kind' => 'device',
             'device_id' => $device->id,
             'label' => 'Front door camera',
         ]);
+        $this->assertDatabaseMissing('site_type_plan_pins', [
+            'site_type_plan_id' => $planId,
+            'device_id' => $device->id,
+        ]);
     }
 
-    public function test_unpin_device_removes_plan_pin(): void
+    public function test_unpin_device_removes_the_draft_copy_and_preserves_the_published_pin(): void
     {
         $planId = DB::table('site_type_plans')->insertGetId([
-            'tenant_id' => $this->siteA->tenant_id,
             'site_id' => $this->siteA->id,
             'site_type' => $this->siteA->type,
             'status' => 'published',
+            'current_slot' => 'published',
             'version' => 1,
             'layout' => json_encode(['schema_version' => 1, 'canvas' => ['width' => 1000, 'height' => 700]]),
             'published_at' => now(),
@@ -646,7 +724,6 @@ class SiteHardwareRefactorTest extends TestCase
         ]);
 
         DB::table('site_type_plan_pins')->insert([
-            'tenant_id' => $this->siteA->tenant_id,
             'site_type_plan_id' => $planId,
             'kind' => 'device',
             'device_id' => $device->id,
@@ -663,20 +740,70 @@ class SiteHardwareRefactorTest extends TestCase
             ->deleteJson("/sites/{$this->siteA->id}/hardware/{$device->id}/pin")
             ->assertOk();
 
-        $this->assertDatabaseMissing('site_type_plan_pins', [
+        $draftId = DB::table('site_type_plans')
+            ->where('site_id', $this->siteA->id)
+            ->where('current_slot', 'draft')
+            ->value('id');
+
+        $this->assertNotNull($draftId);
+        $this->assertDatabaseHas('site_type_plan_pins', [
             'site_type_plan_id' => $planId,
             'kind' => 'device',
             'device_id' => $device->id,
         ]);
+        $this->assertDatabaseMissing('site_type_plan_pins', [
+            'site_type_plan_id' => $draftId,
+            'kind' => 'device',
+            'device_id' => $device->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/sites/{$this->siteA->id}/hardware")
+            ->assertInertia(fn ($page) => $page->where('devices.0.plan_pin', null));
+    }
+
+    public function test_pin_device_from_another_site_is_concealed_before_a_draft_is_created(): void
+    {
+        DB::table('site_type_plans')->insert([
+            'site_id' => $this->siteA->id,
+            'site_type' => $this->siteA->type,
+            'status' => 'published',
+            'current_slot' => 'published',
+            'version' => 1,
+            'layout' => json_encode(['schema_version' => 1, 'canvas' => ['width' => 1000, 'height' => 700]]),
+            'published_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $device = Device::factory()->security()->create();
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $this->siteB->id,
+            'assigned_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->postJson("/sites/{$this->siteA->id}/hardware/{$device->id}/pin", [
+                'x' => 0.42,
+                'y' => 0.33,
+            ])
+            ->assertNotFound();
+
+        $this->assertDatabaseMissing('site_type_plans', [
+            'site_id' => $this->siteA->id,
+            'current_slot' => 'draft',
+        ]);
+        $this->assertDatabaseCount('site_type_plan_pins', 0);
     }
 
     private function createDevicePlanPin(Device $device, array $overrides = []): SiteTypePlanPin
     {
         $planId = DB::table('site_type_plans')->insertGetId([
-            'tenant_id' => $this->siteA->tenant_id,
             'site_id' => $this->siteA->id,
             'site_type' => $this->siteA->type,
             'status' => 'published',
+            'current_slot' => 'published',
             'version' => 1,
             'layout' => json_encode(['schema_version' => 1, 'canvas' => ['width' => 1000, 'height' => 700]]),
             'published_at' => now(),
@@ -685,7 +812,6 @@ class SiteHardwareRefactorTest extends TestCase
         ]);
 
         return SiteTypePlanPin::create(array_merge([
-            'tenant_id' => $this->siteA->tenant_id,
             'site_type_plan_id' => $planId,
             'kind' => SiteTypePlanPin::KIND_DEVICE,
             'device_id' => $device->id,

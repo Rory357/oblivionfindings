@@ -217,6 +217,9 @@ describe('FacilitiesWorkspacePanels', () => {
             within(card).getByText('Temperature Threshold Exceeded'),
         ).toBeInTheDocument();
         expect(
+            within(card).getByRole('link', { name: 'Kauri House' }),
+        ).toHaveAttribute('href', '/security-devices/sites/4');
+        expect(
             screen.queryByRole('button', { name: /silence|reset|control/i }),
         ).not.toBeInTheDocument();
     });

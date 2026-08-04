@@ -14,22 +14,18 @@ export function seedFacilitiesWorkspaceReadinessFixtures() {
         rawSentinel: string;
     }>(`
 $admin = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->firstOrFail();
-$tenantId = (int) ($admin->organization_id ?? 1);
 $site = \\App\\Models\\Site::query()
-    ->where('tenant_id', $tenantId)
     ->where('archived', false)
     ->orderBy('id')
     ->firstOrFail();
 
 $rawSentinel = 'PW-FACILITY-RAW-PRIVATE-EVIDENCE-MUST-NOT-RENDER';
-$upsertDevice = function (string $uid, string $name, string $category, string $subcategory, array $attributes = []) use ($tenantId, $admin, $site) {
+$upsertDevice = function (string $uid, string $name, string $category, string $subcategory, array $attributes = []) use ($admin, $site) {
     $device = \\App\\Domain\\SecurityDevices\\Models\\Device::withTrashed()
-        ->where('tenant_id', $tenantId)
         ->where('device_uid', $uid)
         ->first();
     if (! $device) {
         $device = new \\App\\Domain\\SecurityDevices\\Models\\Device([
-            'tenant_id' => $tenantId,
             'device_uid' => $uid,
         ]);
     } elseif ($device->trashed()) {
@@ -205,7 +201,7 @@ $thresholdType = 'temperature_threshold_exceeded';
 
 $integrationName = 'Milesight IoT';
 \\App\\Models\\Integration\\Integration::query()->updateOrCreate(
-    ['tenant_id' => $tenantId, 'provider' => 'milesight'],
+    ['provider' => 'milesight'],
     [
         'display_name' => $integrationName,
         'status' => \\App\\Models\\Integration\\Integration::STATUS_ACTIVE,
@@ -216,12 +212,10 @@ $integrationName = 'Milesight IoT';
     ],
 );
 \\App\\Models\\Integration\\IntegrationSyncLog::query()
-    ->where('tenant_id', $tenantId)
     ->where('provider', 'milesight')
     ->where('action', 'playwright_facilities_sync')
     ->delete();
 \\App\\Models\\Integration\\IntegrationSyncLog::query()->create([
-    'tenant_id' => $tenantId,
     'provider' => 'milesight',
     'site_id' => $site->id,
     'action' => 'playwright_facilities_sync',

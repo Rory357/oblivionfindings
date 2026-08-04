@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ItServiceIdentity extends Model
 {
+    use WritesLegacyStorageContext;
+
     public const ABILITIES = [
         'work:create',
         'work:read',
@@ -31,7 +33,6 @@ class ItServiceIdentity extends Model
     ];
 
     protected $fillable = [
-        'tenant_id',
         'actor_user_id',
         'created_by_user_id',
         'revoked_by_user_id',
@@ -82,11 +83,6 @@ class ItServiceIdentity extends Model
     public function requests(): HasMany
     {
         return $this->hasMany(ItApiRequest::class, 'service_identity_id');
-    }
-
-    public function scopeForTenant(Builder $query, int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 
     public function hasAbility(string $ability): bool

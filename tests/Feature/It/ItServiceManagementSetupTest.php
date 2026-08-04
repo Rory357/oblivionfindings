@@ -148,17 +148,14 @@ test('agents configure application teams membership roles services and queue rou
 
 test('ticket intake applies the highest priority matching queue service owner team and default assignee', function () {
     $team = ItTeam::factory()->create([
-        'tenant_id' => 1,
         'manager_user_id' => $this->manager->id,
     ]);
     $team->members()->attach($this->assignee->id, ['role' => 'member']);
     $service = ItService::factory()->create([
-        'tenant_id' => 1,
         'owner_user_id' => $this->manager->id,
         'key' => 'identity',
     ]);
     $queue = ItQueue::factory()->create([
-        'tenant_id' => 1,
         'team_id' => $team->id,
         'key' => 'identity-urgent',
         'filter_rules' => [
@@ -195,11 +192,10 @@ test('ticket intake applies the highest priority matching queue service owner te
 });
 
 test('setup exposes Site-scoped workload counts and keeps configuration application-wide', function () {
-    $team = ItTeam::factory()->create(['tenant_id' => 1]);
-    $queue = ItQueue::factory()->create(['tenant_id' => 1, 'team_id' => $team->id]);
-    $service = ItService::factory()->create(['tenant_id' => 1]);
+    $team = ItTeam::factory()->create();
+    $queue = ItQueue::factory()->create(['team_id' => $team->id]);
+    $service = ItService::factory()->create();
     ItTicket::factory()->count(2)->create([
-        'tenant_id' => 1,
         'site_id' => $this->site->id,
         'team_id' => $team->id,
         'queue_id' => $queue->id,
@@ -208,7 +204,6 @@ test('setup exposes Site-scoped workload counts and keeps configuration applicat
     ]);
     $remoteSite = Site::factory()->create();
     ItTicket::factory()->create([
-        'tenant_id' => 1,
         'site_id' => $remoteSite->id,
         'team_id' => $team->id,
         'queue_id' => $queue->id,

@@ -18,6 +18,7 @@ use App\Models\ItTeam;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\LegacyStorageContext;
 use Database\Seeders\ItProvisioningTemplateSeeder;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
@@ -41,8 +42,7 @@ function jmlProfile(?Site $site = null, array $overrides = []): HrEmployeeProfil
     $site ??= test()->site;
     $user = User::factory()->create(['approved_at' => now()]);
 
-    return HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
+    return HrEmployeeProfile::factory()->create([
         'user_id' => $user->id,
         'employee_number' => 'EMP-JML-'.$user->id,
         'personal_email' => 'private-'.$user->id.'@example.test',
@@ -94,7 +94,6 @@ function jmlAssignSite(User $user, Site $site): void
 function jmlTemplate(string $lifecycle, array $tasks, array $overrides = []): ItProvisioningTemplate
 {
     $template = ItProvisioningTemplate::query()->create([
-        'tenant_id' => 1,
         'name' => ucfirst($lifecycle).' default',
         'lifecycle_type' => $lifecycle,
         'position_role' => null,
@@ -139,7 +138,7 @@ beforeEach(function () {
 
 test('JML persistence carries templates workflows and governed provisioning task state', function () {
     expect(Schema::hasColumns('it_provisioning_templates', [
-        'tenant_id', 'lifecycle_type', 'position_role', 'site_id', 'employment_type',
+        LegacyStorageContext::column(), 'lifecycle_type', 'position_role', 'site_id', 'employment_type',
         'selection_priority', 'is_active',
     ]))->toBeTrue();
     expect(Schema::hasColumns('it_provisioning_template_tasks', [
@@ -148,7 +147,7 @@ test('JML persistence carries templates workflows and governed provisioning task
         'evidence_required', 'due_offset_days', 'fulfiller_fields',
     ]))->toBeTrue();
     expect(Schema::hasColumns('it_provisioning_workflows', [
-        'tenant_id', 'employee_profile_id', 'provisioning_template_id', 'lifecycle_type',
+        LegacyStorageContext::column(), 'employee_profile_id', 'provisioning_template_id', 'lifecycle_type',
         'source_type', 'source_id', 'source_event_key', 'status', 'effective_at',
         'role_snapshot', 'site_id_snapshot', 'employment_type_snapshot', 'changes',
     ]))->toBeTrue();
@@ -177,8 +176,8 @@ test('safe baseline templates make joiner mover and leaver workflows usable imme
 });
 
 test('template resolution chooses the most specific role site and employment match', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
-    $otherSite = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
+    $otherSite = Site::factory()->create();
     $profile = jmlProfile($site);
 
     jmlTemplate('joiner', [['title' => 'Generic account']]);
@@ -196,9 +195,9 @@ test('template resolution chooses the most specific role site and employment mat
 
 test('a joiner launch expands ordered and parallel work with teams approvals evidence due targets and minimum data', function () {
     Carbon::setTestNow('2026-07-19 09:00:00');
-    $site = Site::factory()->create(['tenant_id' => 1, 'name' => 'Sunnyside']);
+    $site = Site::factory()->create(['name' => 'Sunnyside']);
     $profile = jmlProfile($site);
-    $team = ItTeam::factory()->create(['tenant_id' => 1, 'name' => 'Identity & Access']);
+    $team = ItTeam::factory()->create(['name' => 'Identity & Access']);
     $template = jmlTemplate('joiner', [
         [
             'task_key' => 'identity',
@@ -286,7 +285,7 @@ test('HR event replay is idempotent and never duplicates a workflow or its reque
 });
 
 test('mover workflows include only deltas triggered by changed role site or employment fields', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $profile = jmlProfile($site, ['position_role' => 'team_lead']);
     jmlTemplate('mover', [
         [
@@ -369,7 +368,6 @@ test('dependencies approvals and evidence gate fulfilment and source HR completi
         ],
     ]);
     $checklist = HrOnboardingChecklist::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'template_key' => 'support_worker:all',
         'status' => 'in_progress',
@@ -451,7 +449,7 @@ test('a failed fulfilment is explicit and marks the workflow partially failed wi
 });
 
 test('leaver launch creates reversal work and canonical asset and device recovery without duplicating ownership', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     jmlAssignSite($this->manager, $site);
     $profile = jmlProfile($site);
     jmlTemplate('leaver', [
@@ -480,7 +478,7 @@ test('leaver launch creates reversal work and canonical asset and device recover
         'purpose' => 'Work device',
         'assigned_at' => now()->subMonth(),
     ]);
-    $device = Device::factory()->create(['tenant_id' => 1, 'name' => 'Staff safety handset']);
+    $device = Device::factory()->create(['name' => 'Staff safety handset']);
     $deviceAssignment = DeviceAssignment::query()->create([
         'device_id' => $device->id,
         'assignable_type' => DeviceAssignment::TARGET_STAFF,
@@ -490,7 +488,6 @@ test('leaver launch creates reversal work and canonical asset and device recover
         'assigned_by_user_id' => $this->manager->id,
     ]);
     $checklist = HrOffboardingChecklist::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'template_key' => 'offboarding:support_worker',
         'status' => 'pending',
@@ -524,7 +521,7 @@ test('leaver launch creates reversal work and canonical asset and device recover
 });
 
 test('template administration is application-wide and the IT workspace exposes JML progress', function () {
-    $team = ItTeam::factory()->create(['tenant_id' => 1]);
+    $team = ItTeam::factory()->create();
 
     $this->actingAs($this->manager)
         ->post('/it/setup/provisioning-templates', [

@@ -12,7 +12,6 @@ use App\Models\ItTicketComment;
 use App\Models\ItTicketEvent;
 use App\Models\User;
 use App\Services\AuditLogger;
-use App\Support\LegacyStorageContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Arr;
@@ -187,7 +186,6 @@ final class ItApiWorkItemService
             }
 
             $ticket = ItTicket::createWithReference([
-                'tenant_id' => LegacyStorageContext::id(),
                 'requester_user_id' => $actor->id,
                 'requested_for_user_id' => $actor->id,
                 'source' => 'system',
@@ -233,7 +231,6 @@ final class ItApiWorkItemService
             }
 
             $comment = ItTicketComment::query()->create([
-                'tenant_id' => LegacyStorageContext::id(),
                 'ticket_id' => $authorized->id,
                 'author_user_id' => $identity->actor_user_id,
                 'body' => $body,

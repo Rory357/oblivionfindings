@@ -7,8 +7,8 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * "Was this helpful?" vote on a published KB article (§I). Reachable by
  * anyone who can browse the knowledge base — a requester (it.request) or an
- * agent (it.view). One-vote-per-user is a localStorage guard on the client
- * (fine for v1); the server just tallies.
+ * agent (it.view). The locked lifecycle service enforces one canonical answer
+ * per user and article; client state is presentation only.
  */
 class KbHelpfulRequest extends FormRequest
 {

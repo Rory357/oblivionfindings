@@ -12,7 +12,7 @@ use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
 use App\Models\Site;
 use App\Models\User;
-use App\Support\LegacyStorageContext;
+use App\Services\AuditLogger;
 use DomainException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
@@ -45,10 +45,8 @@ class ItChangeService
                 throw new DomainException('Choose an approved Site or authorised organisation-wide scope.');
             }
 
-            $storageContextId = LegacyStorageContext::id();
             $requiresApproval = $this->dataNeedsApproval($data);
             $ticket = ItTicket::createWithReference([
-                'tenant_id' => $storageContextId,
                 'title' => $data['title'],
                 'description' => $data['description'] ?? null,
                 'requester_user_id' => $actor->id,
@@ -73,13 +71,22 @@ class ItChangeService
             ]);
 
             $change = ItChange::query()->create([
-                'tenant_id' => $storageContextId,
                 'ticket_id' => $ticket->id,
                 ...Arr::only($data, self::PROFILE_FIELDS),
                 'created_by_user_id' => $actor->id,
                 'updated_by_user_id' => $actor->id,
             ]);
             $this->syncLinks($change, $actor, $data);
+            AuditLogger::logOrFail('it.change.created', $ticket, [
+                'actor_id' => $actor->id,
+                'change_id' => $change->id,
+                'site_id' => $ticket->site_id,
+                'is_organisation_wide' => (bool) $ticket->is_organisation_wide,
+                'change_type' => $change->change_type,
+                'risk_level' => $change->risk_level,
+                'requires_approval' => (bool) $ticket->requires_approval,
+                'application_scope' => 'single_application',
+            ]);
 
             return $change->fresh('ticket');
         });
@@ -120,6 +127,14 @@ class ItChangeService
                 'ticket_fields' => $ticketChanged,
                 'change_fields' => $profileChanged,
                 'links_updated' => $this->linksWereSupplied($data),
+            ]);
+            AuditLogger::logOrFail('it.change.updated', $ticket, [
+                'actor_id' => $actor->id,
+                'change_id' => $change->id,
+                'ticket_fields' => $ticketChanged,
+                'change_fields' => $profileChanged,
+                'links_updated' => $this->linksWereSupplied($data),
+                'application_scope' => 'single_application',
             ]);
 
             return $change->fresh('ticket');

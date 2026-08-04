@@ -18,7 +18,7 @@
 - `it_tickets` and `App\Models\ItTicket` remain the canonical shared IT work record so existing references, email threading, comments, attachments, SLAs, approvals, merge history, CSAT, monitoring links, routes, and deep links continue to work.
 - `ItProvisioningRequest` remains the canonical provisioning record and retains the HR onboarding completion bridge. Provisioning is not reduced to a ticket category.
 - Problems, changes, and major incidents use one-to-one type profiles on the canonical ticket. They do not create parallel conversation, attachment, SLA, approval, or audit stores.
-- `ItTicketLink` remains the typed cross-record and related-work link. New work relationships use allowlisted relationship values and the existing tenant-safe link service.
+- `ItTicketLink` remains the typed cross-record and related-work link. New work relationships use allowlisted relationship values and the existing canonical access-checked link service.
 - A normalized `status` continues to drive shared queues and SLA behavior. A type-specific `workflow_state` records the governed lifecycle state and may change only through `ItWorkTransitionService`.
 - Existing `/it` and `/it/tickets/{ticket}` links remain valid. New grouped navigation adds routes without breaking old query-string tab links.
 - Security & Devices owns devices and technical state; Control Room owns operational correlation; IT & Support owns accountable technical work.
@@ -46,7 +46,7 @@ The missing service-management layers are governed type lifecycles, service cata
 
 - [x] Write failing schema and relationship tests.
 - [x] Run the focused test and verify RED.
-- [x] Create tenant-scoped teams, queues, operational services, work tasks, team membership, and the shared ticket fields: `requested_for_user_id`, `owner_user_id`, `site_id`, `team_id`, `queue_id`, `it_service_id`, `workflow_state`, `is_sensitive`, `waiting_party`, `next_action`, and `due_at`.
+- [x] Create application-wide teams, queues, operational services, work tasks, team membership, and the shared ticket fields: `requested_for_user_id`, `owner_user_id`, `site_id`, `team_id`, `queue_id`, `it_service_id`, `workflow_state`, `is_sensitive`, `waiting_party`, `next_action`, and `due_at`.
 - [x] Extend `WORK_TYPES` with `security_request` and `major_incident` while retaining every existing value.
 - [x] Add relationships, casts, factories, indexes, and stable morph aliases.
 - [x] Verify the focused schema test and the existing ticket schema regression.
@@ -70,7 +70,7 @@ The missing service-management layers are governed type lifecycles, service cata
 - [x] Write failing transition tests for incident, service request, security request, problem, change, task, and major incident.
 - [x] Require allowed transition, actor permission, waiting party/reason, required tasks, required approvals, resolution code/summary, timestamps, SLA behavior, and one immutable event in one transaction.
 - [x] Route new transitions through the service and adapt existing resolve/close/reopen/update actions without changing their public routes.
-- [x] Reject direct invalid workflow-state mutations and tenant-crossing actors.
+- [x] Reject direct invalid workflow-state mutations and actors outside the current work boundary.
 - [x] Verify lifecycle, approval, SLA, workspace, and merge regressions (88 tests, 607 assertions; TypeScript and targeted formatting also pass).
 - [x] Commit as `feat(it): govern work item transitions`.
 
@@ -89,7 +89,7 @@ The missing service-management layers are governed type lifecycles, service cata
 - Create catalogue factories and seeder fixtures
 - Create `tests/Feature/It/ItServiceCatalogTest.php`
 
-- [x] Write failing tests for tenant-scoped published catalogue discovery, schema-versioned field validation, restricted/internal fields, requester confirmation, approval flagging, idempotent submission, and canonical ticket creation.
+- [x] Write failing tests for role-appropriate published catalogue discovery, schema-versioned field validation, restricted/internal fields, requester confirmation, approval flagging, idempotent submission, and canonical ticket creation.
 - [x] Store a versioned form schema on each item and an immutable field-value snapshot on each submission.
 - [x] Support service request, security request, and provisioning catalogue outcomes without creating a second ticket store.
 - [x] Preserve search-first knowledge deflection and add catalogue suggestions to the existing requester payload.
@@ -108,7 +108,7 @@ The missing service-management layers are governed type lifecycles, service cata
 - Modify `routes/web.php`
 - Create `tests/Feature/It/ItWorkTaskTest.php`
 
-- [x] Write failing tests for required/optional tasks, ordering, dependencies, cycle rejection, team/user assignment, due dates, evidence requirement, completion, reopening, and tenant/security gates.
+- [x] Write failing tests for required/optional tasks, ordering, dependencies, cycle rejection, team/user assignment, due dates, evidence requirement, completion, reopening, and Site/role/security gates.
 - [x] Block resolution when required tasks or approvals remain incomplete.
 - [x] Record every task mutation in the canonical ticket event timeline.
 - [x] Expose permission-safe task and dependency context in the ticket workspace payload.
@@ -184,7 +184,7 @@ The missing service-management layers are governed type lifecycles, service cata
 - Create component and browser acceptance tests
 
 - [x] Write failing payload/route tests for the approved Service Desk, Service Delivery, Operations, and Setup groups.
-- [x] Add tenant-scoped teams, membership roles, queue routing rules, service ownership, default assignment, workload counts, and admin audit.
+- [x] Add application-wide teams, membership roles, queue routing rules, service ownership, default assignment, workload counts, and admin audit.
 - [x] Preserve `/it` and existing tab/query deep links while adding understandable workspace routes.
 - [x] Rename visible module copy from `IT & Provisioning` to `IT & Support`; retain Provisioning as a first-class destination.
 - [x] Use grouped side navigation plus local tabs only where a workspace needs tabs. Meet focus, target-size, responsive, icon+text+colour, empty/error/freshness, and permission rules.
@@ -201,7 +201,7 @@ The missing service-management layers are governed type lifecycles, service cata
 - Create versioned API FormRequests, resources, controllers, and routes
 - Create `tests/Feature/It/ItSecureApiTest.php`
 
-- [x] Write failing tests for opaque hashed credentials, optional request signatures, allowed tenant/site/work type/fields, idempotency-key replay, conflicting replay, rate limit, revoked/expired identity, response field minimization, and audit.
+- [x] Write failing tests for opaque hashed credentials, optional request signatures, allowed Sites/work types/fields, idempotency-key replay, conflicting replay, rate limit, revoked/expired identity, response field minimization, and audit.
 - [x] Implement `POST /api/v1/it/work-items`, read status/context, append public evidence/comment, and status callbacks through canonical services.
 - [x] Never expose raw device config, secrets, clinical readings, restricted tracking/media, internal notes, or command capability through a scope that does not explicitly allow them.
 - [x] Add admin setup UI showing identity metadata and one-time secret creation without ever re-displaying a reusable secret.
@@ -240,7 +240,7 @@ The missing service-management layers are governed type lifecycles, service cata
 ## Task 12: Verify the complete IT & Support stream and update the master ledger
 
 - [x] Run all `tests/Feature/It` plus monitoring and DeviceEvent integration tests (272 tests, 2,583 assertions).
-- [x] Run versioned secure API and tenant/field denial suites (6 tests, 101 assertions in the final focused rerun).
+- [x] Run versioned secure API Site/field denial suites (6 tests, 101 assertions in the final focused rerun).
 - [x] Run all frontend tests, types, lint, client build, and SSR build (94 files / 371 tests; TypeScript and repository-wide ESLint pass; client 4,979 modules; SSR 1,631 modules).
 - [x] Run browser journeys for self-service catalogue, email thread, technician incident, problem/change, major incident, provisioning JML, secure API, and denial cases with production-backed fixtures (7 passed across desktop and Pixel 7; 1 deliberate duplicate mobile accessibility scan skipped).
 - [x] Run accessibility checks on Help Centre, grouped navigation, queues, ticket, catalogue, problem, change, major incident, provisioning, and setup (10-route desktop axe matrix with no serious or critical violations).

@@ -4,6 +4,7 @@ import {
     CoverageIndicator,
     OperationalStateBadge,
 } from '@/components/security-devices/estate-operations';
+import { securityDevicesDomainHref } from '@/components/security-devices/security-devices-navigation';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -142,14 +143,6 @@ const domainIcons: Record<string, LucideIcon> = {
     facilities: Building2,
 };
 
-const domainHrefs: Record<string, string> = {
-    security: '/security-devices/security',
-    tracking: '/tracking',
-    iot_healthcare: '/healthcare',
-    it_infrastructure: '/network-it',
-    facilities: '/facilities-iot',
-};
-
 function actionState(key: string, count: number | null): string {
     if (count === null) return 'unknown';
     if (count === 0) return 'healthy';
@@ -239,8 +232,9 @@ export default function Dashboard({
                             What needs attention
                         </h2>
                         <p className="text-sm text-muted-foreground">
-                            Live operational queues. Select a queue to
-                            investigate or assign work.
+                            Current operational queues from the latest available
+                            evidence. Select a queue to investigate or assign
+                            work.
                         </p>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -571,12 +565,9 @@ export default function Dashboard({
                                             return (
                                                 <Link
                                                     key={domain.domain}
-                                                    href={
-                                                        domainHrefs[
-                                                            domain.domain
-                                                        ] ??
-                                                        '/security-devices/devices'
-                                                    }
+                                                    href={securityDevicesDomainHref(
+                                                        domain.domain,
+                                                    )}
                                                     className="flex min-h-14 items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                                 >
                                                     <div className="rounded-md bg-muted p-2">

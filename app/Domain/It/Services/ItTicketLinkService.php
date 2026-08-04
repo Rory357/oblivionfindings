@@ -14,7 +14,6 @@ use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
 use App\Services\UserSiteAccessService;
-use App\Support\LegacyStorageContext;
 use DomainException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -61,17 +60,17 @@ final class ItTicketLinkService
         Model $target,
         string $relationship,
         ?int $actorUserId = null,
-    ): void {
-        DB::transaction(function () use ($ticket, $target, $relationship, $actorUserId): void {
+    ): bool {
+        return DB::transaction(function () use ($ticket, $target, $relationship, $actorUserId): bool {
             $actor = $this->responsibleActor($actorUserId);
             [$canonicalTicket, $canonicalTarget] = $this->lockCanonicalRecords($ticket, $target);
             $this->assertHumanLinkAccess($actor, $canonicalTicket, $canonicalTarget, $relationship);
 
-            $canonicalTicket->links()
+            return $canonicalTicket->links()
                 ->where('relationship', $relationship)
                 ->where('linkable_type', $canonicalTarget->getMorphClass())
                 ->where('linkable_id', $canonicalTarget->getKey())
-                ->delete();
+                ->delete() > 0;
         });
     }
 
@@ -158,17 +157,11 @@ final class ItTicketLinkService
     ): ?int {
         $siteId = $this->canonicalDeviceSiteId($device, $lockForUpdate);
         $alertSiteId = $this->alertProvenance->authoritativeSiteId($alert);
-        $projection = $alert->device_id === null
-            ? null
-            : \App\Models\ControlRoom\Device::query()
-                ->whereKey($alert->device_id)
-                ->when($lockForUpdate, fn ($query) => $query->lockForUpdate())
-                ->first(['canonical_device_id']);
-        $projectionDeviceId = $projection?->canonical_device_id;
+        $alertDeviceId = $this->alertProvenance->authoritativeCanonicalDeviceId($alert);
 
         return $siteId !== null
             && $alertSiteId === $siteId
-            && (int) $projectionDeviceId === (int) $device->id
+            && $alertDeviceId === (int) $device->id
                 ? $siteId
                 : null;
     }
@@ -287,7 +280,6 @@ final class ItTicketLinkService
             'linkable_type' => $target->getMorphClass(),
             'linkable_id' => $target->getKey(),
         ], [
-            'tenant_id' => LegacyStorageContext::id(),
             'context' => $context,
             'created_by_user_id' => $actorUserId,
         ]);
@@ -305,7 +297,6 @@ final class ItTicketLinkService
             'linkable_type' => $target->getMorphClass(),
             'linkable_id' => $target->getKey(),
         ], [
-            'tenant_id' => LegacyStorageContext::id(),
             'context' => $context,
             'created_by_user_id' => null,
         ]);

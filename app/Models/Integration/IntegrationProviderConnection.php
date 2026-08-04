@@ -3,6 +3,7 @@
 namespace App\Models\Integration;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,6 +20,7 @@ class IntegrationProviderConnection extends Model
 {
     use AuditableChanges;
     use HasFactory;
+    use WritesLegacyStorageContext;
 
     public const STATUS_CONNECTED = 'connected';
 
@@ -29,7 +31,6 @@ class IntegrationProviderConnection extends Model
     protected $table = 'integration_tenant_secrets';
 
     protected $fillable = [
-        'tenant_id',
         'provider',
         'secret_encrypted',
         'secret_last4',

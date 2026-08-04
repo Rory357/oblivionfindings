@@ -6,8 +6,8 @@ use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Base agent gate for raising sign-off. The controller conceals an inaccessible
- * ticket first, then applies ItTicketPolicy@requestApproval lifecycle rules.
+ * Base agent gate for raising sign-off. The request conceals an inaccessible
+ * ticket before the locked approval lifecycle revalidates the decision rules.
  */
 class RequestApprovalRequest extends FormRequest
 {

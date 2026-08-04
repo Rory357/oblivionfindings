@@ -17,16 +17,14 @@ export function seedTrackingWorkspaceReadinessFixtures() {
 
     const output = runLaravelPhp(`
 $admin = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->firstOrFail();
-$tenantId = (int) ($admin->organization_id ?? 1);
 $site = \\App\\Models\\Site::query()
-    ->where('tenant_id', $tenantId)
     ->where('archived', false)
     ->orderBy('id')
     ->firstOrFail();
 
-$upsertClient = function (string $firstName, string $preferredName) use ($tenantId, $site, $admin) {
+$upsertClient = function (string $firstName, string $preferredName) use ($site, $admin) {
     $client = \\App\\Models\\Client::withTrashed()
-        ->where('organization_id', $tenantId)
+        ->where('site_id', $site->id)
         ->where('first_name', $firstName)
         ->where('last_name', 'Tracking')
         ->first();
@@ -37,7 +35,6 @@ $upsertClient = function (string $firstName, string $preferredName) use ($tenant
     }
 
     $client->forceFill([
-        'organization_id' => $tenantId,
         'site_id' => $site->id,
         'first_name' => $firstName,
         'last_name' => 'Tracking',
@@ -136,14 +133,12 @@ $clientAsset = \\App\\Models\\Asset::query()->updateOrCreate(
     ],
 );
 
-$upsertDevice = function (string $uid, string $name, string $category, array $attributes = []) use ($tenantId, $admin) {
+$upsertDevice = function (string $uid, string $name, string $category, array $attributes = []) use ($admin) {
     $device = \\App\\Domain\\SecurityDevices\\Models\\Device::withTrashed()
-        ->where('tenant_id', $tenantId)
         ->where('device_uid', $uid)
         ->first();
     if (! $device) {
         $device = new \\App\\Domain\\SecurityDevices\\Models\\Device([
-            'tenant_id' => $tenantId,
             'device_uid' => $uid,
         ]);
     } elseif ($device->trashed()) {

@@ -52,7 +52,7 @@ Calculate the HMAC-SHA256 with the credential's secret portion as the key. Times
 }
 ```
 
-The identity's configured field, work-type, tenant, and site allowlists are enforced server-side. Supported intake fields are `title`, `description`, `category`, `subcategory`, `priority`, `impact`, `urgency`, `work_type`, `site_id`, `it_service_id`, and `asset_id`. An administrator must explicitly enable each field; title, category, priority, and work type are always required.
+The identity's configured field, work-type, and Site allowlists are enforced server-side. Supported intake fields are `title`, `description`, `category`, `subcategory`, `priority`, `impact`, `urgency`, `work_type`, `site_id`, `it_service_id`, and `asset_id`. An administrator must explicitly enable each field; title, category, priority, and work type are always required.
 
 Creation uses the canonical ticket reference, SLA stamping, routing, ownership, event, and audit services. The source is recorded as `system`, and the named execution account is the requester/actor.
 
@@ -95,7 +95,7 @@ Waiting transitions require `waiting_party` and `reason`. Settlement transitions
 - `400`: missing/invalid idempotency key.
 - `401`: invalid, expired, revoked, unsigned, incorrectly signed, or stale credential request.
 - `403`: the identity lacks the route ability.
-- `404`: the work item is outside the identity's tenant, site, work-type, or sensitivity boundary, or does not exist.
+- `404`: the work item is outside the identity's Site, work-type, or sensitivity boundary, or does not exist.
 - `409`: idempotency conflict or the original request is still running.
 - `422`: validation or lifecycle denial.
 - `429`: the identity-specific per-minute limit was exceeded; respect `Retry-After`.

@@ -5,11 +5,17 @@ namespace App\Domain\SecurityDevices\Services;
 use App\Domain\SecurityDevices\Enums\AssignmentType;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\ClientConsent;
+use App\Services\ConsentValidationService;
 use App\Services\Sites\SiteTypePlanPinStatusService;
 use Illuminate\Support\Facades\DB;
 
 class DeviceAssignmentService
 {
+    public function __construct(
+        private readonly ?PersonalTrackingPrivacyService $trackingPrivacy = null,
+    ) {}
+
     /**
      * Assign a device to an entity (site, room, vehicle, staff, client).
      *
@@ -26,7 +32,7 @@ class DeviceAssignmentService
         ?string $notes = null,
     ): DeviceAssignment {
         $this->validateTarget($assignableType);
-        $this->validateConsent($device, $assignableType, $consentId);
+        $this->validateConsent($device, $assignableType, $assignableId, $consentId);
 
         return DB::transaction(function () use (
             $device, $assignableType, $assignableId, $assignedByUserId,
@@ -66,6 +72,11 @@ class DeviceAssignmentService
             'released_at' => $releasedAt,
             'released_by_user_id' => $releasedByUserId,
         ]);
+        $this->stopPersonalTrackingCollection(
+            $active,
+            $releasedByUserId,
+            'assignment_released',
+        );
         app(SiteTypePlanPinStatusService::class)->markDevicePinsStale($device, 'assignment_released', $releasedAt);
 
         return $active->fresh();
@@ -104,6 +115,11 @@ class DeviceAssignmentService
                 'released_at' => $releasedAt,
                 'released_by_user_id' => $userId,
             ]);
+            $this->stopPersonalTrackingCollection(
+                $active,
+                $userId,
+                'assignment_replaced',
+            );
             app(SiteTypePlanPinStatusService::class)->markDevicePinsStale($device, 'assignment_replaced', $releasedAt);
         }
     }
@@ -121,16 +137,42 @@ class DeviceAssignmentService
     /**
      * Client-assigned tracking devices require a consent record (NZ privacy).
      */
-    private function validateConsent(Device $device, string $assignableType, ?int $consentId): void
-    {
-        if (
-            $assignableType === DeviceAssignment::TARGET_CLIENT
-            && $device->domain === 'tracking'
-            && $consentId === null
-        ) {
+    private function validateConsent(
+        Device $device,
+        string $assignableType,
+        int $assignableId,
+        ?int $consentId,
+    ): void {
+        if ($assignableType !== DeviceAssignment::TARGET_CLIENT || $device->domain !== 'tracking') {
+            return;
+        }
+
+        $consent = $consentId
+            ? ClientConsent::query()->with('consentType')->find($consentId)
+            : null;
+
+        if (! $consent
+            || (int) $consent->client_id !== $assignableId
+            || ! ConsentValidationService::isValidTrackingConsent($consent)) {
             throw new \InvalidArgumentException(
-                'Client tracker assignments require a consent_id (NZ privacy requirement).'
+                'Client tracker assignments require an active, assignment-linked location-tracking consent.'
             );
         }
+    }
+
+    private function stopPersonalTrackingCollection(
+        DeviceAssignment $assignment,
+        int $actorUserId,
+        string $reason,
+    ): void {
+        if (! in_array($assignment->assignable_type, [
+            DeviceAssignment::TARGET_CLIENT,
+            DeviceAssignment::TARGET_STAFF,
+        ], true) || $assignment->device_id === null) {
+            return;
+        }
+
+        ($this->trackingPrivacy ?? app(PersonalTrackingPrivacyService::class))
+            ->stopAssignment($assignment, $actorUserId, $reason);
     }
 }

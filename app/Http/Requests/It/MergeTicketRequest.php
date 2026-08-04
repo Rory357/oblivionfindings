@@ -30,6 +30,7 @@ class MergeTicketRequest extends FormRequest
     {
         return [
             'target_ticket_id' => ['required', 'integer', 'exists:it_tickets,id'],
+            'reason' => ['required', 'string', 'max:1000'],
         ];
     }
 

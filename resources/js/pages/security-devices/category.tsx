@@ -1,6 +1,10 @@
 import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import {
+    BulkManagementWorkspace,
+    type BulkManagementWorkspaceData,
+} from '@/components/security-devices/bulk-management-workspace';
+import {
     type FacilitiesWorkspaceData,
     FacilitiesWorkspacePanels,
 } from '@/components/security-devices/facilities-workspace';
@@ -92,6 +96,7 @@ type Props = {
     securityWorkspace?: SecurityWorkspaceData | null;
     healthcareWorkspace?: HealthcareWorkspaceData | null;
     trackingWorkspace?: TrackingWorkspaceData | null;
+    bulkManagement?: BulkManagementWorkspaceData | null;
 };
 
 // ── Icon map ──────────────────────────────────────────────────────
@@ -164,6 +169,7 @@ export default function CategoryPage({
     securityWorkspace,
     healthcareWorkspace,
     trackingWorkspace,
+    bulkManagement,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const PageIcon = iconMap[pageConfig.icon] ?? Server;
@@ -234,241 +240,278 @@ export default function CategoryPage({
                     workspace={workspace}
                     filters={filters}
                 >
-                    {facilitiesWorkspace ? (
-                        <FacilitiesWorkspacePanels data={facilitiesWorkspace} />
-                    ) : null}
-                    {networkItWorkspace ? (
-                        <NetworkItWorkspacePanels data={networkItWorkspace} />
-                    ) : null}
-                    {securityWorkspace ? (
-                        <SecurityWorkspacePanels data={securityWorkspace} />
-                    ) : null}
-                    {healthcareWorkspace ? (
-                        <HealthcareWorkspacePanels data={healthcareWorkspace} />
-                    ) : null}
-                    {trackingWorkspace ? (
-                        <TrackingWorkspacePanels data={trackingWorkspace} />
-                    ) : null}
+                    {bulkManagement ? (
+                        <BulkManagementWorkspace data={bulkManagement} />
+                    ) : (
+                        <>
+                            {facilitiesWorkspace ? (
+                                <FacilitiesWorkspacePanels
+                                    data={facilitiesWorkspace}
+                                />
+                            ) : null}
+                            {networkItWorkspace ? (
+                                <NetworkItWorkspacePanels
+                                    data={networkItWorkspace}
+                                />
+                            ) : null}
+                            {securityWorkspace ? (
+                                <SecurityWorkspacePanels
+                                    data={securityWorkspace}
+                                />
+                            ) : null}
+                            {healthcareWorkspace ? (
+                                <HealthcareWorkspacePanels
+                                    data={healthcareWorkspace}
+                                />
+                            ) : null}
+                            {trackingWorkspace ? (
+                                <TrackingWorkspacePanels
+                                    data={trackingWorkspace}
+                                />
+                            ) : null}
 
-                    {/* Subcategory chips */}
-                    {filterOptions.subcategories.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="xs"
-                                onClick={() =>
-                                    applyFilters({ subcategory: 'all' })
-                                }
-                                className={`h-auto rounded-full px-3 py-1 ${
-                                    !filters.subcategory ||
-                                    filters.subcategory === 'all'
-                                        ? 'border-primary bg-primary/10 text-primary'
-                                        : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                                }`}
-                            >
-                                All
-                                <span className="ml-1 text-muted-foreground">
-                                    ({stats.total})
-                                </span>
-                            </Button>
-                            {filterOptions.subcategories.map((sub) => {
-                                const count =
-                                    stats.bySubcategory[sub.value] ?? 0;
-                                const isActive =
-                                    filters.subcategory === sub.value;
-                                return (
+                            {/* Subcategory chips */}
+                            {filterOptions.subcategories.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
                                     <Button
-                                        key={sub.value}
                                         type="button"
                                         variant="outline"
                                         size="xs"
                                         onClick={() =>
-                                            applyFilters({
-                                                subcategory: sub.value,
-                                            })
+                                            applyFilters({ subcategory: 'all' })
                                         }
                                         className={`h-auto rounded-full px-3 py-1 ${
-                                            isActive
+                                            !filters.subcategory ||
+                                            filters.subcategory === 'all'
                                                 ? 'border-primary bg-primary/10 text-primary'
                                                 : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
                                         }`}
                                     >
-                                        {sub.label}
-                                        {count > 0 && (
-                                            <span className="ml-1 text-muted-foreground/70">
-                                                ({count})
-                                            </span>
-                                        )}
+                                        All
+                                        <span className="ml-1 text-muted-foreground">
+                                            ({stats.total})
+                                        </span>
                                     </Button>
-                                );
-                            })}
-                        </div>
-                    )}
-
-                    {/* Category filter (for multi-category or whole-domain pages) */}
-                    {filterOptions.categories &&
-                        filterOptions.categories.length > 1 && (
-                            <div className="flex flex-wrap gap-2">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="xs"
-                                    onClick={() =>
-                                        applyFilters({ category: 'all' })
-                                    }
-                                    className={`h-auto rounded-full px-3 py-1 ${
-                                        !filters.category ||
-                                        filters.category === 'all'
-                                            ? 'border-primary bg-primary/10 text-primary'
-                                            : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                                    }`}
-                                >
-                                    All categories
-                                </Button>
-                                {filterOptions.categories.map((cat) => (
-                                    <Button
-                                        key={cat.value}
-                                        type="button"
-                                        variant="outline"
-                                        size="xs"
-                                        onClick={() =>
-                                            applyFilters({
-                                                category: cat.value,
-                                            })
-                                        }
-                                        className={`h-auto rounded-full px-3 py-1 ${
-                                            filters.category === cat.value
-                                                ? 'border-primary bg-primary/10 text-primary'
-                                                : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                                        }`}
-                                    >
-                                        {cat.label}
-                                    </Button>
-                                ))}
-                            </div>
-                        )}
-
-                    {/* Filter bar */}
-                    <WorkspaceFilterBar>
-                        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-                            <div className="relative flex-1 sm:max-w-xs">
-                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <CategorySearchInput
-                                    title={pageConfig.title}
-                                    value={search}
-                                    onChange={setSearch}
-                                    onSubmit={() => applyFilters({ search })}
-                                />
-                            </div>
-
-                            <FilterSelect
-                                value={filters.status}
-                                onChange={(v) => applyFilters({ status: v })}
-                                placeholder="Status"
-                                options={filterOptions.statuses}
-                            />
-                            <FilterSelect
-                                value={filters.health}
-                                onChange={(v) => applyFilters({ health: v })}
-                                placeholder="Health"
-                                options={filterOptions.healthStatuses}
-                            />
-                            {filterOptions.providers.length > 0 && (
-                                <FilterSelect
-                                    value={filters.provider}
-                                    onChange={(v) =>
-                                        applyFilters({ provider: v })
-                                    }
-                                    placeholder="Provider"
-                                    options={filterOptions.providers.map(
-                                        (p: string) => ({ value: p, label: p }),
-                                    )}
-                                />
+                                    {filterOptions.subcategories.map((sub) => {
+                                        const count =
+                                            stats.bySubcategory[sub.value] ?? 0;
+                                        const isActive =
+                                            filters.subcategory === sub.value;
+                                        return (
+                                            <Button
+                                                key={sub.value}
+                                                type="button"
+                                                variant="outline"
+                                                size="xs"
+                                                onClick={() =>
+                                                    applyFilters({
+                                                        subcategory: sub.value,
+                                                    })
+                                                }
+                                                className={`h-auto rounded-full px-3 py-1 ${
+                                                    isActive
+                                                        ? 'border-primary bg-primary/10 text-primary'
+                                                        : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                                                }`}
+                                            >
+                                                {sub.label}
+                                                {count > 0 && (
+                                                    <span className="ml-1 text-muted-foreground/70">
+                                                        ({count})
+                                                    </span>
+                                                )}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
                             )}
-                            <FilterSelect
-                                value={filters.assigned}
-                                onChange={(v) => applyFilters({ assigned: v })}
-                                placeholder="Assignment"
-                                options={[
-                                    { value: 'yes', label: 'Assigned' },
-                                    { value: 'no', label: 'Unassigned' },
-                                ]}
-                            />
 
-                            {hasActiveFilters && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={clearFilters}
-                                >
-                                    Clear filters
-                                </Button>
-                            )}
-                        </div>
-                    </WorkspaceFilterBar>
-
-                    {/* Results */}
-                    <WorkspaceDeviceList>
-                        {devices.data.length > 0 ? (
-                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                                {devices.data.map((device) => (
-                                    <DeviceCard
-                                        key={device.id}
-                                        device={device}
-                                    />
-                                ))}
-                            </div>
-                        ) : hasActiveFilters ? (
-                            <EmptySearch
-                                onClear={clearFilters}
-                                searchTerm={filters.search}
-                                title={`No matching ${pageConfig.title.toLowerCase()} found`}
-                            />
-                        ) : (
-                            <EmptyState
-                                icon={PageIcon}
-                                title={pageConfig.emptyTitle}
-                                description={pageConfig.emptyDescription}
-                                action={
-                                    <Button asChild size="sm">
-                                        <Link
-                                            href={`/security-devices/devices/create?domain=${pageConfig.domain}`}
+                            {/* Category filter (for multi-category or whole-domain pages) */}
+                            {filterOptions.categories &&
+                                filterOptions.categories.length > 1 && (
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="xs"
+                                            onClick={() =>
+                                                applyFilters({
+                                                    category: 'all',
+                                                })
+                                            }
+                                            className={`h-auto rounded-full px-3 py-1 ${
+                                                !filters.category ||
+                                                filters.category === 'all'
+                                                    ? 'border-primary bg-primary/10 text-primary'
+                                                    : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                                            }`}
                                         >
-                                            {registerLabel}
-                                        </Link>
-                                    </Button>
-                                }
-                            />
-                        )}
+                                            All categories
+                                        </Button>
+                                        {filterOptions.categories.map((cat) => (
+                                            <Button
+                                                key={cat.value}
+                                                type="button"
+                                                variant="outline"
+                                                size="xs"
+                                                onClick={() =>
+                                                    applyFilters({
+                                                        category: cat.value,
+                                                    })
+                                                }
+                                                className={`h-auto rounded-full px-3 py-1 ${
+                                                    filters.category ===
+                                                    cat.value
+                                                        ? 'border-primary bg-primary/10 text-primary'
+                                                        : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                                                }`}
+                                            >
+                                                {cat.label}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                )}
 
-                        {/* Pagination */}
-                        {(devices.meta.last_page ?? 1) > 1 && (
-                            <div className="flex items-center justify-center gap-1">
-                                {devices.links.map((link, i) => (
-                                    <Button
-                                        key={i}
-                                        variant={
-                                            link.active ? 'default' : 'outline'
+                            {/* Filter bar */}
+                            <WorkspaceFilterBar>
+                                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                                    <div className="relative flex-1 sm:max-w-xs">
+                                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                        <CategorySearchInput
+                                            title={pageConfig.title}
+                                            value={search}
+                                            onChange={setSearch}
+                                            onSubmit={() =>
+                                                applyFilters({ search })
+                                            }
+                                        />
+                                    </div>
+
+                                    <FilterSelect
+                                        value={filters.status}
+                                        onChange={(v) =>
+                                            applyFilters({ status: v })
                                         }
-                                        size="sm"
-                                        disabled={!link.url}
-                                        onClick={() =>
-                                            link.url &&
-                                            router.get(
-                                                link.url,
-                                                {},
-                                                { preserveState: true },
-                                            )
-                                        }
-                                        dangerouslySetInnerHTML={{
-                                            __html: link.label,
-                                        }}
+                                        placeholder="Status"
+                                        options={filterOptions.statuses}
                                     />
-                                ))}
-                            </div>
-                        )}
-                    </WorkspaceDeviceList>
+                                    <FilterSelect
+                                        value={filters.health}
+                                        onChange={(v) =>
+                                            applyFilters({ health: v })
+                                        }
+                                        placeholder="Health"
+                                        options={filterOptions.healthStatuses}
+                                    />
+                                    {filterOptions.providers.length > 0 && (
+                                        <FilterSelect
+                                            value={filters.provider}
+                                            onChange={(v) =>
+                                                applyFilters({ provider: v })
+                                            }
+                                            placeholder="Provider"
+                                            options={filterOptions.providers.map(
+                                                (p: string) => ({
+                                                    value: p,
+                                                    label: p,
+                                                }),
+                                            )}
+                                        />
+                                    )}
+                                    <FilterSelect
+                                        value={filters.assigned}
+                                        onChange={(v) =>
+                                            applyFilters({ assigned: v })
+                                        }
+                                        placeholder="Assignment"
+                                        options={[
+                                            { value: 'yes', label: 'Assigned' },
+                                            {
+                                                value: 'no',
+                                                label: 'Unassigned',
+                                            },
+                                        ]}
+                                    />
+
+                                    {hasActiveFilters && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={clearFilters}
+                                        >
+                                            Clear filters
+                                        </Button>
+                                    )}
+                                </div>
+                            </WorkspaceFilterBar>
+
+                            {/* Results */}
+                            <WorkspaceDeviceList>
+                                {devices.data.length > 0 ? (
+                                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                        {devices.data.map((device) => (
+                                            <DeviceCard
+                                                key={device.id}
+                                                device={device}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : hasActiveFilters ? (
+                                    <EmptySearch
+                                        onClear={clearFilters}
+                                        searchTerm={filters.search}
+                                        title={`No matching ${pageConfig.title.toLowerCase()} found`}
+                                    />
+                                ) : (
+                                    <EmptyState
+                                        icon={PageIcon}
+                                        title={pageConfig.emptyTitle}
+                                        description={
+                                            pageConfig.emptyDescription
+                                        }
+                                        action={
+                                            <Button asChild size="sm">
+                                                <Link
+                                                    href={`/security-devices/devices/create?domain=${pageConfig.domain}`}
+                                                >
+                                                    {registerLabel}
+                                                </Link>
+                                            </Button>
+                                        }
+                                    />
+                                )}
+
+                                {/* Pagination */}
+                                {(devices.meta.last_page ?? 1) > 1 && (
+                                    <div className="flex items-center justify-center gap-1">
+                                        {devices.links.map((link, i) => (
+                                            <Button
+                                                key={i}
+                                                variant={
+                                                    link.active
+                                                        ? 'default'
+                                                        : 'outline'
+                                                }
+                                                size="sm"
+                                                disabled={!link.url}
+                                                onClick={() =>
+                                                    link.url &&
+                                                    router.get(
+                                                        link.url,
+                                                        {},
+                                                        { preserveState: true },
+                                                    )
+                                                }
+                                                dangerouslySetInnerHTML={{
+                                                    __html: link.label,
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </WorkspaceDeviceList>
+                        </>
+                    )}
                 </SecurityDevicesWorkspaceShell>
             </PageShell>
         </AppLayout>

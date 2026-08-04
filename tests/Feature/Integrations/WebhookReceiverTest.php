@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Integrations;
 
+use App\Domain\Monitoring\Models\MonitoringOutbox;
+use App\Domain\Monitoring\Services\MonitoringEnvelopeConsumer;
 use App\Http\Controllers\Api\WebhookReceiverController;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\Integration\IntegrationProviderConnection;
@@ -10,7 +12,9 @@ use App\Models\Site;
 use App\Services\Integration\AlertRoutingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -18,11 +22,29 @@ class WebhookReceiverTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Queue::fake();
+        config()->set('cache.default', 'array');
+        config()->set('integration-capabilities.webhook.replay_store', 'array');
+        config()->set('integration-capabilities.webhook.allow_local_replay_store_for_tests', true);
+        config()->set('monitoring.delivery.sequence_lock_store', 'array');
+        config()->set('monitoring.delivery.allow_local_sequence_lock_for_tests', true);
+        config()->set('monitoring.signing', [
+            'active_key_id' => 'webhook-test-key',
+            'keys' => [
+                'webhook-test-key' => base64_encode(str_repeat("\x42", SODIUM_CRYPTO_AUTH_KEYBYTES)),
+            ],
+        ]);
+    }
+
     public function test_missing_integration_key_is_rejected(): void
     {
         $this->postJson('/webhooks/unifi', $this->payload())
             ->assertUnauthorized()
-            ->assertJson(['error' => 'Missing integration key']);
+            ->assertJson(['error' => 'Webhook rejected']);
 
         $this->assertDatabaseCount('integration_events', 0);
     }
@@ -31,11 +53,10 @@ class WebhookReceiverTest extends TestCase
     {
         $this->createProviderConnection(provider: 'unifi', key: 'correct-secret-1234');
 
-        $this->postJson('/webhooks/unifi', $this->payload(), [
-            'X-Integration-Key' => 'wrong-secret-9999',
-        ])
+        $payload = $this->payload();
+        $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, 'wrong-secret-9999'))
             ->assertUnauthorized()
-            ->assertJson(['error' => 'Invalid integration key']);
+            ->assertJson(['error' => 'Webhook rejected']);
 
         $this->assertDatabaseCount('integration_events', 0);
     }
@@ -45,12 +66,13 @@ class WebhookReceiverTest extends TestCase
         $key = 'unifi-secret-1234';
         $this->createProviderConnection(provider: 'unifi', key: $key);
 
-        $this->postJson('/webhooks/unifi', $this->payload(), [
-            'X-Integration-Key' => $key,
-            'X-Webhook-Signature' => hash_hmac('sha256', 'different body', $key),
-        ])
+        $payload = $this->payload();
+        $headers = $this->signedHeaders($payload, $key);
+        $headers['X-Webhook-Signature'] = 'sha256='.hash_hmac('sha256', 'different body', $key);
+
+        $this->postJson('/webhooks/unifi', $payload, $headers)
             ->assertUnauthorized()
-            ->assertJson(['error' => 'Invalid signature']);
+            ->assertJson(['error' => 'Webhook rejected']);
 
         $this->assertDatabaseCount('integration_events', 0);
     }
@@ -65,12 +87,12 @@ class WebhookReceiverTest extends TestCase
 
         $payload = $this->payload(siteId: $site->id, eventId: 'evt-1001');
 
-        $this->postJson('/webhooks/unifi', $payload, [
-            'X-Integration-Key' => $key,
-            'X-Webhook-Signature' => hash_hmac('sha256', json_encode($payload), $key),
-        ])
-            ->assertOk()
+        $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, $key))
+            ->assertAccepted()
             ->assertJson(['status' => 'accepted']);
+
+        $this->assertDatabaseCount('integration_events', 0);
+        $this->consumeStagedEvent($site->id);
 
         $this->assertDatabaseHas('integration_events', [
             'tenant_id' => 1,
@@ -78,6 +100,7 @@ class WebhookReceiverTest extends TestCase
             'provider' => 'unifi',
             'source_event_id' => 'evt-1001',
             'event_type' => 'doorbell.ring',
+            'raw_payload' => null,
         ]);
     }
 
@@ -91,14 +114,15 @@ class WebhookReceiverTest extends TestCase
 
         $payload = $this->payload(siteId: $site->id, eventId: 'evt-1001');
 
-        $this->postJson('/webhooks/unifi', $payload, [
-            'X-Integration-Key' => $key,
-        ])->assertOk()->assertJson(['status' => 'accepted']);
+        $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, $key, 'nonce-for-first-event-1001'))
+            ->assertAccepted()
+            ->assertJson(['status' => 'accepted']);
 
-        $this->postJson('/webhooks/unifi', $payload, [
-            'X-Integration-Key' => $key,
-        ])->assertOk()->assertJson(['status' => 'duplicate']);
+        $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, $key, 'nonce-for-second-event-1001'))
+            ->assertOk()
+            ->assertJson(['status' => 'duplicate']);
 
+        $this->consumeStagedEvent($site->id);
         $this->assertDatabaseCount('integration_events', 1);
     }
 
@@ -112,13 +136,16 @@ class WebhookReceiverTest extends TestCase
         $this->mapProviderToSite('unifi', $secondSite);
         $this->mockRouting(times: 1);
 
-        $this->postJson('/webhooks/unifi', $this->payload(siteId: $firstSite->id, eventId: 'evt-shared'), [
-            'X-Integration-Key' => $providerKey,
-        ])->assertOk()->assertJson(['status' => 'accepted']);
+        $firstPayload = $this->payload(siteId: $firstSite->id, eventId: 'evt-shared');
+        $this->postJson('/webhooks/unifi', $firstPayload, $this->signedHeaders($firstPayload, $providerKey, 'nonce-for-first-shared-event'))
+            ->assertAccepted()
+            ->assertJson(['status' => 'accepted']);
+        $this->consumeStagedEvent($firstSite->id);
 
-        $this->postJson('/webhooks/unifi', $this->payload(siteId: $secondSite->id, eventId: 'evt-shared'), [
-            'X-Integration-Key' => $providerKey,
-        ])->assertOk()->assertJson(['status' => 'duplicate']);
+        $secondPayload = $this->payload(siteId: $secondSite->id, eventId: 'evt-shared');
+        $this->postJson('/webhooks/unifi', $secondPayload, $this->signedHeaders($secondPayload, $providerKey, 'nonce-for-second-shared-event'))
+            ->assertOk()
+            ->assertJson(['status' => 'duplicate']);
 
         $this->assertDatabaseHas('integration_events', [
             'tenant_id' => 1,
@@ -137,9 +164,9 @@ class WebhookReceiverTest extends TestCase
         $this->mapProviderToSite('unifi', $mappedSite);
         $this->mockRouting(times: 0);
 
-        $this->postJson('/webhooks/unifi', $this->payload(siteId: $unmappedSite->id), [
-            'X-Integration-Key' => $key,
-        ])->assertUnprocessable();
+        $payload = $this->payload(siteId: $unmappedSite->id);
+        $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, $key))
+            ->assertUnprocessable();
 
         $this->assertDatabaseCount('integration_events', 0);
     }
@@ -165,12 +192,38 @@ class WebhookReceiverTest extends TestCase
             ->once();
     }
 
+    public function test_expired_timestamp_and_replayed_nonce_are_rejected_before_persistence(): void
+    {
+        $key = 'unifi-secret-1234';
+        $site = Site::factory()->create();
+        $this->createProviderConnection(provider: 'unifi', key: $key);
+        $this->mapProviderToSite('unifi', $site);
+        $payload = $this->payload(siteId: $site->id);
+
+        $expired = $this->signedHeaders($payload, $key, 'nonce-for-expired-event', now()->subMinutes(10)->timestamp);
+        $this->postJson('/webhooks/unifi', $payload, $expired)->assertUnauthorized();
+
+        $headers = $this->signedHeaders($payload, $key, 'nonce-for-replayed-event');
+        $this->postJson('/webhooks/unifi', $payload, $headers)->assertAccepted();
+        $this->postJson('/webhooks/unifi', $payload, $headers)->assertUnauthorized();
+
+        $this->assertDatabaseCount('monitoring_outbox', 1);
+        $this->assertDatabaseCount('integration_events', 0);
+    }
+
+    public function test_provider_without_verified_webhook_capability_is_hidden(): void
+    {
+        $this->postJson('/webhooks/queclink', [])->assertNotFound();
+        $this->postJson('/webhooks/not-registered', [])->assertNotFound();
+        $this->assertDatabaseCount('monitoring_outbox', 0);
+    }
+
     private function createProviderConnection(string $provider, string $key): IntegrationProviderConnection
     {
         return IntegrationProviderConnection::create([
             'tenant_id' => 1,
             'provider' => $provider,
-            'secret_encrypted' => encrypt($key),
+            'secret_encrypted' => Crypt::encryptString($key),
             'secret_last4' => substr($key, -4),
             'status' => IntegrationProviderConnection::STATUS_CONNECTED,
         ]);
@@ -182,6 +235,7 @@ class WebhookReceiverTest extends TestCase
             'tenant_id' => 1,
             'site_id' => $site->id,
             'provider' => $provider,
+            'mapped_external_site_id' => 'unifi-site-'.$site->id,
             'status' => IntegrationSiteConfig::STATUS_HYBRID,
             'is_active' => true,
         ]);
@@ -197,6 +251,34 @@ class WebhookReceiverTest extends TestCase
         });
     }
 
+    /** @param array<string, mixed> $payload @return array<string, string> */
+    private function signedHeaders(
+        array $payload,
+        string $key,
+        string $nonce = 'nonce-for-webhook-event-1001',
+        ?int $timestamp = null,
+    ): array {
+        $timestamp ??= now()->timestamp;
+        $body = json_encode($payload, JSON_THROW_ON_ERROR);
+
+        return [
+            'X-Integration-Key' => $key,
+            'X-Webhook-Timestamp' => (string) $timestamp,
+            'X-Webhook-Nonce' => $nonce,
+            'X-Webhook-Signature' => 'sha256='.hash_hmac('sha256', $timestamp.'.'.$nonce.'.'.$body, $key),
+        ];
+    }
+
+    private function consumeStagedEvent(int $siteId): void
+    {
+        $outbox = MonitoringOutbox::query()->latest('id')->firstOrFail();
+        app(MonitoringEnvelopeConsumer::class)->consume(
+            'event-projector',
+            $outbox->envelope_bytes,
+            $siteId,
+        );
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -204,7 +286,7 @@ class WebhookReceiverTest extends TestCase
     {
         return [
             '_id' => $eventId,
-            'site_id' => $siteId ?? Site::factory()->create()->id,
+            'site_id' => 'unifi-site-'.($siteId ?? Site::factory()->create()->id),
             'time' => now()->getTimestampMs(),
             'severity' => 'warning',
             'key' => 'doorbell.ring',

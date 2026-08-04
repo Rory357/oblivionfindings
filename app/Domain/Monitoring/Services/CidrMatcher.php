@@ -6,6 +6,64 @@ use InvalidArgumentException;
 
 final class CidrMatcher
 {
+    /**
+     * Expand a CIDR without materialising it and jump over excluded address ranges.
+     *
+     * @param  list<string>  $exclusions
+     * @return iterable<string>
+     */
+    public function expand(string $cidr, int $limit, array $exclusions = []): iterable
+    {
+        if ($limit < 0 || $limit > 65536) {
+            throw new InvalidArgumentException('CIDR expansion limit is invalid.');
+        }
+        if ($limit === 0) {
+            return;
+        }
+
+        [$start, $end] = $this->cidrRange($cidr);
+        $excludedRanges = [];
+        foreach ($exclusions as $exclusion) {
+            if (! is_string($exclusion) || trim($exclusion) === '') {
+                continue;
+            }
+            try {
+                if (str_contains($exclusion, '/')) {
+                    $range = $this->cidrRange(trim($exclusion));
+                } else {
+                    $address = $this->packedAddress(trim($exclusion));
+                    $range = [$address, $address];
+                }
+            } catch (InvalidArgumentException) {
+                continue;
+            }
+            if ($range !== null && strlen($range[0]) === strlen($start)) {
+                $excludedRanges[] = $range;
+            }
+        }
+
+        $cursor = $start;
+        $yielded = 0;
+        while ($cursor !== null && strcmp($cursor, $end) <= 0 && $yielded < $limit) {
+            $skipTo = null;
+            foreach ($excludedRanges as [$excludedStart, $excludedEnd]) {
+                if (strcmp($cursor, $excludedStart) >= 0 && strcmp($cursor, $excludedEnd) <= 0
+                    && ($skipTo === null || strcmp($excludedEnd, $skipTo) > 0)) {
+                    $skipTo = $excludedEnd;
+                }
+            }
+            if ($skipTo !== null) {
+                $cursor = $this->increment($skipTo);
+
+                continue;
+            }
+
+            yield strtolower((string) inet_ntop($cursor));
+            $yielded++;
+            $cursor = $this->increment($cursor);
+        }
+    }
+
     public function contains(string $cidr, string $address): bool
     {
         [$network, $prefix] = $this->parseCidr($cidr);
@@ -135,5 +193,31 @@ final class CidrMatcher
         }
 
         return $result;
+    }
+
+    /** @return array{string, string} */
+    private function cidrRange(string $cidr): array
+    {
+        [$network, $prefix] = $this->parseCidr($cidr);
+
+        return [
+            $this->masked($network, $prefix, false),
+            $this->masked($network, $prefix, true),
+        ];
+    }
+
+    private function increment(string $address): ?string
+    {
+        for ($index = strlen($address) - 1; $index >= 0; $index--) {
+            $value = ord($address[$index]);
+            if ($value < 255) {
+                $address[$index] = chr($value + 1);
+
+                return $address;
+            }
+            $address[$index] = "\0";
+        }
+
+        return null;
     }
 }

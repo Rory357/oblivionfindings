@@ -7,7 +7,6 @@ use App\Models\ItTeam;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
-use App\Support\LegacyStorageContext;
 use DomainException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +23,6 @@ final class ItProvisioningTemplateService
 
         return DB::transaction(function () use ($actor, $data): ItProvisioningTemplate {
             $template = ItProvisioningTemplate::query()->create([
-                'tenant_id' => LegacyStorageContext::id(),
                 'created_by_user_id' => $actor->id,
                 'updated_by_user_id' => $actor->id,
                 ...Arr::only($data, [

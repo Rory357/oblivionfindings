@@ -5,8 +5,9 @@ namespace App\Jobs\Integration;
 use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSyncLog;
+use App\Services\Integration\Contracts\DeviceSyncCapability;
+use App\Services\Integration\Exceptions\CapabilityUnavailable;
 use App\Services\Integration\IntegrationAdapterRegistry;
-use App\Support\LegacyStorageContext;
 use App\Support\SafeOperationalData;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -29,18 +30,24 @@ class SyncIntegrationDevicesJob implements ShouldQueue
     public function __construct(
         public string $provider,
         public ?int $siteId = null,
-    ) {}
+    ) {
+        $this->onQueue((string) config('monitoring.queues.provider', 'monitoring-provider'));
+    }
 
     public function handle(IntegrationAdapterRegistry $registry): void
     {
         try {
-            $adapter = $registry->resolve($this->provider);
-        } catch (\RuntimeException $e) {
-            Log::error('SyncIntegrationDevicesJob: adapter not found', SafeOperationalData::logContext([
+            $adapter = $registry->capability($this->provider, DeviceSyncCapability::class);
+        } catch (CapabilityUnavailable|\RuntimeException $e) {
+            Log::info('SyncIntegrationDevicesJob: capability unavailable', SafeOperationalData::logContext([
                 'provider' => $this->provider,
                 'error_category' => SafeOperationalData::failureCategory($e),
             ]));
 
+            return;
+        }
+
+        if (! $adapter instanceof DeviceSyncCapability) {
             return;
         }
 
@@ -75,7 +82,6 @@ class SyncIntegrationDevicesJob implements ShouldQueue
 
         foreach ($siteConfigs as $siteConfig) {
             $syncLog = IntegrationSyncLog::create([
-                'tenant_id' => LegacyStorageContext::id(),
                 'provider' => $this->provider,
                 'site_id' => $siteConfig->site_id,
                 'action' => 'sync_devices',

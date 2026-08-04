@@ -8,9 +8,8 @@ use Illuminate\Validation\Rule;
 
 /**
  * Agent-raised (manual) provisioning request — the ad-hoc path alongside the
- * onboarding bridge. Tenant ownership of the chosen employee profile and the
- * assignee is asserted in the controller (mirroring assign/fulfil), so this
- * only shapes the fields.
+ * onboarding bridge. The provisioning lifecycle repeats canonical profile and
+ * assignee access under lock; this request only shapes the submitted fields.
  */
 class StoreProvisioningRequestRequest extends FormRequest
 {

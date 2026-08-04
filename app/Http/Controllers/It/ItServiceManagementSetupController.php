@@ -4,17 +4,20 @@ namespace App\Http\Controllers\It;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\Services\ItAutomationScheduleCatalog;
+use App\Domain\It\Services\ItCatalogManagementService;
 use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItProvisioningTemplateService;
 use App\Domain\It\Services\ItServiceIdentityCredentialService;
 use App\Domain\It\Services\ItServiceManagementSetupService;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\It\SaveItCatalogItemRequest;
 use App\Http\Requests\It\SaveItQueueRequest;
 use App\Http\Requests\It\SaveItServiceRequest;
 use App\Http\Requests\It\SaveItTeamRequest;
 use App\Http\Requests\It\StoreItProvisioningTemplateRequest;
 use App\Http\Requests\It\StoreItServiceIdentityRequest;
+use App\Http\Requests\It\UnpublishItCatalogItemRequest;
 use App\Models\ItApiRequest;
 use App\Models\ItAutomationRun;
 use App\Models\ItCatalogItem;
@@ -43,6 +46,7 @@ class ItServiceManagementSetupController extends Controller
         private readonly ItAutomationScheduleCatalog $automationCatalog,
         private readonly ItEmailDeliveryService $emailDeliveries,
         private readonly ItWorkAccessService $workAccess,
+        private readonly ItCatalogManagementService $catalogueManagement,
     ) {}
 
     public function index(Request $request)
@@ -237,7 +241,12 @@ class ItServiceManagementSetupController extends Controller
                 ->get()
             : collect();
         $catalogItems = Schema::hasTable('it_catalog_items')
-            ? ItCatalogItem::query()->get()
+            ? ItCatalogItem::query()
+                ->with('service:id,name')
+                ->withCount('submissions')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get()
             : collect();
         $mailboxes = Schema::hasTable('it_mailbox_connections')
             ? ItMailboxConnection::query()->get()
@@ -296,6 +305,26 @@ class ItServiceManagementSetupController extends Controller
             'teams' => $teams,
             'queues' => $queues,
             'services' => $services,
+            'catalogItems' => $catalogItems->map(fn (ItCatalogItem $item) => [
+                'id' => $item->id,
+                'it_service_id' => $item->it_service_id,
+                'service_name' => $item->service?->name,
+                'name' => $item->name,
+                'slug' => $item->slug,
+                'description' => $item->description,
+                'outcome_type' => $item->outcome_type,
+                'category' => $item->category,
+                'provisioning_type' => $item->provisioning_type,
+                'default_priority' => $item->default_priority,
+                'requires_approval' => $item->requires_approval,
+                'is_published' => $item->is_published,
+                'internal_only' => $item->internal_only,
+                'form_schema_version' => $item->form_schema_version,
+                'form_schema' => $item->form_schema,
+                'search_terms' => $item->search_terms,
+                'sort_order' => $item->sort_order,
+                'submission_count' => $item->submissions_count,
+            ])->values(),
             'apiIdentities' => $apiIdentities,
             'oneTimeApiCredential' => $request->session()->get('it_api_credential'),
             'provisioningTemplates' => $provisioningTemplates,
@@ -414,6 +443,42 @@ class ItServiceManagementSetupController extends Controller
 
         return $this->run(fn () => $this->setupService
             ->updateService($service, $request->user(), $request->validated()), 'Service updated.');
+    }
+
+    public function storeCatalogItem(SaveItCatalogItemRequest $request)
+    {
+        return $this->run(
+            fn () => $this->catalogueManagement->create($request->user(), $request->validated()),
+            'Catalogue request saved as a draft.',
+        );
+    }
+
+    public function updateCatalogItem(SaveItCatalogItemRequest $request, ItCatalogItem $catalogItem)
+    {
+        return $this->run(
+            fn () => $this->catalogueManagement->update($catalogItem, $request->user(), $request->validated()),
+            'Catalogue request updated.',
+        );
+    }
+
+    public function publishCatalogItem(Request $request, ItCatalogItem $catalogItem)
+    {
+        return $this->run(
+            fn () => $this->catalogueManagement->publish($catalogItem, $request->user()),
+            'Catalogue request published.',
+        );
+    }
+
+    public function unpublishCatalogItem(UnpublishItCatalogItemRequest $request, ItCatalogItem $catalogItem)
+    {
+        return $this->run(
+            fn () => $this->catalogueManagement->unpublish(
+                $catalogItem,
+                $request->user(),
+                $request->validated('reason'),
+            ),
+            'Catalogue request unpublished.',
+        );
     }
 
     public function storeIdentity(StoreItServiceIdentityRequest $request)

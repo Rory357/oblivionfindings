@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import { CredentialReferenceManagement } from '@/components/security-devices/credential-reference-management';
 import {
     CredentialRotationStatus,
     ProviderCard,
@@ -13,6 +14,62 @@ import {
 import { AuditEvidence, type AuditEntry } from './settings';
 
 describe('Security & Devices integrations and settings', () => {
+    it('shows safe credential reference status and never renders an external secret path', () => {
+        render(
+            <CredentialReferenceManagement
+                workspace={{
+                    visible: true,
+                    can_manage: true,
+                    driver_state: 'configured',
+                    driver_note:
+                        'The external Vault lease issuer is configured.',
+                    sites: [{ id: 42, name: 'Harbour House' }],
+                    rows: [
+                        {
+                            reference_uuid:
+                                '019f7b90-a3cc-7c6b-8428-766011e76005',
+                            reference_key: 'vault:unifi/site-42',
+                            site_id: 42,
+                            site_name: 'Harbour House',
+                            provider: 'unifi',
+                            purpose: 'device_management',
+                            capabilities: ['command:network.device.reboot'],
+                            status: 'active',
+                            rotation_status: 'current',
+                            test_status: 'passed',
+                            version: 3,
+                            live_lease_count: 0,
+                            pending_revoke_count: 0,
+                            last_tested_at: '2026-07-24T01:00:00Z',
+                            last_rotated_at: '2026-07-23T01:00:00Z',
+                            revoked_at: null,
+                        },
+                    ],
+                }}
+            />,
+        );
+
+        expect(screen.getByText('Credential references')).toBeInTheDocument();
+        expect(screen.getByText('vault:unifi/site-42')).toBeInTheDocument();
+        expect(
+            screen.getByText('command:network.device.reboot'),
+        ).toBeInTheDocument();
+        expect(screen.getByText('Test reference')).toBeInTheDocument();
+        expect(
+            screen.getByText('0 short-lived leases active'),
+        ).toBeInTheDocument();
+        expect(screen.getByText('No revocations pending')).toBeInTheDocument();
+        expect(
+            screen.queryByText('secret/data/sites/42/core-switch'),
+        ).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByText('Add reference'));
+        expect(
+            screen.getByText(
+                /Never paste a password, API key, token or private key/i,
+            ),
+        ).toBeInTheDocument();
+    });
     it.each([
         ['current', 'Rotation current', 'default'],
         ['rotation_due', 'Rotation due', 'warning'],
@@ -39,7 +96,6 @@ describe('Security & Devices integrations and settings', () => {
             name: 'UniFi',
             vendor: 'Ubiquiti',
             summary: 'Network estate',
-            implementation_status: 'live',
             capabilities: ['network'],
             device_scope: ['switches'],
             docs_href: '/security-devices/integrations/unifi',
@@ -84,9 +140,27 @@ describe('Security & Devices integrations and settings', () => {
                 unsupported_checks: 0,
             },
             monitoring_support: {
-                state: 'not_assessed',
+                state: 'supported',
                 scope: 'provider',
                 note: 'Provider evidence only.',
+            },
+            runtime: {
+                version: '1.0',
+                contract_state: 'topology_collection',
+                contract_label: 'Inventory, sync, topology and events',
+                contract_note: 'Typed topology contract is available.',
+                capabilities: ['device_sync'],
+                page_limit: 250,
+                minimum_interval_seconds: 60,
+                backfill_limit: 5000,
+                cursor_scopes: 1,
+                partial_scopes: 0,
+                exception_count: 0,
+                latest_completed_at: '2026-07-18T00:00:00Z',
+                latest_exception_at: null,
+                exception_codes: [],
+                disconnect_ready: true,
+                revoke_ready: true,
             },
             exceptions: [
                 {
@@ -99,7 +173,15 @@ describe('Security & Devices integrations and settings', () => {
             ],
             exception_count: 1,
         };
-        render(<ProviderCard provider={provider} canManage />);
+        const { rerender } = render(
+            <ProviderCard provider={provider} canManage />,
+        );
+        expect(
+            screen.getByText('Inventory, sync, topology and events'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Typed topology contract is available.'),
+        ).toBeInTheDocument();
         expect(
             screen.getByText('1 site mapping requires attention.'),
         ).toBeInTheDocument();
@@ -107,6 +189,34 @@ describe('Security & Devices integrations and settings', () => {
             screen.getByRole('link', { name: 'Review site mappings' }),
         ).toHaveAttribute('href', '/security-devices/integrations/unifi');
         expect(screen.getByText(/Rotation due/)).toBeInTheDocument();
+
+        rerender(
+            <ProviderCard
+                provider={{
+                    ...provider,
+                    slug: 'queclink',
+                    name: 'Queclink',
+                    connection_status: 'unavailable',
+                    connected: false,
+                    runtime: {
+                        ...provider.runtime,
+                        contract_state: 'native_runtime_only',
+                        contract_label: 'Native operations only',
+                        contract_note:
+                            'No verified cloud API is enabled. Direct TCP intake, canonical tracking, and governed Device Management remain available.',
+                    },
+                }}
+                canManage
+            />,
+        );
+        expect(screen.getByText('Native operations only')).toBeInTheDocument();
+        expect(screen.getByText('Cloud API unavailable')).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                /Direct TCP intake, canonical tracking, and governed Device Management remain available/i,
+            ),
+        ).toBeInTheDocument();
+        expect(screen.queryByText('Adapter scaffold')).not.toBeInTheDocument();
     });
 
     it('labels site-only credentials truthfully without inventing rotation evidence', () => {
@@ -115,8 +225,7 @@ describe('Security & Devices integrations and settings', () => {
             name: 'Milesight',
             vendor: 'Milesight IoT',
             summary: 'Sensors',
-            implementation_status: 'scaffold',
-            capabilities: [],
+            capabilities: ['iot', 'device_inventory'],
             device_scope: [],
             docs_href: '/security-devices/integrations/milesight',
             connection_status: 'untested',
@@ -160,9 +269,32 @@ describe('Security & Devices integrations and settings', () => {
                 unsupported_checks: 0,
             },
             monitoring_support: {
-                state: 'not_assessed',
+                state: 'capability_absent',
                 scope: 'provider',
                 note: 'Provider evidence only.',
+            },
+            runtime: {
+                version: '1.1',
+                contract_state: 'inventory_sync',
+                contract_label: 'Inventory and sync',
+                contract_note:
+                    'Authenticated inventory and Device sync are available.',
+                capabilities: [
+                    'connection_health',
+                    'inventory_discovery',
+                    'device_sync',
+                ],
+                page_limit: 100,
+                minimum_interval_seconds: 300,
+                backfill_limit: 1000,
+                cursor_scopes: 0,
+                partial_scopes: 0,
+                exception_count: 0,
+                latest_completed_at: null,
+                latest_exception_at: null,
+                exception_codes: [],
+                disconnect_ready: false,
+                revoke_ready: false,
             },
             exceptions: [],
             exception_count: 0,
@@ -170,7 +302,7 @@ describe('Security & Devices integrations and settings', () => {
 
         render(<ProviderCard provider={provider} canManage />);
         expect(screen.getByText('Not tested')).toBeInTheDocument();
-        expect(screen.getByText('Adapter scaffold')).toBeInTheDocument();
+        expect(screen.queryByText('Adapter scaffold')).not.toBeInTheDocument();
         expect(
             screen.getByText('Site credentials configured'),
         ).toBeInTheDocument();

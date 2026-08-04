@@ -72,7 +72,7 @@ class IntegrationsHubTest extends TestCase
                 ->component('security-devices/integrations')
                 ->has('providers', 3)
                 ->has('stats.providers_total')
-                ->has('stats.providers_live')
+                ->missing('stats.providers_live')
                 ->has('stats.providers_connected')
                 ->has('stats.providers_errored')
                 ->has('stats.imported_devices')
@@ -82,7 +82,7 @@ class IntegrationsHubTest extends TestCase
             );
     }
 
-    public function test_provider_catalog_shape_and_unifi_live_docs(): void
+    public function test_provider_catalog_reports_typed_contract_maturity_without_static_live_labels(): void
     {
         $response = $this->actingAs($this->admin)->get('/security-devices/integrations');
 
@@ -93,11 +93,25 @@ class IntegrationsHubTest extends TestCase
             $this->assertEqualsCanonicalizing(['unifi', 'queclink', 'milesight'], $slugs);
 
             $unifi = $providers->firstWhere('slug', 'unifi');
-            $this->assertSame('live', $unifi['implementation_status']);
             $this->assertSame('/security-devices/integrations/unifi', $unifi['docs_href']);
-            $this->assertSame('scaffold', $providers->firstWhere('slug', 'queclink')['implementation_status']);
-            $this->assertSame('scaffold', $providers->firstWhere('slug', 'milesight')['implementation_status']);
-            $this->assertSame(1, $page->toArray()['props']['stats']['providers_live']);
+            $this->assertSame('monitoring_topology_snapshot_collection', $unifi['runtime']['contract_state']);
+            $this->assertSame('Monitoring, inventory, sync, topology, configuration and events', $unifi['runtime']['contract_label']);
+            $this->assertStringContainsString('governed read-only configuration snapshots', $unifi['runtime']['contract_note']);
+            $milesight = $providers->firstWhere('slug', 'milesight');
+            $this->assertSame('monitoring_inventory_sync_webhook', $milesight['runtime']['contract_state']);
+            $this->assertSame('Monitoring, inventory, sync and signed events', $milesight['runtime']['contract_label']);
+            $this->assertSame('native_runtime_only', $providers->firstWhere('slug', 'queclink')['runtime']['contract_state']);
+            $this->assertSame('Native operations only', $providers->firstWhere('slug', 'queclink')['runtime']['contract_label']);
+            $this->assertSame('unavailable', $providers->firstWhere('slug', 'queclink')['connection_status']);
+            $this->assertStringContainsString(
+                'Direct TCP intake, canonical tracking, and governed Device Management remain available',
+                $providers->firstWhere('slug', 'queclink')['runtime']['contract_note'],
+            );
+
+            foreach ($providers as $provider) {
+                $this->assertArrayNotHasKey('implementation_status', $provider);
+            }
+            $this->assertArrayNotHasKey('providers_live', $page->toArray()['props']['stats']);
 
             // Non-configured providers should report "not_configured" by default.
             $this->assertSame('not_configured', $unifi['connection_status']);
@@ -107,19 +121,16 @@ class IntegrationsHubTest extends TestCase
 
     public function test_volume_aggregation_is_exact_bounded_and_has_no_per_device_queries(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create([]);
         Device::factory()->count(60)->create([
-            'tenant_id' => 1,
             'provider' => 'unifi',
         ]);
         Device::factory()->count(2)->create([
-            'tenant_id' => 1,
             'provider' => 'unifi',
             'external_ref' => ['provider_entity_id' => 'volume-duplicate'],
         ]);
         foreach (range(1, 120) as $number) {
             IntegrationSyncLog::create([
-                'tenant_id' => 1,
                 'provider' => 'unifi',
                 'site_id' => $site->id,
                 'action' => 'sync_devices',
@@ -162,11 +173,10 @@ class IntegrationsHubTest extends TestCase
         );
     }
 
-    public function test_stats_reflect_connected_secrets_per_provider(): void
+    public function test_stats_ignore_unverified_legacy_cloud_state_while_retaining_a_removal_exception(): void
     {
-        // Seed one connected + one errored secret for this tenant.
+        // Seed one connected + one errored secret for the application.
         IntegrationProviderConnection::create([
-            'tenant_id' => $this->admin->tenant_id ?? 1,
             'provider' => 'unifi',
             'secret_encrypted' => 'dummy',
             'secret_last4' => '1234',
@@ -174,7 +184,6 @@ class IntegrationsHubTest extends TestCase
         ]);
 
         IntegrationProviderConnection::create([
-            'tenant_id' => $this->admin->tenant_id ?? 1,
             'provider' => 'queclink',
             'secret_encrypted' => 'dummy',
             'secret_last4' => '5678',
@@ -185,31 +194,32 @@ class IntegrationsHubTest extends TestCase
 
         $response->assertInertia(fn ($page) => $page
             ->where('stats.providers_connected', 1)
-            ->where('stats.providers_errored', 1)
+            ->where('stats.providers_errored', 0)
+            ->where('providers.1.slug', 'queclink')
+            ->where('providers.1.connection_status', 'unavailable')
+            ->where('providers.1.connected', false)
+            ->where('providers.1.exceptions.0.type', 'legacy_cloud_credential')
         );
     }
 
     public function test_provider_state_is_application_wide_and_admin_rollups_cover_all_sites(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
 
         IntegrationProviderConnection::create([
-            'tenant_id' => 42,
             'provider' => 'unifi',
             'secret_encrypted' => 'provider-secret',
             'secret_last4' => '0042',
             'status' => IntegrationProviderConnection::STATUS_CONNECTED,
         ]);
         IntegrationProviderConnection::create([
-            'tenant_id' => 77,
             'provider' => 'milesight',
             'secret_encrypted' => 'second-provider-secret',
             'secret_last4' => '0077',
             'status' => IntegrationProviderConnection::STATUS_ERROR,
         ]);
 
-        $firstSiteDevice = Device::factory()->create(['tenant_id' => 42, 'provider' => 'unifi']);
-        $secondSiteDevice = Device::factory()->create(['tenant_id' => 77, 'provider' => 'milesight']);
+        $firstSiteDevice = Device::factory()->create(['provider' => 'unifi']);
+        $secondSiteDevice = Device::factory()->create(['provider' => 'milesight']);
 
         foreach ([['device' => $firstSiteDevice, 'source' => 'unifi'], ['device' => $secondSiteDevice, 'source' => 'milesight']] as $event) {
             DeviceEvent::create([
@@ -238,12 +248,11 @@ class IntegrationsHubTest extends TestCase
 
     public function test_provider_health_reconciles_visible_mappings_sync_and_import_exceptions_without_raw_values(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
-        $site = Site::factory()->create(['tenant_id' => 42, 'name' => 'Harbour House']);
-        $secondSite = Site::factory()->create(['tenant_id' => 77, 'name' => 'Southern House']);
+
+        $site = Site::factory()->create(['name' => 'Harbour House']);
+        $secondSite = Site::factory()->create(['name' => 'Southern House']);
 
         IntegrationProviderConnection::create([
-            'tenant_id' => 42,
             'provider' => 'unifi',
             'secret_encrypted' => 'RAW-PROVIDER-SECRET',
             'secret_last4' => '0042',
@@ -255,7 +264,6 @@ class IntegrationsHubTest extends TestCase
             'config' => ['api_token' => 'RAW-CONFIG-SECRET'],
         ]);
         IntegrationSiteConfig::create([
-            'tenant_id' => 42,
             'site_id' => $site->id,
             'provider' => 'unifi',
             'status' => IntegrationSiteConfig::STATUS_DISCONNECTED,
@@ -265,14 +273,12 @@ class IntegrationsHubTest extends TestCase
             'is_active' => false,
         ]);
         IntegrationSiteConfig::create([
-            'tenant_id' => 77,
             'site_id' => $secondSite->id,
             'provider' => 'unifi',
             'mapped_external_site_id' => 'southern-controller',
             'is_active' => true,
         ]);
         IntegrationSyncLog::create([
-            'tenant_id' => 42,
             'provider' => 'unifi',
             'site_id' => $site->id,
             'action' => 'sync_devices',
@@ -285,14 +291,12 @@ class IntegrationsHubTest extends TestCase
         ]);
 
         $first = Device::factory()->create([
-            'tenant_id' => 42,
             'provider' => 'unifi',
             'external_ref' => ['provider_entity_id' => 'duplicate-id'],
             'config' => ['credential' => 'RAW-DEVICE-CONFIG'],
             'meta' => ['payload' => 'RAW-DEVICE-META'],
         ]);
         Device::factory()->create([
-            'tenant_id' => 42,
             'provider' => 'unifi',
             'external_ref' => ['provider_entity_id' => 'duplicate-id'],
         ]);
@@ -332,12 +336,11 @@ class IntegrationsHubTest extends TestCase
 
     public function test_view_only_user_gets_scoped_health_but_no_credentials_or_dead_manage_links(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
+
         $manage = Permission::query()->where('key', 'securityDevices.integrations.manage')->firstOrFail();
         $this->admin->permissionOverrides()->attach($manage->id, ['allowed' => false]);
 
         IntegrationProviderConnection::create([
-            'tenant_id' => 42,
             'provider' => 'unifi',
             'secret_encrypted' => 'RAW-SECRET',
             'secret_last4' => '1234',
@@ -365,11 +368,10 @@ class IntegrationsHubTest extends TestCase
         $this->assertSame('/security-devices/integrations/queclink', route('security-devices.integrations.queclink', absolute: false));
     }
 
-    public function test_missing_credentials_are_actionable_and_device_monitoring_support_is_not_invented(): void
+    public function test_missing_credentials_are_actionable_and_native_device_monitoring_support_is_reported(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
+
         Device::factory()->create([
-            'tenant_id' => 42,
             'provider' => 'milesight',
             'meta' => ['capabilities' => ['monitoring' => false]],
         ]);
@@ -384,32 +386,40 @@ class IntegrationsHubTest extends TestCase
                 $this->assertSame('/security-devices/integrations/milesight', $exceptions['missing_credentials']['href']);
                 $this->assertFalse($exceptions->has('unsupported_check'));
                 $this->assertSame(0, $provider['reconciliation']['unsupported_checks']);
-                $this->assertSame('not_assessed', $provider['monitoring_support']['state']);
+                $this->assertSame('supported', $provider['monitoring_support']['state']);
                 $this->assertSame('provider', $provider['monitoring_support']['scope']);
+                $this->assertSame(
+                    [
+                        'connection_health',
+                        'inventory_discovery',
+                        'device_sync',
+                        'observation_collection',
+                        'webhook_verification',
+                    ],
+                    collect($provider['runtime']['capabilities'])->all(),
+                );
             });
     }
 
     public function test_site_restricted_viewer_counts_only_accessible_mappings_and_devices(): void
     {
-        $allowedSite = Site::factory()->create(['tenant_id' => 42, 'name' => 'Allowed Site']);
-        $hiddenSite = Site::factory()->create(['tenant_id' => 42, 'name' => 'Hidden Site']);
-        $viewer = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
+        $allowedSite = Site::factory()->create(['name' => 'Allowed Site']);
+        $hiddenSite = Site::factory()->create(['name' => 'Hidden Site']);
+        $viewer = User::factory()->create(['approved_at' => now()]);
         $viewer->roles()->attach(Role::query()->where('name', 'facilities_manager')->firstOrFail());
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42,
             'user_id' => $viewer->id,
             'primary_site_id' => $allowedSite->id,
             'secondary_site_ids' => [],
         ]);
         foreach ([$allowedSite, $hiddenSite] as $site) {
             IntegrationSiteConfig::create([
-                'tenant_id' => 42,
                 'site_id' => $site->id,
                 'provider' => 'unifi',
                 'mapped_external_site_id' => "site-{$site->id}",
                 'is_active' => true,
             ]);
-            $device = Device::factory()->create(['tenant_id' => 42, 'provider' => 'unifi']);
+            $device = Device::factory()->create(['provider' => 'unifi']);
             DeviceAssignment::create([
                 'device_id' => $device->id,
                 'assignable_type' => DeviceAssignment::TARGET_SITE,
@@ -431,13 +441,12 @@ class IntegrationsHubTest extends TestCase
 
     public function test_site_restricted_reconciliation_uses_worst_latest_site_state_and_excludes_global_or_hidden_counts(): void
     {
-        $allowed = Site::factory()->create(['tenant_id' => 42]);
-        $secondAllowed = Site::factory()->create(['tenant_id' => 42]);
-        $hidden = Site::factory()->create(['tenant_id' => 42]);
-        $viewer = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
+        $allowed = Site::factory()->create([]);
+        $secondAllowed = Site::factory()->create([]);
+        $hidden = Site::factory()->create([]);
+        $viewer = User::factory()->create(['approved_at' => now()]);
         $viewer->roles()->attach(Role::query()->where('name', 'facilities_manager')->firstOrFail());
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42,
             'user_id' => $viewer->id,
             'primary_site_id' => $allowed->id,
             'secondary_site_ids' => [$secondAllowed->id],
@@ -450,7 +459,7 @@ class IntegrationsHubTest extends TestCase
             [$secondAllowed->id, IntegrationSyncLog::STATUS_SUCCESS, 0, now()],
         ] as [$siteId, $status, $errors, $at]) {
             IntegrationSyncLog::create([
-                'tenant_id' => 42, 'provider' => 'unifi', 'site_id' => $siteId,
+                'provider' => 'unifi', 'site_id' => $siteId,
                 'action' => 'sync_devices', 'status' => $status,
                 'items_processed' => 100, 'items_errored' => $errors,
                 'started_at' => $at, 'completed_at' => $at,
@@ -467,13 +476,13 @@ class IntegrationsHubTest extends TestCase
 
     public function test_any_accessible_stale_site_makes_reconciled_freshness_stale(): void
     {
-        $current = Site::factory()->create(['tenant_id' => 42]);
-        $stale = Site::factory()->create(['tenant_id' => 42]);
-        $hidden = Site::factory()->create(['tenant_id' => 42]);
-        $viewer = User::factory()->create(['organization_id' => 42, 'approved_at' => now()]);
+        $current = Site::factory()->create([]);
+        $stale = Site::factory()->create([]);
+        $hidden = Site::factory()->create([]);
+        $viewer = User::factory()->create(['approved_at' => now()]);
         $viewer->roles()->attach(Role::query()->where('name', 'facilities_manager')->firstOrFail());
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 42, 'user_id' => $viewer->id,
+            'user_id' => $viewer->id,
             'primary_site_id' => $current->id, 'secondary_site_ids' => [$stale->id],
         ]);
         foreach ([
@@ -483,7 +492,7 @@ class IntegrationsHubTest extends TestCase
             [null, now()->subHours(50)],
         ] as [$siteId, $at]) {
             IntegrationSyncLog::create([
-                'tenant_id' => 42, 'provider' => 'unifi', 'site_id' => $siteId,
+                'provider' => 'unifi', 'site_id' => $siteId,
                 'action' => 'sync_devices', 'status' => IntegrationSyncLog::STATUS_SUCCESS,
                 'items_processed' => 1, 'items_errored' => 0,
                 'started_at' => $at, 'completed_at' => $at,
@@ -502,19 +511,19 @@ class IntegrationsHubTest extends TestCase
 
     public function test_enabled_site_credential_satisfies_configuration_and_reports_sanitized_site_state(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create([]);
         IntegrationSiteConfig::create([
-            'tenant_id' => 1, 'site_id' => $site->id, 'provider' => 'milesight',
+            'site_id' => $site->id, 'provider' => 'milesight',
             'mapped_external_site_id' => 'RAW-MAPPING', 'is_active' => true,
         ]);
         IntegrationSiteSecret::create([
-            'tenant_id' => 1, 'site_id' => $site->id, 'provider' => 'milesight',
+            'site_id' => $site->id, 'provider' => 'milesight',
             'capability' => 'gateway', 'base_url' => 'https://RAW-SITE-HOST.test',
             'secret_encrypted' => 'RAW-SITE-SECRET', 'is_enabled' => true,
             'last_error' => 'Bearer RAW-ENABLED-SITE-ERROR', 'last_tested_at' => now()->subHour(),
         ]);
         IntegrationSiteSecret::create([
-            'tenant_id' => 1, 'site_id' => $site->id, 'provider' => 'milesight',
+            'site_id' => $site->id, 'provider' => 'milesight',
             'capability' => 'sensor_api', 'base_url' => 'https://RAW-DISABLED-HOST.test',
             'secret_encrypted' => 'RAW-DISABLED-SECRET', 'is_enabled' => false,
             'last_error' => 'Bearer RAW-SITE-ERROR',
@@ -554,7 +563,7 @@ class IntegrationsHubTest extends TestCase
 
     public function test_site_credential_health_uses_test_evidence_and_keeps_disabled_credentials_neutral(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create([]);
         foreach ([
             ['provider' => 'milesight', 'capability' => 'untested', 'is_enabled' => true, 'last_tested_at' => null, 'last_error' => null],
             ['provider' => 'queclink', 'capability' => 'tested', 'is_enabled' => true, 'last_tested_at' => now(), 'last_error' => null],
@@ -562,7 +571,6 @@ class IntegrationsHubTest extends TestCase
             ['provider' => 'unifi', 'capability' => 'failed', 'is_enabled' => true, 'last_tested_at' => now(), 'last_error' => 'RAW-MIXED-FAILURE'],
         ] as $credential) {
             IntegrationSiteSecret::create(array_merge([
-                'tenant_id' => 1,
                 'site_id' => $site->id,
                 'base_url' => 'https://RAW-MIXED-HOST.test',
                 'secret_encrypted' => 'RAW-MIXED-SECRET',
@@ -583,15 +591,15 @@ class IntegrationsHubTest extends TestCase
             $this->assertSame(1, $milesight['credential']['site_credentials']['needs_attention']);
             $this->assertFalse(collect($milesight['exceptions'])->contains('type', 'site_credential_error'));
             $this->assertSame(1, collect($milesight['exceptions'])->firstWhere('type', 'site_credential_untested')['count']);
-            $this->assertSame('connected', $queclink['connection_status']);
-            $this->assertTrue($queclink['connected']);
+            $this->assertSame('unavailable', $queclink['connection_status']);
+            $this->assertFalse($queclink['connected']);
             $this->assertSame(2, $queclink['credential']['site_credentials']['total']);
             $this->assertSame(1, $queclink['credential']['site_credentials']['enabled']);
             $this->assertSame(0, $queclink['credential']['site_credentials']['needs_attention']);
             $this->assertFalse(collect($queclink['exceptions'])->contains('type', 'site_credential_error'));
             $this->assertSame('error', $unifi['connection_status']);
             $this->assertFalse($unifi['connected']);
-            $this->assertSame(1, $props['stats']['providers_connected']);
+            $this->assertSame(0, $props['stats']['providers_connected']);
             $this->assertSame(1, $props['stats']['providers_errored']);
         });
 
@@ -618,14 +626,14 @@ class IntegrationsHubTest extends TestCase
 
     public function test_view_only_exception_links_are_null_when_destination_permission_is_missing(): void
     {
-        $this->admin->forceFill(['organization_id' => 42])->save();
+
         foreach (['securityDevices.integrations.manage', 'securityDevices.devices.view'] as $permissionKey) {
             $permission = Permission::query()->where('key', $permissionKey)->firstOrFail();
             $this->admin->permissionOverrides()->attach($permission->id, ['allowed' => false]);
         }
-        $device = Device::factory()->create(['tenant_id' => 42, 'provider' => 'unifi']);
+        $device = Device::factory()->create(['provider' => 'unifi']);
         Device::factory()->create([
-            'tenant_id' => 42, 'provider' => 'unifi',
+            'provider' => 'unifi',
             'external_ref' => ['provider_entity_id' => 'duplicate'],
         ]);
         $device->update(['external_ref' => ['provider_entity_id' => 'duplicate']]);
@@ -652,14 +660,14 @@ class IntegrationsHubTest extends TestCase
     {
         foreach (['milesight'] as $provider) {
             IntegrationProviderConnection::create([
-                'tenant_id' => 1, 'provider' => $provider,
+                'provider' => $provider,
                 'secret_encrypted' => 'RAW-'.$provider.'-SECRET', 'secret_last4' => '0042',
                 'status' => IntegrationProviderConnection::STATUS_ERROR,
                 'last_error' => 'https://RAW-'.$provider.'-ERROR.test/?token=secret',
                 'config' => ['base_url' => 'https://RAW-'.$provider.'-HOST.test', 'token' => 'RAW-CONFIG'],
             ]);
             IntegrationSyncLog::create([
-                'tenant_id' => 1, 'provider' => $provider, 'action' => 'sync_devices',
+                'provider' => $provider, 'action' => 'sync_devices',
                 'status' => IntegrationSyncLog::STATUS_FAILED,
                 'error_message' => 'Bearer RAW-'.$provider.'-SYNC', 'started_at' => now(),
             ]);

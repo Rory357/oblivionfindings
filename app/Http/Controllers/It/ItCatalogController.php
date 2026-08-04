@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\It;
 
 use App\Domain\It\ItStaffDirectory;
+use App\Domain\It\Services\ItCatalogFieldOptionService;
 use App\Domain\It\Services\ItCatalogSubmissionService;
 use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Http\Controllers\Controller;
@@ -18,6 +19,7 @@ class ItCatalogController extends Controller
     public function __construct(
         private readonly ItCatalogSubmissionService $submissionService,
         private readonly ItEmailDeliveryService $emailDeliveries,
+        private readonly ItCatalogFieldOptionService $fieldOptions,
     ) {}
 
     public function index(Request $request)
@@ -43,7 +45,16 @@ class ItCatalogController extends Controller
             ->map(fn (ItCatalogItem $item) => $item->discoveryPayload($includeInternal))
             ->values();
 
-        return response()->json(['data' => $items]);
+        $types = $items->flatMap(fn (array $item) => collect($item['form_schema']['fields'] ?? [])->pluck('type'))
+            ->filter(fn (mixed $type): bool => in_array($type, ItCatalogFieldOptionService::TYPES, true))
+            ->unique()
+            ->values()
+            ->all();
+
+        return response()->json([
+            'data' => $items,
+            'field_options' => $this->fieldOptions->forTypes($user, $types),
+        ]);
     }
 
     public function store(StoreCatalogRequest $request, int $catalogItem)

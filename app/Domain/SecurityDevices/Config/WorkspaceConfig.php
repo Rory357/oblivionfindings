@@ -39,6 +39,7 @@ class WorkspaceConfig
                     self::tab('services', 'Services', 'Service checks, dependencies, and monitoring coverage.'),
                     self::tab('traffic-capacity', 'Traffic & capacity', 'Retained traffic and utilisation evidence.'),
                     self::tab('configuration-firmware', 'Configuration & firmware', 'Observed configuration, drift, and firmware evidence.'),
+                    self::managementTab(),
                 ],
             ],
             'security' => [
@@ -58,6 +59,7 @@ class WorkspaceConfig
                         'Canonical device events and Control Room context.',
                         requiredPermission: 'securityDevices.events.view',
                     ),
+                    self::managementTab(),
                 ],
             ],
             'healthcare' => [
@@ -82,6 +84,7 @@ class WorkspaceConfig
                         'Calibration and maintenance evidence.',
                         requiredPermission: 'securityDevices.maintenance.view',
                     ),
+                    self::managementTab(),
                 ],
             ],
             'tracking' => [
@@ -127,6 +130,7 @@ class WorkspaceConfig
                         'Permission and retention-aware tracking history.',
                         requiredPermission: 'assets.telemetry.view',
                     ),
+                    self::managementTab(),
                 ],
             ],
             'facilities-iot' => [
@@ -142,6 +146,7 @@ class WorkspaceConfig
                     self::tab('utilities', 'Utilities', 'Observed utility services and metering integrations.'),
                     self::tab('automations', 'Automations', 'Supported facility automations and last execution state.'),
                     self::tab('history', 'History', 'Canonical event and observation history.'),
+                    self::managementTab(),
                 ],
             ],
         ];
@@ -177,5 +182,21 @@ class WorkspaceConfig
             'requiredPermission' => $requiredPermission,
             'requiredAnyPermission' => $requiredAnyPermission,
         ], fn ($value) => $value !== null);
+    }
+
+    private static function managementTab(): array
+    {
+        return self::tab(
+            'management',
+            'Management',
+            'Governed multi-Device actions with target review, approvals, independent results, and reconciliation.',
+            requiredAnyPermission: [
+                'securityDevices.commands.observe',
+                'securityDevices.commands.operate',
+                'securityDevices.commands.manage',
+                'securityDevices.commands.control',
+                'securityDevices.commands.admin',
+            ],
+        );
     }
 }

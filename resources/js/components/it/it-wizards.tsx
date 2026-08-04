@@ -44,6 +44,7 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/hr/wizard';
+import type { TicketRoutingDetails } from '@/components/it/ticket-routing-summary';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
@@ -65,6 +66,26 @@ export interface AssetOption {
     id: number;
     name: string;
     tag: string | null;
+}
+
+/** An active approved Site for explicit ticket scope. */
+export interface SiteOption {
+    id: number;
+    name: string;
+}
+
+/** A permission-safe canonical Security & Devices record for ticket context. */
+export interface DeviceOption {
+    id: number;
+    name: string;
+    uid: string;
+    site_id: number | null;
+}
+
+/** An active service from the canonical IT service catalogue. */
+export interface ServiceOption {
+    id: number;
+    name: string;
 }
 
 export interface RequestRow {
@@ -112,15 +133,29 @@ export interface TicketRow {
     reference: string | null;
     title: string;
     description: string | null;
+    work_type: string;
+    service: ServiceOption | null;
     category: string;
     priority: string;
     status: string;
+    waiting_party:
+        | 'requester'
+        | 'vendor'
+        | 'approver'
+        | 'team'
+        | 'change'
+        | 'other'
+        | null;
+    waiting_reason: string | null;
+    next_action: string | null;
+    waiting_since: string | null;
     sla_state: string;
     first_response_due_at: string | null;
     resolution_due_at: string | null;
     first_responded_at: string | null;
     requester: string;
     assignee: AssigneeOption | null;
+    routing: TicketRoutingDetails;
     age: string | null;
     updated: string | null;
     resolved: string | null;
@@ -234,6 +269,9 @@ export function ItWizard({
     assignees,
     employeeOptions = [],
     assetOptions = [],
+    siteOptions = [],
+    deviceOptions = [],
+    serviceOptions = [],
     slaPolicies,
     slaCalendar,
     kbSuggestions = [],
@@ -246,6 +284,9 @@ export function ItWizard({
     assignees: AssigneeOption[];
     employeeOptions?: EmployeeOption[];
     assetOptions?: AssetOption[];
+    siteOptions?: SiteOption[];
+    deviceOptions?: DeviceOption[];
+    serviceOptions?: ServiceOption[];
     slaPolicies?: SlaPolicyGrid | null;
     slaCalendar?: SlaCalendar | null;
     kbSuggestions?: KbSuggestion[];
@@ -261,6 +302,9 @@ export function ItWizard({
                 <CreateTicketWizard
                     assignees={assignees}
                     assetOptions={assetOptions}
+                    siteOptions={siteOptions}
+                    deviceOptions={deviceOptions}
+                    serviceOptions={serviceOptions}
                     slaPolicies={slaPolicies}
                     provisioning={modal.provisioning}
                     onClose={onClose}
@@ -404,15 +448,42 @@ const PRIORITY_OPTIONS = [
     },
 ] as const;
 
+const INTAKE_WORK_TYPE_OPTIONS = [
+    {
+        key: 'incident',
+        label: 'Incident',
+        description: 'Something is broken or degraded',
+        icon: Ticket,
+    },
+    {
+        key: 'service_request',
+        label: 'Service request',
+        description: 'Access, equipment or standard help',
+        icon: ClipboardCheck,
+    },
+    {
+        key: 'security_request',
+        label: 'Security request',
+        description: 'A security concern or sensitive access',
+        icon: KeyRound,
+    },
+] as const;
+
 function CreateTicketWizard({
     assignees,
     assetOptions,
+    siteOptions,
+    deviceOptions,
+    serviceOptions,
     slaPolicies,
     provisioning,
     onClose,
 }: {
     assignees: AssigneeOption[];
     assetOptions: AssetOption[];
+    siteOptions: SiteOption[];
+    deviceOptions: DeviceOption[];
+    serviceOptions: ServiceOption[];
     slaPolicies?: SlaPolicyGrid | null;
     provisioning?: { id: number; item: string };
     onClose: () => void;
@@ -430,9 +501,13 @@ function CreateTicketWizard({
         category: string;
         subcategory: string;
         priority: string;
+        work_type: string;
+        it_service_id: string;
         requester_user_id: string;
         assigned_to_user_id: string;
         asset_id: string;
+        site_id: string;
+        device_id: string;
         watchers: number[];
         provisioning_request_id: number | null;
         attachments: File[];
@@ -442,9 +517,14 @@ function CreateTicketWizard({
         category: 'hardware',
         subcategory: '',
         priority: 'normal',
+        work_type: 'incident',
+        it_service_id: UNASSIGNED,
         requester_user_id: UNASSIGNED,
         assigned_to_user_id: UNASSIGNED,
         asset_id: UNASSIGNED,
+        site_id:
+            siteOptions.length === 1 ? String(siteOptions[0].id) : UNASSIGNED,
+        device_id: UNASSIGNED,
         watchers: [],
         provisioning_request_id: provisioning?.id ?? null,
         attachments: [],
@@ -455,13 +535,28 @@ function CreateTicketWizard({
         null;
     const asset =
         assetOptions.find((a) => String(a.id) === form.data.asset_id) ?? null;
+    const site =
+        siteOptions.find((s) => String(s.id) === form.data.site_id) ?? null;
+    const availableDevices = deviceOptions.filter(
+        (candidate) =>
+            form.data.site_id !== UNASSIGNED &&
+            candidate.site_id === Number(form.data.site_id),
+    );
+    const device =
+        availableDevices.find(
+            (candidate) => String(candidate.id) === form.data.device_id,
+        ) ?? null;
+    const service =
+        serviceOptions.find((s) => String(s.id) === form.data.it_service_id) ??
+        null;
     const requesterName =
         form.data.requester_user_id === UNASSIGNED
             ? 'Me (myself)'
             : (assignees.find(
                   (a) => String(a.id) === form.data.requester_user_id,
               )?.name ?? undefined);
-    const detailsValid = form.data.title.trim().length > 0;
+    const detailsValid =
+        form.data.title.trim().length > 0 && form.data.site_id !== UNASSIGNED;
 
     // Live SLA preview — the effective targets for the chosen priority,
     // projected from now (client-side; updates as priority changes, no re-fetch).
@@ -488,6 +583,13 @@ function CreateTicketWizard({
                     : Number(data.assigned_to_user_id),
             asset_id:
                 data.asset_id === UNASSIGNED ? null : Number(data.asset_id),
+            site_id: Number(data.site_id),
+            device_id:
+                data.device_id === UNASSIGNED ? null : Number(data.device_id),
+            it_service_id:
+                data.it_service_id === UNASSIGNED
+                    ? null
+                    : Number(data.it_service_id),
             subcategory:
                 data.subcategory.trim() === '' ? null : data.subcategory,
         }));
@@ -655,6 +757,43 @@ function CreateTicketWizard({
                                 />
                             </Field>
                         ) : null}
+                        <Field
+                            label="Ticket Site"
+                            hint="required — where support is needed"
+                            required
+                            error={form.errors.site_id}
+                        >
+                            <SelectInput
+                                value={form.data.site_id}
+                                onChange={(v) => {
+                                    const selectedDevice = deviceOptions.find(
+                                        (candidate) =>
+                                            String(candidate.id) ===
+                                            form.data.device_id,
+                                    );
+                                    form.setData({
+                                        ...form.data,
+                                        site_id: v,
+                                        device_id:
+                                            selectedDevice?.site_id ===
+                                            Number(v)
+                                                ? form.data.device_id
+                                                : UNASSIGNED,
+                                    });
+                                }}
+                                placeholder="Choose a Site"
+                                options={[
+                                    {
+                                        value: UNASSIGNED,
+                                        label: 'Choose a Site',
+                                    },
+                                    ...siteOptions.map((site) => ({
+                                        value: String(site.id),
+                                        label: site.name,
+                                    })),
+                                ]}
+                            />
+                        </Field>
                         <Field label="Title" required error={form.errors.title}>
                             <Input
                                 value={form.data.title}
@@ -746,6 +885,40 @@ function CreateTicketWizard({
                         blurb="How urgent is it, who picks it up, and what’s it about?"
                     />
                     <div className="grid gap-3.5">
+                        <Field
+                            label="Work type"
+                            hint="required — controls the support workflow"
+                            error={form.errors.work_type}
+                        >
+                            <TilePicker
+                                value={form.data.work_type}
+                                onChange={(v) => form.setData('work_type', v)}
+                                options={[...INTAKE_WORK_TYPE_OPTIONS]}
+                            />
+                        </Field>
+                        <Field
+                            label="Affected service"
+                            hint="optional — helps route the ticket to the right queue"
+                            error={form.errors.it_service_id}
+                        >
+                            <SelectInput
+                                value={form.data.it_service_id}
+                                onChange={(v) =>
+                                    form.setData('it_service_id', v)
+                                }
+                                placeholder="No service selected"
+                                options={[
+                                    {
+                                        value: UNASSIGNED,
+                                        label: 'No service selected',
+                                    },
+                                    ...serviceOptions.map((serviceOption) => ({
+                                        value: String(serviceOption.id),
+                                        label: serviceOption.name,
+                                    })),
+                                ]}
+                            />
+                        </Field>
                         <Field label="Priority" error={form.errors.priority}>
                             <TilePicker
                                 value={form.data.priority}
@@ -815,6 +988,31 @@ function CreateTicketWizard({
                                             label: a.tag
                                                 ? `${a.name} · ${a.tag}`
                                                 : a.name,
+                                        })),
+                                    ]}
+                                />
+                            </Field>
+                        ) : null}
+                        {availableDevices.length > 0 ? (
+                            <Field
+                                label="Affected Device"
+                                hint="optional — canonical Security & Devices record"
+                                error={form.errors.device_id}
+                            >
+                                <SelectInput
+                                    value={form.data.device_id}
+                                    onChange={(v) =>
+                                        form.setData('device_id', v)
+                                    }
+                                    placeholder="No Device"
+                                    options={[
+                                        {
+                                            value: UNASSIGNED,
+                                            label: 'No Device',
+                                        },
+                                        ...availableDevices.map((device) => ({
+                                            value: String(device.id),
+                                            label: `${device.name} · ${device.uid}`,
                                         })),
                                     ]}
                                 />
@@ -905,6 +1103,7 @@ function CreateTicketWizard({
                                 label="Requester"
                                 value={requesterName}
                             />
+                            <ReviewRow label="Site" value={site?.name} />
                             <ReviewRow label="Title" value={form.data.title} />
                             <ReviewRow
                                 label="Category"
@@ -937,6 +1136,19 @@ function CreateTicketWizard({
                             onEdit={() => wizard.goTo(1)}
                         >
                             <ReviewRow
+                                label="Work type"
+                                value={
+                                    INTAKE_WORK_TYPE_OPTIONS.find(
+                                        (option) =>
+                                            option.key === form.data.work_type,
+                                    )?.label
+                                }
+                            />
+                            <ReviewRow
+                                label="Service"
+                                value={service?.name ?? 'Not selected'}
+                            />
+                            <ReviewRow
                                 label="Priority"
                                 value={
                                     PRIORITY_OPTIONS.find(
@@ -963,6 +1175,14 @@ function CreateTicketWizard({
                                         ? asset.tag
                                             ? `${asset.name} · ${asset.tag}`
                                             : asset.name
+                                        : undefined
+                                }
+                            />
+                            <ReviewRow
+                                label="Device"
+                                value={
+                                    device
+                                        ? `${device.name} · ${device.uid}`
                                         : undefined
                                 }
                             />
@@ -2218,6 +2438,7 @@ export function MergeTicketDialog({
 }) {
     const [q, setQ] = useState('');
     const [selected, setSelected] = useState<number | null>(null);
+    const [reason, setReason] = useState('');
     const [processing, setProcessing] = useState(false);
 
     const filtered = useMemo(() => {
@@ -2233,11 +2454,11 @@ export function MergeTicketDialog({
     const chosen = targets.find((t) => t.id === selected) ?? null;
 
     const submit = () => {
-        if (!selected) return;
+        if (!selected || !reason.trim()) return;
         setProcessing(true);
         router.post(
             `/it/tickets/${ticket.id}/merge`,
-            { target_ticket_id: selected },
+            { target_ticket_id: selected, reason: reason.trim() },
             {
                 onSuccess: () => toast.success('Ticket merged.'),
                 onError: () =>
@@ -2264,10 +2485,18 @@ export function MergeTicketDialog({
             pct={100}
             footerEnd={
                 <>
-                    <Button variant="ghost" onClick={onClose}>
+                    <Button
+                        variant="ghost"
+                        className="min-h-11"
+                        onClick={onClose}
+                    >
                         Cancel
                     </Button>
-                    <Button onClick={submit} disabled={!selected || processing}>
+                    <Button
+                        className="min-h-11"
+                        onClick={submit}
+                        disabled={!selected || !reason.trim() || processing}
+                    >
                         {processing
                             ? 'Merging…'
                             : chosen
@@ -2307,7 +2536,7 @@ export function MergeTicketDialog({
                                         type="button"
                                         aria-pressed={on}
                                         onClick={() => setSelected(t.id)}
-                                        className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
+                                        className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
                                             on
                                                 ? 'border-primary ring-1 ring-primary'
                                                 : 'border-border hover:bg-muted'
@@ -2336,10 +2565,24 @@ export function MergeTicketDialog({
                             })
                         )}
                     </div>
+                    <Field
+                        label="Reason for merging"
+                        required
+                        hint="This appears on both ticket timelines."
+                    >
+                        <Textarea
+                            value={reason}
+                            onChange={(event) => setReason(event.target.value)}
+                            rows={3}
+                            maxLength={1000}
+                            required
+                            placeholder="Explain why these are the same request"
+                        />
+                    </Field>
                     <InfoCard icon={GitMerge}>
-                        Merging can’t be undone. The duplicate stays in the
-                        record — closed and linked to the survivor — so nothing
-                        is lost.
+                        Only tickets for the same requester are available.
+                        Merging can’t be undone: the duplicate closes, its
+                        conversation moves, and both records retain the link.
                     </InfoCard>
                 </div>
             </WizardStepPane>

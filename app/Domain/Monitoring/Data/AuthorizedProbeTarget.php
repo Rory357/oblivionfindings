@@ -52,9 +52,10 @@ final readonly class AuthorizedProbeTarget
     public function url(): string
     {
         $host = str_contains($this->host, ':') ? "[{$this->host}]" : $this->host;
-        $defaultPort = ($this->scheme === 'http' && $this->port === 80)
-            || ($this->scheme === 'https' && $this->port === 443);
+        $urlScheme = $this->scheme === 'winrm' ? 'https' : $this->scheme;
+        $defaultPort = ($urlScheme === 'http' && $this->port === 80)
+            || ($urlScheme === 'https' && $this->port === 443);
 
-        return "{$this->scheme}://{$host}".($defaultPort ? '' : ":{$this->port}").($this->path ?? '/');
+        return "{$urlScheme}://{$host}".($defaultPort ? '' : ":{$this->port}").($this->path ?? '/');
     }
 }

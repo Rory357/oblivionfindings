@@ -3,17 +3,18 @@
 namespace App\Models;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ItProvisioningWorkflow extends Model
 {
+    use WritesLegacyStorageContext;
+
     public const STATUSES = ['pending', 'in_progress', 'partially_failed', 'completed', 'cancelled'];
 
     protected $fillable = [
-        'tenant_id',
         'employee_profile_id',
         'provisioning_template_id',
         'lifecycle_type',
@@ -53,10 +54,5 @@ class ItProvisioningWorkflow extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
-    }
-
-    public function scopeForTenant(Builder $query, int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 }

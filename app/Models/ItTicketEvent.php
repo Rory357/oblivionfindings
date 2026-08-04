@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -14,10 +15,11 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  */
 class ItTicketEvent extends Model
 {
+    use WritesLegacyStorageContext;
+
     public const UPDATED_AT = null;
 
     protected $fillable = [
-        'tenant_id',
         'subject_type',
         'subject_id',
         'actor_user_id',
@@ -60,7 +62,6 @@ class ItTicketEvent extends Model
         array $payload = [],
     ): self {
         return $subject->events()->create([
-            'tenant_id' => $subject->tenant_id,
             'actor_user_id' => $actorUserId,
             'type' => $type,
             'payload' => $payload === [] ? null : $payload,

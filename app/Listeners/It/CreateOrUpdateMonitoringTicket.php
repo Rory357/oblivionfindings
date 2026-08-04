@@ -3,12 +3,12 @@
 namespace App\Listeners\It;
 
 use App\Domain\It\Services\ItTicketLinkService;
+use App\Domain\Monitoring\Services\MonitoringIncidentEvidenceService;
 use App\Domain\SecurityDevices\Events\DeviceSignalPublished;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
 use App\Models\ItTicketEvent;
-use App\Support\LegacyStorageContext;
 use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -25,6 +25,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
 
     public function __construct(
         private readonly ItTicketLinkService $links,
+        private readonly MonitoringIncidentEvidenceService $incidentEvidence,
     ) {}
 
     public function handle(DeviceSignalPublished $event): void
@@ -66,7 +67,15 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             if ($ticket) {
                 $this->links->linkMonitoringEvidence($ticket, $event->device, $lockedAlert, [
                     'source' => 'oblivion_monitoring',
+                    'monitor_correlation_key' => $this->monitorCorrelationKey($event),
                 ]);
+                $this->incidentEvidence->captureIfMissing(
+                    $ticket,
+                    $event->device,
+                    $lockedAlert,
+                    $event->deviceEvent,
+                    $this->monitorCorrelationKey($event),
+                );
                 $ticket->forceFill([
                     'status_reason' => 'monitoring_outage',
                     'monitoring_recovered_at' => null,
@@ -80,7 +89,6 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             }
 
             $ticket = ItTicket::createWithReference([
-                ...LegacyStorageContext::attributes(),
                 'site_id' => $siteId,
                 'is_organisation_wide' => false,
                 'title' => Str::limit('Monitoring outage: '.$event->device->name, 255, ''),
@@ -102,7 +110,15 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
 
             $this->links->linkMonitoringEvidence($ticket, $event->device, $lockedAlert, [
                 'source' => 'oblivion_monitoring',
+                'monitor_correlation_key' => $this->monitorCorrelationKey($event),
             ]);
+            $this->incidentEvidence->captureIfMissing(
+                $ticket,
+                $event->device,
+                $lockedAlert,
+                $event->deviceEvent,
+                $this->monitorCorrelationKey($event),
+            );
 
             ItTicketEvent::record($ticket, 'created_from_monitoring', null, $this->eventEvidence($event, $lockedAlert));
         });
@@ -115,8 +131,13 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             if ($siteId === null) {
                 return;
             }
+            $correlationKey = $this->monitorCorrelationKey($event);
+            $legacyRecovery = data_get($event->deviceEvent->payload, 'legacy_monitoring_recovery') === true;
+            if ($correlationKey === null && ! $legacyRecovery) {
+                return;
+            }
 
-            $tickets = ItTicket::query()
+            $ticketsQuery = ItTicket::query()
                 ->where('source', 'system')
                 ->where('work_type', 'incident')
                 ->where('site_id', $siteId)
@@ -135,9 +156,23 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
                         ->where('type', 'created_from_monitoring')
                         ->where('payload->system_principal', ItTicketLinkService::MONITORING_PRINCIPAL)
                         ->where('payload->operation', ItTicketLinkService::MONITORING_OPERATION);
-                })
-                ->lockForUpdate()
-                ->get();
+                });
+
+            if ($correlationKey !== null) {
+                $ticketsQuery->whereHas('events', function ($events) use ($correlationKey): void {
+                    $events
+                        ->where('type', 'created_from_monitoring')
+                        ->where('payload->monitor_correlation_key', $correlationKey);
+                });
+            } else {
+                $ticketsQuery->whereHas('events', function ($events): void {
+                    $events
+                        ->where('type', 'created_from_monitoring')
+                        ->whereNull('payload->monitor_correlation_key');
+                });
+            }
+
+            $tickets = $ticketsQuery->lockForUpdate()->get();
 
             foreach ($tickets as $ticket) {
                 if ($ticket->monitoring_recovered_at !== null) {
@@ -153,6 +188,7 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
                     'device_id' => $event->device->id,
                     'device_event_id' => $event->deviceEvent->id,
                     'signal_id' => $event->signal->id,
+                    'monitor_correlation_key' => $correlationKey,
                 ]);
             }
         });
@@ -212,9 +248,19 @@ final class CreateOrUpdateMonitoringTicket implements ShouldQueueAfterCommit
             'alert_id' => $alert->id,
             'severity' => $alert->severity,
             'message' => data_get($event->deviceEvent->payload, 'message'),
+            'monitor_correlation_key' => $this->monitorCorrelationKey($event),
             'system_principal' => ItTicketLinkService::MONITORING_PRINCIPAL,
             'operation' => ItTicketLinkService::MONITORING_OPERATION,
         ];
+    }
+
+    private function monitorCorrelationKey(DeviceSignalPublished $event): ?string
+    {
+        $key = data_get($event->deviceEvent->payload, 'monitor_correlation_key');
+
+        return is_string($key) && preg_match('/\A[a-f0-9]{64}\z/', $key) === 1
+            ? $key
+            : null;
     }
 
     private function failureDescription(DeviceSignalPublished $event): string

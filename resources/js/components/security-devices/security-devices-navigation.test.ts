@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     buildSecurityDevicesNavigationGroups,
     isSecurityDevicesDestinationActive,
+    securityDevicesDomainHref,
 } from './security-devices-navigation';
 
 const allPermissions = {
@@ -18,6 +19,27 @@ const allPermissions = {
 };
 
 describe('Security & Devices navigation contract', () => {
+    it('routes estate domains through their canonical workspaces', () => {
+        expect(securityDevicesDomainHref('security')).toBe(
+            '/security-devices/security',
+        );
+        expect(securityDevicesDomainHref('tracking')).toBe(
+            '/security-devices/tracking',
+        );
+        expect(securityDevicesDomainHref('iot_healthcare')).toBe(
+            '/security-devices/healthcare',
+        );
+        expect(securityDevicesDomainHref('it_infrastructure')).toBe(
+            '/security-devices/network-it',
+        );
+        expect(securityDevicesDomainHref('facilities')).toBe(
+            '/security-devices/facilities-iot',
+        );
+        expect(securityDevicesDomainHref('unknown')).toBe(
+            '/security-devices/devices',
+        );
+    });
+
     it('uses the approved four groups and destination order', () => {
         const groups = buildSecurityDevicesNavigationGroups(allPermissions);
 

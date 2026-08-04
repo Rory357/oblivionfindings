@@ -1,5 +1,9 @@
 import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import {
+    CredentialReferenceManagement,
+    type CredentialReferenceWorkspace,
+} from '@/components/security-devices/credential-reference-management';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
@@ -25,6 +29,28 @@ type Profile = {
     recovery_confirmations: number;
     stale_after_seconds: number;
     state: string;
+};
+type RetentionPolicy = {
+    id: number;
+    name: string;
+    scope: string;
+    site_id: number | null;
+    device_id: number | null;
+    data_class: string | null;
+    privacy_class: string | null;
+    raw_days: number;
+    hourly_days: number;
+    daily_days: number;
+    legal_hold: boolean;
+};
+type RuntimeQueue = {
+    state: string;
+    pending: number | null;
+    oldest_age_seconds: number | null;
+    dead_letters: number | null;
+    worker_state: string;
+    heartbeat_age_seconds: number | null;
+    dispatch_lag_seconds: number | null;
 };
 
 export function AuditEvidence({
@@ -87,7 +113,30 @@ export default function SettingsAudit(props: {
         state: string;
         values: Record<string, unknown>;
     }>;
+    credentialReferences: CredentialReferenceWorkspace;
     monitoringProfiles: Profile[];
+    monitoringRetention: {
+        policies: RetentionPolicy[];
+        application_defaults: {
+            raw_days: number;
+            hourly_days: number;
+            daily_days: number;
+        };
+        rule: string;
+    };
+    monitoringRuntime: {
+        state: string;
+        workers: {
+            state: string;
+            available: number;
+            total: number;
+            attention: number;
+            not_observed: number;
+            note: string;
+        };
+        queues: Record<string, RuntimeQueue>;
+        observed_at: string;
+    };
     dataQuality: {
         visible_devices: number;
         unassigned_devices: number;
@@ -107,7 +156,10 @@ export default function SettingsAudit(props: {
         areas,
         classificationDefaults,
         providerOperationalDefaults,
+        credentialReferences,
         monitoringProfiles,
+        monitoringRetention,
+        monitoringRuntime,
         dataQuality,
         featureSupport,
         audit,
@@ -256,6 +308,61 @@ export default function SettingsAudit(props: {
                         )}
                     </CardContent>
                 </Card>
+                <CredentialReferenceManagement
+                    workspace={credentialReferences}
+                />
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Monitoring retention</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                            {monitoringRetention.rule}
+                        </p>
+                        {monitoringRetention.policies.length ? (
+                            monitoringRetention.policies.map((policy) => (
+                                <article
+                                    key={policy.id}
+                                    className="rounded-lg border p-4 text-sm"
+                                >
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <strong>{policy.name}</strong>
+                                        <div className="flex gap-2">
+                                            <Badge variant="outline">
+                                                {policy.scope.replaceAll(
+                                                    '_',
+                                                    ' ',
+                                                )}
+                                            </Badge>
+                                            {policy.legal_hold ? (
+                                                <Badge variant="secondary">
+                                                    Legal hold
+                                                </Badge>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                    <p className="mt-2 text-muted-foreground">
+                                        Raw {policy.raw_days} days · hourly{' '}
+                                        {policy.hourly_days} days · daily{' '}
+                                        {policy.daily_days} days
+                                    </p>
+                                    {policy.data_class ||
+                                    policy.privacy_class ? (
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            {policy.data_class ?? 'All data'} ·{' '}
+                                            {policy.privacy_class ??
+                                                'All privacy classes'}
+                                        </p>
+                                    ) : null}
+                                </article>
+                            ))
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                No active retention policies are visible.
+                            </p>
+                        )}
+                    </CardContent>
+                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle>Monitoring profiles</CardTitle>
@@ -292,6 +399,61 @@ export default function SettingsAudit(props: {
                                 </article>
                             ))
                         )}
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>
+                            Runtime workers, queues and dead letters
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-2 text-sm">
+                            <Badge variant="outline">
+                                {monitoringRuntime.state.replaceAll('_', ' ')}
+                            </Badge>
+                            <span className="text-muted-foreground">
+                                {monitoringRuntime.workers.note}
+                            </span>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            {Object.entries(monitoringRuntime.queues).map(
+                                ([name, queue]) => (
+                                    <article
+                                        key={name}
+                                        className="rounded-lg border p-3 text-sm"
+                                    >
+                                        <div className="flex items-center justify-between gap-2">
+                                            <strong className="capitalize">
+                                                {name.replaceAll('_', ' ')}
+                                            </strong>
+                                            <Badge variant="outline">
+                                                {queue.state.replaceAll(
+                                                    '_',
+                                                    ' ',
+                                                )}
+                                            </Badge>
+                                        </div>
+                                        <p className="mt-2 text-muted-foreground">
+                                            {queue.pending === null
+                                                ? 'Counts restricted to authorised operators'
+                                                : `${queue.pending} pending · ${queue.dead_letters ?? 0} dead letters`}
+                                        </p>
+                                        <p className="mt-1 text-muted-foreground">
+                                            Worker{' '}
+                                            {queue.worker_state.replaceAll(
+                                                '_',
+                                                ' ',
+                                            )}
+                                            {queue.heartbeat_age_seconds ===
+                                            null
+                                                ? ' · no heartbeat consumed'
+                                                : ` · heartbeat ${queue.heartbeat_age_seconds}s ago`}
+                                        </p>
+                                    </article>
+                                ),
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
                 <Card>

@@ -2,8 +2,11 @@
 
 namespace App\Domain\Monitoring\Contracts;
 
+use App\Domain\SecurityDevices\Management\Models\DeviceCommandAttempt;
+use App\Domain\SecurityDevices\Management\Models\DeviceCommandRequest;
+use App\Models\User;
+
 interface CommandDispatchPort
 {
-    /** @param array<string, scalar|null> $parameters */
-    public function dispatch(string $capability, int $deviceId, array $parameters): never;
+    public function dispatch(DeviceCommandRequest $request, User $triggeredBy): DeviceCommandAttempt;
 }

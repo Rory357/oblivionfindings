@@ -2,7 +2,9 @@
 
 namespace App\Domain\It\Presenters;
 
+use App\Domain\It\Services\ItTicketLinkService;
 use App\Domain\It\Services\ItWorkAccessService;
+use App\Domain\Monitoring\Presenters\MonitoringIncidentEvidencePresenter;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\ControlRoomAlert;
@@ -20,10 +22,11 @@ final class ItTicketContextPresenter
         private readonly ItWorkAccessService $workAccess,
         private readonly SecurityDevicesAccessService $deviceAccess,
         private readonly UserSiteAccessService $siteAccess,
+        private readonly MonitoringIncidentEvidencePresenter $incidentEvidence,
     ) {}
 
     /**
-     * @return array{devices: array<int, array<string, mixed>>, alerts: array<int, array<string, mixed>>, tasks: array<int, array<string, mixed>>, problems: array<int, array<string, mixed>>, changes: array<int, array<string, mixed>>, major_incidents: array<int, array<string, mixed>>}
+     * @return array{devices: array<int, array<string, mixed>>, alerts: array<int, array<string, mixed>>, incident_evidence: array<int, array<string, mixed>>, tasks: array<int, array<string, mixed>>, problems: array<int, array<string, mixed>>, changes: array<int, array<string, mixed>>, major_incidents: array<int, array<string, mixed>>}
      */
     public function present(ItTicket $ticket, User $viewer): array
     {
@@ -31,6 +34,7 @@ final class ItTicketContextPresenter
             return [
                 'devices' => [],
                 'alerts' => [],
+                'incident_evidence' => [],
                 'tasks' => [],
                 'problems' => [],
                 'changes' => [],
@@ -44,7 +48,7 @@ final class ItTicketContextPresenter
             ->filter(fn (ItTicketLink $link): bool => $link->relationship === 'affected_device'
                 && $link->linkable instanceof Device
                 && $this->canViewDevice($link->linkable, $viewer))
-            ->map(fn (ItTicketLink $link): array => $this->presentDevice($link->linkable))
+            ->map(fn (ItTicketLink $link): array => $this->presentDevice($link->linkable, $link, $ticket, $viewer))
             ->values()
             ->all();
 
@@ -59,6 +63,7 @@ final class ItTicketContextPresenter
         return [
             'devices' => $devices,
             'alerts' => $alerts,
+            'incident_evidence' => $this->incidentEvidence->forTicket($ticket, $viewer),
             'tasks' => $this->presentTasks($ticket, $viewer),
             'problems' => $this->presentProblems($ticket, $viewer),
             'changes' => $this->presentChanges($ticket, $viewer),
@@ -175,6 +180,8 @@ final class ItTicketContextPresenter
 
         return $ticket->tasks()
             ->with(['dependencies:id,title,status', 'team:id,name', 'assignee:id,name', 'completedBy:id,name'])
+            ->orderBy('sort_order')
+            ->orderBy('id')
             ->get()
             ->filter(fn (ItWorkTask $task): bool => Gate::forUser($viewer)->allows('view', $task))
             ->map(fn (ItWorkTask $task): array => [
@@ -228,8 +235,11 @@ final class ItTicketContextPresenter
     }
 
     /** @return array<string, mixed> */
-    private function presentDevice(Device $device): array
+    private function presentDevice(Device $device, ItTicketLink $link, ItTicket $ticket, User $viewer): array
     {
+        $isMonitoringEvidence = (($link->context ?? [])['system_principal'] ?? null)
+            === ItTicketLinkService::MONITORING_PRINCIPAL;
+
         return [
             'id' => $device->id,
             'uid' => $device->device_uid,
@@ -240,6 +250,12 @@ final class ItTicketContextPresenter
             'health_status' => $this->value($device->health_status),
             'last_seen_at' => $device->last_seen_at?->toIso8601String(),
             'href' => route('security-devices.devices.show', $device),
+            'is_monitoring_evidence' => $isMonitoringEvidence,
+            'can_unlink' => ! $isMonitoringEvidence
+                && in_array($ticket->work_type, ItTicket::INTAKE_WORK_TYPES, true)
+                && ! $ticket->isMerged()
+                && in_array($ticket->status, ItTicket::OPEN_STATUSES, true)
+                && $this->workAccess->canWork($viewer, $ticket),
         ];
     }
 

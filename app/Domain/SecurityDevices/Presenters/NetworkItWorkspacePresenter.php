@@ -6,6 +6,8 @@ use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorObservation;
+use App\Domain\Monitoring\Topology\Models\TopologyEdge;
+use App\Domain\Monitoring\Topology\Models\TopologySnapshot;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -35,6 +37,7 @@ class NetworkItWorkspacePresenter
                 'monitors' => fn ($query) => $query
                     ->with('collector:id,name,status,last_seen_at')
                     ->orderBy('name'),
+                'latestConfigurationSnapshot',
             ])
             ->orderBy('name')
             ->limit(self::DEVICE_LIMIT + 1)
@@ -49,7 +52,7 @@ class NetworkItWorkspacePresenter
             ->map(fn (Device $device): array => $this->mapDevice($device, $siteContext))
             ->values();
         $relationships = $this->relationships($deviceIds);
-        $topology = $this->topology($mappedDevices, $relationships);
+        $topology = $this->topology($mappedDevices, $relationships, $this->latestTopologySnapshots($mappedDevices));
         $interfaces = $this->interfaces($devices, $latestObservations);
         $services = $this->services($devices, $relationships);
         $traffic = $interfaces
@@ -77,7 +80,7 @@ class NetworkItWorkspacePresenter
             ])
             ->values();
         $configuration = $devices
-            ->map(fn (Device $device): array => $this->configuration($device))
+            ->map(fn (Device $device): array => $this->configuration($device, $viewer))
             ->values();
         $permissions = [
             'viewItWork' => $viewer->canDo('it.view'),
@@ -273,9 +276,42 @@ class NetworkItWorkspacePresenter
             ->get();
     }
 
-    /** @return array<string, mixed> */
-    private function topology(Collection $devices, Collection $relationships): array
+    /** @param Collection<int, array<string, mixed>> $devices @return Collection<int, TopologySnapshot> */
+    private function latestTopologySnapshots(Collection $devices): Collection
     {
+        $siteIds = $devices->pluck('site.id')->filter()->unique()->values();
+        if ($siteIds->isEmpty()) {
+            return collect();
+        }
+
+        return TopologySnapshot::query()
+            ->whereIn('site_id', $siteIds)
+            ->where('status', 'completed')
+            ->with([
+                'site:id,name',
+                'nodes.canonicalDevice:id,name,category,subcategory,health_status',
+                'edges.fromNode.canonicalDevice:id,name',
+                'edges.toNode.canonicalDevice:id,name',
+                'changes:id,current_snapshot_id,change_type,edge_hash,created_at',
+            ])
+            ->orderByDesc('captured_at')
+            ->orderByDesc('id')
+            ->get()
+            ->reject(fn (TopologySnapshot $snapshot): bool => preg_match(
+                '/^native:snmp:(?:lldp|cdp|arp|forwarding_table|route):device:\d+$/',
+                $snapshot->source,
+            ) === 1)
+            ->unique(fn (TopologySnapshot $snapshot): string => $snapshot->site_id.':'.$snapshot->source)
+            ->values();
+    }
+
+    /** @return array<string, mixed> */
+    private function topology(Collection $devices, Collection $relationships, Collection $snapshots): array
+    {
+        if ($snapshots->isNotEmpty()) {
+            return $this->runtimeTopology($devices, $snapshots);
+        }
+
         $names = $devices->keyBy('id');
         $linkedIds = $relationships
             ->flatMap(fn (DeviceRelationship $relationship): array => [
@@ -292,6 +328,7 @@ class NetworkItWorkspacePresenter
         };
 
         return [
+            'source' => 'manual_relationships',
             'state' => $state,
             'label' => $label,
             'nodeCount' => $devices->count(),
@@ -319,8 +356,111 @@ class NetworkItWorkspacePresenter
                     'type' => $relationship->relationship_type?->value,
                     'label' => $relationship->relationship_type?->label() ?? 'Related to',
                     'port' => $relationship->port,
+                    'source' => 'manual',
+                    'confidence' => 1.0,
+                    'reviewState' => 'reviewed',
+                    'evidenceLabel' => 'Reviewed canonical Device relationship',
                 ];
             })->values(),
+            'snapshots' => [],
+            'changes' => ['added' => 0, 'removed' => 0, 'changed' => 0],
+        ];
+    }
+
+    /** @param Collection<int, array<string, mixed>> $devices @param Collection<int, TopologySnapshot> $snapshots @return array<string, mixed> */
+    private function runtimeTopology(Collection $devices, Collection $snapshots): array
+    {
+        $visible = $devices->keyBy('id');
+        $nodes = $snapshots->flatMap->nodes
+            ->filter(fn ($node): bool => $node->canonical_device_id !== null && $visible->has((int) $node->canonical_device_id))
+            ->unique('canonical_device_id')
+            ->map(function ($node) use ($visible): array {
+                $device = $visible->get((int) $node->canonical_device_id);
+
+                return [
+                    'id' => (int) $node->canonical_device_id,
+                    'name' => $device['name'],
+                    'category' => $device['category'],
+                    'subcategory' => $device['subcategory'],
+                    'health' => $device['health'],
+                    'site' => $device['site']['name'] ?? null,
+                    'href' => $device['href'],
+                ];
+            })
+            ->values();
+        $visibleIds = $nodes->pluck('id');
+        $edges = $snapshots->flatMap->edges
+            ->filter(function (TopologyEdge $edge) use ($visibleIds): bool {
+                $from = $edge->fromNode?->canonical_device_id;
+                $to = $edge->toNode?->canonical_device_id;
+
+                return $from !== null && $to !== null
+                    && $visibleIds->contains((int) $from)
+                    && $visibleIds->contains((int) $to);
+            })
+            ->map(function (TopologyEdge $edge): array {
+                $from = $edge->fromNode?->canonicalDevice;
+                $to = $edge->toNode?->canonicalDevice;
+                $confidence = (float) $edge->confidence;
+                $provider = is_array($edge->evidence) && is_string($edge->evidence['provider'] ?? null)
+                    ? $edge->evidence['provider']
+                    : null;
+                $providerLabel = $provider === 'unifi' ? 'UniFi' : Str::headline((string) $provider);
+                $evidenceSource = $edge->source === 'provider' && $provider !== null
+                    ? $providerLabel.' provider'
+                    : Str::headline($edge->source);
+
+                return [
+                    'id' => 'runtime-'.$edge->id,
+                    'parentId' => $from?->id,
+                    'parentName' => $from?->name ?? 'Unknown source Device',
+                    'childId' => $to?->id,
+                    'childName' => $to?->name ?? 'Unknown destination Device',
+                    'type' => $edge->kind,
+                    'label' => Str::headline($edge->kind),
+                    'port' => collect([$edge->local_port, $edge->remote_port])->filter()->implode(' → ') ?: null,
+                    'source' => $edge->source,
+                    'confidence' => $confidence,
+                    'reviewState' => in_array($edge->source, ['manual', 'reviewed'], true) ? 'reviewed' : 'inferred',
+                    'evidenceLabel' => $evidenceSource.' '.Str::headline($edge->kind).' evidence',
+                    'firstSeenAt' => $edge->first_seen_at?->toIso8601String(),
+                    'lastSeenAt' => $edge->last_seen_at?->toIso8601String(),
+                ];
+            })
+            ->values();
+        $linkedIds = $edges->flatMap(fn (array $edge): array => [(int) $edge['parentId'], (int) $edge['childId']])->unique();
+        $unlinked = $nodes->pluck('id')->diff($linkedIds)->count();
+        $changes = $snapshots->flatMap->changes->countBy('change_type');
+
+        return [
+            'source' => 'runtime_topology',
+            'state' => $edges->isEmpty() ? 'partial' : ($unlinked === 0 ? 'known' : 'partial'),
+            'label' => $edges->isEmpty()
+                ? 'Latest topology snapshots have no visible relationships'
+                : ($unlinked === 0 ? 'Topology evidence covers every visible Device' : 'Topology evidence is incomplete'),
+            'nodeCount' => $nodes->count(),
+            'edgeCount' => $edges->count(),
+            'unlinkedCount' => $unlinked,
+            'nodes' => $nodes,
+            'edges' => $edges,
+            'snapshots' => $snapshots->map(fn (TopologySnapshot $snapshot): array => [
+                'id' => $snapshot->id,
+                'site' => $snapshot->site ? [
+                    'id' => $snapshot->site->id,
+                    'name' => $snapshot->site->name,
+                    'href' => "/security-devices/sites/{$snapshot->site->id}",
+                ] : null,
+                'source' => $snapshot->source,
+                'capturedAt' => $snapshot->captured_at?->toIso8601String(),
+                'nodeCount' => $snapshot->node_count,
+                'edgeCount' => $snapshot->edge_count,
+                'changeCount' => $snapshot->change_count,
+            ])->values(),
+            'changes' => [
+                'added' => (int) ($changes['added'] ?? 0),
+                'removed' => (int) ($changes['removed'] ?? 0),
+                'changed' => (int) ($changes['changed'] ?? 0),
+            ],
         ];
     }
 
@@ -412,7 +552,7 @@ class NetworkItWorkspacePresenter
     }
 
     /** @return array<string, mixed> */
-    private function configuration(Device $device): array
+    private function configuration(Device $device, User $viewer): array
     {
         $observedHash = $this->evidenceValue($device, [
             'observed.configuration_hash',
@@ -457,6 +597,10 @@ class NetworkItWorkspacePresenter
             $currentFirmware !== null => 'observed',
             default => 'desired_only',
         };
+        $snapshot = $device->latestConfigurationSnapshot;
+        $canDownload = $snapshot !== null
+            && $snapshot->storage_state === 'available'
+            && ($snapshot->source_kind !== 'provider' || $viewer->canDo('securityDevices.integrations.view'));
 
         return [
             'deviceId' => $device->id,
@@ -473,6 +617,21 @@ class NetworkItWorkspacePresenter
                 'currentVersion' => $currentFirmware,
                 'desiredVersion' => $desiredFirmware,
                 'observedAt' => $firmwareAt,
+            ],
+            'latestSnapshot' => $snapshot === null ? null : [
+                'id' => $snapshot->id,
+                'sourceKind' => $snapshot->source_kind,
+                'source' => $snapshot->source,
+                'capturedAt' => $snapshot->captured_at?->toISOString(),
+                'contentHash' => $snapshot->content_hash,
+                'configurationHash' => $snapshot->configuration_hash,
+                'contentSize' => $snapshot->content_size,
+                'mimeType' => $snapshot->mime_type,
+                'storageState' => $snapshot->storage_state,
+                'diff' => $snapshot->diff_summary,
+                'downloadHref' => $canDownload
+                    ? "/security-devices/devices/{$device->id}/configuration-snapshots/{$snapshot->id}"
+                    : null,
             ],
         ];
     }

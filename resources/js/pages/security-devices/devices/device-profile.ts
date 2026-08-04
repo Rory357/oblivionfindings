@@ -4,6 +4,7 @@ export type DeviceProfileSectionKey =
     | 'topology'
     | 'interfaces-sensors'
     | 'configuration'
+    | 'management'
     | 'assignments'
     | 'tickets'
     | 'events'
@@ -195,6 +196,142 @@ export type DeviceProfile = {
         fields: string[];
         createdAt: string | null;
     }>;
+    management: {
+        visible: boolean;
+        actions: Array<{
+            key: string;
+            label: string;
+            domain: string;
+            workspace: string;
+            sensitivity: string;
+            group: 'diagnostics' | 'standard_management' | 'high_risk_control';
+            level: 'observe' | 'operate' | 'manage' | 'control' | 'admin';
+            risk: 'low' | 'medium' | 'high' | 'critical';
+            impact: string;
+            expectedResult: string;
+            confirmationMode:
+                | 'none'
+                | 'acknowledge_impact'
+                | 'type_device_name';
+            executionMode:
+                | 'central_runtime'
+                | 'collector_runtime'
+                | 'unavailable';
+            executionGuidance: string;
+            allowed: boolean;
+            adapterAvailable: boolean;
+            available: boolean;
+            state: string;
+            reason: string;
+            requiresStepUp: boolean;
+            requiresMfa: boolean;
+            requiresFreshObservation: boolean;
+            freshness: {
+                state: string;
+                observedAt: string | null;
+                staleAfterSeconds: number;
+            };
+            requiresApproval: boolean;
+            requiresChange: boolean;
+            allowsBreakGlass: boolean;
+            expiresAfterSeconds: number;
+            parameters: Array<{
+                name: string;
+                label: string;
+                type: 'integer' | 'string' | 'date_time';
+                min: number | null;
+                max: number | null;
+                options: string[];
+                optionLabels?: Record<string, string>;
+            }>;
+        }>;
+        history: Array<{
+            id: number;
+            uuid: string;
+            capability: string;
+            label: string;
+            status: string;
+            risk: string;
+            confirmationMode:
+                | 'none'
+                | 'acknowledge_impact'
+                | 'type_device_name'
+                | null;
+            impactAcknowledgedAt: string | null;
+            reason: string;
+            safeParameters: Record<string, string | number | boolean | null>;
+            expectedState: Record<string, string | number | boolean | null>;
+            requestedBy: string | null;
+            approvedBy: string | null;
+            isBreakGlass: boolean;
+            breakGlass: {
+                reviewer: string | null;
+                emergencyReason: string | null;
+                declaredAt: string | null;
+                notificationSentAt: string | null;
+                reviewDueAt: string | null;
+                reviewedBy: string | null;
+                reviewedAt: string | null;
+                outcome: string | null;
+                reviewSummary: string | null;
+                overdue: boolean;
+            } | null;
+            requestedAt: string | null;
+            expiresAt: string | null;
+            reconciledAt: string | null;
+            safeFailureReason: string | null;
+            blockedReasonCode: string | null;
+            blockedAt: string | null;
+            change: {
+                id: number;
+                reference: string;
+                title: string;
+            } | null;
+            nextAction: string;
+            evidenceExportHref: string;
+            executionRoute: string | null;
+            latestAttempt: {
+                number: number;
+                status: string;
+                runtime: string;
+                safeResult: Record<string, unknown>;
+                safeFailureReason: string | null;
+                completedAt: string | null;
+            } | null;
+            latestReconciliation: {
+                outcome: string;
+                observedState: Record<string, unknown>;
+                safeEvidenceSummary: string | null;
+                observedAt: string | null;
+            } | null;
+            canDecide: boolean;
+            canDispatch: boolean;
+            dispatchPreconditionsCurrent: boolean;
+            canReviewBreakGlass: boolean;
+        }>;
+        canObserve: boolean;
+        canApprove: boolean;
+        stepUpCurrent: boolean;
+        changeOptions: Array<{
+            id: number;
+            reference: string;
+            title: string;
+            workflowState: string;
+            maintenanceEndsAt: string | null;
+        }>;
+        breakGlassReviewers: Array<{
+            id: number;
+            name: string;
+        }>;
+        summary: {
+            declared: number;
+            available: number;
+            awaitingApproval: number;
+            uncertain: number;
+            blocked: number;
+            breakGlassReviewDue: number;
+        };
+    };
     capabilities: {
         registry: Capability;
         assignment: Capability;

@@ -378,6 +378,36 @@ class SecurityDevicesAccessService
         return $query;
     }
 
+    /**
+     * Count active canonical Devices for a bounded set of Assets without
+     * exposing Device existence outside the viewer's Security & Devices scope.
+     *
+     * @param  Collection<int, int|string>  $assetIds
+     * @return Collection<int, int>
+     */
+    public function visibleActiveDeviceCountsForAssets(User $user, Collection $assetIds): Collection
+    {
+        $ids = $assetIds
+            ->filter(fn (mixed $id): bool => is_numeric($id))
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        if (! $user->canDo('securityDevices.devices.view') || $ids->isEmpty()) {
+            return collect();
+        }
+
+        return DeviceAssetLink::query()
+            ->active()
+            ->whereIn('asset_id', $ids)
+            ->whereIn('device_id', $this->visibleDevices($user)->select('devices.id'))
+            ->selectRaw('asset_id, COUNT(DISTINCT device_id) AS aggregate')
+            ->groupBy('asset_id')
+            ->pluck('aggregate', 'asset_id')
+            ->map(fn (mixed $count): int => (int) $count);
+    }
+
     public function releasableDevices(User $user): Builder
     {
         $siteIds = $this->accessibleSiteIds($user);

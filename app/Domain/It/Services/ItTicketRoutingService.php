@@ -17,9 +17,13 @@ final class ItTicketRoutingService
         $before = $ticket->only(['queue_id', 'team_id', 'owner_user_id', 'assigned_to_user_id']);
         $queue = $this->matchingQueue($ticket);
 
+        // Classification is authoritative: a re-triaged ticket must not keep
+        // a queue/team/owner that no longer matches its current properties.
+        $ticket->queue_id = $queue?->id;
+        $ticket->team_id = $queue?->team_id;
+        $ticket->owner_user_id = null;
+
         if ($queue) {
-            $ticket->queue_id = $queue->id;
-            $ticket->team_id = $queue->team_id;
             $defaultAssigneeId = $queue->filter_rules['default_assignee_user_id'] ?? null;
             if ($ticket->assigned_to_user_id === null
                 && is_numeric($defaultAssigneeId)

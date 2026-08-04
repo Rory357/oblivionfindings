@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ItTicketLink extends Model
 {
+    use WritesLegacyStorageContext;
+
     public const RELATIONSHIPS = [
         'affected_device',
         'source_alert',
@@ -25,7 +28,6 @@ class ItTicketLink extends Model
     ];
 
     protected $fillable = [
-        'tenant_id',
         'ticket_id',
         'relationship',
         'linkable_type',
@@ -51,10 +53,5 @@ class ItTicketLink extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
-    }
-
-    public function scopeForTenant($query, int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 }

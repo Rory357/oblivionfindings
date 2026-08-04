@@ -1,25 +1,49 @@
 <?php
 
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Models\ControlRoom\Device as ControlRoomDevice;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoomAlert;
+use App\Models\Site;
+use App\Models\User;
 use App\Services\ControlRoom\SignalProcessingService;
 use Database\Seeders\SecurityDevicesSignalSeeder;
+
+/** @return array{Device, ControlRoomDevice} */
+function monitoringRecoveryDevice(): array
+{
+    $site = Site::factory()->create();
+    $device = Device::factory()->itInfrastructure()->create();
+    $actor = User::factory()->create();
+
+    DeviceAssignment::query()->create([
+        'device_id' => $device->id,
+        'assignable_type' => DeviceAssignment::TARGET_SITE,
+        'assignable_id' => $site->id,
+        'assignment_type' => 'permanent',
+        'assigned_at' => now(),
+        'assigned_by_user_id' => $actor->id,
+    ]);
+
+    $projection = ControlRoomDevice::query()->create([
+        'name' => $device->name,
+        'canonical_device_id' => $device->id,
+        'site_id' => $site->id,
+        'type' => ControlRoomDevice::TYPE_NETWORK,
+    ]);
+
+    return [$device, $projection];
+}
 
 beforeEach(function () {
     $this->seed(SecurityDevicesSignalSeeder::class);
 });
 
 it('resolves the offline alert and does not create a device-online alert', function () {
-    $device = Device::factory()->itInfrastructure()->create();
-    $projection = ControlRoomDevice::create([
-        'name' => $device->name,
-        'canonical_device_id' => $device->id,
-        'type' => ControlRoomDevice::TYPE_NETWORK,
-    ]);
+    [$device, $projection] = monitoringRecoveryDevice();
 
     DeviceEvent::create([
         'device_id' => $device->id,
@@ -36,6 +60,7 @@ it('resolves the offline alert and does not create a device-online alert', funct
         'severity' => 'info',
         'source' => 'oblivion_monitoring',
         'occurred_at' => now(),
+        'payload' => ['legacy_monitoring_recovery' => true],
     ]);
 
     expect($offline->fresh()->status)->toBe(ControlRoomAlert::STATUS_RESOLVED)
@@ -46,12 +71,7 @@ it('resolves the offline alert and does not create a device-online alert', funct
 });
 
 it('processes an identity-less recovery without resolving unrelated alerts', function () {
-    $device = Device::factory()->itInfrastructure()->create();
-    $projection = ControlRoomDevice::create([
-        'name' => $device->name,
-        'canonical_device_id' => $device->id,
-        'type' => ControlRoomDevice::TYPE_NETWORK,
-    ]);
+    [$device, $projection] = monitoringRecoveryDevice();
 
     DeviceEvent::create([
         'device_id' => $device->id,

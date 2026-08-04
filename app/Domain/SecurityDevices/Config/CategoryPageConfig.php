@@ -24,7 +24,7 @@ class CategoryPageConfig
                 'title' => 'Network & IT',
                 'description' => 'Network, server, storage, power, endpoint, voice, printing, and rack infrastructure across all sites.',
                 'emptyTitle' => 'No network or IT devices registered',
-                'emptyDescription' => 'Register infrastructure devices to build the organisation-wide technology estate.',
+                'emptyDescription' => 'Register infrastructure devices to build the application-wide technology estate.',
                 'icon' => 'network-it',
                 'domain' => 'it_infrastructure',
                 'categories' => null,

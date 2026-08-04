@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Http;
 function itPollRequestSender(string $email): User
 {
     $site = Site::factory()->create();
-    $sender = User::factory()->create(['email' => $email, 'organization_id' => 1]);
+    $sender = User::factory()->create(['email' => $email]);
     $permission = Permission::query()->firstOrCreate(
         ['key' => 'it.request'],
         ['description' => 'Create IT requests', 'group' => 'it', 'module' => 'Operations'],
@@ -47,7 +47,6 @@ function itPollRequestSender(string $email): User
 function itPollConnection(array $overrides = []): ItMailboxConnection
 {
     return ItMailboxConnection::create(array_merge([
-        'tenant_id' => 1,
         'provider' => ItMailboxConnection::PROVIDER_MICROSOFT,
         'status' => ItMailboxConnection::STATUS_CONNECTED,
         'access_token' => 'access-123',
@@ -93,10 +92,9 @@ test('polling a connected mailbox turns unread mail into tickets and marks it re
 });
 
 test('an already-ingested message is not ticketed twice but is still marked read', function () {
-    User::factory()->create(['email' => 'worker@example.test', 'organization_id' => 1]);
+    User::factory()->create(['email' => 'worker@example.test']);
     itPollConnection();
     ItInboundEmail::create([
-        'tenant_id' => 1,
         'from_email' => 'worker@example.test',
         'message_id' => '<msg1@mail.example.test>',
         'status' => 'processed',

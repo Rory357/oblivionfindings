@@ -35,11 +35,10 @@ class UnifiDiscoveryFailureTest extends TestCase
 
         $this->seed(RbacSeeder::class);
         $this->seed(SecurityDevicesPermissionsSeeder::class);
-        $this->admin = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+        $this->admin = User::factory()->create(['approved_at' => now()]);
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
-        $this->site = Site::factory()->create(['tenant_id' => 1]);
+        $this->site = Site::factory()->create([]);
         $this->secret = IntegrationProviderConnection::create([
-            'tenant_id' => 1,
             'provider' => 'unifi',
             'secret_encrypted' => Crypt::encryptString('RAW-UNIFI-API-TOKEN'),
             'status' => IntegrationProviderConnection::STATUS_CONNECTED,

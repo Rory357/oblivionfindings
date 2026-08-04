@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\ControlRoomAlert;
 use App\Models\ItMajorIncident;
 use App\Models\ItService;
@@ -84,7 +85,12 @@ test('an agent declares and finds a canonical major incident with command accoun
         ->and($majorIncident->communications_lead_user_id)->toBe($this->communicationsLead->id)
         ->and($majorIncident->declared_at)->not->toBeNull()
         ->and($majorIncident->next_update_due_at)->not->toBeNull()
-        ->and($majorIncident->ticket->events()->where('type', 'created')->count())->toBe(1);
+        ->and($majorIncident->ticket->events()->where('type', 'created')->count())->toBe(1)
+        ->and(AuditLog::query()
+            ->where('action', 'it.major_incident.created')
+            ->where('auditable_id', $majorIncident->ticket_id)
+            ->where('meta->major_incident_id', $majorIncident->id)
+            ->exists())->toBeTrue();
 
     $this->actingAs($this->commander)
         ->get('/it/major-incidents?severity=sev1&state=declared&q=identity')
@@ -176,7 +182,15 @@ test('update cadence becomes overdue and audience safe communications notify aff
     Notification::assertSentTo($this->requester, MajorIncidentUpdateNotification::class);
 
     $majorIncident->refresh();
-    expect($majorIncident->next_update_due_at?->equalTo(now()->addMinutes(30)))->toBeTrue();
+    expect($majorIncident->next_update_due_at?->equalTo(now()->addMinutes(30)))->toBeTrue()
+        ->and(AuditLog::query()
+            ->where('action', 'it.major_incident.updated')
+            ->where('auditable_id', $majorIncident->ticket_id)
+            ->exists())->toBeTrue()
+        ->and(AuditLog::query()
+            ->where('action', 'it.major_incident.update.published')
+            ->where('auditable_id', $majorIncident->ticket_id)
+            ->count())->toBe(2);
 
     $this->actingAs($this->requester)
         ->getJson("/it/major-incidents/{$majorIncident->id}/status")
@@ -249,14 +263,12 @@ test('restoration resolution review and closure require explicit evidence', func
 test('the live workspace reuses shared ticket work and exposes communications state', function () {
     $majorIncident = majorIncidentAtSite($this->site);
     $majorIncident->ticket->comments()->create([
-        'tenant_id' => 1,
         'author_user_id' => $this->commander->id,
         'body' => 'Command bridge opened.',
         'is_internal' => true,
     ]);
-    ItWorkTask::factory()->create(['tenant_id' => 1, 'ticket_id' => $majorIncident->ticket_id]);
+    ItWorkTask::factory()->create(['ticket_id' => $majorIncident->ticket_id]);
     $majorIncident->updates()->create([
-        'tenant_id' => 1,
         'update_kind' => 'stakeholder_update',
         'audience' => 'staff',
         'summary' => 'Investigation is active.',

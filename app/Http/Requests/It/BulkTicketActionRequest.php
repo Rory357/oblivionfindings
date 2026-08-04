@@ -35,6 +35,10 @@ class BulkTicketActionRequest extends FormRequest
             // Working states only — settling happens via close (here) or the
             // resolve modal (with its required note), never a bare status set.
             'status' => ['required_if:action,status', Rule::in(ItTicket::OPEN_STATUSES)],
+            'waiting_party' => ['required_if:status,waiting', 'nullable', Rule::in(['requester', 'vendor', 'approver', 'team', 'change', 'other'])],
+            'waiting_reason' => ['required_if:status,waiting', 'nullable', 'string', 'max:1000'],
+            'next_action' => ['nullable', 'string', 'max:2000'],
+            'reason' => ['required_if:action,close', 'nullable', 'string', 'max:1000'],
         ];
     }
 }
