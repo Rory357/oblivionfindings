@@ -2,9 +2,12 @@
 
 namespace App\Domain\SecurityDevices\AccessControl\Http\Controllers;
 
+use App\Domain\SecurityDevices\AccessControl\Http\Requests\DeactivateAccessControlScheduleRequest;
 use App\Domain\SecurityDevices\AccessControl\Http\Requests\StoreAccessControlCredentialRequest;
 use App\Domain\SecurityDevices\AccessControl\Http\Requests\StoreAccessControlScheduleRequest;
+use App\Domain\SecurityDevices\AccessControl\Http\Requests\UpdateAccessControlScheduleRequest;
 use App\Domain\SecurityDevices\AccessControl\Models\AccessControlCredential;
+use App\Domain\SecurityDevices\AccessControl\Models\AccessControlSchedule;
 use App\Domain\SecurityDevices\AccessControl\Services\AccessControlLifecycleService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
@@ -20,13 +23,16 @@ class AccessControlController extends Controller
     ): RedirectResponse {
         try {
             $service->createSchedule($request->user(), $request->validated());
-        } catch (QueryException) {
+        } catch (QueryException $exception) {
+            if (! $this->isDuplicateScheduleName($exception)) {
+                throw $exception;
+            }
             throw ValidationException::withMessages([
                 'name' => 'A schedule with that name already exists at this Site.',
             ]);
         }
 
-        return back()->with('success', 'Access schedule created.');
+        return back()->with('success', 'Schedule created in Oblivion Findings. Provider reconciliation is still required.');
     }
 
     public function storeCredential(
@@ -44,6 +50,35 @@ class AccessControlController extends Controller
         return back()->with('success', 'Physical access credential issued.');
     }
 
+    public function updateSchedule(
+        UpdateAccessControlScheduleRequest $request,
+        AccessControlSchedule $accessSchedule,
+        AccessControlLifecycleService $service,
+    ): RedirectResponse {
+        try {
+            $service->updateSchedule($request->user(), $accessSchedule, $request->validated());
+        } catch (QueryException $exception) {
+            if (! $this->isDuplicateScheduleName($exception)) {
+                throw $exception;
+            }
+            throw ValidationException::withMessages([
+                'name' => 'A schedule with that name already exists at this Site.',
+            ]);
+        }
+
+        return back()->with('success', 'Schedule updated in Oblivion Findings. Provider reconciliation is still required.');
+    }
+
+    public function deactivateSchedule(
+        DeactivateAccessControlScheduleRequest $request,
+        AccessControlSchedule $accessSchedule,
+        AccessControlLifecycleService $service,
+    ): RedirectResponse {
+        $service->deactivateSchedule($request->user(), $accessSchedule, $request->validated());
+
+        return back()->with('success', 'Schedule deactivated in Oblivion Findings. Provider reconciliation is still required.');
+    }
+
     public function revoke(
         Request $request,
         AccessControlCredential $accessCredential,
@@ -56,5 +91,14 @@ class AccessControlController extends Controller
         $service->revokeCredential($request->user(), $accessCredential, $data['reason']);
 
         return back()->with('success', 'Physical access credential revoked.');
+    }
+
+    private function isDuplicateScheduleName(QueryException $exception): bool
+    {
+        $message = strtolower($exception->getMessage());
+
+        return str_contains($message, 'access_schedules_site_name_unique')
+            || (str_contains($message, 'access_control_schedules.site_id')
+                && str_contains($message, 'access_control_schedules.name'));
     }
 }

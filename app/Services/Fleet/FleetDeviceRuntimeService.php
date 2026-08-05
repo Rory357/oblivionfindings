@@ -3,15 +3,20 @@
 namespace App\Services\Fleet;
 
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\Asset;
 use App\Models\AssetTelemetrySnapshot;
 use App\Models\AssetTracker;
 use App\Models\Client;
 use App\Models\ClientConsent;
+use App\Models\Site;
 use App\Services\ConsentValidationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use UnexpectedValueException;
 
 class FleetDeviceRuntimeService
 {
@@ -87,42 +92,50 @@ class FleetDeviceRuntimeService
 
     public function ensureCanonicalDeviceForTracker(AssetTracker $tracker): Device
     {
-        $device = $this->resolveCanonicalDevice($tracker->vendor, [
-            'device_uid' => $tracker->device_uid,
-            'imei' => $tracker->imei,
-            'serial_number' => $tracker->serial_number,
-        ], $tracker);
+        return DB::transaction(function () use ($tracker): Device {
+            $lockedTracker = AssetTracker::query()
+                ->lockForUpdate()
+                ->findOrFail($tracker->id);
+            $device = $this->resolveCanonicalDevice($lockedTracker->vendor, [
+                'device_uid' => $lockedTracker->device_uid,
+                'imei' => $lockedTracker->imei,
+                'serial_number' => $lockedTracker->serial_number,
+            ], $lockedTracker);
 
-        if ($device) {
-            $device->fill([
-                'legacy_asset_tracker_id' => $tracker->id,
-                'provider' => $device->provider ?: $tracker->vendor,
-                'manufacturer' => $device->manufacturer ?: $tracker->vendor,
-                'imei' => $device->imei ?: $tracker->imei,
-                'serial_number' => $device->serial_number ?: $tracker->serial_number,
-                'last_seen_at' => $tracker->last_seen_at ?: $device->last_seen_at,
-                'external_ref' => $device->external_ref ?: $tracker->vendor_metadata,
-            ]);
+            if ($device) {
+                $device = Device::query()->lockForUpdate()->findOrFail($device->id);
+                $device->fill([
+                    'legacy_asset_tracker_id' => $device->legacy_asset_tracker_id ?: $lockedTracker->id,
+                    'provider' => $device->provider ?: $lockedTracker->vendor,
+                    'manufacturer' => $device->manufacturer ?: $lockedTracker->vendor,
+                    'imei' => $device->imei ?: $lockedTracker->imei,
+                    'serial_number' => $device->serial_number ?: $lockedTracker->serial_number,
+                    'last_seen_at' => $lockedTracker->last_seen_at ?: $device->last_seen_at,
+                    'external_ref' => $device->external_ref ?: $lockedTracker->vendor_metadata,
+                ]);
+                $device->save();
+            } else {
+                $device = Device::create([
+                    'device_uid' => $lockedTracker->device_uid,
+                    'name' => "Tracker {$lockedTracker->device_uid}",
+                    'domain' => 'tracking',
+                    'category' => 'vehicle_tracker',
+                    'subcategory' => 'hardwired_gps',
+                    'manufacturer' => $lockedTracker->vendor,
+                    'imei' => $lockedTracker->imei,
+                    'serial_number' => $lockedTracker->serial_number,
+                    'status' => $this->mapTrackerStatus($lockedTracker->status),
+                    'last_seen_at' => $lockedTracker->last_seen_at,
+                    'provider' => $lockedTracker->vendor,
+                    'external_ref' => $lockedTracker->vendor_metadata,
+                    'legacy_asset_tracker_id' => $lockedTracker->id,
+                ]);
+            }
 
-            $device->save();
+            $this->ensureCanonicalAssetLink($device, $lockedTracker);
 
-            return $device;
-        }
-
-        return Device::create([
-            'name' => "Tracker {$tracker->device_uid}",
-            'domain' => 'tracking',
-            'category' => 'vehicle_tracker',
-            'subcategory' => 'hardwired_gps',
-            'manufacturer' => $tracker->vendor,
-            'imei' => $tracker->imei,
-            'serial_number' => $tracker->serial_number,
-            'status' => $this->mapTrackerStatus($tracker->status),
-            'last_seen_at' => $tracker->last_seen_at,
-            'provider' => $tracker->vendor,
-            'external_ref' => $tracker->vendor_metadata,
-            'legacy_asset_tracker_id' => $tracker->id,
-        ]);
+            return $device->fresh();
+        }, 3);
     }
 
     public function resolveConsentContext(Device $device): array
@@ -206,6 +219,57 @@ class FleetDeviceRuntimeService
         return Device::query()
             ->where('domain', 'tracking')
             ->where('provider', $vendor);
+    }
+
+    private function ensureCanonicalAssetLink(Device $device, AssetTracker $tracker): void
+    {
+        if (! is_numeric($tracker->asset_id)) {
+            return;
+        }
+
+        $asset = Asset::query()->lockForUpdate()->findOrFail((int) $tracker->asset_id);
+        $siteIds = collect([$asset->site_id, $asset->home_site_id]);
+        if (is_numeric($asset->client_id)) {
+            $siteIds->push(Client::query()->whereKey($asset->client_id)->value('site_id'));
+        }
+        $siteIds = $siteIds
+            ->filter(fn (mixed $siteId): bool => is_numeric($siteId) && (int) $siteId > 0)
+            ->map(fn (mixed $siteId): int => (int) $siteId)
+            ->unique()
+            ->values();
+        if ($siteIds->count() !== 1 || ! Site::query()
+            ->whereKey($siteIds->first())
+            ->where('is_active', true)
+            ->where(fn (Builder $query): Builder => $query->whereNull('archived')->orWhere('archived', false))
+            ->exists()) {
+            throw new UnexpectedValueException('Tracker Asset must resolve to one canonical active Site.');
+        }
+
+        $activeLinks = DeviceAssetLink::query()
+            ->active()
+            ->where('device_id', $device->id)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+        if ($activeLinks->count() > 1) {
+            throw new UnexpectedValueException('Canonical Device has conflicting active Asset links.');
+        }
+        $activeLink = $activeLinks->first();
+        if ($activeLink && (int) $activeLink->asset_id !== (int) $asset->id) {
+            throw new UnexpectedValueException('Canonical Device is already linked to a different Asset.');
+        }
+        if ($activeLink) {
+            return;
+        }
+
+        DeviceAssetLink::query()->create([
+            'device_id' => $device->id,
+            'asset_id' => $asset->id,
+            'link_type' => 'installed_in',
+            'linked_at' => $tracker->paired_at ?? now(),
+            'linked_by_user_id' => null,
+            'notes' => 'Canonical ownership recovered from retained tracker lineage.',
+        ]);
     }
 
     private function normalizeIdentifier(?string $value): ?string

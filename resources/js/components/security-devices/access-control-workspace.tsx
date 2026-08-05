@@ -36,7 +36,30 @@ export type AccessControlWorkspaceData = {
         endsAt: string;
         timezone: string;
         isActive: boolean;
+        version: number;
         activeCredentials: number;
+        impact: {
+            activeCredentials: number;
+            requiresExactConfirmation: boolean;
+            updateConfirmation: string | null;
+            deactivateConfirmation: string | null;
+        };
+        providerReconciliation: {
+            status: string;
+            requiredAt: string | null;
+            message: string;
+        };
+        deactivatedAt: string | null;
+        deactivationReason: string | null;
+        revisionHistory: Array<{
+            id: number;
+            version: number;
+            action: string;
+            reason: string;
+            activeCredentialsAffected: number;
+            actor: string;
+            occurredAt: string | null;
+        }>;
     }>;
     credentials: Array<{
         id: number;
@@ -195,7 +218,322 @@ function ScheduleForm({ data }: { data: AccessControlWorkspaceData }) {
             <Button type="submit" disabled={form.processing || !form.data.name}>
                 Create schedule
             </Button>
+            <p className="text-xs text-muted-foreground">
+                This records the schedule in Oblivion Findings. Provider-side
+                execution is not claimed and will remain marked for
+                reconciliation.
+            </p>
         </form>
+    );
+}
+
+function ScheduleLifecycleActions({
+    schedule,
+}: {
+    schedule: AccessControlWorkspaceData['schedules'][number];
+}) {
+    const [mode, setMode] = useState<'edit' | 'deactivate' | null>(null);
+    const update = useForm<{
+        expected_version: number;
+        name: string;
+        days: string[];
+        starts_at: string;
+        ends_at: string;
+        reason: string;
+        confirmed_active_credentials: number | null;
+        confirmation_text: string;
+    }>({
+        expected_version: schedule.version,
+        name: schedule.name,
+        days: schedule.days,
+        starts_at: schedule.startsAt,
+        ends_at: schedule.endsAt,
+        reason: '',
+        confirmed_active_credentials: schedule.impact.requiresExactConfirmation
+            ? schedule.impact.activeCredentials
+            : null,
+        confirmation_text: '',
+    });
+    const deactivate = useForm<{
+        expected_version: number;
+        reason: string;
+        confirmed_active_credentials: number | null;
+        confirmation_text: string;
+    }>({
+        expected_version: schedule.version,
+        reason: '',
+        confirmed_active_credentials: schedule.impact.requiresExactConfirmation
+            ? schedule.impact.activeCredentials
+            : null,
+        confirmation_text: '',
+    });
+
+    if (!schedule.isActive) return null;
+
+    const impact = (
+        <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning">
+            <p className="font-medium">Current impact preview</p>
+            <p className="mt-1">
+                {schedule.impact.activeCredentials === 0
+                    ? 'No active credentials currently use this schedule.'
+                    : `${schedule.impact.activeCredentials} active credential${schedule.impact.activeCredentials === 1 ? '' : 's'} currently use this schedule.`}
+            </p>
+            <p className="mt-1 text-xs">
+                The server rechecks this count under lock before saving. A
+                changed count requires a fresh review.
+            </p>
+        </div>
+    );
+
+    return (
+        <div className="mt-3 space-y-3 border-t pt-3">
+            <div className="flex flex-wrap gap-2">
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setMode(mode === 'edit' ? null : 'edit')}
+                >
+                    Edit schedule
+                </Button>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                        setMode(mode === 'deactivate' ? null : 'deactivate')
+                    }
+                >
+                    Deactivate
+                </Button>
+            </div>
+            {mode === 'edit' ? (
+                <form
+                    className="space-y-3 rounded-lg border p-3"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        update.put(
+                            `/security-devices/access-control/schedules/${schedule.id}`,
+                            {
+                                preserveScroll: true,
+                                onSuccess: () => setMode(null),
+                            },
+                        );
+                    }}
+                >
+                    {impact}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                            <Label htmlFor={`schedule-name-${schedule.id}`}>
+                                Schedule name
+                            </Label>
+                            <Input
+                                id={`schedule-name-${schedule.id}`}
+                                value={update.data.name}
+                                onChange={(event) =>
+                                    update.setData('name', event.target.value)
+                                }
+                            />
+                            <ErrorText value={update.errors.name} />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor={`schedule-reason-${schedule.id}`}>
+                                Reason for change
+                            </Label>
+                            <Input
+                                id={`schedule-reason-${schedule.id}`}
+                                value={update.data.reason}
+                                onChange={(event) =>
+                                    update.setData('reason', event.target.value)
+                                }
+                                placeholder="Why this access window is changing"
+                            />
+                            <ErrorText value={update.errors.reason} />
+                        </div>
+                    </div>
+                    <fieldset className="space-y-2">
+                        <legend className="text-sm font-medium">
+                            Allowed days
+                        </legend>
+                        <div className="flex flex-wrap gap-2">
+                            {days.map(([value, label]) => (
+                                <label
+                                    key={value}
+                                    className="flex min-h-10 items-center gap-2 rounded-md border px-3 text-sm"
+                                >
+                                    <Checkbox
+                                        checked={update.data.days.includes(
+                                            value,
+                                        )}
+                                        onCheckedChange={(checked) =>
+                                            update.setData(
+                                                'days',
+                                                checked
+                                                    ? [
+                                                          ...update.data.days,
+                                                          value,
+                                                      ]
+                                                    : update.data.days.filter(
+                                                          (day) =>
+                                                              day !== value,
+                                                      ),
+                                            )
+                                        }
+                                    />
+                                    {label}
+                                </label>
+                            ))}
+                        </div>
+                        <ErrorText value={update.errors.days} />
+                    </fieldset>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                            <Label htmlFor={`schedule-start-${schedule.id}`}>
+                                Starts
+                            </Label>
+                            <Input
+                                id={`schedule-start-${schedule.id}`}
+                                type="time"
+                                value={update.data.starts_at}
+                                onChange={(event) =>
+                                    update.setData(
+                                        'starts_at',
+                                        event.target.value,
+                                    )
+                                }
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor={`schedule-end-${schedule.id}`}>
+                                Ends
+                            </Label>
+                            <Input
+                                id={`schedule-end-${schedule.id}`}
+                                type="time"
+                                value={update.data.ends_at}
+                                onChange={(event) =>
+                                    update.setData(
+                                        'ends_at',
+                                        event.target.value,
+                                    )
+                                }
+                            />
+                            <ErrorText value={update.errors.ends_at} />
+                        </div>
+                    </div>
+                    {schedule.impact.requiresExactConfirmation ? (
+                        <div className="space-y-1.5">
+                            <Label
+                                htmlFor={`schedule-confirm-update-${schedule.id}`}
+                            >
+                                Type {schedule.impact.updateConfirmation}{' '}
+                                exactly
+                            </Label>
+                            <Input
+                                id={`schedule-confirm-update-${schedule.id}`}
+                                value={update.data.confirmation_text}
+                                onChange={(event) =>
+                                    update.setData(
+                                        'confirmation_text',
+                                        event.target.value,
+                                    )
+                                }
+                                autoComplete="off"
+                            />
+                            <ErrorText
+                                value={update.errors.confirmation_text}
+                            />
+                        </div>
+                    ) : null}
+                    <ErrorText value={update.errors.expected_version} />
+                    <Button
+                        type="submit"
+                        disabled={
+                            update.processing ||
+                            !update.data.reason.trim() ||
+                            (schedule.impact.requiresExactConfirmation &&
+                                update.data.confirmation_text !==
+                                    schedule.impact.updateConfirmation)
+                        }
+                    >
+                        Save new version
+                    </Button>
+                </form>
+            ) : null}
+            {mode === 'deactivate' ? (
+                <form
+                    className="space-y-3 rounded-lg border border-destructive/40 p-3"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        deactivate.post(
+                            `/security-devices/access-control/schedules/${schedule.id}/deactivate`,
+                            {
+                                preserveScroll: true,
+                                onSuccess: () => setMode(null),
+                            },
+                        );
+                    }}
+                >
+                    {impact}
+                    <p className="text-sm text-muted-foreground">
+                        This stops future use of the schedule in Oblivion
+                        Findings. Existing credentials are not falsely presented
+                        as revoked; provider reconciliation remains required.
+                    </p>
+                    <div className="space-y-1.5">
+                        <Label htmlFor={`schedule-deactivate-${schedule.id}`}>
+                            Deactivation reason
+                        </Label>
+                        <Input
+                            id={`schedule-deactivate-${schedule.id}`}
+                            value={deactivate.data.reason}
+                            onChange={(event) =>
+                                deactivate.setData('reason', event.target.value)
+                            }
+                        />
+                        <ErrorText value={deactivate.errors.reason} />
+                    </div>
+                    {schedule.impact.requiresExactConfirmation ? (
+                        <div className="space-y-1.5">
+                            <Label
+                                htmlFor={`schedule-confirm-deactivate-${schedule.id}`}
+                            >
+                                Type {schedule.impact.deactivateConfirmation}{' '}
+                                exactly
+                            </Label>
+                            <Input
+                                id={`schedule-confirm-deactivate-${schedule.id}`}
+                                value={deactivate.data.confirmation_text}
+                                onChange={(event) =>
+                                    deactivate.setData(
+                                        'confirmation_text',
+                                        event.target.value,
+                                    )
+                                }
+                                autoComplete="off"
+                            />
+                            <ErrorText
+                                value={deactivate.errors.confirmation_text}
+                            />
+                        </div>
+                    ) : null}
+                    <ErrorText value={deactivate.errors.expected_version} />
+                    <Button
+                        type="submit"
+                        variant="destructive"
+                        disabled={
+                            deactivate.processing ||
+                            !deactivate.data.reason.trim() ||
+                            (schedule.impact.requiresExactConfirmation &&
+                                deactivate.data.confirmation_text !==
+                                    schedule.impact.deactivateConfirmation)
+                        }
+                    >
+                        Deactivate schedule
+                    </Button>
+                </form>
+            ) : null}
+        </div>
     );
 }
 
@@ -709,12 +1047,27 @@ export function AccessControlWorkspace({
                                                 {schedule.name}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                                {schedule.siteName}
+                                                {schedule.siteName} • Version{' '}
+                                                {schedule.version}
                                             </p>
                                         </div>
-                                        <Badge variant="outline">
-                                            {schedule.activeCredentials} active
-                                        </Badge>
+                                        <div className="flex flex-wrap justify-end gap-2">
+                                            <Badge
+                                                variant={
+                                                    schedule.isActive
+                                                        ? 'outline'
+                                                        : 'secondary'
+                                                }
+                                            >
+                                                {schedule.isActive
+                                                    ? 'Active'
+                                                    : 'Inactive'}
+                                            </Badge>
+                                            <Badge variant="outline">
+                                                {schedule.activeCredentials}{' '}
+                                                active
+                                            </Badge>
+                                        </div>
                                     </div>
                                     <p className="mt-2 text-sm">
                                         {schedule.days
@@ -725,6 +1078,95 @@ export function AccessControlWorkspace({
                                     <p className="text-xs text-muted-foreground">
                                         {schedule.timezone}
                                     </p>
+                                    <div className="mt-3 rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <Badge variant="secondary">
+                                                Provider reconciliation required
+                                            </Badge>
+                                            {schedule.providerReconciliation
+                                                .requiredAt ? (
+                                                <span>
+                                                    Since{' '}
+                                                    {formatDateTime(
+                                                        schedule
+                                                            .providerReconciliation
+                                                            .requiredAt,
+                                                    )}
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                        <p className="mt-2">
+                                            {
+                                                schedule.providerReconciliation
+                                                    .message
+                                            }
+                                        </p>
+                                    </div>
+                                    {!schedule.isActive &&
+                                    schedule.deactivationReason ? (
+                                        <p className="mt-3 text-xs text-muted-foreground">
+                                            Deactivated
+                                            {schedule.deactivatedAt
+                                                ? ` ${formatDateTime(schedule.deactivatedAt)}`
+                                                : ''}
+                                            {' • '}
+                                            {schedule.deactivationReason}
+                                        </p>
+                                    ) : null}
+                                    {schedule.revisionHistory.length ? (
+                                        <details className="mt-3 rounded-lg border p-3 text-sm">
+                                            <summary className="frontline-focus cursor-pointer font-medium">
+                                                Version history
+                                            </summary>
+                                            <ol className="mt-3 space-y-3">
+                                                {schedule.revisionHistory.map(
+                                                    (revision) => (
+                                                        <li
+                                                            key={revision.id}
+                                                            className="border-l-2 border-primary/30 pl-3"
+                                                        >
+                                                            <p className="font-medium capitalize">
+                                                                Version{' '}
+                                                                {
+                                                                    revision.version
+                                                                }{' '}
+                                                                {
+                                                                    revision.action
+                                                                }
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {
+                                                                    revision.reason
+                                                                }
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {revision.actor}
+                                                                {revision.occurredAt
+                                                                    ? ` • ${formatDateTime(revision.occurredAt)}`
+                                                                    : ''}
+                                                                {' • '}
+                                                                {
+                                                                    revision.activeCredentialsAffected
+                                                                }{' '}
+                                                                active
+                                                                credential
+                                                                {revision.activeCredentialsAffected ===
+                                                                1
+                                                                    ? ''
+                                                                    : 's'}{' '}
+                                                                affected
+                                                            </p>
+                                                        </li>
+                                                    ),
+                                                )}
+                                            </ol>
+                                        </details>
+                                    ) : null}
+                                    {data.canManage ? (
+                                        <ScheduleLifecycleActions
+                                            schedule={schedule}
+                                        />
+                                    ) : null}
                                 </article>
                             ))
                         )}

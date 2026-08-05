@@ -9,14 +9,17 @@ use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceLinkService;
 use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
+use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ConsentValidationService;
 use App\Services\Fleet\FleetDeviceRuntimeService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -28,6 +31,7 @@ class DeviceController extends Controller
         private readonly DeviceLinkService $linkService,
         private readonly FleetDeviceRuntimeService $deviceRuntime,
         private readonly PersonalTrackingPrivacyService $trackingPrivacy,
+        private readonly SecurityDevicesAccessService $deviceAccess,
     ) {}
 
     /**
@@ -38,10 +42,11 @@ class DeviceController extends Controller
         $viewer = $request->user();
         abort_unless($viewer, 403);
 
-        // CSV export — canonical devices.
+        $visibleTrackingDevices = $this->visibleTrackingDevices($viewer);
+
+        // CSV export — canonical, Site-scoped devices.
         if ($request->input('export') === 'csv') {
-            $exportQuery = Device::query()
-                ->where('domain', 'tracking')
+            $exportQuery = (clone $visibleTrackingDevices)
                 ->with(['activeAssetLinks.asset:id,name,asset_tag'])
                 ->orderByDesc('last_seen_at');
 
@@ -73,8 +78,7 @@ class DeviceController extends Controller
         }
 
         // Canonical tracking devices.
-        $query = Device::query()
-            ->where('domain', 'tracking')
+        $query = (clone $visibleTrackingDevices)
             ->with([
                 'activeAssetLinks.asset:id,name,asset_tag,category,asset_category_id,site_id,client_id',
                 'activeAssetLinks.asset.categoryRef:id,slug',
@@ -89,7 +93,7 @@ class DeviceController extends Controller
         $consent = $this->consentPayload($viewer);
 
         // Stats across all tracking devices (not just page).
-        $allStats = Device::where('domain', 'tracking');
+        $allStats = clone $visibleTrackingDevices;
         $totalCount = (clone $allStats)->count();
         $stats = [
             'total' => $totalCount,
@@ -105,12 +109,10 @@ class DeviceController extends Controller
         // dialog; deep links redirect here with ?device={id}.
         $deviceDetail = null;
         if ($request->filled('device')) {
-            $detailDevice = Device::query()
-                ->where('domain', 'tracking')
+            $detailDevice = (clone $visibleTrackingDevices)
                 ->find($request->integer('device'));
-            if ($detailDevice) {
-                $deviceDetail = $this->deviceDetailPayload($detailDevice, $request->user());
-            }
+            abort_unless($detailDevice, 404);
+            $deviceDetail = $this->deviceDetailPayload($detailDevice, $viewer);
         }
 
         return Inertia::render('fleet-assets/devices/index', [
@@ -129,8 +131,7 @@ class DeviceController extends Controller
             ],
             'stats' => $stats,
             'pairing_options' => [
-                'devices' => Device::query()
-                    ->where('domain', 'tracking')
+                'devices' => (clone $visibleTrackingDevices)
                     ->whereDoesntHave('activeAssetLinks')
                     ->orderBy('provider')
                     ->orderBy('device_uid')
@@ -141,7 +142,7 @@ class DeviceController extends Controller
                         'label' => trim(collect([$device->provider, $device->device_uid])->filter()->implode(' - ')),
                     ])
                     ->values(),
-                'assets' => Asset::query()
+                'assets' => $this->visibleAssets($viewer)
                     ->where('status', 'active')
                     ->orderBy('name')
                     ->limit(20)
@@ -157,6 +158,8 @@ class DeviceController extends Controller
 
     public function searchPairingOptions(Request $request)
     {
+        $viewer = $request->user();
+        abort_unless($viewer, 403);
         $data = $request->validate([
             'type' => ['required', 'in:assets,devices'],
             'q' => ['required', 'string', 'min:2', 'max:100'],
@@ -164,8 +167,7 @@ class DeviceController extends Controller
 
         $term = $data['q'];
         $results = $data['type'] === 'devices'
-            ? Device::query()
-                ->where('domain', 'tracking')
+            ? $this->visibleTrackingDevices($viewer)
                 ->whereDoesntHave('activeAssetLinks')
                 ->where(fn ($query) => $query
                     ->where('provider', 'like', "%{$term}%")
@@ -180,7 +182,7 @@ class DeviceController extends Controller
                     'label' => trim(collect([$device->provider, $device->device_uid])->filter()->implode(' - ')),
                 ])
                 ->values()
-            : Asset::query()
+            : $this->visibleAssets($viewer)
                 ->where('status', 'active')
                 ->where(fn ($query) => $query
                     ->where('name', 'like', "%{$term}%")
@@ -203,6 +205,10 @@ class DeviceController extends Controller
      */
     public function show(Request $request, Device $device)
     {
+        $viewer = $request->user();
+        abort_unless($viewer, 403);
+        $this->assertVisibleTrackingDevice($viewer, $device);
+
         return redirect()->route(
             'fleet-assets.devices.index',
             array_merge($request->query(), ['device' => $device->id]),
@@ -314,12 +320,16 @@ class DeviceController extends Controller
     public function pair(Request $request)
     {
         $data = $request->validate([
-            'asset_id' => ['required', 'integer', 'exists:assets,id'],
-            'device_id' => ['required', 'integer', 'exists:devices,id'],
+            'asset_id' => ['required', 'integer'],
+            'device_id' => ['required', 'integer'],
         ]);
+        $viewer = $request->user();
+        abort_unless($viewer, 403);
 
-        $asset = Asset::findOrFail($data['asset_id']);
-        $device = Device::findOrFail($data['device_id']);
+        $asset = $this->visibleAssets($viewer)
+            ->where('status', 'active')
+            ->findOrFail($data['asset_id']);
+        $device = $this->visibleTrackingDevices($viewer)->findOrFail($data['device_id']);
 
         // Check if already actively linked to another asset.
         $existingLink = DeviceAssetLink::where('device_id', $device->id)
@@ -335,7 +345,7 @@ class DeviceController extends Controller
         }
 
         try {
-            $this->linkService->link($device, $asset, $request->user()->id, LinkType::InstalledIn);
+            $this->linkService->link($device, $asset, $viewer->id, LinkType::InstalledIn);
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['device_id' => $e->getMessage()]);
         }
@@ -353,6 +363,9 @@ class DeviceController extends Controller
      */
     public function unpair(Request $request, Device $device)
     {
+        $viewer = $request->user();
+        abort_unless($viewer, 403);
+        $this->assertVisibleTrackingDevice($viewer, $device);
         $link = $device->activeAssetLinks()->first();
 
         if (! $link) {
@@ -360,6 +373,7 @@ class DeviceController extends Controller
         }
 
         $asset = $link->asset;
+        abort_unless($asset && $this->visibleAssets($viewer)->whereKey($asset->id)->exists(), 404);
 
         try {
             $this->linkService->unlink($link);
@@ -395,11 +409,12 @@ class DeviceController extends Controller
      */
     private function consentPayload(User $viewer): array
     {
-        $devices = Device::query()
-            ->where('domain', 'tracking')
+        $devices = $this->visibleTrackingDevices($viewer)
             ->where(function ($query) {
-                $query->whereNotNull('legacy_asset_tracker_id')
-                    ->orWhereHas('activeAssetLinks');
+                $query->whereHas('activeAssetLinks')
+                    ->orWhereHas('assignments', fn (Builder $assignment): Builder => $assignment
+                        ->active()
+                        ->where('assignable_type', DeviceAssignment::TARGET_CLIENT));
             })
             ->with([
                 'activeAssetLinks.asset:id,name,asset_tag,category,asset_category_id,site_id,client_id',
@@ -412,22 +427,41 @@ class DeviceController extends Controller
                         'consent:id,client_id,status,given_at,withdrawn_at,given_by_user_id,expires_at',
                         'consent.givenBy:id,name',
                     ])
-                    ->latest('assigned_at'),
-                'legacyAssetTracker.asset:id,name,asset_tag,category,asset_category_id,site_id,client_id',
-                'legacyAssetTracker.asset.categoryRef:id,slug',
-                'legacyAssetTracker.asset.client:id,first_name,last_name',
+                    ->latest('assigned_at')
+                    ->latest('id'),
                 'legacyAssetTracker.consent:id,client_id,status,given_at,withdrawn_at,given_by_user_id,expires_at',
                 'legacyAssetTracker.consent.givenBy:id,name',
             ])
             ->orderByDesc('updated_at')
             ->get();
 
-        $deviceRows = $devices->map(function (Device $device) use ($viewer) {
+        $assignmentClients = Client::query()
+            ->whereKey($devices
+                ->flatMap->assignments
+                ->pluck('assignable_id')
+                ->filter(fn (mixed $clientId): bool => is_numeric($clientId) && (int) $clientId > 0)
+                ->map(fn (mixed $clientId): int => (int) $clientId)
+                ->unique()
+                ->values())
+            ->get(['id', 'first_name', 'last_name'])
+            ->keyBy('id');
+
+        $deviceRows = $devices->map(function (Device $device) use ($assignmentClients, $viewer) {
             $assignment = $device->assignments->first();
             $tracker = $device->legacyAssetTracker;
-            $consent = $assignment?->consent ?? $tracker?->consent;
-            $asset = $device->activeAssetLinks->first()?->asset ?? $tracker?->asset;
-            $client = $asset?->client;
+            $asset = $device->activeAssetLinks->first()?->asset;
+            $client = $assignment
+                ? $assignmentClients->get((int) $assignment->assignable_id)
+                : $asset?->client;
+            $assignmentConsent = $assignment?->consent;
+            if ($assignmentConsent && (int) $assignmentConsent->client_id !== (int) $assignment->assignable_id) {
+                $assignmentConsent = null;
+            }
+            $legacyConsent = $assignment ? null : $tracker?->consent;
+            if ($legacyConsent && (! $client || (int) $legacyConsent->client_id !== (int) $client->id)) {
+                $legacyConsent = null;
+            }
+            $consent = $assignmentConsent ?? $legacyConsent;
 
             return [
                 'id' => $device->id,
@@ -467,6 +501,9 @@ class DeviceController extends Controller
 
     public function grantConsent(Request $request, Device $device)
     {
+        $viewer = $request->user();
+        abort_unless($viewer, 403);
+        $this->assertVisibleTrackingDevice($viewer, $device);
         $request->validate([
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
@@ -477,8 +514,8 @@ class DeviceController extends Controller
         $asset = $context['asset'];
         $client = $context['client'];
 
-        if (! $client) {
-            return back()->withErrors(['consent' => 'A linked client is required before consent can be recorded.']);
+        if (! $assignment || ! $client) {
+            return back()->withErrors(['consent' => 'An active canonical Client assignment is required before consent can be recorded.']);
         }
 
         $consentType = ConsentType::query()
@@ -526,10 +563,7 @@ class DeviceController extends Controller
                 'updated_by' => $request->user()->id,
             ]);
 
-            collect([
-                $context['assignment_consent'],
-                $context['tracker_consent'],
-            ])->filter()->unique('id')->sortBy('id')->each(
+            collect([$context['assignment_consent']])->filter()->unique('id')->sortBy('id')->each(
                 function (ClientConsent $oldConsent) use ($consent, $request): void {
                     $lockedConsent = ClientConsent::query()
                         ->lockForUpdate()
@@ -539,22 +573,16 @@ class DeviceController extends Controller
                 },
             );
 
-            if ($assignment) {
-                $this->trackingPrivacy->resumeClientAssignment(
-                    $assignment,
-                    $consent,
-                    $request->user()->id,
-                );
-            }
+            $this->trackingPrivacy->resumeClientAssignment(
+                $assignment,
+                $consent,
+                $request->user()->id,
+            );
 
-            if ($tracker) {
-                $tracker->update(['consent_id' => $consent->id]);
-            }
-
-            AuditLogger::logOrFail('assets.tracker.consent.granted', $asset ?? $device, [
+            AuditLogger::logOrFail('assets.device_assignment.consent.granted', $asset ?? $device, [
                 'actor_id' => $request->user()->id,
                 'device_id' => $device->id,
-                'tracker_id' => $tracker?->id,
+                'legacy_tracker_id' => $tracker?->id,
                 'assignment_id' => $assignment?->id,
                 'client_id' => $client->id,
                 'consent_id' => $consent->id,
@@ -566,6 +594,9 @@ class DeviceController extends Controller
 
     public function revokeConsent(Request $request, Device $device)
     {
+        $viewer = $request->user();
+        abort_unless($viewer, 403);
+        $this->assertVisibleTrackingDevice($viewer, $device);
         $request->validate([
             'reason' => ['required', 'string', 'min:3', 'max:1000'],
         ]);
@@ -574,10 +605,8 @@ class DeviceController extends Controller
         $assignment = $context['assignment'];
         $tracker = $context['tracker'];
         $asset = $context['asset'];
-        $consents = collect([
-            $context['assignment_consent'],
-            $context['tracker_consent'],
-        ])->filter(fn (?ClientConsent $consent): bool => $consent !== null
+        $consents = collect([$context['assignment_consent']])
+            ->filter(fn (?ClientConsent $consent): bool => $consent !== null
             && ConsentValidationService::isValidTrackingConsent($consent))
             ->unique('id')
             ->sortBy('id')
@@ -616,10 +645,10 @@ class DeviceController extends Controller
                 $this->trackingPrivacy->stopForConsent($lockedConsent, $request->user()->id);
             }
 
-            AuditLogger::logOrFail('assets.tracker.consent.revoked', $asset ?? $device, [
+            AuditLogger::logOrFail('assets.device_assignment.consent.revoked', $asset ?? $device, [
                 'actor_id' => $request->user()->id,
                 'device_id' => $device->id,
-                'tracker_id' => $tracker?->id,
+                'legacy_tracker_id' => $tracker?->id,
                 'assignment_id' => $assignment?->id,
                 'consent_ids' => $consents->pluck('id')->values()->all(),
                 'reason_recorded' => true,
@@ -675,5 +704,25 @@ class DeviceController extends Controller
             && Gate::forUser($viewer)->allows('view', $asset);
 
         return $canUseAssetRoute ? "/fleet-assets/assets/{$asset->id}" : null;
+    }
+
+    private function visibleTrackingDevices(User $viewer): Builder
+    {
+        return $this->deviceAccess->visibleDevices($viewer)->where('domain', 'tracking');
+    }
+
+    private function visibleAssets(User $viewer): Builder
+    {
+        $assetIds = $this->deviceAccess->authorizedAssetIds($viewer);
+
+        return Asset::query()
+            ->when($assetIds === [], fn (Builder $query): Builder => $query->whereRaw('1 = 0'))
+            ->when($assetIds !== [], fn (Builder $query): Builder => $query->whereKey($assetIds));
+    }
+
+    private function assertVisibleTrackingDevice(User $viewer, Device $device): void
+    {
+        abort_unless($device->domain === 'tracking', 404);
+        $this->deviceAccess->assertCanViewDevice($viewer, $device);
     }
 }

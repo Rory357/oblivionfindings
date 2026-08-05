@@ -5,6 +5,7 @@ namespace Tests\Feature\SecurityDevices;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\AccessControl\Models\AccessControlCredential;
 use App\Domain\SecurityDevices\AccessControl\Models\AccessControlSchedule;
+use App\Domain\SecurityDevices\AccessControl\Models\AccessControlScheduleRevision;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\AuditLog;
@@ -74,6 +75,12 @@ class AccessControlWorkflowTest extends TestCase
             'auditable_type' => AccessControlSchedule::class,
             'auditable_id' => $schedule->id,
         ]);
+        $this->assertDatabaseHas('access_control_schedule_revisions', [
+            'access_schedule_id' => $schedule->id,
+            'version' => 1,
+            'action' => 'created',
+            'active_credentials_affected' => 0,
+        ]);
         $this->assertDatabaseHas('audit_logs', [
             'action' => 'access_control.credential.issued',
             'auditable_type' => AccessControlCredential::class,
@@ -88,6 +95,12 @@ class AccessControlWorkflowTest extends TestCase
                 ->where('securityWorkspace.activeTab.accessControl.summary.activeCredentials', 1)
                 ->where('securityWorkspace.activeTab.accessControl.summary.activeSchedules', 1)
                 ->where('securityWorkspace.activeTab.accessControl.summary.coveredDoors', 1)
+                ->where('securityWorkspace.activeTab.accessControl.schedules.0.version', 1)
+                ->where('securityWorkspace.activeTab.accessControl.schedules.0.impact.activeCredentials', 1)
+                ->where('securityWorkspace.activeTab.accessControl.schedules.0.impact.updateConfirmation', 'UPDATE 1')
+                ->where('securityWorkspace.activeTab.accessControl.schedules.0.providerReconciliation.status', 'required')
+                ->where('securityWorkspace.activeTab.accessControl.schedules.0.revisionHistory.0.version', 1)
+                ->where('securityWorkspace.activeTab.accessControl.schedules.0.revisionHistory.0.action', 'created')
                 ->where('securityWorkspace.activeTab.accessControl.credentials.0.holderLabel', 'Taylor Worker')
                 ->where('securityWorkspace.activeTab.accessControl.credentials.0.referenceKey', 'unifi:credential/taylor-001')
                 ->where('securityWorkspace.activeTab.accessControl.history.0.action', 'Credential issued'));
@@ -107,6 +120,115 @@ class AccessControlWorkflowTest extends TestCase
             ->where('action', 'access_control.credential.revoked')
             ->where('auditable_id', $credential->id)
             ->count());
+    }
+
+    public function test_manager_versions_schedule_changes_and_reasoned_deactivation_after_exact_impact_confirmation(): void
+    {
+        $site = Site::factory()->create();
+        $holder = User::factory()->create(['approved_at' => now()]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $holder->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
+        $reader = $this->accessDeviceAt($site, 'Main access reader');
+
+        $this->actingAs($this->admin)->post('/security-devices/access-control/schedules', [
+            'site_id' => $site->id,
+            'name' => 'Standard hours',
+            'days' => ['monday'],
+            'starts_at' => '08:00',
+            'ends_at' => '18:00',
+        ])->assertRedirect();
+        $schedule = AccessControlSchedule::query()->firstOrFail();
+        $this->actingAs($this->admin)->post('/security-devices/access-control/credentials', [
+            'site_id' => $site->id,
+            'access_schedule_id' => $schedule->id,
+            'label' => 'Main badge',
+            'holder_type' => 'staff',
+            'holder_id' => $holder->id,
+            'reference_key' => 'unifi:credential/main-001',
+            'device_ids' => [$reader->id],
+        ])->assertRedirect();
+
+        $update = [
+            'expected_version' => 1,
+            'name' => 'Extended hours',
+            'days' => ['monday', 'tuesday'],
+            'starts_at' => '07:00',
+            'ends_at' => '19:00',
+            'reason' => 'Approved operating-hours change',
+            'confirmed_active_credentials' => 1,
+            'confirmation_text' => 'UPDATE 0',
+        ];
+        $this->actingAs($this->admin)
+            ->put("/security-devices/access-control/schedules/{$schedule->id}", $update)
+            ->assertSessionHasErrors('confirmation_text');
+        $this->assertSame(1, $schedule->fresh()->version);
+
+        $this->actingAs($this->admin)
+            ->put("/security-devices/access-control/schedules/{$schedule->id}", [
+                ...$update,
+                'confirmation_text' => 'UPDATE 1',
+            ])->assertRedirect();
+
+        $schedule->refresh();
+        $this->assertSame(2, $schedule->version);
+        $this->assertSame('Extended hours', $schedule->name);
+        $this->assertSame('required', $schedule->provider_reconciliation_status);
+        $this->assertNotNull($schedule->provider_reconciliation_required_at);
+        $this->assertDatabaseHas('access_control_schedule_revisions', [
+            'access_schedule_id' => $schedule->id,
+            'version' => 2,
+            'action' => 'updated',
+            'change_reason' => 'Approved operating-hours change',
+            'active_credentials_affected' => 1,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->put("/security-devices/access-control/schedules/{$schedule->id}", [
+                ...$update,
+                'confirmation_text' => 'UPDATE 1',
+            ])->assertSessionHasErrors('expected_version');
+        $this->assertSame(2, $schedule->fresh()->version);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/access-control/schedules/{$schedule->id}/deactivate", [
+                'expected_version' => 2,
+                'reason' => 'Superseded by the approved seasonal schedule',
+                'confirmed_active_credentials' => 1,
+                'confirmation_text' => 'DEACTIVATE 1',
+            ])->assertRedirect();
+
+        $schedule->refresh();
+        $this->assertFalse($schedule->is_active);
+        $this->assertSame(3, $schedule->version);
+        $this->assertSame('Superseded by the approved seasonal schedule', $schedule->deactivation_reason);
+        $this->assertSame($this->admin->id, $schedule->deactivated_by_user_id);
+        $this->assertSame('active', AccessControlCredential::query()->firstOrFail()->status);
+        $this->assertDatabaseHas('access_control_schedule_revisions', [
+            'access_schedule_id' => $schedule->id,
+            'version' => 3,
+            'action' => 'deactivated',
+            'active_credentials_affected' => 1,
+        ]);
+        $this->assertSame(3, AccessControlScheduleRevision::query()->where('access_schedule_id', $schedule->id)->count());
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'access_control.schedule.deactivated',
+            'auditable_type' => AccessControlSchedule::class,
+            'auditable_id' => $schedule->id,
+        ]);
+        $this->actingAs($this->admin)->post('/security-devices/access-control/credentials', [
+            'site_id' => $site->id,
+            'access_schedule_id' => $schedule->id,
+            'label' => 'Credential after deactivation',
+            'holder_type' => 'staff',
+            'holder_id' => $holder->id,
+            'reference_key' => 'unifi:credential/after-deactivation',
+            'device_ids' => [$reader->id],
+        ])->assertNotFound();
+        $this->assertSame(1, AccessControlCredential::query()->count());
     }
 
     public function test_site_scoped_manager_cannot_use_or_revoke_other_site_records(): void
@@ -153,6 +275,30 @@ class AccessControlWorkflowTest extends TestCase
             ['reason' => 'Attempted cross-Site access'],
         )->assertNotFound();
 
+        $this->actingAs($manager)->put(
+            "/security-devices/access-control/schedules/{$schedule->id}",
+            [
+                'expected_version' => 1,
+                'name' => 'Hidden update',
+                'days' => ['monday'],
+                'starts_at' => '08:00',
+                'ends_at' => '18:00',
+                'reason' => 'Attempted cross-Site schedule update',
+                'confirmed_active_credentials' => 1,
+                'confirmation_text' => 'UPDATE 1',
+            ],
+        )->assertNotFound();
+
+        $this->actingAs($manager)->post(
+            "/security-devices/access-control/schedules/{$schedule->id}/deactivate",
+            [
+                'expected_version' => 1,
+                'reason' => 'Attempted cross-Site schedule deactivation',
+                'confirmed_active_credentials' => 1,
+                'confirmation_text' => 'DEACTIVATE 1',
+            ],
+        )->assertNotFound();
+
         $this->actingAs($manager)->post('/security-devices/access-control/credentials', [
             'site_id' => $allowedSite->id,
             'access_schedule_id' => $schedule->id,
@@ -164,6 +310,8 @@ class AccessControlWorkflowTest extends TestCase
         ])->assertNotFound();
 
         $this->assertSame('active', $credential->fresh()->status);
+        $this->assertTrue($schedule->fresh()->is_active);
+        $this->assertSame(1, $schedule->fresh()->version);
     }
 
     public function test_general_device_view_does_not_reveal_or_mutate_physical_access_records(): void
@@ -194,6 +342,46 @@ class AccessControlWorkflowTest extends TestCase
             'starts_at' => '08:00',
             'ends_at' => '18:00',
         ])->assertForbidden();
+    }
+
+    public function test_schedule_revision_rows_cannot_be_changed_or_deleted(): void
+    {
+        $site = Site::factory()->create();
+        $this->actingAs($this->admin)->post('/security-devices/access-control/schedules', [
+            'site_id' => $site->id,
+            'name' => 'Immutable history schedule',
+            'days' => ['monday'],
+            'starts_at' => '08:00',
+            'ends_at' => '18:00',
+        ])->assertRedirect();
+
+        $revision = AccessControlScheduleRevision::query()->firstOrFail();
+        $updateBlocked = false;
+        try {
+            $revision->change_reason = 'Rewritten history';
+            $revision->save();
+        } catch (\UnexpectedValueException $exception) {
+            $updateBlocked = str_contains($exception->getMessage(), 'immutable');
+        }
+        $this->assertTrue($updateBlocked);
+
+        $deleteBlocked = false;
+        try {
+            $revision->refresh()->delete();
+        } catch (\UnexpectedValueException $exception) {
+            $deleteBlocked = str_contains($exception->getMessage(), 'immutable');
+        }
+        $this->assertTrue($deleteBlocked);
+        $this->assertDatabaseHas('access_control_schedule_revisions', ['id' => $revision->id]);
+
+        $scheduleDeleteBlocked = false;
+        try {
+            AccessControlSchedule::query()->firstOrFail()->delete();
+        } catch (\UnexpectedValueException $exception) {
+            $scheduleDeleteBlocked = str_contains($exception->getMessage(), 'cannot be hard deleted');
+        }
+        $this->assertTrue($scheduleDeleteBlocked);
+        $this->assertSame(1, AccessControlSchedule::query()->count());
     }
 
     public function test_credential_projection_rechecks_current_device_site_visibility(): void

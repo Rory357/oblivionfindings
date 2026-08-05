@@ -1,6 +1,10 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import {
+    AccessControlWorkspace,
+    type AccessControlWorkspaceData,
+} from './access-control-workspace';
 import {
     SecurityWorkspacePanels,
     type SecurityWorkspaceData,
@@ -59,7 +63,90 @@ const base: SecurityWorkspaceData = {
     },
 };
 
+const managedAccessControl: AccessControlWorkspaceData = {
+    restricted: false,
+    canManage: true,
+    summary: {
+        activeCredentials: 2,
+        activeSchedules: 1,
+        coveredDoors: 1,
+    },
+    sites: [{ id: 9, name: 'Harbour House' }],
+    deviceOptions: [],
+    holderOptions: [],
+    schedules: [
+        {
+            id: 2,
+            siteId: 9,
+            siteName: 'Harbour House',
+            name: 'Weekday staff access',
+            days: ['monday', 'tuesday'],
+            startsAt: '08:00',
+            endsAt: '18:00',
+            timezone: 'Pacific/Auckland',
+            isActive: true,
+            version: 3,
+            activeCredentials: 2,
+            impact: {
+                activeCredentials: 2,
+                requiresExactConfirmation: true,
+                updateConfirmation: 'UPDATE 2',
+                deactivateConfirmation: 'DEACTIVATE 2',
+            },
+            providerReconciliation: {
+                status: 'required',
+                requiredAt: '2026-08-06T01:00:00.000Z',
+                message:
+                    'Saved in Oblivion Findings only. Provider-side schedule execution has not been claimed and must be reconciled separately.',
+            },
+            deactivatedAt: null,
+            deactivationReason: null,
+            revisionHistory: [
+                {
+                    id: 21,
+                    version: 3,
+                    action: 'updated',
+                    reason: 'Approved operating-hours change',
+                    activeCredentialsAffected: 2,
+                    actor: 'Alex Admin',
+                    occurredAt: '2026-08-06T01:00:00.000Z',
+                },
+            ],
+        },
+    ],
+    credentials: [],
+    history: [],
+};
+
 describe('SecurityWorkspacePanels', () => {
+    it('previews exact active-credential impact and keeps provider execution truthful for schedule changes', () => {
+        render(<AccessControlWorkspace data={managedAccessControl} />);
+
+        expect(
+            screen.getByText('Provider reconciliation required'),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Edit schedule' }));
+        expect(screen.getByText('Current impact preview')).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                '2 active credentials currently use this schedule.',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByLabelText('Type UPDATE 2 exactly'),
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Deactivate' }));
+        expect(
+            screen.getByLabelText('Type DEACTIVATE 2 exactly'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                /Existing credentials are not falsely presented as revoked/,
+            ),
+        ).toBeInTheDocument();
+    });
+
     it('makes the overview and required actions immediately understandable', () => {
         render(<SecurityWorkspacePanels data={base} />);
 
@@ -407,7 +494,23 @@ describe('SecurityWorkspacePanels', () => {
                                     endsAt: '18:00',
                                     timezone: 'Pacific/Auckland',
                                     isActive: true,
+                                    version: 2,
                                     activeCredentials: 1,
+                                    impact: {
+                                        activeCredentials: 1,
+                                        requiresExactConfirmation: true,
+                                        updateConfirmation: 'UPDATE 1',
+                                        deactivateConfirmation: 'DEACTIVATE 1',
+                                    },
+                                    providerReconciliation: {
+                                        status: 'required',
+                                        requiredAt: '2026-08-05T09:00:00.000Z',
+                                        message:
+                                            'Saved in Oblivion Findings only. Provider-side schedule execution has not been claimed and must be reconciled separately.',
+                                    },
+                                    deactivatedAt: null,
+                                    deactivationReason: null,
+                                    revisionHistory: [],
                                 },
                             ],
                             credentials: [
@@ -455,6 +558,14 @@ describe('SecurityWorkspacePanels', () => {
             screen.getByText('unifi:credential/taylor-001'),
         ).toBeInTheDocument();
         expect(screen.getByText('Credential issued')).toBeInTheDocument();
+        expect(
+            screen.getByText('Provider reconciliation required'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                /Provider-side schedule execution has not been claimed/,
+            ),
+        ).toBeInTheDocument();
         expect(
             screen.queryByRole('button', { name: 'Revoke' }),
         ).not.toBeInTheDocument();

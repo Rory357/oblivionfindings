@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Models\Device;
@@ -16,6 +17,7 @@ use App\Models\ConsentType;
 use App\Models\ConsentTypeVersion;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
@@ -87,15 +89,19 @@ class FleetDeviceRefactorTest extends TestCase
 
     public function test_asset_links_are_emitted_only_for_destination_routes_the_viewer_can_open(): void
     {
-        $vehicle = Asset::factory()->vehicle()->create(['name' => 'Destination van']);
-        $equipment = Asset::factory()->create([
+        $visibleSite = Site::factory()->create(['name' => 'Visible Fleet Site']);
+        $hiddenSite = Site::factory()->create(['name' => 'Hidden Fleet Site']);
+        $vehicle = Asset::factory()->vehicle()->forSite($visibleSite)->create(['name' => 'Destination van']);
+        $equipment = Asset::factory()->forSite($visibleSite)->create([
             'name' => 'Destination equipment',
             'category' => 'IT Equipment',
         ]);
+        $hiddenVehicle = Asset::factory()->vehicle()->forSite($hiddenSite)->create(['name' => 'Hidden destination van']);
         $vehicleDevice = Device::factory()->tracking()->create(['name' => 'Vehicle destination tracker']);
         $equipmentDevice = Device::factory()->tracking()->create(['name' => 'Equipment destination tracker']);
+        $hiddenDevice = Device::factory()->tracking()->create(['name' => 'Hidden destination tracker']);
 
-        foreach ([[$vehicleDevice, $vehicle], [$equipmentDevice, $equipment]] as [$device, $asset]) {
+        foreach ([[$vehicleDevice, $vehicle], [$equipmentDevice, $equipment], [$hiddenDevice, $hiddenVehicle]] as [$device, $asset]) {
             DeviceAssetLink::create([
                 'device_id' => $device->id,
                 'asset_id' => $asset->id,
@@ -104,25 +110,26 @@ class FleetDeviceRefactorTest extends TestCase
             ]);
         }
 
-        $fleetViewer = $this->viewerWithPermissions(['fleet.viewAny']);
+        $fleetViewer = $this->viewerWithPermissions(['fleet.viewAny'], $visibleSite);
         $this->actingAs($fleetViewer)
             ->get('/fleet-assets/devices')
             ->assertOk()
-            ->assertInertia(function ($page) use ($equipmentDevice, $vehicle, $vehicleDevice): void {
+            ->assertInertia(function ($page) use ($equipmentDevice, $hiddenDevice, $vehicle, $vehicleDevice): void {
                 $rows = collect($page->toArray()['props']['devices']['data'])->keyBy('id');
 
                 $this->assertSame(
                     "/fleet-assets/vehicles/{$vehicle->id}",
                     $rows->get($vehicleDevice->id)['asset']['href'],
                 );
-                $this->assertNull($rows->get($equipmentDevice->id)['asset']['href']);
+                $this->assertFalse($rows->has($equipmentDevice->id));
+                $this->assertFalse($rows->has($hiddenDevice->id));
             });
 
-        $assetViewer = $this->viewerWithPermissions(['assets.trackers.manage', 'assets.viewAny']);
+        $assetViewer = $this->viewerWithPermissions(['assets.trackers.manage', 'assets.viewAny'], $visibleSite);
         $this->actingAs($assetViewer)
             ->get('/fleet-assets/devices')
             ->assertOk()
-            ->assertInertia(function ($page) use ($equipment, $equipmentDevice, $vehicle, $vehicleDevice): void {
+            ->assertInertia(function ($page) use ($equipment, $equipmentDevice, $hiddenDevice, $vehicle, $vehicleDevice): void {
                 $rows = collect($page->toArray()['props']['devices']['data'])->keyBy('id');
 
                 $this->assertSame(
@@ -133,7 +140,106 @@ class FleetDeviceRefactorTest extends TestCase
                     "/fleet-assets/assets/{$equipment->id}",
                     $rows->get($equipmentDevice->id)['asset']['href'],
                 );
+                $this->assertFalse($rows->has($hiddenDevice->id));
             });
+    }
+
+    public function test_fleet_device_surfaces_conceal_hidden_site_devices_assets_and_consent_rows(): void
+    {
+        $visibleSite = Site::factory()->create(['name' => 'Fleet Visible Site']);
+        $hiddenSite = Site::factory()->create(['name' => 'Fleet Hidden Site']);
+        $visibleAsset = Asset::factory()->vehicle()->forSite($visibleSite)->create(['name' => 'Scoped vehicle visible']);
+        $hiddenAsset = Asset::factory()->vehicle()->forSite($hiddenSite)->create(['name' => 'Scoped vehicle hidden']);
+        $visibleLinked = Device::factory()->tracking()->create(['name' => 'Scoped tracker visible']);
+        $hiddenLinked = Device::factory()->tracking()->create(['name' => 'Scoped tracker hidden']);
+        foreach ([[$visibleLinked, $visibleAsset], [$hiddenLinked, $hiddenAsset]] as [$device, $asset]) {
+            DeviceAssetLink::query()->create([
+                'device_id' => $device->id,
+                'asset_id' => $asset->id,
+                'link_type' => LinkType::InstalledIn,
+                'linked_at' => now(),
+            ]);
+        }
+
+        $visibleCandidate = Device::factory()->tracking()->create(['name' => 'Pair candidate visible']);
+        $hiddenCandidate = Device::factory()->tracking()->create(['name' => 'Pair candidate hidden']);
+        foreach ([[$visibleCandidate, $visibleSite], [$hiddenCandidate, $hiddenSite]] as [$device, $site]) {
+            DeviceAssignment::query()->create([
+                'device_id' => $device->id,
+                'assignable_type' => DeviceAssignment::TARGET_SITE,
+                'assignable_id' => $site->id,
+                'assigned_at' => now(),
+            ]);
+        }
+
+        $viewer = $this->viewerWithPermissions([
+            'fleet.viewAny',
+            'assets.trackers.manage',
+            'assets.viewAny',
+        ], $visibleSite);
+
+        $this->actingAs($viewer)
+            ->get('/fleet-assets/devices?device='.$visibleLinked->id)
+            ->assertOk()
+            ->assertInertia(function ($page) use ($hiddenAsset, $hiddenCandidate, $hiddenLinked, $visibleAsset, $visibleCandidate, $visibleLinked): void {
+                $props = $page->toArray()['props'];
+                $deviceIds = collect($props['devices']['data'])->pluck('id');
+                $consentIds = collect($props['consent_devices'])->pluck('id');
+                $pairingDeviceIds = collect($props['pairing_options']['devices'])->pluck('id');
+                $pairingAssetIds = collect($props['pairing_options']['assets'])->pluck('id');
+
+                $this->assertTrue($deviceIds->contains($visibleLinked->id));
+                $this->assertTrue($deviceIds->contains($visibleCandidate->id));
+                $this->assertFalse($deviceIds->contains($hiddenLinked->id));
+                $this->assertFalse($deviceIds->contains($hiddenCandidate->id));
+                $this->assertSame($visibleLinked->id, $props['device_detail']['id']);
+                $this->assertSame([$visibleLinked->id], $consentIds->all());
+                $this->assertTrue($pairingDeviceIds->contains($visibleCandidate->id));
+                $this->assertFalse($pairingDeviceIds->contains($hiddenCandidate->id));
+                $this->assertTrue($pairingAssetIds->contains($visibleAsset->id));
+                $this->assertFalse($pairingAssetIds->contains($hiddenAsset->id));
+            });
+
+        $this->actingAs($viewer)
+            ->get('/fleet-assets/devices?device='.$hiddenLinked->id)
+            ->assertNotFound();
+        $this->actingAs($viewer)
+            ->get('/fleet-assets/devices/'.$hiddenLinked->id)
+            ->assertNotFound();
+
+        $csv = $this->actingAs($viewer)
+            ->get('/fleet-assets/devices?export=csv')
+            ->assertOk()
+            ->streamedContent();
+        $this->assertStringContainsString((string) $visibleLinked->device_uid, $csv);
+        $this->assertStringNotContainsString((string) $hiddenLinked->device_uid, $csv);
+
+        $this->actingAs($viewer)
+            ->getJson('/fleet-assets/devices/options/search?type=devices&q='.urlencode((string) $visibleCandidate->device_uid))
+            ->assertOk()
+            ->assertJsonPath('results.0.id', $visibleCandidate->id)
+            ->assertJsonCount(1, 'results');
+        $this->actingAs($viewer)
+            ->getJson('/fleet-assets/devices/options/search?type=assets&q=Scoped%20vehicle')
+            ->assertOk()
+            ->assertJsonPath('results.0.id', $visibleAsset->id)
+            ->assertJsonCount(1, 'results');
+
+        $this->actingAs($viewer)
+            ->post('/fleet-assets/devices/pair', ['device_id' => $hiddenCandidate->id, 'asset_id' => $visibleAsset->id])
+            ->assertNotFound();
+        $this->actingAs($viewer)
+            ->post('/fleet-assets/devices/pair', ['device_id' => $visibleCandidate->id, 'asset_id' => $hiddenAsset->id])
+            ->assertNotFound();
+        $this->actingAs($viewer)
+            ->post('/fleet-assets/devices/'.$hiddenLinked->id.'/unpair')
+            ->assertNotFound();
+        $this->actingAs($viewer)
+            ->post('/fleet-assets/devices/'.$hiddenLinked->id.'/consent/grant')
+            ->assertNotFound();
+        $this->actingAs($viewer)
+            ->post('/fleet-assets/devices/'.$hiddenLinked->id.'/consent/revoke', ['reason' => 'Hidden Site test'])
+            ->assertNotFound();
     }
 
     public function test_index_stats_correct(): void
@@ -389,8 +495,10 @@ class FleetDeviceRefactorTest extends TestCase
 
     public function test_consent_index_prefers_assignment_consent_and_uses_canonical_device_ids(): void
     {
-        $client = Client::factory()->create();
-        $asset = Asset::factory()->vehicle()->forClient($client->id)->create(['name' => 'Van Consent']);
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $assetClient = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $asset = Asset::factory()->vehicle()->forClient($assetClient->id)->create(['name' => 'Van Consent']);
         $tracker = AssetTracker::create([
             'asset_id' => $asset->id,
             'vendor' => 'queclink',
@@ -403,7 +511,7 @@ class FleetDeviceRefactorTest extends TestCase
             'legacy_asset_tracker_id' => $tracker->id,
         ]);
 
-        $trackerConsent = $this->createFleetTrackingConsent($client, [
+        $trackerConsent = $this->createFleetTrackingConsent($assetClient, [
             'status' => 'withdrawn',
             'given_by_user_id' => $this->admin->id,
             'given_at' => now()->subDays(7),
@@ -431,7 +539,7 @@ class FleetDeviceRefactorTest extends TestCase
         $this->actingAs($this->admin)
             ->get('/fleet-assets/devices?tab=consent')
             ->assertOk()
-            ->assertInertia(function ($page) use ($device) {
+            ->assertInertia(function ($page) use ($client, $device) {
                 $props = $page->toArray()['props'];
                 $this->assertSame('consent', $props['tab']);
                 $row = collect($props['consent_devices'])->firstWhere('id', $device->id);
@@ -439,12 +547,14 @@ class FleetDeviceRefactorTest extends TestCase
                 $this->assertNotNull($row);
                 $this->assertEquals($device->id, $row['id']);
                 $this->assertEquals('consented', $row['consent_status']);
+                $this->assertSame(trim($client->first_name.' '.$client->last_name), $row['client_name']);
             });
     }
 
-    public function test_grant_consent_uses_canonical_device_route_and_syncs_assignment_and_tracker(): void
+    public function test_grant_consent_updates_only_the_canonical_assignment_and_preserves_tracker_history(): void
     {
-        $client = Client::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $asset = Asset::factory()->vehicle()->forClient($client->id)->create();
         $tracker = AssetTracker::create([
             'asset_id' => $asset->id,
@@ -463,6 +573,12 @@ class FleetDeviceRefactorTest extends TestCase
             'assignable_id' => $client->id,
             'assigned_at' => now(),
         ]);
+        $legacyConsent = $this->createFleetTrackingConsent($client, [
+            'given_by_user_id' => $this->admin->id,
+            'given_at' => now()->subDays(10),
+            'expires_at' => now()->addDays(10),
+        ]);
+        $tracker->update(['consent_id' => $legacyConsent->id]);
 
         $this->actingAs($this->admin)
             ->post("/fleet-assets/devices/{$device->id}/consent/grant", [
@@ -478,13 +594,19 @@ class FleetDeviceRefactorTest extends TestCase
         ]);
         $this->assertDatabaseHas('asset_trackers', [
             'id' => $tracker->id,
-            'consent_id' => $consentId,
+            'consent_id' => $legacyConsent->id,
+        ]);
+        $this->assertDatabaseHas('client_consents', [
+            'id' => $legacyConsent->id,
+            'status' => 'given',
+            'superseded_by_consent_id' => null,
         ]);
     }
 
-    public function test_revoke_consent_uses_canonical_device_route_and_revokes_distinct_assignment_and_tracker_consents(): void
+    public function test_revoke_consent_withdraws_only_the_canonical_assignment_consent(): void
     {
-        $client = Client::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $asset = Asset::factory()->vehicle()->forClient($client->id)->create();
         $tracker = AssetTracker::create([
             'asset_id' => $asset->id,
@@ -530,7 +652,11 @@ class FleetDeviceRefactorTest extends TestCase
         ]);
         $this->assertDatabaseHas('client_consents', [
             'id' => $trackerConsent->id,
-            'status' => 'withdrawn',
+            'status' => 'given',
+        ]);
+        $this->assertDatabaseHas('asset_trackers', [
+            'id' => $tracker->id,
+            'consent_id' => $trackerConsent->id,
         ]);
     }
 
@@ -578,9 +704,17 @@ class FleetDeviceRefactorTest extends TestCase
     }
 
     /** @param array<int, string> $permissions */
-    private function viewerWithPermissions(array $permissions): User
+    private function viewerWithPermissions(array $permissions, ?Site $site = null): User
     {
         $viewer = User::factory()->create(['approved_at' => now()]);
+        if ($site) {
+            HrEmployeeProfile::factory()->create([
+                'user_id' => $viewer->id,
+                'primary_site_id' => $site->id,
+                'secondary_site_ids' => [],
+                'is_active' => true,
+            ]);
+        }
         foreach ($permissions as $key) {
             Permission::firstOrCreate(
                 ['key' => $key],

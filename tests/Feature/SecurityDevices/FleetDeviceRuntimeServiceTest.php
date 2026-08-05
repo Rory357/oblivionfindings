@@ -1,15 +1,20 @@
 <?php
 
+use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Models\Asset;
 use App\Models\AssetTracker;
+use App\Models\Site;
 use App\Services\Fleet\FleetDeviceRuntimeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 it('creates one canonical non-operational Device for an unrecognised tracker state', function () {
-    $asset = Asset::factory()->create();
+    $site = Site::factory()->create();
+    $asset = Asset::factory()->forSite($site)->create();
     $tracker = AssetTracker::query()->create([
         'asset_id' => $asset->id,
         'vendor' => 'queclink',
@@ -24,13 +29,20 @@ it('creates one canonical non-operational Device for an unrecognised tracker sta
 
     expect($device->domain)->toBe('tracking')
         ->and($device->provider)->toBe('queclink')
+        ->and($device->device_uid)->toBe($tracker->device_uid)
         ->and($device->legacy_asset_tracker_id)->toBe($tracker->id)
         ->and($device->status)->toBe(DeviceStatus::InStock)
-        ->and($device->status->isOperational())->toBeFalse();
+        ->and($device->status->isOperational())->toBeFalse()
+        ->and(Device::query()->count())->toBe(1)
+        ->and(DeviceAssetLink::query()->active()->where('device_id', $device->id)->count())->toBe(1)
+        ->and(DeviceAssetLink::query()->active()->where('device_id', $device->id)->value('asset_id'))->toBe($asset->id)
+        ->and(app(CanonicalDeviceSiteResolver::class)->resolveForContext($device->id))->toBe($site->id)
+        ->and($tracker->fresh()->asset_id)->toBe($asset->id);
 });
 
 it('reuses canonical provider identity rather than creating a second Device', function () {
-    $asset = Asset::factory()->create();
+    $site = Site::factory()->create();
+    $asset = Asset::factory()->forSite($site)->create();
     $tracker = AssetTracker::query()->create([
         'asset_id' => $asset->id,
         'vendor' => 'queclink',
@@ -46,5 +58,9 @@ it('reuses canonical provider identity rather than creating a second Device', fu
 
     expect($second->is($first))->toBeTrue()
         ->and($first->status)->toBe(DeviceStatus::Active)
-        ->and($first->status->isOperational())->toBeTrue();
+        ->and($first->status->isOperational())->toBeTrue()
+        ->and(Device::query()->count())->toBe(1)
+        ->and(DeviceAssetLink::query()->active()->where('device_id', $first->id)->count())->toBe(1)
+        ->and(DeviceAssetLink::query()->active()->where('device_id', $first->id)->value('asset_id'))->toBe($asset->id)
+        ->and(app(CanonicalDeviceSiteResolver::class)->resolve($first->id))->toBe($site->id);
 });

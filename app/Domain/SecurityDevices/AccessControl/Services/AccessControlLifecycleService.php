@@ -5,6 +5,7 @@ namespace App\Domain\SecurityDevices\AccessControl\Services;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\AccessControl\Models\AccessControlCredential;
 use App\Domain\SecurityDevices\AccessControl\Models\AccessControlSchedule;
+use App\Domain\SecurityDevices\AccessControl\Models\AccessControlScheduleRevision;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -14,6 +15,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class AccessControlLifecycleService
 {
@@ -35,15 +37,108 @@ class AccessControlLifecycleService
                 'starts_at' => $data['starts_at'],
                 'ends_at' => $data['ends_at'],
                 'is_active' => true,
+                'version' => 1,
+                'provider_reconciliation_status' => 'required',
+                'provider_reconciliation_required_at' => now(),
                 'created_by_user_id' => $actor->getKey(),
             ]);
+
+            $this->recordScheduleRevision(
+                $schedule,
+                $actor,
+                'created',
+                'Initial schedule creation.',
+                0,
+            );
 
             AuditLogger::logOrFail('access_control.schedule.created', $schedule, [
                 'actor_id' => (int) $actor->getKey(),
                 'site_id' => $siteId,
+                'version' => 1,
+                'provider_reconciliation_status' => 'required',
             ]);
 
             return $schedule;
+        });
+    }
+
+    /** @param array<string, mixed> $data */
+    public function updateSchedule(User $actor, AccessControlSchedule $schedule, array $data): AccessControlSchedule
+    {
+        $this->assertCanManage($actor);
+
+        return DB::transaction(function () use ($actor, $schedule, $data): AccessControlSchedule {
+            $locked = AccessControlSchedule::query()->whereKey($schedule->getKey())->lockForUpdate()->firstOrFail();
+            $this->access->assertCanViewSite($actor, (int) $locked->site_id);
+            abort_unless($locked->is_active, 409, 'Inactive access schedules cannot be changed.');
+            $this->assertExpectedVersion($locked, (int) $data['expected_version']);
+            $activeCredentials = $this->lockActiveCredentials($locked);
+            $this->assertImpactConfirmation($data, 'UPDATE', $activeCredentials);
+            $reason = trim((string) $data['reason']);
+            $nextVersion = (int) $locked->version + 1;
+            $now = now();
+
+            $locked->forceFill([
+                'name' => trim((string) $data['name']),
+                'days' => array_values($data['days']),
+                'starts_at' => $data['starts_at'],
+                'ends_at' => $data['ends_at'],
+                'version' => $nextVersion,
+                'provider_reconciliation_status' => 'required',
+                'provider_reconciliation_required_at' => $now,
+            ])->save();
+
+            $this->recordScheduleRevision($locked, $actor, 'updated', $reason, $activeCredentials);
+            AuditLogger::logOrFail('access_control.schedule.updated', $locked, [
+                'actor_id' => (int) $actor->getKey(),
+                'site_id' => (int) $locked->site_id,
+                'version' => $nextVersion,
+                'active_credentials_affected' => $activeCredentials,
+                'provider_reconciliation_status' => 'required',
+                'reason' => $reason,
+            ]);
+
+            return $locked;
+        });
+    }
+
+    /** @param array<string, mixed> $data */
+    public function deactivateSchedule(User $actor, AccessControlSchedule $schedule, array $data): AccessControlSchedule
+    {
+        $this->assertCanManage($actor);
+
+        return DB::transaction(function () use ($actor, $schedule, $data): AccessControlSchedule {
+            $locked = AccessControlSchedule::query()->whereKey($schedule->getKey())->lockForUpdate()->firstOrFail();
+            $this->access->assertCanViewSite($actor, (int) $locked->site_id);
+            abort_unless($locked->is_active, 409, 'This access schedule is already inactive.');
+            $this->assertExpectedVersion($locked, (int) $data['expected_version']);
+            $activeCredentials = $this->lockActiveCredentials($locked);
+            $this->assertImpactConfirmation($data, 'DEACTIVATE', $activeCredentials);
+            $reason = trim((string) $data['reason']);
+            $nextVersion = (int) $locked->version + 1;
+            $now = now();
+
+            $locked->forceFill([
+                'is_active' => false,
+                'version' => $nextVersion,
+                'provider_reconciliation_status' => 'required',
+                'provider_reconciliation_required_at' => $now,
+                'deactivated_at' => $now,
+                'deactivated_by_user_id' => $actor->getKey(),
+                'deactivation_reason' => $reason,
+            ])->save();
+
+            $this->recordScheduleRevision($locked, $actor, 'deactivated', $reason, $activeCredentials);
+            AuditLogger::logOrFail('access_control.schedule.deactivated', $locked, [
+                'actor_id' => (int) $actor->getKey(),
+                'site_id' => (int) $locked->site_id,
+                'version' => $nextVersion,
+                'active_credentials_affected' => $activeCredentials,
+                'provider_reconciliation_status' => 'required',
+                'reason' => $reason,
+            ]);
+
+            return $locked;
         });
     }
 
@@ -64,9 +159,17 @@ class AccessControlLifecycleService
         $devices = $this->authorisedAccessDevices($actor, $data['device_ids'], $siteId);
 
         return DB::transaction(function () use ($actor, $data, $devices, $schedule, $siteId): AccessControlCredential {
+            $lockedSchedule = AccessControlSchedule::query()
+                ->whereKey($schedule->getKey())
+                ->where('site_id', $siteId)
+                ->where('is_active', true)
+                ->lockForUpdate()
+                ->first();
+            abort_unless($lockedSchedule, 404);
+
             $credential = AccessControlCredential::query()->create([
                 'site_id' => $siteId,
-                'access_schedule_id' => $schedule->getKey(),
+                'access_schedule_id' => $lockedSchedule->getKey(),
                 'label' => trim((string) $data['label']),
                 'holder_type' => $data['holder_type'],
                 'holder_id' => (int) $data['holder_id'],
@@ -120,6 +223,75 @@ class AccessControlLifecycleService
     private function assertCanManage(User $actor): void
     {
         abort_unless($actor->canDo('securityDevices.accessControl.manage'), 403);
+    }
+
+    private function assertExpectedVersion(AccessControlSchedule $schedule, int $expectedVersion): void
+    {
+        if ((int) $schedule->version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_version' => 'This schedule changed after you opened it. Review the current version before trying again.',
+            ]);
+        }
+    }
+
+    private function lockActiveCredentials(AccessControlSchedule $schedule): int
+    {
+        return $schedule->credentials()
+            ->where('status', 'active')
+            ->lockForUpdate()
+            ->get(['access_control_credentials.id'])
+            ->count();
+    }
+
+    /** @param array<string, mixed> $data */
+    private function assertImpactConfirmation(array $data, string $action, int $activeCredentials): void
+    {
+        $confirmedCount = $data['confirmed_active_credentials'] ?? null;
+        if ($confirmedCount !== null && (int) $confirmedCount !== $activeCredentials) {
+            throw ValidationException::withMessages([
+                'confirmation_text' => 'The active-credential impact changed. Review the current preview before trying again.',
+            ]);
+        }
+
+        if ($activeCredentials === 0) {
+            return;
+        }
+
+        $expected = $action.' '.$activeCredentials;
+        $confirmation = trim((string) ($data['confirmation_text'] ?? ''));
+        if ($confirmedCount === null || ! hash_equals($expected, $confirmation)) {
+            throw ValidationException::withMessages([
+                'confirmation_text' => "The impact changed or the confirmation did not match. Review the preview and type {$expected} exactly.",
+            ]);
+        }
+    }
+
+    private function recordScheduleRevision(
+        AccessControlSchedule $schedule,
+        User $actor,
+        string $action,
+        string $reason,
+        int $activeCredentials,
+    ): void {
+        AccessControlScheduleRevision::query()->create([
+            'access_schedule_id' => $schedule->getKey(),
+            'version' => (int) $schedule->version,
+            'action' => $action,
+            'snapshot' => [
+                'name' => $schedule->name,
+                'timezone' => $schedule->timezone,
+                'days' => array_values($schedule->days ?? []),
+                'starts_at' => $schedule->starts_at,
+                'ends_at' => $schedule->ends_at,
+                'is_active' => (bool) $schedule->is_active,
+                'provider_reconciliation_status' => $schedule->provider_reconciliation_status,
+                'deactivated_at' => $schedule->deactivated_at?->toIso8601String(),
+            ],
+            'change_reason' => $reason,
+            'active_credentials_affected' => $activeCredentials,
+            'recorded_by_user_id' => $actor->getKey(),
+            'created_at' => now(),
+        ]);
     }
 
     private function assertHolderAtSite(User $actor, string $holderType, int $holderId, int $siteId): void

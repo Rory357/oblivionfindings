@@ -246,6 +246,14 @@ Route::middleware([
         ->middleware('permission:securityDevices.accessControl.manage')
         ->name('security-devices.access-control.schedules.store');
 
+    Route::put('/access-control/schedules/{accessSchedule}', [AccessControlController::class, 'updateSchedule'])
+        ->middleware('permission:securityDevices.accessControl.manage')
+        ->name('security-devices.access-control.schedules.update');
+
+    Route::post('/access-control/schedules/{accessSchedule}/deactivate', [AccessControlController::class, 'deactivateSchedule'])
+        ->middleware('permission:securityDevices.accessControl.manage')
+        ->name('security-devices.access-control.schedules.deactivate');
+
     Route::post('/access-control/credentials', [AccessControlController::class, 'storeCredential'])
         ->middleware('permission:securityDevices.accessControl.manage')
         ->name('security-devices.access-control.credentials.store');

@@ -4,6 +4,7 @@ namespace App\Domain\SecurityDevices\Presenters;
 
 use App\Domain\SecurityDevices\AccessControl\Models\AccessControlCredential;
 use App\Domain\SecurityDevices\AccessControl\Models\AccessControlSchedule;
+use App\Domain\SecurityDevices\AccessControl\Models\AccessControlScheduleRevision;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -42,6 +43,12 @@ class AccessControlWorkspacePresenter
             ->orderBy('name')
             ->limit(self::LIST_LIMIT)
             ->get();
+        $scheduleRevisions = AccessControlScheduleRevision::query()
+            ->whereIn('access_schedule_id', $schedules->modelKeys())
+            ->with('recordedBy:id,name')
+            ->latest('version')
+            ->get()
+            ->groupBy('access_schedule_id');
         $credentials = AccessControlCredential::query()
             ->whereIn('site_id', $siteIds)
             ->with([
@@ -94,7 +101,36 @@ class AccessControlWorkspacePresenter
                 'endsAt' => $schedule->ends_at,
                 'timezone' => $schedule->timezone,
                 'isActive' => (bool) $schedule->is_active,
+                'version' => (int) $schedule->version,
                 'activeCredentials' => (int) $schedule->active_credentials_count,
+                'impact' => [
+                    'activeCredentials' => (int) $schedule->active_credentials_count,
+                    'requiresExactConfirmation' => (int) $schedule->active_credentials_count > 0,
+                    'updateConfirmation' => (int) $schedule->active_credentials_count > 0
+                        ? 'UPDATE '.(int) $schedule->active_credentials_count
+                        : null,
+                    'deactivateConfirmation' => (int) $schedule->active_credentials_count > 0
+                        ? 'DEACTIVATE '.(int) $schedule->active_credentials_count
+                        : null,
+                ],
+                'providerReconciliation' => [
+                    'status' => $schedule->provider_reconciliation_status,
+                    'requiredAt' => $schedule->provider_reconciliation_required_at?->toIso8601String(),
+                    'message' => 'Saved in Oblivion Findings only. Provider-side schedule execution has not been claimed and must be reconciled separately.',
+                ],
+                'deactivatedAt' => $schedule->deactivated_at?->toIso8601String(),
+                'deactivationReason' => $schedule->deactivation_reason,
+                'revisionHistory' => $scheduleRevisions->get($schedule->id, collect())
+                    ->take(10)
+                    ->map(fn (AccessControlScheduleRevision $revision): array => [
+                        'id' => (int) $revision->id,
+                        'version' => (int) $revision->version,
+                        'action' => $revision->action,
+                        'reason' => $revision->change_reason,
+                        'activeCredentialsAffected' => (int) $revision->active_credentials_affected,
+                        'actor' => $revision->recordedBy?->name ?? 'System',
+                        'occurredAt' => $revision->created_at?->toIso8601String(),
+                    ])->values(),
             ])->values(),
             'credentials' => $credentials->map(fn (AccessControlCredential $credential): array => [
                 'id' => (int) $credential->id,
@@ -251,6 +287,8 @@ class AccessControlWorkspacePresenter
                 'id' => (int) $entry->id,
                 'action' => match ($entry->action) {
                     'access_control.schedule.created' => 'Schedule created',
+                    'access_control.schedule.updated' => 'Schedule updated',
+                    'access_control.schedule.deactivated' => 'Schedule deactivated',
                     'access_control.credential.issued' => 'Credential issued',
                     'access_control.credential.revoked' => 'Credential revoked',
                     default => str_replace(['access_control.', '_', '.'], ['', ' ', ' '], $entry->action),
