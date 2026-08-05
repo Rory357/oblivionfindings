@@ -3,7 +3,9 @@
 namespace Tests\Feature\SecurityDevices;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -118,7 +120,7 @@ class SecurityDevicesSingleApplicationAccessTest extends TestCase
         $this->assertContains($vehicleDevice->id, $visibleIds);
     }
 
-    public function test_room_parent_site_and_ambiguous_private_assignments_fail_closed(): void
+    public function test_room_parent_site_and_private_assignments_require_their_canonical_access(): void
     {
         $allowedSite = Site::factory()->create();
         $hiddenSite = Site::factory()->create();
@@ -135,18 +137,14 @@ class SecurityDevicesSingleApplicationAccessTest extends TestCase
         $visible = $this->assignedDevice($allowedRoom);
         $hidden = $this->assignedDevice($hiddenRoom);
         $privateClient = Client::factory()->create(['site_id' => $allowedSite->id]);
-        DeviceAssignment::query()->create([
-            'device_id' => $visible->id,
-            'assignable_type' => DeviceAssignment::TARGET_CLIENT,
-            'assignable_id' => $privateClient->id,
-            'assigned_at' => now(),
-        ]);
+        $private = $this->assignedDevice($privateClient);
 
-        $this->assertFalse($this->access->visibleDevices($viewer)->whereKey($visible->id)->exists());
+        $this->assertTrue($this->access->visibleDevices($viewer)->whereKey($visible->id)->exists());
         $this->assertFalse($this->access->visibleDevices($viewer)->whereKey($hidden->id)->exists());
+        $this->assertFalse($this->access->visibleDevices($viewer)->whereKey($private->id)->exists());
 
         $this->grant($viewer, 'clients.viewAny');
-        $this->assertTrue($this->access->visibleDevices($viewer)->whereKey($visible->id)->exists());
+        $this->assertTrue($this->access->visibleDevices($viewer)->whereKey($private->id)->exists());
     }
 
     public function test_mixed_site_provenance_fails_closed_in_the_access_kernel_and_site_registry(): void
@@ -155,11 +153,12 @@ class SecurityDevicesSingleApplicationAccessTest extends TestCase
         $hiddenSite = Site::factory()->create();
         $viewer = $this->viewer('coordinator', $allowedSite);
         $device = $this->assignedDevice($allowedSite, ['name' => 'Ambiguous Site device']);
-        DeviceAssignment::query()->create([
+        $hiddenAsset = Asset::factory()->vehicle()->forSite($hiddenSite)->create();
+        DeviceAssetLink::query()->create([
             'device_id' => $device->id,
-            'assignable_type' => DeviceAssignment::TARGET_SITE,
-            'assignable_id' => $hiddenSite->id,
-            'assigned_at' => now(),
+            'asset_id' => $hiddenAsset->id,
+            'link_type' => LinkType::InstalledIn,
+            'linked_at' => now(),
         ]);
 
         $this->assertFalse($this->access->visibleDevices($viewer)->whereKey($device->id)->exists());
