@@ -37,6 +37,7 @@ class SecurityWorkspacePresenter
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
         private readonly UserSiteAccessService $siteAccess,
+        private readonly AccessControlWorkspacePresenter $accessControlPresenter,
     ) {}
 
     public function present(User $viewer, Builder $securityScope, array $activeTab): array
@@ -127,6 +128,9 @@ class SecurityWorkspacePresenter
                 'controlRoomAlerts' => $restricted
                     ? []
                     : $alerts->map(fn (ControlRoomAlert $alert) => $this->mapAlert($alert))->values(),
+                'accessControl' => $activeTab['key'] === 'access-control'
+                    ? $this->accessControlPresenter->present($viewer, clone $activeScope)
+                    : null,
             ],
         ];
     }

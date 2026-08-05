@@ -375,4 +375,128 @@ describe('SecurityWorkspacePanels', () => {
             screen.queryByRole('button', { name: /acknowledge|resolve/i }),
         ).not.toBeInTheDocument();
     });
+
+    it('shows Site-bound access schedules, safe credential references and audit history to an authorised read-only role', () => {
+        render(
+            <SecurityWorkspacePanels
+                data={{
+                    ...base,
+                    activeTab: {
+                        ...base.activeTab,
+                        key: 'access-control',
+                        label: 'Access Control',
+                        accessControl: {
+                            restricted: false,
+                            canManage: false,
+                            summary: {
+                                activeCredentials: 1,
+                                activeSchedules: 1,
+                                coveredDoors: 1,
+                            },
+                            sites: [{ id: 9, name: 'Harbour House' }],
+                            deviceOptions: [],
+                            holderOptions: [],
+                            schedules: [
+                                {
+                                    id: 2,
+                                    siteId: 9,
+                                    siteName: 'Harbour House',
+                                    name: 'Weekday staff access',
+                                    days: ['monday', 'tuesday'],
+                                    startsAt: '08:00',
+                                    endsAt: '18:00',
+                                    timezone: 'Pacific/Auckland',
+                                    isActive: true,
+                                    activeCredentials: 1,
+                                },
+                            ],
+                            credentials: [
+                                {
+                                    id: 4,
+                                    siteId: 9,
+                                    siteName: 'Harbour House',
+                                    label: 'Reception badge',
+                                    holderType: 'staff',
+                                    holderLabel: 'Taylor Worker',
+                                    referenceKey: 'unifi:credential/taylor-001',
+                                    status: 'active',
+                                    scheduleName: 'Weekday staff access',
+                                    devices: [
+                                        {
+                                            id: 11,
+                                            name: 'Staff entrance reader',
+                                            href: '/security-devices/devices/11',
+                                        },
+                                    ],
+                                    validFrom: null,
+                                    validUntil: null,
+                                    revokedAt: null,
+                                    revocationReason: null,
+                                },
+                            ],
+                            history: [
+                                {
+                                    id: 8,
+                                    action: 'Credential issued',
+                                    actor: 'Alex Admin',
+                                    occurredAt: '2026-08-05T10:00:00.000Z',
+                                },
+                            ],
+                        },
+                    },
+                }}
+            />,
+        );
+
+        expect(screen.getByText('Active credentials')).toBeInTheDocument();
+        expect(screen.getAllByText('Weekday staff access')).toHaveLength(2);
+        expect(screen.getByText(/Taylor Worker/)).toBeInTheDocument();
+        expect(
+            screen.getByText('unifi:credential/taylor-001'),
+        ).toBeInTheDocument();
+        expect(screen.getByText('Credential issued')).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Revoke' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Issue credential' }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('keeps access credential and history data hidden from a general device viewer', () => {
+        render(
+            <SecurityWorkspacePanels
+                data={{
+                    ...base,
+                    activeTab: {
+                        ...base.activeTab,
+                        key: 'access-control',
+                        label: 'Access Control',
+                        accessControl: {
+                            restricted: true,
+                            canManage: false,
+                            summary: {
+                                activeCredentials: 0,
+                                activeSchedules: 0,
+                                coveredDoors: 0,
+                            },
+                            sites: [],
+                            deviceOptions: [],
+                            holderOptions: [],
+                            schedules: [],
+                            credentials: [],
+                            history: [],
+                        },
+                    },
+                }}
+            />,
+        );
+
+        expect(
+            screen.getByText('Physical access records are restricted'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText('Issued credentials'),
+        ).not.toBeInTheDocument();
+    });
 });

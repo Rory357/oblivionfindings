@@ -21,6 +21,11 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import {
+    AccessControlWorkspace,
+    type AccessControlWorkspaceData,
+} from './access-control-workspace';
+
 type SecurityAction = {
     key: string;
     label: string;
@@ -117,6 +122,7 @@ export type SecurityWorkspaceData = {
         devices: SecurityDevice[];
         recentEvents: SecurityEvent[];
         controlRoomAlerts: SecurityAlert[];
+        accessControl?: AccessControlWorkspaceData | null;
     };
 };
 
@@ -636,6 +642,19 @@ export function SecurityWorkspacePanels({
 
     if (data.activeTab.key === 'events') {
         return <EventsPanel data={data} />;
+    }
+
+    if (
+        data.activeTab.key === 'access-control' &&
+        data.activeTab.accessControl
+    ) {
+        return (
+            <div className="space-y-4">
+                <SpecialistInventory data={data} />
+                <AccessControlWorkspace data={data.activeTab.accessControl} />
+                <EventsPanel data={data} />
+            </div>
+        );
     }
 
     return (

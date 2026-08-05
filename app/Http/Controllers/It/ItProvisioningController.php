@@ -11,6 +11,7 @@ use App\Domain\It\Services\ItEmailDeliveryService;
 use App\Domain\It\Services\ItLinkedContextOptions;
 use App\Domain\It\Services\ItProvisioningAccessService;
 use App\Domain\It\Services\ItProvisioningRequestLifecycleService;
+use App\Domain\It\Services\ItSavedTicketFilterService;
 use App\Domain\It\Services\ItTicketIntakeService;
 use App\Domain\It\Services\ItTicketInteractionService;
 use App\Domain\It\Services\ItTicketTriageService;
@@ -32,6 +33,7 @@ use App\Models\ItCatalogItem;
 use App\Models\ItKbArticle;
 use App\Models\ItProvisioningRequest;
 use App\Models\ItProvisioningWorkflow;
+use App\Models\ItSavedTicketFilter;
 use App\Models\ItService;
 use App\Models\ItSlaPolicy;
 use App\Models\ItTicket;
@@ -69,6 +71,7 @@ class ItProvisioningController extends Controller
         private readonly ItCatalogFieldOptionService $catalogFieldOptions,
         private readonly ItLinkedContextOptions $linkedContextOptions,
         private readonly ItTicketRoutingPresenter $routingPresenter,
+        private readonly ItSavedTicketFilterService $savedTicketFilters,
     ) {}
 
     /* ================================================================== */
@@ -86,6 +89,7 @@ class ItProvisioningController extends Controller
             'status' => $this->cleanFilter($request->query('status'), ItProvisioningRequest::STATUSES),
             'type' => $this->cleanFilter($request->query('type'), ItProvisioningRequest::TYPES),
             'assignee' => is_numeric($request->query('assignee')) ? (int) $request->query('assignee') : null,
+            'site_id' => is_numeric($request->query('site_id')) ? (int) $request->query('site_id') : null,
             'ticket_status' => $this->cleanFilter($request->query('ticket_status'), ItTicket::STATUSES),
             'ticket_priority' => $this->cleanFilter($request->query('ticket_priority'), ItTicket::PRIORITIES),
             'ticket_category' => $this->cleanFilter($request->query('ticket_category'), ItTicket::CATEGORIES),
@@ -101,13 +105,50 @@ class ItProvisioningController extends Controller
             'resolved_from' => $this->cleanDate($request->query('resolved_from')),
             'resolved_to' => $this->cleanDate($request->query('resolved_to')),
             'sla' => $this->cleanFilter($request->query('sla'), ItTicket::SLA_STATES),
-            'view' => $this->cleanFilter($request->query('view'), array_keys(self::TICKET_VIEWS)),
+            'view' => $this->cleanFilter($request->query('view'), array_keys(ItSavedTicketFilterService::PREDEFINED_VIEWS)),
             'q' => trim((string) $request->query('q', '')) !== '' ? trim((string) $request->query('q')) : null,
             'from' => $this->cleanDate($request->query('from')),
             'to' => $this->cleanDate($request->query('to')),
             'sort' => $this->cleanFilter($request->query('sort'), ['reference', 'created', 'updated', 'priority', 'status']),
             'dir' => $this->cleanFilter($request->query('dir'), ['asc', 'desc']),
         ];
+
+        // Numeric query params must follow the same current-access option
+        // contract as saved filters; a guessed Site, assignee or retired
+        // service is treated as no filter and never reflected as a choice.
+        $requestedOptionFilters = array_filter([
+            'site_id' => $filters['site_id'],
+            'assignee' => $filters['assignee'],
+            'service' => $filters['service'],
+        ], fn (mixed $value): bool => $value !== null);
+        $safeOptionFilters = $this->savedTicketFilters->sanitize($user, $requestedOptionFilters);
+        foreach (['site_id', 'assignee', 'service'] as $optionKey) {
+            if ($filters[$optionKey] !== null && ! array_key_exists($optionKey, $safeOptionFilters)) {
+                $filters[$optionKey] = null;
+            }
+        }
+
+        $activeSavedTicketFilter = null;
+        if ($isAgent && is_numeric($request->query('saved_filter'))) {
+            abort_unless(Schema::hasTable('it_saved_ticket_filters'), 404);
+            $activeSavedTicketFilter = ItSavedTicketFilter::query()
+                ->where('user_id', $user->id)
+                ->find((int) $request->query('saved_filter'));
+            abort_unless($activeSavedTicketFilter, 404);
+
+            $saved = $this->savedTicketFilters->sanitize($user, (array) $activeSavedTicketFilter->filters);
+            if ($saved !== $activeSavedTicketFilter->filters) {
+                $activeSavedTicketFilter->forceFill(['filters' => $saved])->saveQuietly();
+            }
+
+            // An explicit query key wins over its saved value; a plain
+            // ?saved_filter= deep-link applies the complete stored filter.
+            foreach ($saved as $key => $value) {
+                if (! $request->query->has($key)) {
+                    $filters[$key] = $value;
+                }
+            }
+        }
 
         $canManage = (bool) ($user && $user->canDo('it.manage'));
         $canEditSla = $canManage && $user->hasRole('admin');
@@ -125,6 +166,8 @@ class ItProvisioningController extends Controller
             'deviceOptions' => $this->linkedContextOptions->devices($user),
             'serviceOptions' => $this->linkedContextOptions->services(),
             'filters' => $filters,
+            'savedTicketFilters' => $this->savedTicketFilters->ownedRows($user),
+            'activeSavedTicketFilterId' => $activeSavedTicketFilter?->id,
             // The effective SLA targets go to every agent — the Log & triage
             // wizard reads them for its live "resolution due …" preview. Only
             // editing them is admin-gated (can.edit_sla drives the editor button).
@@ -665,26 +708,9 @@ class ItProvisioningController extends Controller
     /* ================================================================== */
 
     /**
-     * Saved views for the tickets queue — server-side where clauses keyed by
-     * the `view` query param. "awaiting_reply" is a v1 proxy (no agent
-     * response yet); it sharpens once the thread lands.
-     *
-     * @var array<string, string>
+     * Apply one predefined view's constraints to a tickets query.
+     * "awaiting_reply" remains a proxy until the thread records an agent reply.
      */
-    private const TICKET_VIEWS = [
-        'all_open' => 'All open',
-        'unassigned' => 'Unassigned',
-        'mine' => 'Mine',
-        'owned_by_me' => 'Owned by me',
-        'my_team' => "My team's work",
-        'breaching' => 'Breaching soon',
-        'breached' => 'Breached',
-        'awaiting_reply' => 'Awaiting reply',
-        'waiting' => 'All waiting work',
-        'recently_resolved' => 'Recently resolved',
-    ];
-
-    /** Apply one saved view's constraints to a tickets query. */
     private function applyTicketView($query, string $view, int $userId)
     {
         return match ($view) {
@@ -881,6 +907,7 @@ class ItProvisioningController extends Controller
             ->when($filters['source'], fn ($q, $source) => $q->where('source', $source))
             ->when($filters['work_type'], fn ($q, $workType) => $q->where('work_type', $workType))
             ->when($filters['service'], fn ($q, $service) => $q->where('it_service_id', $service))
+            ->when($filters['site_id'], fn ($q, $siteId) => $q->where('site_id', $siteId))
             ->when($filters['age'], fn ($q, $age) => $this->applyTicketAge($q, $age))
             ->when($filters['missing'], fn ($q, $missing) => $q->whereNull(match ($missing) {
                 'service' => 'it_service_id',
@@ -992,7 +1019,7 @@ class ItProvisioningController extends Controller
     }
 
     /**
-     * The server summary that feeds the hero, tab badges and saved-view
+     * The server summary that feeds the hero, tab badges and predefined-view
      * chips. Computed over ALL rows (never the current page); requesters get
      * only their own `my` section — an agent-shaped summary must never reach
      * a self-service payload.

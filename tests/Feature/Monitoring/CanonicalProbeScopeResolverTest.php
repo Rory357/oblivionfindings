@@ -8,6 +8,7 @@ use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\CanonicalProbeScopeResolver;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
 use App\Models\AssetCategory;
@@ -159,7 +160,17 @@ it('fails before the provider when a device has zero or conflicting canonical si
     ]);
     $conflicting = Device::factory()->create();
     taskFourAssign($conflicting, DeviceAssignment::TARGET_SITE, $site->id);
-    taskFourAssign($conflicting, DeviceAssignment::TARGET_SITE, $otherSite->id);
+    $conflictingAsset = Asset::factory()->create([
+        'site_id' => $otherSite->id,
+        'home_site_id' => $otherSite->id,
+        'status' => 'active',
+    ]);
+    DeviceAssetLink::create([
+        'device_id' => $conflicting->id,
+        'asset_id' => $conflictingAsset->id,
+        'link_type' => 'primary',
+        'linked_at' => now(),
+    ]);
     $conflictingVehicle = Asset::factory()->vehicle()->create([
         'site_id' => $site->id,
         'home_site_id' => $otherSite->id,
@@ -337,7 +348,17 @@ it('rejects unavailable devices archived sites and missing assignment targets be
 it('does not silently drop a missing target beside an otherwise valid assignment', function () {
     $site = Site::factory()->create();
     $device = Device::factory()->create();
-    taskFourAssign($device, DeviceAssignment::TARGET_SITE, $site->id);
+    $validAsset = Asset::factory()->create([
+        'site_id' => $site->id,
+        'home_site_id' => $site->id,
+        'status' => 'active',
+    ]);
+    DeviceAssetLink::create([
+        'device_id' => $device->id,
+        'asset_id' => $validAsset->id,
+        'link_type' => 'primary',
+        'linked_at' => now(),
+    ]);
     taskFourAssign($device, DeviceAssignment::TARGET_ROOM, 999_999);
     [$resolver, $provider] = taskFourCanonicalResolver();
 

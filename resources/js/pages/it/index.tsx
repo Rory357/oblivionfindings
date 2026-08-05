@@ -40,6 +40,10 @@ import { TicketDrawer } from '@/components/it/ticket-drawer';
 import { TicketReopenDialog } from '@/components/it/ticket-reopen-dialog';
 import { TicketRoutingSummary } from '@/components/it/ticket-routing-summary';
 import {
+    TicketSavedFilters,
+    type SavedTicketFilterRow,
+} from '@/components/it/ticket-saved-filters';
+import {
     TicketWaitingDialog,
     waitingStatusLabel,
 } from '@/components/it/ticket-waiting-dialog';
@@ -164,6 +168,7 @@ interface Filters {
     status: string | null;
     type: string | null;
     assignee: number | null;
+    site_id: number | null;
     ticket_status: string | null;
     ticket_priority: string | null;
     ticket_category: string | null;
@@ -238,6 +243,9 @@ interface Props {
     kbArticles?: KbRow[];
     kbOptions?: KbOptions;
     filters?: Filters;
+    /** User-owned queue filters; their filter JSON never leaves the server. */
+    savedTicketFilters?: SavedTicketFilterRow[];
+    activeSavedTicketFilterId?: number | null;
     /** §F1 Overview board — KPIs + needs-attention lanes (agents only). */
     overview?: OverviewPayload;
     /** Effective SLA grid — present only for admins (the policy editor). */
@@ -347,7 +355,7 @@ const TICKET_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 const TICKET_CATEGORIES = ['hardware', 'account', 'network', 'other'];
 const SLA_STATES = ['ok', 'at_risk', 'breached', 'met'];
 
-/** Saved views — server `view` param; counts come from `summary.tickets.views`
+/** Predefined views — server `view` param; counts come from `summary.tickets.views`
  *  keyed identically. Order mirrors the triage funnel (open → attention → done). */
 const TICKET_VIEWS: { key: string; label: string }[] = [
     { key: 'all_open', label: 'All open' },
@@ -390,6 +398,8 @@ export default function ItIndex({
     kbArticles = [],
     kbOptions = { owners: [], sites: [], services: [] },
     filters,
+    savedTicketFilters = [],
+    activeSavedTicketFilterId = null,
     overview,
     slaPolicies,
     slaCalendar,
@@ -583,7 +593,7 @@ export default function ItIndex({
     const applyFilter = (key: keyof Filters, value: string) =>
         navigate({ [key]: value === ALL || value === '' ? undefined : value });
 
-    /** Saved-view chip: remember it as the agent's default, then filter. */
+    /** Predefined-view chip: remember it as the agent's default, then filter. */
     const applyView = (key: string) => {
         try {
             localStorage.setItem(TICKETS_VIEW_KEY, key);
@@ -592,6 +602,15 @@ export default function ItIndex({
         }
         navigate({ view: key });
     };
+
+    const applySavedTicketFilter = (id: number) =>
+        router.get(
+            '/it',
+            { tab: 'tickets', saved_filter: id },
+            // Remount so a saved search term becomes the controlled search
+            // input value instead of being overwritten by stale local state.
+            { preserveState: false, preserveScroll: true, replace: true },
+        );
 
     /** Sortable header: first click → desc, re-click toggles asc⇄desc. */
     const applySort = (col: string) => {
@@ -615,7 +634,13 @@ export default function ItIndex({
     // Land an agent on their remembered view when they open Tickets with none set
     // (a hero deep-link carrying ?view= always wins).
     useEffect(() => {
-        if (!can.view || tab !== 'tickets' || filters?.view) return;
+        if (
+            !can.view ||
+            tab !== 'tickets' ||
+            filters?.view ||
+            activeSavedTicketFilterId !== null
+        )
+            return;
         const stored = readStoredView();
         if (stored) navigate({ view: stored });
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -638,13 +663,14 @@ export default function ItIndex({
     }, [can.view, breachedCount]);
 
     const ticketFiltersActive = Boolean(
-        filters?.q ||
+        search.trim() ||
         filters?.view ||
         filters?.ticket_status ||
         filters?.ticket_priority ||
         filters?.ticket_category ||
         filters?.sla ||
         filters?.assignee ||
+        filters?.site_id ||
         filters?.from ||
         filters?.to ||
         filters?.source ||
@@ -659,6 +685,36 @@ export default function ItIndex({
         filters?.resolved_from ||
         filters?.resolved_to,
     );
+
+    const currentTicketFilters = Object.fromEntries(
+        Object.entries({
+            view: filters?.view,
+            q: search.trim() || null,
+            ticket_status: filters?.ticket_status,
+            ticket_priority: filters?.ticket_priority,
+            ticket_category: filters?.ticket_category,
+            sla: filters?.sla,
+            assignee: filters?.assignee,
+            site_id: filters?.site_id,
+            from: filters?.from,
+            to: filters?.to,
+            source: filters?.source,
+            work_type: filters?.work_type,
+            service: filters?.service,
+            age: filters?.age,
+            missing: filters?.missing,
+            reopened: filters?.reopened,
+            first_contact: filters?.first_contact,
+            open_only: filters?.open_only,
+            device_linked: filters?.device_linked,
+            resolved_from: filters?.resolved_from,
+            resolved_to: filters?.resolved_to,
+            sort: filters?.sort,
+            dir: filters?.dir,
+        }).filter(
+            ([, value]) => value !== null && value !== '' && value !== false,
+        ),
+    ) as Record<string, string | number | boolean>;
 
     /** Wipe every tickets filter (and the search box) back to the full queue. */
     const clearTicketFilters = () => {
@@ -2031,8 +2087,11 @@ export default function ItIndex({
                     {/* ── Ticket queue (agents) ── */}
                     {can.view && tab === 'tickets' && (
                         <>
-                            {/* Saved views — counts from the all-time summary */}
-                            <div className="flex flex-wrap items-center gap-1.5">
+                            {/* Canonical queue views — counts from the all-time summary. */}
+                            <div
+                                className="flex flex-wrap items-center gap-1.5"
+                                aria-label="Predefined ticket views"
+                            >
                                 {TICKET_VIEWS.map((v) => {
                                     const activeView = filters?.view === v.key;
                                     const count =
@@ -2063,6 +2122,14 @@ export default function ItIndex({
                                     );
                                 })}
                             </div>
+
+                            <TicketSavedFilters
+                                filters={savedTicketFilters}
+                                activeId={activeSavedTicketFilterId}
+                                currentFilters={currentTicketFilters}
+                                canSave={ticketFiltersActive}
+                                onApply={applySavedTicketFilter}
+                            />
 
                             {/* Toolbar — search + filters */}
                             <div className="flex flex-wrap items-center gap-2">
@@ -2122,6 +2189,15 @@ export default function ItIndex({
                                     onChange={(v) => applyFilter('sla', v)}
                                     allLabel="Any SLA state"
                                     options={SLA_STATES}
+                                />
+                                <SiteFilter
+                                    value={
+                                        filters?.site_id != null
+                                            ? String(filters.site_id)
+                                            : ALL
+                                    }
+                                    onChange={(v) => applyFilter('site_id', v)}
+                                    sites={siteOptions}
                                 />
                                 <AssigneeFilter
                                     value={
@@ -3016,6 +3092,35 @@ function AssigneeFilter({
                 {assignees.map((a) => (
                     <SelectItem key={a.id} value={String(a.id)}>
                         {a.name}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
+
+function SiteFilter({
+    value,
+    onChange,
+    sites,
+}: {
+    value: string;
+    onChange: (v: string) => void;
+    sites: SiteOption[];
+}) {
+    return (
+        <Select value={value} onValueChange={onChange}>
+            <SelectTrigger
+                className="h-8 w-[180px]"
+                aria-label="Filter by Site"
+            >
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value={ALL}>All accessible Sites</SelectItem>
+                {sites.map((site) => (
+                    <SelectItem key={site.id} value={String(site.id)}>
+                        {site.name}
                     </SelectItem>
                 ))}
             </SelectContent>

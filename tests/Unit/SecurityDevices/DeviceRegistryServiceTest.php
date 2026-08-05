@@ -16,6 +16,7 @@ use App\Models\SiteRoom;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+use UnexpectedValueException;
 
 class DeviceRegistryServiceTest extends TestCase
 {
@@ -93,6 +94,90 @@ class DeviceRegistryServiceTest extends TestCase
         $results = $this->service->forSite($site->id)->get();
 
         $this->assertCount(1, $results);
+    }
+
+    public function test_site_room_resolves_only_active_canonical_devices_and_retains_assignment_history(): void
+    {
+        $site = Site::factory()->create();
+        $actor = User::factory()->create();
+        $room = SiteRoom::create([
+            'site_id' => $site->id,
+            'name' => 'Plant room',
+        ]);
+        $device = Device::factory()->itInfrastructure()->create([
+            'provider' => 'native',
+        ]);
+        $siteAssignment = DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now()->subHour(),
+        ]);
+
+        $roomAssignment = $this->service->placeWithinSite(
+            $device,
+            $site->id,
+            $room->id,
+            $actor->id,
+        );
+
+        $this->assertSame(DeviceAssignment::TARGET_ROOM, $roomAssignment->assignable_type);
+        $this->assertSame($room->id, $roomAssignment->assignable_id);
+        $this->assertNotNull($siteAssignment->fresh()->released_at);
+        $this->assertSame([$device->id], $room->activeDevices()->pluck('devices.id')->all());
+        $this->assertSame(
+            [$roomAssignment->id],
+            $room->deviceAssignments()->active()->pluck('device_assignments.id')->all(),
+        );
+
+        $siteReturn = $this->service->placeWithinSite(
+            $device,
+            $site->id,
+            null,
+            $actor->id,
+        );
+
+        $this->assertSame(DeviceAssignment::TARGET_SITE, $siteReturn->assignable_type);
+        $this->assertSame($site->id, $siteReturn->assignable_id);
+        $this->assertNotNull($roomAssignment->fresh()->released_at);
+        $this->assertFalse($room->activeDevices()->exists());
+        $this->assertSame(3, $device->assignments()->count());
+    }
+
+    public function test_site_room_placement_fails_closed_for_another_site_without_rewriting_history(): void
+    {
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
+        $actor = User::factory()->create();
+        $room = SiteRoom::create([
+            'site_id' => $otherSite->id,
+            'name' => 'Private room',
+        ]);
+        $device = Device::factory()->itInfrastructure()->create();
+        $assignment = DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now(),
+        ]);
+
+        try {
+            $this->service->placeWithinSite(
+                $device,
+                $site->id,
+                $room->id,
+                $actor->id,
+            );
+            $this->fail('A room from another Site must not become canonical Device placement.');
+        } catch (UnexpectedValueException) {
+            $this->assertDatabaseHas('device_assignments', [
+                'id' => $assignment->id,
+                'assignable_type' => DeviceAssignment::TARGET_SITE,
+                'assignable_id' => $site->id,
+                'released_at' => null,
+            ]);
+            $this->assertSame(1, $device->assignments()->count());
+        }
     }
 
     public function test_for_site_excludes_released_assignments(): void

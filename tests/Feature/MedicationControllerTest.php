@@ -1362,6 +1362,7 @@ class MedicationControllerTest extends TestCase
                 'on_hand' => 8,
                 'witnessed_by' => $witness->id,
                 'reason' => 'Two missing after shift change',
+                'immediate_action_taken' => 'Secured the remaining stock and escalated the discrepancy.',
                 'unit' => 'tablets',
             ])
             ->assertRedirect()
@@ -1376,6 +1377,7 @@ class MedicationControllerTest extends TestCase
             'status' => 'open',
             'reported_by' => $this->admin->id,
             'witnessed_by' => $witness->id,
+            'immediate_action_taken' => 'Secured the remaining stock and escalated the discrepancy.',
         ]);
     }
 
@@ -1418,6 +1420,7 @@ class MedicationControllerTest extends TestCase
                 'on_hand' => 8,
                 'witnessed_by' => $this->hrUser->id,
                 'reason' => 'Check',
+                'immediate_action_taken' => 'Secured the stock pending an authorised witness review.',
             ])
             ->assertRedirect()
             ->assertSessionHas('error');
@@ -2465,6 +2468,7 @@ class MedicationControllerTest extends TestCase
                 'on_hand' => 9,
                 'witnessed_by' => $witness->id,
                 'reason' => 'Override check',
+                'immediate_action_taken' => 'Secured the stock and escalated the new discrepancy.',
                 'unit' => 'tablets',
             ])
             ->assertRedirect()

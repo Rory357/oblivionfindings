@@ -6,6 +6,7 @@ use App\Domain\Monitoring\Discovery\Models\DeviceIdentityEvidence;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryCandidate;
 use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\SecurityDevices\AccessControl\Models\AccessControlCredential;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
@@ -210,6 +211,12 @@ class Device extends Model
     public function documents(): HasMany
     {
         return $this->hasMany(DeviceDocument::class);
+    }
+
+    public function accessControlCredentials(): BelongsToMany
+    {
+        return $this->belongsToMany(AccessControlCredential::class, 'access_control_credential_device', 'device_id', 'access_credential_id')
+            ->withTimestamps();
     }
 
     // ── Scopes ────────────────────────────────────────────────────

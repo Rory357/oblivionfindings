@@ -466,6 +466,7 @@ it('keeps waiting ownership explicit governed and requester safe', function () {
 it('keeps canonical routed ownership visible to technicians and private from requesters', function () {
     $root = str_replace('\\', '/', dirname(__DIR__, 2));
     $queueController = file_get_contents($root.'/app/Http/Controllers/It/ItProvisioningController.php');
+    $savedFilters = file_get_contents($root.'/app/Domain/It/Services/ItSavedTicketFilterService.php');
     $ticketController = file_get_contents($root.'/app/Http/Controllers/It/ItTicketController.php');
     $routing = file_get_contents($root.'/app/Domain/It/Services/ItTicketRoutingService.php');
     $presenter = file_get_contents($root.'/app/Domain/It/Presenters/ItTicketRoutingPresenter.php');
@@ -478,9 +479,10 @@ it('keeps canonical routed ownership visible to technicians and private from req
         ->toContain('$ticket->queue_id = $queue?->id')
         ->toContain('$ticket->team_id = $queue?->team_id')
         ->toContain('$ticket->owner_user_id = null')
-        ->and($queueController)
+        ->and($savedFilters)
         ->toContain("'owned_by_me' => 'Owned by me'")
         ->toContain("'my_team' => \"My team's work\"")
+        ->and($queueController)
         ->toContain("'routing' => \$this->routingPresenter->present(\$t)")
         ->and($ticketController)
         ->toContain("...(\$isAgent ? ['routing' => \$this->routingPresenter->present(\$ticket)] : [])")

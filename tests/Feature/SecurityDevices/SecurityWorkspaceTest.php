@@ -518,6 +518,8 @@ class SecurityWorkspaceTest extends TestCase
 
     private function assignToStaff(Device $device, User $viewer): void
     {
+        $device->assignments()->active()->update(['released_at' => now()]);
+
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_STAFF,

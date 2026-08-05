@@ -11,6 +11,7 @@ use App\Http\Controllers\It\ItMajorIncidentController;
 use App\Http\Controllers\It\ItProblemController;
 use App\Http\Controllers\It\ItProvisioningController;
 use App\Http\Controllers\It\ItReportsController;
+use App\Http\Controllers\It\ItSavedTicketFilterController;
 use App\Http\Controllers\It\ItServiceManagementSetupController;
 use App\Http\Controllers\It\ItTicketController;
 use App\Http\Controllers\It\ItWorkTaskController;
@@ -161,6 +162,12 @@ Route::get('/my-roster', [RosterController::class, 'index'])
 // docs/IT_TICKETING_GAP_ANALYSIS.md.
 Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () {
     Route::get('/it', [ItProvisioningController::class, 'index'])->name('it.index');
+    Route::post('/it/ticket-filters', [ItSavedTicketFilterController::class, 'store'])
+        ->middleware('permission:it.view')
+        ->name('it.ticket-filters.store');
+    Route::delete('/it/ticket-filters/{savedFilter}', [ItSavedTicketFilterController::class, 'destroy'])
+        ->middleware('permission:it.view')
+        ->name('it.ticket-filters.destroy');
     Route::get('/it/catalog', [ItCatalogController::class, 'index'])->name('it.catalog.index');
     Route::post('/it/catalog/{catalogItem}/submissions', [ItCatalogController::class, 'store'])->name('it.catalog.submissions.store');
     Route::get('/it/changes', [ItChangeController::class, 'index'])->middleware('permission:it.view')->name('it.changes.index');

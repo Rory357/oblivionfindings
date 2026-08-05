@@ -29,6 +29,8 @@ class SecurityDevicesPermissionsTest extends TestCase
         'securityDevices.groups.manage',
         'securityDevices.events.view',
         'securityDevices.cctv.media.view',
+        'securityDevices.accessControl.view',
+        'securityDevices.accessControl.manage',
         'securityDevices.maintenance.view',
         'securityDevices.maintenance.manage',
         'securityDevices.integrations.view',
@@ -63,11 +65,11 @@ class SecurityDevicesPermissionsTest extends TestCase
         }
     }
 
-    public function test_exactly_22_security_devices_permissions(): void
+    public function test_exactly_24_security_devices_permissions(): void
     {
         $count = Permission::where('key', 'like', 'securityDevices.%')->count();
 
-        $this->assertEquals(22, $count);
+        $this->assertEquals(24, $count);
     }
 
     public function test_permissions_have_correct_group_and_module(): void
@@ -125,6 +127,7 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.reports.view',
             'securityDevices.commands.observe',
             'securityDevices.commands.operate',
+            'securityDevices.accessControl.view',
         ];
         $denied = [
             'securityDevices.devices.create',
@@ -138,6 +141,7 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.commands.control',
             'securityDevices.commands.approve',
             'securityDevices.commands.admin',
+            'securityDevices.accessControl.manage',
         ];
 
         foreach ($expected as $key) {
@@ -177,6 +181,8 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.commands.control',
             'securityDevices.commands.approve',
             'securityDevices.commands.admin',
+            'securityDevices.accessControl.view',
+            'securityDevices.accessControl.manage',
         ];
 
         foreach ($expected as $key) {
@@ -211,6 +217,8 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.commands.control',
             'securityDevices.commands.approve',
             'securityDevices.commands.admin',
+            'securityDevices.accessControl.view',
+            'securityDevices.accessControl.manage',
         ];
 
         foreach ($expected as $key) {
@@ -241,6 +249,8 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.commands.observe',
             'securityDevices.commands.operate',
             'securityDevices.commands.manage',
+            'securityDevices.accessControl.view',
+            'securityDevices.accessControl.manage',
         ];
         $denied = [
             'securityDevices.devices.delete',
@@ -272,6 +282,7 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.events.view',
             'securityDevices.reports.view',
             'securityDevices.commands.observe',
+            'securityDevices.accessControl.view',
         ];
         $denied = [
             'securityDevices.devices.create',
@@ -285,6 +296,7 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.commands.control',
             'securityDevices.commands.approve',
             'securityDevices.commands.admin',
+            'securityDevices.accessControl.manage',
         ];
 
         foreach ($expected as $key) {

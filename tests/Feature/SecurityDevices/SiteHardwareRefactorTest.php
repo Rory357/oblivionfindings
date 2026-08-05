@@ -214,7 +214,7 @@ class SiteHardwareRefactorTest extends TestCase
 
     // ── Integration/rooms data still present ──────────────────────
 
-    public function test_rooms_and_unifi_data_still_passed_without_legacy_site_hardware_props(): void
+    public function test_rooms_and_permissions_are_passed_without_legacy_site_hardware_props(): void
     {
         SiteRoom::create([
             'site_id' => $this->siteA->id,
@@ -227,7 +227,6 @@ class SiteHardwareRefactorTest extends TestCase
         $response->assertInertia(function ($page) {
             $props = $page->toArray()['props'];
             $this->assertNotEmpty($props['rooms']);
-            $this->assertArrayHasKey('unifi', $props);
             $this->assertArrayHasKey('can', $props);
             $this->assertArrayNotHasKey('hardware', $props);
             $this->assertArrayNotHasKey('assets', $props);
@@ -376,6 +375,69 @@ class SiteHardwareRefactorTest extends TestCase
         // The canonical DeviceAssignment is authoritative; legacy
         // LocationHardware.room_id is intentionally not synced — see
         // UnifiOperationalBridgeService::syncRoomAssignment.
+    }
+
+    public function test_assign_room_route_places_non_unifi_equipment_in_the_canonical_device_registry(): void
+    {
+        $room = SiteRoom::create([
+            'site_id' => $this->siteA->id,
+            'name' => 'Clinical equipment room',
+        ]);
+        $device = Device::factory()->iotHealthcare()->create([
+            'provider' => 'native',
+            'name' => 'Portable oxygen monitor',
+        ]);
+        $siteAssignment = DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $this->siteA->id,
+            'assigned_at' => now()->subHour(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/sites/{$this->siteA->id}/hardware/{$device->id}/assign-room", [
+                'room_id' => $room->id,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Hardware room assignment updated.');
+
+        $active = $device->fresh()->assignments()->active()->sole();
+        $this->assertSame(DeviceAssignment::TARGET_ROOM, $active->assignable_type);
+        $this->assertSame($room->id, $active->assignable_id);
+        $this->assertNotNull($siteAssignment->fresh()->released_at);
+        $this->assertSame([$device->id], $room->activeDevices()->pluck('devices.id')->all());
+    }
+
+    public function test_non_unifi_room_placement_conceals_another_site_and_keeps_the_current_assignment(): void
+    {
+        config()->set('app.debug', false);
+        $foreignRoom = SiteRoom::create([
+            'site_id' => $this->siteB->id,
+            'name' => 'Other Site equipment room',
+        ]);
+        $device = Device::factory()->security()->create([
+            'provider' => 'milesight',
+        ]);
+        $assignment = DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $this->siteA->id,
+            'assigned_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->postJson("/sites/{$this->siteA->id}/hardware/{$device->id}/assign-room", [
+                'room_id' => $foreignRoom->id,
+            ]);
+
+        $response->assertNotFound();
+        $this->assertDatabaseHas('device_assignments', [
+            'id' => $assignment->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $this->siteA->id,
+            'released_at' => null,
+        ]);
+        $this->assertSame(1, $device->assignments()->count());
     }
 
     public function test_assign_room_route_does_not_reveal_missing_or_inaccessible_rooms_or_mutate_state(): void

@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\SecurityDevices\AccessControl\Http\Controllers\AccessControlController;
 use App\Domain\SecurityDevices\Credentials\Http\Controllers\CredentialReferenceController;
 use App\Domain\SecurityDevices\Http\Controllers\AlertsEventsController;
 use App\Domain\SecurityDevices\Http\Controllers\CategoryPageController;
@@ -232,6 +233,18 @@ Route::middleware([
 
     Route::get('/access-control', [CategoryPageController::class, 'accessControl'])
         ->name('security-devices.access-control');
+
+    Route::post('/access-control/schedules', [AccessControlController::class, 'storeSchedule'])
+        ->middleware('permission:securityDevices.accessControl.manage')
+        ->name('security-devices.access-control.schedules.store');
+
+    Route::post('/access-control/credentials', [AccessControlController::class, 'storeCredential'])
+        ->middleware('permission:securityDevices.accessControl.manage')
+        ->name('security-devices.access-control.credentials.store');
+
+    Route::post('/access-control/credentials/{accessCredential}/revoke', [AccessControlController::class, 'revoke'])
+        ->middleware('permission:securityDevices.accessControl.manage')
+        ->name('security-devices.access-control.credentials.revoke');
 
     Route::get('/tracking-devices', [CategoryPageController::class, 'trackingDevices'])
         ->name('security-devices.tracking-devices');

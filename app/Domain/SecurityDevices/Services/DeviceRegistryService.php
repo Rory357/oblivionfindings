@@ -101,6 +101,80 @@ class DeviceRegistryService
         return $this->applySiteScope($this->access->visibleDevices($user), $siteId, $roomIds);
     }
 
+    /**
+     * Move a canonical Device between a Site and one of its rooms.
+     *
+     * This is the sole generic Site Profile placement path. It preserves the
+     * released assignment as history and fails closed if the Device moved to
+     * another Site after the caller performed its permission-scoped lookup.
+     */
+    public function placeWithinSite(
+        Device $device,
+        int $expectedSiteId,
+        ?int $roomId,
+        int $actorId,
+    ): DeviceAssignment {
+        return DB::transaction(function () use ($device, $expectedSiteId, $roomId, $actorId): DeviceAssignment {
+            $siteExists = Site::query()
+                ->whereKey($expectedSiteId)
+                ->lockForUpdate()
+                ->exists();
+            $actorExists = User::query()
+                ->whereKey($actorId)
+                ->whereNotNull('approved_at')
+                ->exists();
+            $lockedDevice = Device::query()
+                ->whereKey($device->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if (! $siteExists || ! $actorExists || $lockedDevice === null) {
+                throw new UnexpectedValueException('Canonical Site placement is unavailable.');
+            }
+
+            $activeAssignments = $lockedDevice->assignments()
+                ->active()
+                ->orderByDesc('assigned_at')
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->get();
+
+            if ($activeAssignments->count() !== 1
+                || $this->assignmentSiteId($activeAssignments->first()) !== $expectedSiteId) {
+                throw new UnexpectedValueException('Canonical Device no longer belongs to the expected Site.');
+            }
+
+            $room = $roomId === null
+                ? null
+                : SiteRoom::query()
+                    ->whereKey($roomId)
+                    ->where('site_id', $expectedSiteId)
+                    ->lockForUpdate()
+                    ->first();
+            if ($roomId !== null && $room === null) {
+                throw new UnexpectedValueException('Canonical room placement is unavailable.');
+            }
+
+            $targetType = $room === null
+                ? DeviceAssignment::TARGET_SITE
+                : DeviceAssignment::TARGET_ROOM;
+            $targetId = $room?->getKey() ?? $expectedSiteId;
+            $active = $activeAssignments->first();
+            if ($active->assignable_type === $targetType
+                && (int) $active->assignable_id === (int) $targetId) {
+                return $active;
+            }
+
+            return $this->deviceAssignments->assign(
+                device: $lockedDevice,
+                assignableType: $targetType,
+                assignableId: (int) $targetId,
+                assignedByUserId: $actorId,
+                assignmentType: AssignmentType::Permanent,
+            );
+        }, 3);
+    }
+
     private function applySiteScope(Builder $query, int $siteId, $roomIds): Builder
     {
         return $query
@@ -133,6 +207,23 @@ class DeviceRegistryService
                     });
                 });
             });
+    }
+
+    private function assignmentSiteId(DeviceAssignment $assignment): ?int
+    {
+        if ($assignment->assignable_type === DeviceAssignment::TARGET_SITE) {
+            $siteId = Site::query()->whereKey($assignment->assignable_id)->value('id');
+
+            return is_numeric($siteId) ? (int) $siteId : null;
+        }
+
+        if ($assignment->assignable_type === DeviceAssignment::TARGET_ROOM) {
+            $siteId = SiteRoom::query()->whereKey($assignment->assignable_id)->value('site_id');
+
+            return is_numeric($siteId) ? (int) $siteId : null;
+        }
+
+        return null;
     }
 
     /**

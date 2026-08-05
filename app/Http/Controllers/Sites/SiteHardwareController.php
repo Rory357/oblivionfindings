@@ -16,6 +16,7 @@ use App\Services\Sites\SiteTypePlanService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use UnexpectedValueException;
 
 class SiteHardwareController extends Controller
 {
@@ -36,39 +37,52 @@ class SiteHardwareController extends Controller
     }
 
     // ── Remaining room-management methods ────────────────────────
-    // Sites still owns room management itself, but UniFi room placement now
-    // writes canonical DeviceAssignment state first and only mirrors the
-    // linked LocationHardware row as compatibility metadata.
+    // Sites owns physical room management, while every provider's placement
+    // writes canonical DeviceAssignment state. UniFi retains its hardened
+    // integration bridge; other providers use the generic registry service.
     public function assignRoom(
         Request $request,
         Site $site,
         int $hardware,
-        UnifiOperationalBridgeService $runtime,
+        UnifiOperationalBridgeService $unifi,
     ) {
         $this->authorize('update', $site);
 
         $device = $this->registry->visibleForSite($request->user(), $site->id)
-            ->byProvider('unifi')
             ->findOrFail($hardware);
-
-        $currentSiteId = $runtime->resolveSiteId($device);
-        abort_unless($currentSiteId === null || $currentSiteId === $site->id, 404);
 
         $validated = $request->validate([
             'room_id' => ['nullable', 'integer'],
         ]);
 
-        $room = null;
-        $roomId = $validated['room_id'] ?? null;
-        if ($roomId !== null) {
-            $room = SiteRoom::query()
-                ->where('site_id', $site->id)
-                ->whereHas('site')
-                ->find($roomId);
-            abort_unless($room, 404);
-        }
+        $roomId = isset($validated['room_id']) ? (int) $validated['room_id'] : null;
 
-        $runtime->syncRoomAssignment($device, $room, $request->user()?->id, $site->id);
+        if ($device->provider === 'unifi') {
+            $room = $roomId === null
+                ? null
+                : SiteRoom::query()
+                    ->where('site_id', $site->id)
+                    ->whereHas('site')
+                    ->find($roomId);
+            abort_unless($roomId === null || $room !== null, 404);
+            $unifi->syncRoomAssignment(
+                $device,
+                $room,
+                $request->user()?->id,
+                (int) $site->id,
+            );
+        } else {
+            try {
+                $this->registry->placeWithinSite(
+                    device: $device,
+                    expectedSiteId: (int) $site->id,
+                    roomId: $roomId,
+                    actorId: (int) $request->user()->id,
+                );
+            } catch (UnexpectedValueException) {
+                abort(404);
+            }
+        }
 
         return redirect()->back()->with('success', 'Hardware room assignment updated.');
     }

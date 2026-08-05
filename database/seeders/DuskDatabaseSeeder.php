@@ -221,6 +221,7 @@ class DuskDatabaseSeeder extends Seeder
             'securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.devices.create',
             'securityDevices.devices.update', 'securityDevices.devices.delete', 'securityDevices.devices.assign',
             'securityDevices.groups.manage', 'securityDevices.events.view', 'securityDevices.cctv.media.view',
+            'securityDevices.accessControl.view', 'securityDevices.accessControl.manage',
             'securityDevices.maintenance.view', 'securityDevices.maintenance.manage',
             'securityDevices.integrations.view', 'securityDevices.integrations.manage',
             'securityDevices.reports.view', 'securityDevices.commands.observe',
