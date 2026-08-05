@@ -14,6 +14,7 @@ final class CollectorEnrollment extends Model
     protected $fillable = [
         'site_id',
         'issued_by_user_id',
+        'replacement_collector_id',
         'token_hash',
         'expires_at',
         'consumed_at',
@@ -37,6 +38,11 @@ final class CollectorEnrollment extends Model
     public function issuedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'issued_by_user_id');
+    }
+
+    public function replacementCollector(): BelongsTo
+    {
+        return $this->belongsTo(MonitoringCollector::class, 'replacement_collector_id');
     }
 
     public function consumedCollector(): BelongsTo

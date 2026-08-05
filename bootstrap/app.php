@@ -40,6 +40,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->group(base_path('routes/monitoring-collector.php'));
         },
     )
+    ->withBroadcasting(
+        __DIR__.'/../routes/channels.php',
+        ['middleware' => ['web', 'auth']],
+    )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 

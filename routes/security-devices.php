@@ -18,6 +18,7 @@ use App\Domain\SecurityDevices\Http\Controllers\Integrations\UnifiController;
 use App\Domain\SecurityDevices\Http\Controllers\IntegrationsHubController;
 use App\Domain\SecurityDevices\Http\Controllers\MaintenanceHealthController;
 use App\Domain\SecurityDevices\Http\Controllers\MaintenanceOperationsController;
+use App\Domain\SecurityDevices\Http\Controllers\MonitoringCollectorLifecycleController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringDeadLetterController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringOperationsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringRuntimeHealthController;
@@ -361,6 +362,22 @@ Route::middleware([
     Route::get('/discovery', DiscoveryCollectorController::class)
         ->middleware('permission:securityDevices.integrations.view')
         ->name('security-devices.discovery');
+
+    Route::prefix('/discovery/collectors')
+        ->middleware([
+            'permission:securityDevices.integrations.manage',
+            'throttle:6,1',
+        ])
+        ->group(function () {
+            Route::post('/enrolments', [MonitoringCollectorLifecycleController::class, 'issue'])
+                ->name('security-devices.collectors.enrolments.issue');
+            Route::post('/{collector}/re-enrolment', [MonitoringCollectorLifecycleController::class, 'reEnroll'])
+                ->whereNumber('collector')
+                ->name('security-devices.collectors.enrolments.reissue');
+            Route::post('/{collector}/revoke', [MonitoringCollectorLifecycleController::class, 'revoke'])
+                ->whereNumber('collector')
+                ->name('security-devices.collectors.revoke');
+        });
 
     Route::get('/settings', SettingsAuditController::class)
         ->name('security-devices.settings');

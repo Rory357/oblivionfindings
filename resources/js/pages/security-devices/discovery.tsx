@@ -1,6 +1,13 @@
 import { PageHero, PageTabs } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import {
+    CollectorEnrollmentDialog,
+    CollectorRevocationDialog,
+    type CollectorLifecycleTarget,
+    type CollectorManagementSite,
+} from '@/components/security-devices/collector-lifecycle-dialogs';
+import { Button } from '@/components/ui/button';
+import {
     Card,
     CardContent,
     CardDescription,
@@ -18,7 +25,9 @@ import {
     Network,
     Radar,
     RadioTower,
+    RotateCcw,
     ShieldCheck,
+    ShieldX,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -42,6 +51,11 @@ export type Collector = {
     corrupted_frames?: number;
     clock_drift_seconds?: number | null;
     revoked_at?: string | null;
+    actions?: {
+        can_manage: boolean;
+        revoke_url: string | null;
+        re_enrol_url: string | null;
+    };
 };
 
 export type DiscoveryScopeRow = {
@@ -124,6 +138,11 @@ export type DiscoveryWorkspace = {
         description: string;
     };
     collectors: Collector[];
+    collector_management: {
+        can_manage: boolean;
+        issue_url: string | null;
+        sites: CollectorManagementSite[];
+    };
     scopes: DiscoveryScopeRow[];
     runs: DiscoveryRunRow[];
     candidates: DiscoveryCandidateRow[];
@@ -250,7 +269,15 @@ export function DiscoveryRunCard({ run }: { run: DiscoveryRunRow }) {
     );
 }
 
-export function CollectorCard({ collector }: { collector: Collector }) {
+export function CollectorCard({
+    collector,
+    onReEnroll,
+    onRevoke,
+}: {
+    collector: Collector;
+    onReEnroll?: (collector: Collector) => void;
+    onRevoke?: (collector: Collector) => void;
+}) {
     return (
         <article
             aria-label={`Collector ${collector.name}`}
@@ -294,6 +321,32 @@ export function CollectorCard({ collector }: { collector: Collector }) {
                             {collector.corrupted_frames ?? 0} corrupt frames
                         </p>
                     ) : null}
+                    {collector.actions?.can_manage ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {collector.actions.re_enrol_url && onReEnroll ? (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => onReEnroll(collector)}
+                                >
+                                    <RotateCcw className="mr-2 h-4 w-4" />
+                                    Re-enrol collector
+                                </Button>
+                            ) : null}
+                            {collector.actions.revoke_url && onRevoke ? (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => onRevoke(collector)}
+                                >
+                                    <ShieldX className="mr-2 h-4 w-4" />
+                                    Revoke collector
+                                </Button>
+                            ) : null}
+                        </div>
+                    ) : null}
                 </div>
                 <div className="text-xs text-muted-foreground lg:text-right">
                     <p>Last heartbeat {when(collector.last_seen_at)}</p>
@@ -315,6 +368,11 @@ export default function DiscoveryCollectors({
     workspace: DiscoveryWorkspace;
 }) {
     const [activeTab, setActiveTab] = useState(workspace.active_tab);
+    const [enrollmentOpen, setEnrollmentOpen] = useState(false);
+    const [replacementCollector, setReplacementCollector] =
+        useState<CollectorLifecycleTarget | null>(null);
+    const [revocationCollector, setRevocationCollector] =
+        useState<CollectorLifecycleTarget | null>(null);
     const changeTab = (tab: string) => {
         setActiveTab(tab);
         router.get(
@@ -323,6 +381,19 @@ export default function DiscoveryCollectors({
             { preserveState: true, preserveScroll: true, replace: true },
         );
     };
+    const lifecycleTarget = (
+        collector: Collector,
+    ): CollectorLifecycleTarget => ({
+        id: collector.id,
+        name: collector.name,
+        site: collector.site
+            ? { id: collector.site.id, name: collector.site.name }
+            : null,
+        revoke_url: collector.actions?.revoke_url ?? null,
+        re_enrol_url: collector.actions?.re_enrol_url ?? null,
+    });
+    const refreshCollectors = () =>
+        router.reload({ only: ['workspace'], preserveScroll: true });
 
     return (
         <AppLayout
@@ -483,13 +554,28 @@ export default function DiscoveryCollectors({
 
                 {activeTab === 'collectors' ? (
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Remote collectors</CardTitle>
-                            <CardDescription>
-                                Heartbeat, site scope, exact monitor load, and
-                                affected-device impact. No invented capacity
-                                percentage.
-                            </CardDescription>
+                        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <CardTitle>Remote collectors</CardTitle>
+                                <CardDescription>
+                                    Heartbeat, site scope, exact monitor load,
+                                    and affected-device impact. No invented
+                                    capacity percentage.
+                                </CardDescription>
+                            </div>
+                            {workspace.collector_management.can_manage &&
+                            workspace.collector_management.issue_url &&
+                            workspace.collector_management.sites.length ? (
+                                <Button
+                                    type="button"
+                                    onClick={() => {
+                                        setReplacementCollector(null);
+                                        setEnrollmentOpen(true);
+                                    }}
+                                >
+                                    Enrol remote collector
+                                </Button>
+                            ) : null}
                         </CardHeader>
                         <CardContent className="space-y-3">
                             {workspace.collectors.length ? (
@@ -497,6 +583,17 @@ export default function DiscoveryCollectors({
                                     <CollectorCard
                                         key={collector.id}
                                         collector={collector}
+                                        onReEnroll={(selected) => {
+                                            setReplacementCollector(
+                                                lifecycleTarget(selected),
+                                            );
+                                            setEnrollmentOpen(true);
+                                        }}
+                                        onRevoke={(selected) =>
+                                            setRevocationCollector(
+                                                lifecycleTarget(selected),
+                                            )
+                                        }
                                     />
                                 ))
                             ) : (
@@ -807,6 +904,24 @@ export default function DiscoveryCollectors({
                     </Card>
                 ) : null}
             </PageShell>
+            {workspace.collector_management.issue_url ? (
+                <CollectorEnrollmentDialog
+                    open={enrollmentOpen}
+                    onOpenChange={setEnrollmentOpen}
+                    issueUrl={workspace.collector_management.issue_url}
+                    sites={workspace.collector_management.sites}
+                    replacement={replacementCollector}
+                    onIssued={refreshCollectors}
+                />
+            ) : null}
+            <CollectorRevocationDialog
+                open={revocationCollector !== null}
+                onOpenChange={(open) => {
+                    if (!open) setRevocationCollector(null);
+                }}
+                collector={revocationCollector}
+                onRevoked={refreshCollectors}
+            />
         </AppLayout>
     );
 }

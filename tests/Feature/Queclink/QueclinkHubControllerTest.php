@@ -649,7 +649,8 @@ class QueclinkHubControllerTest extends TestCase
             'device_id' => $canonicalDevice->id,
             'assignable_type' => DeviceAssignment::TARGET_SITE,
             'assignable_id' => $localSite->id,
-            'assigned_at' => now(),
+            'assigned_at' => now()->subMinutes(2),
+            'released_at' => now()->subMinute(),
         ]);
         $assignment = DeviceAssignment::create([
             'device_id' => $canonicalDevice->id,
@@ -680,7 +681,7 @@ class QueclinkHubControllerTest extends TestCase
 
         $this->assertNull($assignment->fresh()->released_at);
         $this->assertNull($assignment->fresh()->released_by_user_id);
-        $this->assertNull($localAssignment->fresh()->released_at);
+        $this->assertNotNull($localAssignment->fresh()->released_at);
         $this->assertNull($localAssignment->fresh()->released_by_user_id);
         $this->assertSame('paired', $tracker->fresh()->status);
         $this->assertNull($tracker->fresh()->unpaired_at);

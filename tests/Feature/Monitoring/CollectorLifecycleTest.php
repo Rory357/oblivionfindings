@@ -580,8 +580,17 @@ it('denies every authenticated endpoint after revocation and permits governed re
         'revoked-heartbeat-nonce',
     )->assertUnauthorized()->assertExactJson(['message' => 'Collector authentication failed.']);
 
-    $replacement = app(CollectorEnrollmentService::class)->issue($record['site']->id, $record['actor']->id);
+    $replacement = app(CollectorEnrollmentService::class)->issue(
+        $record['site']->id,
+        $record['actor']->id,
+        replacesCollectorId: $record['collector']->id,
+    );
     $newPair = sodium_crypto_sign_keypair();
+    $this->withToken($replacement->plainToken)->postJson('/api/monitoring/collectors/enrol', [
+        'collector_id' => '018f0000-0000-7000-8000-000000000099',
+        'collector_public_key' => base64_encode(sodium_crypto_sign_publickey($newPair)),
+    ])->assertUnprocessable();
+
     $this->withToken($replacement->plainToken)->postJson('/api/monitoring/collectors/enrol', [
         'collector_id' => $record['collector']->collector_uuid,
         'collector_public_key' => base64_encode(sodium_crypto_sign_publickey($newPair)),

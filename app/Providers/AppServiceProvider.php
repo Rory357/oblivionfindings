@@ -169,6 +169,7 @@ use App\Observers\TimesheetMileageObserver;
 use App\Observers\WorkplaceInjuryObserver;
 use App\Services\AuditLogger;
 use App\Services\Catering\DeliveryProviders\DeliveryProviderManager;
+use App\Services\Fleet\FleetRealtimeAuthorizationService;
 use App\Services\Integration\Adapters\MilesightAdapter;
 use App\Services\Integration\Adapters\QueclinkAdapter;
 use App\Services\Integration\Adapters\UnifiAdapter;
@@ -505,23 +506,14 @@ class AppServiceProvider extends ServiceProvider
                 'occurred_at' => optional($event->signal->occurred_at)->toISOString(),
             ]);
 
-            // Broadcast wandering alert when a geofence breach involves a resident-linked tracker
-            if (in_array($event->signal->signal_type, ['geofence.breach', 'vehicle.sos'])) {
-                $asset = $event->signal->asset;
-                if ($asset && $asset->client_id) {
-                    $client = $asset->client;
-                    $payload = $event->signal->payload ?? [];
+            if (in_array($event->signal->signal_type, ['geofence.breach', 'vehicle.sos'], true)) {
+                $client = app(FleetRealtimeAuthorizationService::class)
+                    ->consentedClientForSignal($event->signal);
 
+                if ($client !== null) {
                     broadcast(new FleetWanderingAlertTriggered(
-                        alertId: $event->signal->id,
-                        alertType: $event->signal->signal_type,
+                        clientId: (int) $client->id,
                         severity: $event->signal->severity_hint ?? 'medium',
-                        clientName: $client ? trim(($client->first_name ?? '').' '.($client->last_name ?? '')) : null,
-                        clientId: $asset->client_id,
-                        latitude: $payload['lat'] ?? $payload['latitude'] ?? null,
-                        longitude: $payload['lng'] ?? $payload['longitude'] ?? null,
-                        geofenceName: $payload['geofence_name'] ?? null,
-                        triggeredAt: optional($event->signal->occurred_at)->toISOString() ?? now()->toISOString(),
                     ));
                 }
             }

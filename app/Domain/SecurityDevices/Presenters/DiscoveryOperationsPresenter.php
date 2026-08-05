@@ -9,6 +9,7 @@ use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Services\MonitoringCollectorAvailabilityService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -26,6 +27,7 @@ class DiscoveryOperationsPresenter
         $visibleDeviceIds = $this->access->visibleDevices($viewer)->pluck('devices.id');
         $siteIds = $this->access->accessibleSiteIds($viewer);
         $canViewAllSites = $this->access->canViewAllSites($viewer);
+        $canManageCollectors = $viewer->canDo('securityDevices.integrations.manage');
         $monitors = $visibleDeviceIds->isEmpty()
             ? collect()
             : Monitor::query()
@@ -54,6 +56,7 @@ class DiscoveryOperationsPresenter
         $mappedCollectors = $collectors->map(fn (MonitoringCollector $collector): array => $this->mapCollector(
             $collector,
             $monitors->where('collector_id', $collector->id),
+            $canManageCollectors,
         ));
         $direct = $monitors->whereNull('collector_id');
         $remote = $monitors->whereNotNull('collector_id');
@@ -220,6 +223,24 @@ class DiscoveryOperationsPresenter
                 'description' => 'These checks are configured without a Site collector. Live Site reachability and durable central-runtime proof remain in Monitoring > Data collection.',
             ],
             'collectors' => $mappedCollectors->values(),
+            'collector_management' => [
+                'can_manage' => $canManageCollectors,
+                'issue_url' => $canManageCollectors
+                    ? '/security-devices/discovery/collectors/enrolments'
+                    : null,
+                'sites' => $canManageCollectors && $siteIds !== []
+                    ? Site::query()
+                        ->whereIn('id', $siteIds)
+                        ->orderBy('name')
+                        ->get(['id', 'name'])
+                        ->map(fn (Site $site): array => [
+                            'id' => (int) $site->id,
+                            'name' => $site->name,
+                        ])
+                        ->values()
+                        ->all()
+                    : [],
+            ],
             'scopes' => $mappedScopes,
             'runs' => $mappedRuns,
             'candidates' => $mappedCandidates,
@@ -242,8 +263,11 @@ class DiscoveryOperationsPresenter
     }
 
     /** @param Collection<int, Monitor> $monitors @return array<string, mixed> */
-    private function mapCollector(MonitoringCollector $collector, Collection $monitors): array
-    {
+    private function mapCollector(
+        MonitoringCollector $collector,
+        Collection $monitors,
+        bool $canManage,
+    ): array {
         $state = $this->collectorAvailability->state($collector);
         $lastHeartbeat = $this->collectorAvailability->lastHeartbeat($collector);
 
@@ -273,6 +297,15 @@ class DiscoveryOperationsPresenter
             'impact_note' => $state === MonitoringCollectorAvailabilityService::AVAILABLE
                 ? 'Collection path is reporting within the configured heartbeat window.'
                 : 'Downstream monitor results are uncertain until this collection path reports again.',
+            'actions' => [
+                'can_manage' => $canManage,
+                'revoke_url' => $canManage && $collector->revoked_at === null
+                    ? "/security-devices/discovery/collectors/{$collector->id}/revoke"
+                    : null,
+                're_enrol_url' => $canManage && $collector->revoked_at !== null
+                    ? "/security-devices/discovery/collectors/{$collector->id}/re-enrolment"
+                    : null,
+            ],
         ];
     }
 }

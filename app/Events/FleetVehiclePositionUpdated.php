@@ -2,21 +2,14 @@
 
 namespace App\Events;
 
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Broadcast when a fleet vehicle's GPS position changes.
- *
- * NOTE: This event requires a broadcasting driver (Laravel Reverb or Pusher)
- * to be installed and configured. Until then, the event will be dispatched
- * but not actually broadcast to WebSocket clients.
- *
- * Setup: composer require laravel/reverb  (or pusher/pusher-php-server)
- *        php artisan install:broadcasting
+ * Broadcast a minimal fleet vehicle position to authorised record viewers.
  */
 class FleetVehiclePositionUpdated implements ShouldBroadcast
 {
@@ -32,13 +25,26 @@ class FleetVehiclePositionUpdated implements ShouldBroadcast
         public ?string $motion_status,
     ) {}
 
-    public function broadcastOn(): Channel
+    public function broadcastOn(): PrivateChannel
     {
-        return new Channel('fleet.vehicles');
+        return new PrivateChannel("fleet.assets.{$this->assetId}.positions");
     }
 
     public function broadcastAs(): string
     {
         return 'position.updated';
+    }
+
+    /** @return array<string, int|float|string|null> */
+    public function broadcastWith(): array
+    {
+        return [
+            'asset_id' => $this->assetId,
+            'latitude' => $this->latitude,
+            'longitude' => $this->longitude,
+            'speed_kph' => $this->speed_kph,
+            'heading_deg' => $this->heading_deg,
+            'status' => $this->status,
+        ];
     }
 }

@@ -29,6 +29,7 @@ final readonly class CollectorEnrollmentService
         int $siteId,
         int $actorId,
         ?CarbonImmutable $expiresAt = null,
+        ?int $replacesCollectorId = null,
     ): CollectorEnrollmentIssue {
         $site = Site::query()
             ->whereKey($siteId)
@@ -44,11 +45,24 @@ final readonly class CollectorEnrollmentService
             throw new DomainException('Collector enrolment expiry is invalid.');
         }
 
-        return DB::transaction(function () use ($site, $actor, $expiresAt): CollectorEnrollmentIssue {
+        return DB::transaction(function () use ($site, $actor, $expiresAt, $replacesCollectorId): CollectorEnrollmentIssue {
+            $replacement = $replacesCollectorId === null
+                ? null
+                : MonitoringCollector::query()
+                    ->whereKey($replacesCollectorId)
+                    ->where('site_id', $site->id)
+                    ->whereNotNull('revoked_at')
+                    ->lockForUpdate()
+                    ->first();
+            if ($replacesCollectorId !== null && $replacement === null) {
+                throw new DomainException('Collector re-enrolment scope is unavailable.');
+            }
+
             $plainToken = 'ofc_enrol_'.rtrim(strtr(base64_encode(random_bytes(48)), '+/', '-_'), '=');
             $enrollment = CollectorEnrollment::query()->create([
                 'site_id' => $site->id,
                 'issued_by_user_id' => $actor->id,
+                'replacement_collector_id' => $replacement?->id,
                 'token_hash' => hash('sha256', $plainToken),
                 'expires_at' => $expiresAt,
             ]);
@@ -56,6 +70,8 @@ final readonly class CollectorEnrollmentService
                 'actor_id' => $actor->id,
                 'site_id' => $site->id,
                 'expires_at' => $expiresAt->toISOString(),
+                'purpose' => $replacement === null ? 'new_collector' : 'collector_re_enrolment',
+                ...($replacement === null ? [] : ['replaces_collector_id' => (int) $replacement->id]),
             ]);
 
             return new CollectorEnrollmentIssue($enrollment, $plainToken);
@@ -94,6 +110,18 @@ final readonly class CollectorEnrollmentService
                 ->first();
             if ($site === null) {
                 throw new DomainException('Collector enrolment Site is unavailable.');
+            }
+            $replacement = $enrollment->replacement_collector_id === null
+                ? null
+                : MonitoringCollector::query()
+                    ->whereKey($enrollment->replacement_collector_id)
+                    ->where('site_id', $site->id)
+                    ->whereNotNull('revoked_at')
+                    ->lockForUpdate()
+                    ->first();
+            if ($enrollment->replacement_collector_id !== null
+                && ($replacement === null || $replacement->collector_uuid !== $collectorUuid)) {
+                throw new DomainException('Collector identity is unavailable for enrolment.');
             }
             $collector = MonitoringCollector::query()
                 ->where('collector_uuid', $collectorUuid)
@@ -170,9 +198,17 @@ final readonly class CollectorEnrollmentService
         }, 3);
     }
 
-    public function revoke(MonitoringCollector $collector, int $actorId): MonitoringCollector
-    {
-        return DB::transaction(function () use ($collector, $actorId): MonitoringCollector {
+    public function revoke(
+        MonitoringCollector $collector,
+        int $actorId,
+        ?string $reason = null,
+    ): MonitoringCollector {
+        $reason = $reason === null ? null : trim($reason);
+        if ($reason !== null && (mb_strlen($reason) < 10 || mb_strlen($reason) > 500)) {
+            throw new DomainException('Collector revocation reason is invalid.');
+        }
+
+        return DB::transaction(function () use ($collector, $actorId, $reason): MonitoringCollector {
             $actor = User::query()->whereKey($actorId)->whereNotNull('approved_at')->lockForUpdate()->first();
             $locked = MonitoringCollector::query()->whereKey($collector->id)->lockForUpdate()->firstOrFail();
             if ($actor === null) {
@@ -183,6 +219,7 @@ final readonly class CollectorEnrollmentService
                 AuditLogger::logOrFail('monitoring.collector.revoked', $locked, [
                     'actor_id' => $actor->id,
                     'site_id' => (int) $locked->site_id,
+                    ...($reason === null ? [] : ['reason' => $reason]),
                 ]);
             }
 

@@ -52,7 +52,12 @@ it('rejects a Shift from another Client and protects private canonical notes on 
             'content' => 'Must not attach to another Client Shift.',
             'note_type' => 'activity',
         ])
-        ->assertNotFound();
+        ->assertRedirect()
+        ->assertSessionHasErrors([
+            'shift_id' => 'Choose a Shift assigned to this Client and Site.',
+        ]);
+
+    expect(ClientNote::query()->where('client_id', $client->id)->exists())->toBeFalse();
 
     $privateNote = ClientNote::query()->create([
         'client_id' => $client->id,
