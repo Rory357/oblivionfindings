@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ControlledDrugLossReport;
 use App\Services\MedicationIncidentIntegrationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CDLossReportController extends Controller
 {
@@ -33,6 +34,7 @@ class CDLossReportController extends Controller
             'quantity_lost' => ['required', 'numeric', 'min:0.01'],
             'unit' => ['nullable', 'string', 'max:50'],
             'circumstances' => ['required', 'string'],
+            'immediate_action_taken' => ['required', 'string', 'max:5000'],
             'accountable_officer_name' => ['nullable', 'string', 'max:255'],
             'reported_to_police' => ['boolean'],
             'police_reference' => ['nullable', 'string', 'max:100'],
@@ -71,15 +73,13 @@ class CDLossReportController extends Controller
             $validated['regulator_notified_at'] = now();
         }
 
-        $report = ControlledDrugLossReport::create($validated);
+        $report = DB::transaction(function () use ($request, $validated): ControlledDrugLossReport {
+            $report = ControlledDrugLossReport::create($validated);
+            app(MedicationIncidentIntegrationService::class)
+                ->handleControlledLossReport($report, $request->user()->id);
 
-        $incident = app(MedicationIncidentIntegrationService::class)
-            ->handleControlledLossReport($report, $request->user()->id);
-
-        // Persist the link so the loss detail can surface the governing incident.
-        if ($incident) {
-            $report->forceFill(['incident_id' => $incident->id])->save();
-        }
+            return $report->fresh() ?? $report;
+        }, 3);
 
         $payload = [
             'success' => true,

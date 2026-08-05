@@ -138,6 +138,39 @@ class HazardModuleTest extends TestCase
         $this->assertSame('Main bathroom', $hazard->location);
     }
 
+    public function test_store_requires_truthful_action_when_immediate_action_is_marked_applied(): void
+    {
+        $payload = [
+            'hazard_type' => 'slip_trip_fall',
+            'severity' => 'medium',
+            'likelihood' => 'possible',
+            'description' => 'Water on the corridor floor.',
+        ];
+
+        $this->actingAs($this->admin)
+            ->post("/sites/{$this->site->id}/hazards", [
+                ...$payload,
+                'immediate_action_applied' => true,
+                'immediate_action_taken' => '   ',
+            ])
+            ->assertSessionHasErrors('immediate_action_taken');
+
+        $this->assertDatabaseCount('site_hazards', 0);
+
+        $this->actingAs($this->admin)
+            ->post("/sites/{$this->site->id}/hazards", [
+                ...$payload,
+                'immediate_action_applied' => false,
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('site_hazards', [
+            'site_id' => $this->site->id,
+            'immediate_action_applied' => false,
+            'immediate_action_taken' => null,
+        ]);
+    }
+
     public function test_detail_payload_loads_only_when_hazard_param_present(): void
     {
         $hazard = $this->makeHazard();

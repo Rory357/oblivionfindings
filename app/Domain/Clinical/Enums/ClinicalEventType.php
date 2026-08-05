@@ -43,6 +43,14 @@ enum ClinicalEventType: string
     }
 
     /**
+     * H&S-linked clinical events must record the operator's immediate action.
+     */
+    public function requiresImmediateAction(): bool
+    {
+        return $this->shouldLinkToHs();
+    }
+
+    /**
      * The HsEvent category to use when auto-linking.
      */
     public function hsEventCategory(): ?string

@@ -225,6 +225,10 @@ class MedicationIncidentIntegrationService
                 $lockedDiscrepancy->reported_by,
                 'controlled drug discrepancy',
             );
+            $immediateAction = $this->requireRecordedImmediateAction(
+                $lockedDiscrepancy->immediate_action_taken,
+                'controlled drug discrepancy',
+            );
             $incident = $lockedDiscrepancy->incident_id === null
                 ? null
                 : ClientIncident::query()
@@ -244,7 +248,7 @@ class MedicationIncidentIntegrationService
                 $incident->submitted_at = now();
                 $incident->occurred_at = $lockedDiscrepancy->reported_at ?? now();
                 $incident->reported_by = $actor->id;
-                $incident->immediate_action_taken = 'Witnessed controlled-drug balance mismatch recorded and escalated for immediate reconciliation.';
+                $incident->immediate_action_taken = $immediateAction;
                 $this->assignIncidentServiceContext($incident, $lockedDiscrepancy->service_context_id);
                 $incident->save();
 
@@ -535,6 +539,16 @@ class MedicationIncidentIntegrationService
                 $lockedFollowup->created_by,
                 'medication refusal escalation',
             );
+            $isSerious = (bool) ($medication?->controlled_drug || $medication?->high_risk);
+            $immediateAction = filled($lockedFollowup->follow_up_action)
+                ? trim((string) $lockedFollowup->follow_up_action)
+                : null;
+            if ($isSerious) {
+                $immediateAction = $this->requireRecordedImmediateAction(
+                    $immediateAction,
+                    'medication refusal escalation',
+                );
+            }
 
             $incident = ClientIncident::query()
                 ->where('client_id', $client->id)
@@ -553,12 +567,12 @@ class MedicationIncidentIntegrationService
                     $recentRefusalCount
                 );
                 $incident->category = 'medication';
-                $incident->severity = ($medication?->controlled_drug || $medication?->high_risk) ? 'high' : 'medium';
+                $incident->severity = $isSerious ? 'high' : 'medium';
                 $incident->status = 'submitted';
                 $incident->submitted_at = now();
                 $incident->occurred_at = $lockedFollowup->created_at ?? now();
                 $incident->reported_by = $actor->id;
-                $incident->immediate_action_taken = 'Repeated medication refusal recorded and escalated for clinical follow-up.';
+                $incident->immediate_action_taken = $immediateAction;
                 $incident->metadata = [
                     'medication_refusal_followup_id' => $lockedFollowup->id,
                 ];
@@ -628,6 +642,10 @@ class MedicationIncidentIntegrationService
                 $lockedReport->discovered_by,
                 'controlled drug loss',
             );
+            $immediateAction = $this->requireRecordedImmediateAction(
+                $lockedReport->immediate_action_taken,
+                'controlled drug loss',
+            );
 
             $medication = $lockedReport->medication;
             $medicationName = $lockedReport->medication_name ?: $medication?->name ?: 'Controlled medication';
@@ -650,7 +668,7 @@ class MedicationIncidentIntegrationService
                 $incident->submitted_at = now();
                 $incident->occurred_at = $lockedReport->discovered_at ?? now();
                 $incident->reported_by = $actor->id;
-                $incident->immediate_action_taken = 'Controlled-drug loss report recorded and escalated for accountable-officer review.';
+                $incident->immediate_action_taken = $immediateAction;
                 $this->assignIncidentServiceContext($incident, $client->service_context_id);
                 $incident->save();
 
@@ -1066,6 +1084,21 @@ class MedicationIncidentIntegrationService
         }
 
         return $actor;
+    }
+
+    private function requireRecordedImmediateAction(
+        ?string $immediateAction,
+        string $journeyType,
+    ): string {
+        $immediateAction = trim((string) $immediateAction);
+
+        if ($immediateAction === '') {
+            throw new \DomainException(
+                "Submitted {$journeyType} journey requires the immediate action actually taken before any records are written.",
+            );
+        }
+
+        return $immediateAction;
     }
 
     /**

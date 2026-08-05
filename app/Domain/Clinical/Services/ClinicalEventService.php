@@ -12,8 +12,11 @@ use App\Models\Shift;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\HealthSafety\HsEventService;
+use App\Services\Timeline\TimelineEmitter;
 use App\Support\WorkerClock;
+use DomainException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ClinicalEventService
@@ -51,30 +54,52 @@ class ClinicalEventService
             : ClinicalEventType::from($input['event_type']);
 
         $severity = AlertSeverity::normalise($input['severity'] ?? AlertSeverity::MEDIUM);
+        $siteId = $this->resolveCanonicalSiteId($client, $shift, $type->shouldLinkToHs());
+        $immediateAction = $input['immediate_action_taken'] ?? null;
+        $hasImmediateAction = is_string($immediateAction) && trim($immediateAction) !== '';
 
-        $event = ClinicalEvent::create([
-            'client_id' => $client->id,
-            'shift_id' => $shift?->id,
-            'site_id' => $shift?->site_id ?? $client->site_id,
-            'reported_by' => $reporter->id,
-            'event_type' => $type,
-            'severity' => $severity,
-            'occurred_at' => WorkerClock::toUtc($input['occurred_at'] ?? null) ?? now(),
-            'reported_at' => now(),
-            'description' => $input['description'],
-            'immediate_action_taken' => $input['immediate_action_taken'] ?? null,
-            'outcome' => $input['outcome'] ?? null,
-            'witnesses' => $input['witnesses'] ?? null,
-            'requires_followup' => $input['requires_followup'] ?? false,
-            'followup_notes' => ($input['requires_followup'] ?? false) ? ($input['followup_notes'] ?? null) : null,
-            'status' => 'open',
-        ]);
-
-        $this->createTimelineEvent($event, $reporter);
-
-        if ($type->shouldLinkToHs()) {
-            $this->linkToHsEvent($event);
+        if ($type->requiresImmediateAction() && ! $hasImmediateAction) {
+            throw new DomainException('Immediate action taken is required for clinical events linked to Health & Safety.');
         }
+
+        $event = DB::transaction(function () use (
+            $client,
+            $hasImmediateAction,
+            $immediateAction,
+            $input,
+            $reporter,
+            $severity,
+            $shift,
+            $siteId,
+            $type,
+        ): ClinicalEvent {
+            $event = ClinicalEvent::create([
+                'client_id' => $client->id,
+                'shift_id' => $shift?->id,
+                'site_id' => $siteId,
+                'reported_by' => $reporter->id,
+                'event_type' => $type,
+                'severity' => $severity,
+                'occurred_at' => WorkerClock::toUtc($input['occurred_at'] ?? null) ?? now(),
+                'reported_at' => now(),
+                'description' => $input['description'],
+                // Store only the operator's exact, non-blank input. Never infer a default.
+                'immediate_action_taken' => $hasImmediateAction ? $immediateAction : null,
+                'outcome' => $input['outcome'] ?? null,
+                'witnesses' => $input['witnesses'] ?? null,
+                'requires_followup' => $input['requires_followup'] ?? false,
+                'followup_notes' => ($input['requires_followup'] ?? false) ? ($input['followup_notes'] ?? null) : null,
+                'status' => 'open',
+            ]);
+
+            $this->createTimelineEvent($event, $reporter);
+
+            if ($type->shouldLinkToHs()) {
+                $this->linkToHsEvent($event);
+            }
+
+            return $event;
+        }, 3);
 
         $this->signalService->emitForEvent($event);
 
@@ -90,6 +115,28 @@ class ClinicalEventService
         ]);
 
         return $event;
+    }
+
+    protected function resolveCanonicalSiteId(Client $client, ?Shift $shift, bool $required): ?int
+    {
+        if ($shift && (int) $shift->client_id !== (int) $client->id) {
+            throw new DomainException('The shift does not belong to the clinical event client.');
+        }
+
+        $clientSiteId = (int) ($client->site_id ?? 0) ?: null;
+        $shiftSiteId = (int) ($shift?->site_id ?? 0) ?: null;
+
+        if ($clientSiteId && $shiftSiteId && $clientSiteId !== $shiftSiteId) {
+            throw new DomainException('The shift Site does not match the clinical event client Site.');
+        }
+
+        $siteId = $shiftSiteId ?? $clientSiteId;
+
+        if ($required && ! $siteId) {
+            throw new DomainException('A canonical Site is required for clinical events linked to Health & Safety.');
+        }
+
+        return $siteId;
     }
 
     // ── Workflow actions (review / follow-up / escalate) ─────────────────
@@ -139,7 +186,7 @@ class ClinicalEventService
 
     protected function recordActionTimeline(ClinicalEvent $event, User $actor, string $subject, string $body): void
     {
-        app(\App\Services\Timeline\TimelineEmitter::class)->record([
+        app(TimelineEmitter::class)->record([
             'type' => self::TIMELINE_TYPE_CLINICAL_EVENT,
             'source_type' => ClinicalEvent::class,
             'source_id' => $event->id,
@@ -201,7 +248,7 @@ class ClinicalEventService
         $hsCategory = $event->event_type->hsEventCategory();
 
         if (! $hsCategory) {
-            return;
+            throw new DomainException('The clinical event does not define a Health & Safety category.');
         }
 
         $event->loadMissing('client');
@@ -218,16 +265,22 @@ class ClinicalEventService
             'created_by' => $event->reported_by,
         ]);
 
-        if ($hsEvent) {
-            $event->updateQuietly(['linked_hs_event_id' => $hsEvent->id]);
+        if (! $hsEvent) {
+            throw new DomainException('The clinical event could not be linked to Health & Safety.');
         }
+
+        if ((int) $hsEvent->site_id !== (int) $event->site_id) {
+            throw new DomainException('The Health & Safety event Site does not match the clinical event Site.');
+        }
+
+        $event->updateQuietly(['linked_hs_event_id' => $hsEvent->id]);
     }
 
     // ── Timeline ─────────────────────────────────────────────────────────
 
     protected function createTimelineEvent(ClinicalEvent $event, User $reporter): TimelineEvent
     {
-        return app(\App\Services\Timeline\TimelineEmitter::class)->record([
+        return app(TimelineEmitter::class)->record([
             'type' => self::TIMELINE_TYPE_CLINICAL_EVENT,
             'source_type' => ClinicalEvent::class,
             'source_id' => $event->id,
@@ -236,7 +289,7 @@ class ClinicalEventService
             'client_id' => $event->client_id,
             'shift_id' => $event->shift_id,
             'site_id' => $event->site_id,
-            'subject' => $event->event_type->label() . ' reported',
+            'subject' => $event->event_type->label().' reported',
             'body' => $this->buildTimelineBody($event),
             'meta' => [
                 'clinical_event_id' => $event->id,
@@ -252,7 +305,7 @@ class ClinicalEventService
     {
         $parts = [
             $event->event_type->label(),
-            'Severity: ' . $event->severity,
+            'Severity: '.$event->severity,
         ];
 
         if ($event->description) {
@@ -260,11 +313,11 @@ class ClinicalEventService
         }
 
         if ($event->immediate_action_taken) {
-            $parts[] = 'Action taken: ' . $event->immediate_action_taken;
+            $parts[] = 'Action taken: '.$event->immediate_action_taken;
         }
 
         if ($event->outcome) {
-            $parts[] = 'Outcome: ' . $event->outcome;
+            $parts[] = 'Outcome: '.$event->outcome;
         }
 
         if ($event->requires_followup) {
@@ -272,7 +325,7 @@ class ClinicalEventService
         }
 
         if ($event->followup_notes) {
-            $parts[] = 'Follow-up notes: ' . $event->followup_notes;
+            $parts[] = 'Follow-up notes: '.$event->followup_notes;
         }
 
         return implode(' · ', $parts);

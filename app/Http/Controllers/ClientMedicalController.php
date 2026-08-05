@@ -22,7 +22,9 @@ use App\Services\Timeline\TimelineEmitter;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ClientMedicalController extends Controller
 {
@@ -292,10 +294,15 @@ class ClientMedicalController extends Controller
             'notes' => ['nullable', 'string'],
             'witnessed_by' => ['nullable', 'integer'],
             'reason' => ['nullable', 'string', 'max:255'],
+            'immediate_action_taken' => ['nullable', 'string', 'max:5000'],
         ]);
 
         $stock = ClientMedicationStock::firstOrNew(['client_medication_id' => $medication->id]);
         $beforeOnHand = $stock->exists ? $stock->on_hand : null;
+        $immediateAction = filled($data['immediate_action_taken'] ?? null)
+            ? trim((string) $data['immediate_action_taken'])
+            : null;
+        unset($data['immediate_action_taken']);
         $stock->fill($data);
         $stock->client_medication_id = $medication->id;
         if (isset($data['last_counted_at']) && $data['last_counted_at']) {
@@ -324,6 +331,15 @@ class ClientMedicalController extends Controller
             if (empty($data['reason'])) {
                 return back()->withInput()->with('error', 'Please provide a reason for the controlled drug stock update.');
             }
+            if ($beforeOnHand !== null
+                && $stock->on_hand !== null
+                && (int) $stock->on_hand !== (int) $beforeOnHand
+                && $immediateAction === null
+            ) {
+                throw ValidationException::withMessages([
+                    'immediate_action_taken' => 'Record the immediate action actually taken for this controlled-drug discrepancy.',
+                ]);
+            }
 
             $witness = User::query()->find($data['witnessed_by']);
             if (! $witness || $witness->hasRole('client', 'next_of_kin') || in_array($witness->role, ['client', 'next_of_kin'], true) || ! $witness->canDo('medications.controlled.witness')) {
@@ -333,48 +349,51 @@ class ClientMedicalController extends Controller
         $discrepancy = null;
 
         try {
-            $stock->save();
-            if ($medication->controlled_drug) {
-                ClientControlledDrugEntry::create([
-                    'client_id' => $client->id,
-                    'client_medication_id' => $medication->id,
-                    'shift_id' => null,
-                    'service_context_id' => $client->service_context_id ?: ServiceContext::defaultId(),
-                    'entry_type' => 'stock_count',
-                    'quantity' => null,
-                    'unit' => $stock->unit,
-                    'on_hand_before' => $beforeOnHand,
-                    'on_hand_after' => $stock->on_hand,
-                    'reason' => $data['reason'],
-                    'notes' => $data['notes'] ?? null,
-                    'recorded_at' => now(),
-                    'recorded_by' => $user->id,
-                    'witnessed_by' => (int) $data['witnessed_by'],
-                ]);
-
-                // If the counted stock differs from the last known on-hand, flag a discrepancy for review.
-                if ($beforeOnHand !== null && $stock->on_hand !== null && (int) $stock->on_hand !== (int) $beforeOnHand) {
-                    $discrepancy = ClientControlledDrugDiscrepancy::create([
+            DB::transaction(function () use ($stock, $medication, $client, $beforeOnHand, $data, $user, $immediateAction, &$discrepancy): void {
+                $stock->save();
+                if ($medication->controlled_drug) {
+                    ClientControlledDrugEntry::create([
                         'client_id' => $client->id,
                         'client_medication_id' => $medication->id,
+                        'shift_id' => null,
                         'service_context_id' => $client->service_context_id ?: ServiceContext::defaultId(),
+                        'entry_type' => 'stock_count',
+                        'quantity' => null,
+                        'unit' => $stock->unit,
                         'on_hand_before' => $beforeOnHand,
                         'on_hand_after' => $stock->on_hand,
-                        'difference' => (int) $stock->on_hand - (int) $beforeOnHand,
-                        'reason' => $data['reason'] ?? null,
+                        'reason' => $data['reason'],
                         'notes' => $data['notes'] ?? null,
-                        'reported_at' => now(),
-                        'reported_by' => $user->id,
+                        'recorded_at' => now(),
+                        'recorded_by' => $user->id,
                         'witnessed_by' => (int) $data['witnessed_by'],
-                        'status' => 'open',
                     ]);
-                }
-            }
 
-            if ($discrepancy) {
-                app(MedicationIncidentIntegrationService::class)
-                    ->handleControlledDiscrepancy($discrepancy, $user->id);
-            }
+                    // If the counted stock differs from the last known on-hand, flag a discrepancy for review.
+                    if ($beforeOnHand !== null && $stock->on_hand !== null && (int) $stock->on_hand !== (int) $beforeOnHand) {
+                        $discrepancy = ClientControlledDrugDiscrepancy::create([
+                            'client_id' => $client->id,
+                            'client_medication_id' => $medication->id,
+                            'service_context_id' => $client->service_context_id ?: ServiceContext::defaultId(),
+                            'on_hand_before' => $beforeOnHand,
+                            'on_hand_after' => $stock->on_hand,
+                            'difference' => (int) $stock->on_hand - (int) $beforeOnHand,
+                            'reason' => $data['reason'] ?? null,
+                            'notes' => $data['notes'] ?? null,
+                            'immediate_action_taken' => $immediateAction,
+                            'reported_at' => now(),
+                            'reported_by' => $user->id,
+                            'witnessed_by' => (int) $data['witnessed_by'],
+                            'status' => 'open',
+                        ]);
+                    }
+                }
+
+                if ($discrepancy) {
+                    app(MedicationIncidentIntegrationService::class)
+                        ->handleControlledDiscrepancy($discrepancy, $user->id);
+                }
+            }, 3);
 
             app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'medication stock', $stock, $client, [
                 'title' => 'Medication stock updated: '.($medication->name ?? 'Medication'),

@@ -10,6 +10,7 @@ use App\Models\SiteHazard;
 use App\Models\SiteHazardAction;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\References\ReferenceNumberGenerator;
 use App\Services\Sites\SiteHazardRiskCalculator;
 use App\Services\UserSiteAccessService;
 use App\Support\HazardComplianceSnapshot;
@@ -17,8 +18,10 @@ use App\Support\HazardDetailPresenter;
 use App\Support\SiteRecommendedHazards;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SiteHazardController extends Controller
@@ -88,7 +91,7 @@ class SiteHazardController extends Controller
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="hazards-' . now()->format('Y-m-d') . '.csv"',
+            'Content-Disposition' => 'attachment; filename="hazards-'.now()->format('Y-m-d').'.csv"',
         ]);
     }
 
@@ -225,7 +228,7 @@ class SiteHazardController extends Controller
             ->when($request->filled('from'), fn ($q) => $q->whereDate('created_at', '>=', $request->query('from')))
             ->when($request->filled('to'), fn ($q) => $q->whereDate('created_at', '<=', $request->query('to')))
             ->when($request->filled('q'), function ($q) use ($request) {
-                $term = '%' . $request->query('q') . '%';
+                $term = '%'.$request->query('q').'%';
                 $q->where(function ($sub) use ($term) {
                     $sub->where('reference_number', 'like', $term)
                         ->orWhere('description', 'like', $term)
@@ -379,13 +382,18 @@ class SiteHazardController extends Controller
         $validated = $request->validate([
             'hazard_type' => 'required|string|max:50',
             'custom_hazard_type' => 'nullable|string|max:100',
-            'severity' => 'required|in:' . implode(',', SiteHazardRiskCalculator::severities()),
-            'likelihood' => 'required|in:' . implode(',', SiteHazardRiskCalculator::likelihoods()),
+            'severity' => 'required|in:'.implode(',', SiteHazardRiskCalculator::severities()),
+            'likelihood' => 'required|in:'.implode(',', SiteHazardRiskCalculator::likelihoods()),
             'description' => 'required|string',
             'location' => 'nullable|string|max:255',
             'witnesses' => 'nullable|string',
             'immediate_action_applied' => 'boolean',
-            'immediate_action_taken' => 'nullable|string',
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn () => $request->boolean('immediate_action_applied')),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
             'assigned_to_user_id' => 'nullable|exists:users,id',
             'due_date' => 'nullable|date',
             'photos' => 'nullable|array',
@@ -430,8 +438,8 @@ class SiteHazardController extends Controller
 
         $validated = $request->validate([
             'description' => 'required|string',
-            'severity' => 'required|in:' . implode(',', SiteHazardRiskCalculator::severities()),
-            'likelihood' => 'required|in:' . implode(',', SiteHazardRiskCalculator::likelihoods()),
+            'severity' => 'required|in:'.implode(',', SiteHazardRiskCalculator::severities()),
+            'likelihood' => 'required|in:'.implode(',', SiteHazardRiskCalculator::likelihoods()),
             'location' => 'nullable|string|max:255',
             'witnesses' => 'nullable|string',
         ]);
@@ -467,7 +475,7 @@ class SiteHazardController extends Controller
             'assignee_name' => $assignee?->name,
         ]);
 
-        return back()->with('success', 'Hazard assigned to ' . ($assignee?->name ?? 'owner') . '.');
+        return back()->with('success', 'Hazard assigned to '.($assignee?->name ?? 'owner').'.');
     }
 
     public function transition(Request $request, SiteHazard $hazard)
@@ -479,8 +487,8 @@ class SiteHazardController extends Controller
             'note' => 'nullable|string',
             'control_hierarchy' => 'nullable|array',
             'control_hierarchy.*' => 'string',
-            'residual_severity' => 'nullable|in:' . implode(',', SiteHazardRiskCalculator::severities()),
-            'residual_likelihood' => 'nullable|in:' . implode(',', SiteHazardRiskCalculator::likelihoods()),
+            'residual_severity' => 'nullable|in:'.implode(',', SiteHazardRiskCalculator::severities()),
+            'residual_likelihood' => 'nullable|in:'.implode(',', SiteHazardRiskCalculator::likelihoods()),
         ]);
 
         $from = $hazard->status;
@@ -490,7 +498,7 @@ class SiteHazardController extends Controller
             || ($to === 'mitigated' && $from === 'in_progress');
 
         if (! $valid) {
-            return back()->with('error', "A {$from} hazard can't be moved to " . str_replace('_', ' ', $to) . '.');
+            return back()->with('error', "A {$from} hazard can't be moved to ".str_replace('_', ' ', $to).'.');
         }
 
         $patch = ['status' => $to];
@@ -515,7 +523,7 @@ class SiteHazardController extends Controller
         // Observer stamps status_changed_at / status_changed_by + audit log.
         $hazard->update($patch);
 
-        $label = $to === 'mitigated' ? 'Mitigated · residual ' . Str::title($patch['residual_risk_rating']) : 'In progress';
+        $label = $to === 'mitigated' ? 'Mitigated · residual '.Str::title($patch['residual_risk_rating']) : 'In progress';
 
         return back()->with('success', "Hazard moved to {$label}.");
     }
@@ -657,13 +665,13 @@ class SiteHazardController extends Controller
         // HZA (hazard action) — race-safe via the central allocator, and a
         // prefix distinct from the H&S corrective-action register's CA-YYYY-NNNN.
         // Pre-2026-07 rows keep their legacy CA-NNNN references.
-        return app(\App\Services\References\ReferenceNumberGenerator::class)->next('HZA');
+        return app(ReferenceNumberGenerator::class)->next('HZA');
     }
 
     /**
      * Store images and return relative storage paths (string[]).
      *
-     * @param  array<int,\Illuminate\Http\UploadedFile|null>  $files
+     * @param  array<int,UploadedFile|null>  $files
      * @return array<int,string>
      */
     private function storePaths(array $files, int $hazardId, string $sub): array
@@ -679,7 +687,7 @@ class SiteHazardController extends Controller
     /**
      * Store files and return {name, path, size} metadata objects.
      *
-     * @param  array<int,\Illuminate\Http\UploadedFile|null>  $files
+     * @param  array<int,UploadedFile|null>  $files
      * @return array<int,array{name:string, path:string, size:int}>
      */
     private function storeFilesWithMeta(array $files, int $hazardId, string $sub): array

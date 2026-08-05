@@ -31,9 +31,10 @@ class ControlRoomBridgeWiringTest extends TestCase
 
     public function test_high_severity_submitted_incident_creates_alert(): void
     {
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'severity' => 'high',
             'status' => 'submitted',
+            'immediate_action_taken' => 'The reporter isolated the immediate risk and requested assistance.',
         ]);
 
         $this->assertDatabaseHas('control_room_alerts', [
@@ -56,9 +57,11 @@ class ControlRoomBridgeWiringTest extends TestCase
 
         $incident = ClientIncident::factory()->create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'shift_id' => $shift->id,
             'severity' => 'high',
             'status' => 'submitted',
+            'immediate_action_taken' => 'The reporter stopped the journey and requested assistance.',
         ]);
 
         $alert = ControlRoomAlert::query()
@@ -74,7 +77,7 @@ class ControlRoomBridgeWiringTest extends TestCase
 
     public function test_low_severity_incident_does_not_create_alert(): void
     {
-        ClientIncident::factory()->create([
+        $this->createSiteBoundIncident([
             'severity' => 'low',
             'status' => 'submitted',
         ]);
@@ -84,7 +87,7 @@ class ControlRoomBridgeWiringTest extends TestCase
 
     public function test_high_severity_draft_incident_does_not_create_alert(): void
     {
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'severity' => 'high',
             'status' => 'draft',
             'submitted_at' => null,
@@ -98,10 +101,11 @@ class ControlRoomBridgeWiringTest extends TestCase
 
     public function test_draft_submission_builds_one_exact_high_journey_and_repeated_updates_are_stable(): void
     {
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'severity' => 'high',
             'status' => 'draft',
             'submitted_at' => null,
+            'immediate_action_taken' => 'The reporter isolated the immediate risk and requested assistance.',
         ]);
 
         $this->assertDatabaseCount('control_room_alerts', 0);
@@ -135,9 +139,10 @@ class ControlRoomBridgeWiringTest extends TestCase
 
     public function test_draft_incident_submitted_with_high_severity_creates_alert(): void
     {
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'severity' => 'high',
             'status' => 'draft',
+            'immediate_action_taken' => 'The reporter isolated the immediate risk and requested assistance.',
         ]);
 
         $this->assertDatabaseCount('control_room_alerts', 0);
@@ -153,7 +158,7 @@ class ControlRoomBridgeWiringTest extends TestCase
 
     public function test_incident_severity_escalation_promotes_the_same_exact_journey(): void
     {
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'severity' => 'low',
             'status' => 'submitted',
         ]);
@@ -162,7 +167,10 @@ class ControlRoomBridgeWiringTest extends TestCase
         $this->assertDatabaseCount('hs_events', 1);
         $eventId = $incident->fresh()->hs_event_id;
 
-        $incident->update(['severity' => 'high']);
+        $incident->update([
+            'severity' => 'high',
+            'immediate_action_taken' => 'The reporter isolated the immediate risk and requested assistance.',
+        ]);
         $incident = $incident->fresh();
         $alert = ControlRoomAlert::query()->sole();
 
@@ -181,7 +189,7 @@ class ControlRoomBridgeWiringTest extends TestCase
 
     public function test_medium_severity_incident_does_not_create_alert(): void
     {
-        ClientIncident::factory()->create([
+        $this->createSiteBoundIncident([
             'severity' => 'medium',
             'status' => 'submitted',
         ]);
@@ -191,9 +199,10 @@ class ControlRoomBridgeWiringTest extends TestCase
 
     public function test_incident_description_edit_does_not_create_duplicate_alert(): void
     {
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'severity' => 'high',
             'status' => 'submitted',
+            'immediate_action_taken' => 'The reporter isolated the immediate risk and requested assistance.',
         ]);
 
         $this->assertDatabaseCount('control_room_alerts', 1);
@@ -452,20 +461,25 @@ class ControlRoomBridgeWiringTest extends TestCase
 
     public function test_distinct_incidents_do_not_fuzzy_deduplicate_each_others_alerts(): void
     {
-        $client = Client::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
 
         $first = ClientIncident::factory()->create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'type' => 'injury',
             'severity' => 'high',
             'status' => 'submitted',
+            'immediate_action_taken' => 'The reporter isolated the first immediate risk.',
         ]);
 
         $second = ClientIncident::factory()->create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'type' => 'injury',
             'severity' => 'high',
             'status' => 'submitted',
+            'immediate_action_taken' => 'The reporter isolated the second immediate risk.',
         ]);
 
         $alertCount = ControlRoomAlert::where('source', 'incident')
@@ -501,9 +515,10 @@ class ControlRoomBridgeWiringTest extends TestCase
             $mock->shouldNotReceive('escalateClientIncident');
         });
 
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'severity' => 'high',
             'status' => 'submitted',
+            'immediate_action_taken' => 'The reporter isolated the immediate risk and requested assistance.',
         ]);
 
         $this->assertDatabaseHas('client_incidents', [
@@ -520,5 +535,20 @@ class ControlRoomBridgeWiringTest extends TestCase
                 && $context['error'] === 'Forced journey failure'
                 && is_array($context['changed_fields']),
         );
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function createSiteBoundIncident(array $attributes): ClientIncident
+    {
+        $site = Site::factory()->create();
+        $client = Client::factory()->create([
+            'site_id' => $site->id,
+            'status' => 'active',
+        ]);
+
+        return ClientIncident::factory()->create(array_merge([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ], $attributes));
     }
 }

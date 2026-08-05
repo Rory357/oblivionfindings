@@ -8,6 +8,8 @@ use App\Models\MedicationRefusalFollowup;
 use App\Services\MedicationIncidentIntegrationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class RefusalFollowUpController extends Controller
 {
@@ -33,12 +35,19 @@ class RefusalFollowUpController extends Controller
         $validated['created_by'] = Auth::id();
 
         // If family was notified, record the timestamp
-        if (!empty($validated['family_notified'])) {
+        if (! empty($validated['family_notified'])) {
             $validated['family_notified_at'] = now();
         }
 
         // Check for refusal cluster: 3+ refusals in 7 days for the same medication
-        $administration = ClientMedicationAdministration::findOrFail($validated['client_medication_administration_id']);
+        $administration = ClientMedicationAdministration::query()
+            ->with('medication')
+            ->findOrFail($validated['client_medication_administration_id']);
+        if ((int) $administration->client_id !== (int) $validated['client_id']) {
+            throw ValidationException::withMessages([
+                'client_medication_administration_id' => 'The administration does not belong to the selected client.',
+            ]);
+        }
         $recentRefusals = ClientMedicationAdministration::where('client_id', $validated['client_id'])
             ->where('client_medication_id', $administration->client_medication_id)
             ->whereIn('status', ['refused', 'withheld'])
@@ -50,14 +59,24 @@ class RefusalFollowUpController extends Controller
             $validated['escalated_at'] = now();
             // Auto-flag GP notification when cluster detected
             $validated['gp_notification_required'] = true;
+
+            if (($administration->medication?->controlled_drug || $administration->medication?->high_risk)
+                && blank($validated['follow_up_action'] ?? null)
+            ) {
+                throw ValidationException::withMessages([
+                    'follow_up_action' => 'Record the immediate follow-up action taken before escalating a high-risk refusal pattern.',
+                ]);
+            }
         }
 
-        $followup = MedicationRefusalFollowup::create($validated);
+        DB::transaction(function () use ($validated, $recentRefusals): void {
+            $followup = MedicationRefusalFollowup::create($validated);
 
-        if (! empty($validated['escalated_to_manager'])) {
-            app(MedicationIncidentIntegrationService::class)
-                ->handleRefusalEscalation($followup, $recentRefusals);
-        }
+            if (! empty($validated['escalated_to_manager'])) {
+                app(MedicationIncidentIntegrationService::class)
+                    ->handleRefusalEscalation($followup, $recentRefusals);
+            }
+        }, 3);
 
         return redirect()->back()->with('success', 'Refusal follow-up recorded successfully.');
     }

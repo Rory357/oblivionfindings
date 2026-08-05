@@ -383,6 +383,7 @@ class EmarController extends Controller
                 'difference' => $discrepancy->difference,
                 'reason' => $discrepancy->reason,
                 'notes' => $discrepancy->notes,
+                'immediate_action_taken' => $discrepancy->immediate_action_taken,
                 'status' => $discrepancy->status,
                 'reported_at' => $discrepancy->reported_at?->toIso8601String(),
             ])
@@ -1654,6 +1655,7 @@ class EmarController extends Controller
                 'reported_at' => $discrepancy->reported_at?->toIso8601String(),
                 'reported_by_name' => $discrepancy->reportedBy?->name,
                 'witnessed_by_name' => $discrepancy->witnessedBy?->name,
+                'immediate_action_taken' => $discrepancy->immediate_action_taken,
                 'resolved_at' => $discrepancy->resolved_at instanceof \DateTimeInterface ? $discrepancy->resolved_at->toIso8601String() : null,
                 'resolved_by_name' => $discrepancy->resolvedBy?->name,
                 'resolution_notes' => $discrepancy->resolution_notes,
@@ -1694,6 +1696,7 @@ class EmarController extends Controller
                 'quantity_lost' => $report->quantity_lost,
                 'unit' => $report->unit,
                 'circumstances' => $report->circumstances,
+                'immediate_action_taken' => $report->immediate_action_taken,
                 'accountable_officer_name' => $report->accountable_officer_name,
                 'reported_to_police' => (bool) $report->reported_to_police,
                 'police_reference' => $report->police_reference,
@@ -4734,6 +4737,13 @@ class EmarController extends Controller
             'actual_balance' => 'required|numeric|min:0',
             'witnessed_by' => 'required|exists:users,id|different:'.auth()->id(),
             'discrepancy_notes' => 'nullable|string|max:2000',
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn (): bool => (float) ($request->input('on_hand_before') ?? $request->input('expected_balance'))
+                    !== (float) ($request->input('on_hand_after') ?? $request->input('actual_balance'))),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
             'client_request_uuid' => 'nullable|uuid',
             'captured_offline_at' => 'nullable|date',
             'origin_device_id' => 'nullable|string|max:255',
@@ -4813,9 +4823,13 @@ class EmarController extends Controller
                     'reported_by' => auth()->id(),
                     'witnessed_by' => $validated['witnessed_by'],
                     'notes' => $validated['discrepancy_notes'] ?? null,
+                    'immediate_action_taken' => trim((string) $validated['immediate_action_taken']),
                     'status' => 'open',
                     'reported_at' => now(),
                 ]);
+
+                app(MedicationIncidentIntegrationService::class)
+                    ->handleControlledDiscrepancy($discrepancy, auth()->id());
             }
         });
 
@@ -4829,16 +4843,6 @@ class EmarController extends Controller
                 ->where('status', 'active')
                 ->get()
                 ->each(fn ($alert) => $alert->resolve('Balance check recorded.'));
-        }
-
-        if ($discrepancy) {
-            $incident = app(MedicationIncidentIntegrationService::class)
-                ->handleControlledDiscrepancy($discrepancy, auth()->id());
-
-            // Persist the link so the discrepancy detail can surface the incident.
-            if ($incident) {
-                $discrepancy->forceFill(['incident_id' => $incident->id])->save();
-            }
         }
 
         $refreshedStock = $medication?->stock()->first();

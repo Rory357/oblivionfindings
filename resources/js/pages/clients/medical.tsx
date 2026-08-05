@@ -1,10 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Dialog,
     DialogContent,
@@ -12,6 +8,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -19,8 +17,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -73,7 +73,9 @@ export default function ClientMedical({
         typeof window !== 'undefined'
             ? new URLSearchParams(window.location.search).get('section')
             : null;
-    const [focusSection, setFocusSection] = useState<string>(sectionParam ?? 'all');
+    const [focusSection, setFocusSection] = useState<string>(
+        sectionParam ?? 'all',
+    );
 
     const profileForm = useForm({
         medical_history: profile?.medical_history || '',
@@ -120,7 +122,8 @@ export default function ClientMedical({
         (m) => `${m.id}` === `${administrationForm.data.medication_id}`,
     );
     const administrationNeedsReason =
-        administrationForm.data.status !== 'given' || !!selectedMedication?.is_prn;
+        administrationForm.data.status !== 'given' ||
+        !!selectedMedication?.is_prn;
 
     const stockForm = useForm({
         medication_id: medications?.[0]?.id ?? '',
@@ -131,6 +134,7 @@ export default function ClientMedical({
         notes: '',
         reason: '',
         witnessed_by: '',
+        immediate_action_taken: '',
     });
 
     const [closeDiscOpen, setCloseDiscOpen] = useState(false);
@@ -141,6 +145,14 @@ export default function ClientMedical({
 
     const selectedStockMedication = medications.find(
         (m) => `${m.id}` === `${stockForm.data.medication_id}`,
+    );
+    const stockDiscrepancyWillBeRaised = Boolean(
+        selectedStockMedication?.controlled_drug &&
+        selectedStockMedication?.stock?.on_hand !== null &&
+        selectedStockMedication?.stock?.on_hand !== undefined &&
+        stockForm.data.on_hand !== '' &&
+        Number(stockForm.data.on_hand) !==
+            Number(selectedStockMedication.stock.on_hand),
     );
     const conditionForm = useForm({
         label: '',
@@ -162,7 +174,12 @@ export default function ClientMedical({
             {
                 preserveScroll: true,
                 onSuccess: () => {
-                    administrationForm.reset('dose_given', 'scheduled_for', 'notes', 'reason');
+                    administrationForm.reset(
+                        'dose_given',
+                        'scheduled_for',
+                        'notes',
+                        'reason',
+                    );
                     administrationForm.reset('witnessed_by');
                     setConfirmAdminOpen(false);
                 },
@@ -173,7 +190,10 @@ export default function ClientMedical({
     return (
         <AppLayout
             breadcrumbs={[
-                { title: labels?.['client.plural'] ?? 'Clients', href: '/clients' },
+                {
+                    title: labels?.['client.plural'] ?? 'Clients',
+                    href: '/clients',
+                },
                 { title: name, href: `/clients/${client.id}` },
                 { title: 'Medical', href: `/clients/${client.id}/medical` },
             ]}
@@ -184,13 +204,25 @@ export default function ClientMedical({
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <div>
                         <div className="text-lg font-semibold">{name}</div>
-                        <div className="text-xs text-muted-foreground">Medication orders & medical profile</div>
+                        <div className="text-xs text-muted-foreground">
+                            Medication orders & medical profile
+                        </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" onClick={() => (window.location.href = `/emar/mar?client_id=${client.id}`)}>
+                        <Button
+                            variant="outline"
+                            onClick={() =>
+                                (window.location.href = `/emar/mar?client_id=${client.id}`)
+                            }
+                        >
                             eMAR Dashboard
                         </Button>
-                        <Button variant="outline" onClick={() => (window.location.href = `/clients/${client.id}/mar`)}>
+                        <Button
+                            variant="outline"
+                            onClick={() =>
+                                (window.location.href = `/clients/${client.id}/mar`)
+                            }
+                        >
                             Open Daily MAR
                         </Button>
                     </div>
@@ -198,31 +230,55 @@ export default function ClientMedical({
 
                 {has_open_controlled_discrepancy && (
                     <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning">
-                        There is an open controlled-drug discrepancy for this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}. Review and resolve before further controlled stock edits (unless override is granted).
+                        There is an open controlled-drug discrepancy for this{' '}
+                        {(
+                            labels?.['client.singular'] ?? 'Client'
+                        ).toLowerCase()}
+                        . Review and resolve before further controlled stock
+                        edits (unless override is granted).
                     </div>
                 )}
 
                 {med_charts.length > 0 && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Medication chart (source of truth)</CardTitle>
+                            <CardTitle className="text-base">
+                                Medication chart (source of truth)
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             {med_charts.map((d: any) => (
-                                <div key={d.id} className="flex items-center justify-between rounded-md border p-3">
+                                <div
+                                    key={d.id}
+                                    className="flex items-center justify-between rounded-md border p-3"
+                                >
                                     <div>
-                                        <div className="text-sm font-medium">{d.title}</div>
+                                        <div className="text-sm font-medium">
+                                            {d.title}
+                                        </div>
                                         <div className="text-xs text-muted-foreground">
-                                            {d.version ? `v${d.version} • ` : ''}
-                                            {d.effective_date ? `Effective: ${new Date(d.effective_date).toLocaleDateString()}` : ''}
+                                            {d.version
+                                                ? `v${d.version} • `
+                                                : ''}
+                                            {d.effective_date
+                                                ? `Effective: ${new Date(d.effective_date).toLocaleDateString()}`
+                                                : ''}
                                         </div>
                                     </div>
-                                    <Button variant="outline" onClick={() => (window.location.href = `/clients/${client.id}/documents/${d.id}/download`)}>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() =>
+                                            (window.location.href = `/clients/${client.id}/documents/${d.id}/download`)
+                                        }
+                                    >
                                         Download
                                     </Button>
                                 </div>
                             ))}
-                            <div className="text-xs text-muted-foreground">To upload/update charts, use the Documents tab (category: Medication chart).</div>
+                            <div className="text-xs text-muted-foreground">
+                                To upload/update charts, use the Documents tab
+                                (category: Medication chart).
+                            </div>
                         </CardContent>
                     </Card>
                 )}
@@ -245,21 +301,29 @@ export default function ClientMedical({
                 </Button>
                 <Button
                     size="sm"
-                    variant={focusSection === 'medications' ? 'default' : 'outline'}
+                    variant={
+                        focusSection === 'medications' ? 'default' : 'outline'
+                    }
                     onClick={() => setFocusSection('medications')}
                 >
                     Medications
                 </Button>
                 <Button
                     size="sm"
-                    variant={focusSection === 'conditions' ? 'default' : 'outline'}
+                    variant={
+                        focusSection === 'conditions' ? 'default' : 'outline'
+                    }
                     onClick={() => setFocusSection('conditions')}
                 >
                     Conditions
                 </Button>
                 <Button
                     size="sm"
-                    variant={focusSection === 'emergency_contacts' ? 'default' : 'outline'}
+                    variant={
+                        focusSection === 'emergency_contacts'
+                            ? 'default'
+                            : 'outline'
+                    }
                     onClick={() => setFocusSection('emergency_contacts')}
                 >
                     Emergency contacts
@@ -272,7 +336,13 @@ export default function ClientMedical({
             </div>
 
             <div className="grid auto-rows-fr grid-cols-2 gap-4 md:grid-cols-2">
-                <Card className={cn(focusSection !== 'all' && focusSection !== 'profile' && 'hidden')}>
+                <Card
+                    className={cn(
+                        focusSection !== 'all' &&
+                            focusSection !== 'profile' &&
+                            'hidden',
+                    )}
+                >
                     <CardHeader>
                         <CardTitle className="text-base">
                             Medical profile
@@ -347,7 +417,13 @@ export default function ClientMedical({
                     </CardContent>
                 </Card>
 
-                <Card className={cn(focusSection !== 'all' && focusSection !== 'medications' && 'hidden')}>
+                <Card
+                    className={cn(
+                        focusSection !== 'all' &&
+                            focusSection !== 'medications' &&
+                            'hidden',
+                    )}
+                >
                     <CardHeader>
                         <CardTitle className="text-base">Medications</CardTitle>
                     </CardHeader>
@@ -401,11 +477,15 @@ export default function ClientMedical({
                                                 medForm.setData('is_prn', !!v)
                                             }
                                         />
-                                        <Label className="!mt-0">PRN (as needed)</Label>
+                                        <Label className="!mt-0">
+                                            PRN (as needed)
+                                        </Label>
                                     </div>
                                     <div className="flex items-center gap-2 pt-6">
                                         <Checkbox
-                                            checked={!!medForm.data.controlled_drug}
+                                            checked={
+                                                !!medForm.data.controlled_drug
+                                            }
                                             onCheckedChange={(v) =>
                                                 medForm.setData(
                                                     'controlled_drug',
@@ -414,7 +494,8 @@ export default function ClientMedical({
                                             }
                                         />
                                         <Label className="!mt-0">
-                                            Controlled drug (double-sign required)
+                                            Controlled drug (double-sign
+                                            required)
                                         </Label>
                                     </div>
                                     {medForm.data.is_prn && (
@@ -422,7 +503,9 @@ export default function ClientMedical({
                                             <div>
                                                 <Label>PRN reason</Label>
                                                 <Input
-                                                    value={medForm.data.prn_reason}
+                                                    value={
+                                                        medForm.data.prn_reason
+                                                    }
                                                     onChange={(e) =>
                                                         medForm.setData(
                                                             'prn_reason',
@@ -434,7 +517,9 @@ export default function ClientMedical({
                                             <div>
                                                 <Label>Max per day</Label>
                                                 <Input
-                                                    value={medForm.data.max_per_day}
+                                                    value={
+                                                        medForm.data.max_per_day
+                                                    }
                                                     onChange={(e) =>
                                                         medForm.setData(
                                                             'max_per_day',
@@ -482,7 +567,9 @@ export default function ClientMedical({
                                         />
                                     </div>
                                     <div>
-                                        <Label>Form (tablet/liquid/patch)</Label>
+                                        <Label>
+                                            Form (tablet/liquid/patch)
+                                        </Label>
                                         <Input
                                             value={medForm.data.form}
                                             onChange={(e) =>
@@ -494,9 +581,13 @@ export default function ClientMedical({
                                         />
                                     </div>
                                     <div>
-                                        <Label>Dose times (HH:MM, comma separated)</Label>
+                                        <Label>
+                                            Dose times (HH:MM, comma separated)
+                                        </Label>
                                         <Input
-                                            value={medForm.data.dose_times as any}
+                                            value={
+                                                medForm.data.dose_times as any
+                                            }
                                             onChange={(e) =>
                                                 medForm.setData(
                                                     'dose_times',
@@ -518,9 +609,15 @@ export default function ClientMedical({
                                                 <SelectValue placeholder="Select state" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="active">Active</SelectItem>
-                                                <SelectItem value="paused">Paused</SelectItem>
-                                                <SelectItem value="ceased">Ceased</SelectItem>
+                                                <SelectItem value="active">
+                                                    Active
+                                                </SelectItem>
+                                                <SelectItem value="paused">
+                                                    Paused
+                                                </SelectItem>
+                                                <SelectItem value="ceased">
+                                                    Ceased
+                                                </SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -530,7 +627,9 @@ export default function ClientMedical({
                                                 <Label>Ceased date</Label>
                                                 <Input
                                                     type="date"
-                                                    value={medForm.data.ceased_at}
+                                                    value={
+                                                        medForm.data.ceased_at
+                                                    }
                                                     onChange={(e) =>
                                                         medForm.setData(
                                                             'ceased_at',
@@ -542,7 +641,10 @@ export default function ClientMedical({
                                             <div>
                                                 <Label>Ceased reason</Label>
                                                 <Input
-                                                    value={medForm.data.ceased_reason}
+                                                    value={
+                                                        medForm.data
+                                                            .ceased_reason
+                                                    }
                                                     onChange={(e) =>
                                                         medForm.setData(
                                                             'ceased_reason',
@@ -607,17 +709,30 @@ export default function ClientMedical({
                                             // Inertia's useForm().transform() does not always support chaining in all versions.
                                             // Normalize dose_times without relying on chained calls.
                                             const dt =
-                                                typeof (medForm.data as any).dose_times === 'string'
-                                                    ? (medForm.data as any).dose_times
+                                                typeof (medForm.data as any)
+                                                    .dose_times === 'string'
+                                                    ? (
+                                                          medForm.data as any
+                                                      ).dose_times
                                                           .split(',')
-                                                          .map((s: string) => s.trim())
+                                                          .map((s: string) =>
+                                                              s.trim(),
+                                                          )
                                                           .filter(Boolean)
-                                                    : (medForm.data as any).dose_times;
-                                            medForm.setData('dose_times', dt as any);
-                                            medForm.post(`/clients/${client.id}/medical/medications`, {
-                                                preserveScroll: true,
-                                                onSuccess: () => medForm.reset(),
-                                            });
+                                                    : (medForm.data as any)
+                                                          .dose_times;
+                                            medForm.setData(
+                                                'dose_times',
+                                                dt as any,
+                                            );
+                                            medForm.post(
+                                                `/clients/${client.id}/medical/medications`,
+                                                {
+                                                    preserveScroll: true,
+                                                    onSuccess: () =>
+                                                        medForm.reset(),
+                                                },
+                                            );
                                         }}
                                         disabled={
                                             medForm.processing ||
@@ -646,7 +761,9 @@ export default function ClientMedical({
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => (window.location.href = `/emar/mar?client_id=${client.id}`)}
+                                                onClick={() =>
+                                                    (window.location.href = `/emar/mar?client_id=${client.id}`)
+                                                }
                                             >
                                                 View in eMAR
                                             </Button>
@@ -693,7 +810,13 @@ export default function ClientMedical({
                     </CardContent>
                 </Card>
 
-                <Card className={cn(focusSection !== 'all' && focusSection !== 'conditions' && 'hidden')}>
+                <Card
+                    className={cn(
+                        focusSection !== 'all' &&
+                            focusSection !== 'conditions' &&
+                            'hidden',
+                    )}
+                >
                     <CardHeader>
                         <CardTitle className="text-base">Conditions</CardTitle>
                     </CardHeader>
@@ -814,7 +937,13 @@ export default function ClientMedical({
                     </CardContent>
                 </Card>
 
-                <Card className={cn(focusSection !== 'all' && focusSection !== 'emergency_contacts' && 'hidden')}>
+                <Card
+                    className={cn(
+                        focusSection !== 'all' &&
+                            focusSection !== 'emergency_contacts' &&
+                            'hidden',
+                    )}
+                >
                     <CardHeader>
                         <CardTitle className="text-base">
                             Emergency contacts
@@ -969,7 +1098,14 @@ export default function ClientMedical({
             </div>
 
             {/* MAR + Stock */}
-            <div className={cn('grid gap-4 md:grid-cols-2', focusSection !== 'all' && focusSection !== 'medications' && 'hidden')}>
+            <div
+                className={cn(
+                    'grid gap-4 md:grid-cols-2',
+                    focusSection !== 'all' &&
+                        focusSection !== 'medications' &&
+                        'hidden',
+                )}
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">
@@ -1013,7 +1149,9 @@ export default function ClientMedical({
                                     <div>
                                         <Label>Status</Label>
                                         <Select
-                                            value={administrationForm.data.status}
+                                            value={
+                                                administrationForm.data.status
+                                            }
                                             onValueChange={(v) =>
                                                 administrationForm.setData(
                                                     'status',
@@ -1049,7 +1187,10 @@ export default function ClientMedical({
                                                     : 'Reason (required)'}
                                             </Label>
                                             <Input
-                                                value={administrationForm.data.reason}
+                                                value={
+                                                    administrationForm.data
+                                                        .reason
+                                                }
                                                 onChange={(e) =>
                                                     administrationForm.setData(
                                                         'reason',
@@ -1062,18 +1203,25 @@ export default function ClientMedical({
                                                         : 'e.g. client refused, clinical hold, unavailable'
                                                 }
                                             />
-                                            {administrationForm.errors.reason && (
+                                            {administrationForm.errors
+                                                .reason && (
                                                 <div className="mt-1 text-xs text-status-critical">
-                                                    {administrationForm.errors.reason}
+                                                    {
+                                                        administrationForm
+                                                            .errors.reason
+                                                    }
                                                 </div>
                                             )}
                                         </div>
                                     )}
 
                                     {selectedMedication?.controlled_drug &&
-                                        administrationForm.data.status === 'given' && (
+                                        administrationForm.data.status ===
+                                            'given' && (
                                             <div className="md:col-span-2">
-                                                <Label>Witness (required)</Label>
+                                                <Label>
+                                                    Witness (required)
+                                                </Label>
                                                 <Select
                                                     value={`${administrationForm.data.witnessed_by}`}
                                                     onValueChange={(v) =>
@@ -1087,19 +1235,26 @@ export default function ClientMedical({
                                                         <SelectValue placeholder="Select witness" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {witnesses.map((w: any) => (
-                                                            <SelectItem
-                                                                key={w.id}
-                                                                value={`${w.id}`}
-                                                            >
-                                                                {w.name}
-                                                            </SelectItem>
-                                                        ))}
+                                                        {witnesses.map(
+                                                            (w: any) => (
+                                                                <SelectItem
+                                                                    key={w.id}
+                                                                    value={`${w.id}`}
+                                                                >
+                                                                    {w.name}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
                                                     </SelectContent>
                                                 </Select>
-                                                {administrationForm.errors.witnessed_by && (
+                                                {administrationForm.errors
+                                                    .witnessed_by && (
                                                     <div className="mt-1 text-xs text-status-critical">
-                                                        {administrationForm.errors.witnessed_by}
+                                                        {
+                                                            administrationForm
+                                                                .errors
+                                                                .witnessed_by
+                                                        }
                                                     </div>
                                                 )}
                                             </div>
@@ -1108,7 +1263,10 @@ export default function ClientMedical({
                                     <div>
                                         <Label>Dose given</Label>
                                         <Input
-                                            value={administrationForm.data.dose_given}
+                                            value={
+                                                administrationForm.data
+                                                    .dose_given
+                                            }
                                             onChange={(e) =>
                                                 administrationForm.setData(
                                                     'dose_given',
@@ -1122,7 +1280,10 @@ export default function ClientMedical({
                                         <Label>Administered at</Label>
                                         <Input
                                             type="datetime-local"
-                                            value={administrationForm.data.administered_at}
+                                            value={
+                                                administrationForm.data
+                                                    .administered_at
+                                            }
                                             onChange={(e) =>
                                                 administrationForm.setData(
                                                     'administered_at',
@@ -1136,7 +1297,10 @@ export default function ClientMedical({
                                         <Label>Scheduled for (optional)</Label>
                                         <Input
                                             type="datetime-local"
-                                            value={administrationForm.data.scheduled_for}
+                                            value={
+                                                administrationForm.data
+                                                    .scheduled_for
+                                            }
                                             onChange={(e) =>
                                                 administrationForm.setData(
                                                     'scheduled_for',
@@ -1149,7 +1313,9 @@ export default function ClientMedical({
                                     <div className="md:col-span-2">
                                         <Label>Notes</Label>
                                         <Textarea
-                                            value={administrationForm.data.notes}
+                                            value={
+                                                administrationForm.data.notes
+                                            }
                                             onChange={(e) =>
                                                 administrationForm.setData(
                                                     'notes',
@@ -1163,7 +1329,11 @@ export default function ClientMedical({
                                     <Button
                                         onClick={() => {
                                             administrationForm.clearErrors();
-                                            if (!administrationForm.data.medication_id) return;
+                                            if (
+                                                !administrationForm.data
+                                                    .medication_id
+                                            )
+                                                return;
                                             if (
                                                 administrationNeedsReason &&
                                                 !administrationForm.data.reason
@@ -1176,8 +1346,10 @@ export default function ClientMedical({
                                             }
                                             if (
                                                 selectedMedication?.controlled_drug &&
-                                                administrationForm.data.status === 'given' &&
-                                                !administrationForm.data.witnessed_by
+                                                administrationForm.data
+                                                    .status === 'given' &&
+                                                !administrationForm.data
+                                                    .witnessed_by
                                             ) {
                                                 administrationForm.setError(
                                                     'witnessed_by',
@@ -1203,7 +1375,8 @@ export default function ClientMedical({
                                         <DialogContent>
                                             <DialogHeader>
                                                 <DialogTitle>
-                                                    Confirm medication administration
+                                                    Confirm medication
+                                                    administration
                                                 </DialogTitle>
                                             </DialogHeader>
 
@@ -1212,27 +1385,38 @@ export default function ClientMedical({
                                                     <span className="font-medium">
                                                         Medication:
                                                     </span>{' '}
-                                                    {selectedMedication?.name || 'Medication'}
+                                                    {selectedMedication?.name ||
+                                                        'Medication'}
                                                 </div>
                                                 <div>
                                                     <span className="font-medium">
                                                         Outcome:
                                                     </span>{' '}
-                                                    {administrationForm.data.status}
+                                                    {
+                                                        administrationForm.data
+                                                            .status
+                                                    }
                                                 </div>
-                                                {administrationForm.data.reason && (
+                                                {administrationForm.data
+                                                    .reason && (
                                                     <div>
                                                         <span className="font-medium">
                                                             Reason:
                                                         </span>{' '}
-                                                        {administrationForm.data.reason}
+                                                        {
+                                                            administrationForm
+                                                                .data.reason
+                                                        }
                                                     </div>
                                                 )}
                                                 <div>
                                                     <span className="font-medium">
                                                         Administered at:
                                                     </span>{' '}
-                                                    {administrationForm.data.administered_at}
+                                                    {
+                                                        administrationForm.data
+                                                            .administered_at
+                                                    }
                                                 </div>
                                             </div>
 
@@ -1240,14 +1424,20 @@ export default function ClientMedical({
                                                 <Button
                                                     variant="outline"
                                                     onClick={() =>
-                                                        setConfirmAdminOpen(false)
+                                                        setConfirmAdminOpen(
+                                                            false,
+                                                        )
                                                     }
                                                 >
                                                     Cancel
                                                 </Button>
                                                 <Button
-                                                    onClick={submitAdministration}
-                                                    disabled={administrationForm.processing}
+                                                    onClick={
+                                                        submitAdministration
+                                                    }
+                                                    disabled={
+                                                        administrationForm.processing
+                                                    }
                                                 >
                                                     Confirm
                                                 </Button>
@@ -1351,9 +1541,14 @@ export default function ClientMedical({
                                     {selectedStockMedication?.controlled_drug && (
                                         <>
                                             <div className="md:col-span-2">
-                                                <Label>Reason (required for controlled drug stock)</Label>
+                                                <Label>
+                                                    Reason (required for
+                                                    controlled drug stock)
+                                                </Label>
                                                 <Input
-                                                    value={stockForm.data.reason}
+                                                    value={
+                                                        stockForm.data.reason
+                                                    }
                                                     onChange={(e) =>
                                                         stockForm.setData(
                                                             'reason',
@@ -1364,12 +1559,17 @@ export default function ClientMedical({
                                                 />
                                                 {stockForm.errors.reason && (
                                                     <div className="mt-1 text-xs text-status-critical">
-                                                        {stockForm.errors.reason}
+                                                        {
+                                                            stockForm.errors
+                                                                .reason
+                                                        }
                                                     </div>
                                                 )}
                                             </div>
                                             <div className="md:col-span-2">
-                                                <Label>Witness (required)</Label>
+                                                <Label>
+                                                    Witness (required)
+                                                </Label>
                                                 <Select
                                                     value={`${stockForm.data.witnessed_by}`}
                                                     onValueChange={(v) =>
@@ -1383,19 +1583,25 @@ export default function ClientMedical({
                                                         <SelectValue placeholder="Select witness" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {witnesses.map((w: any) => (
-                                                            <SelectItem
-                                                                key={w.id}
-                                                                value={`${w.id}`}
-                                                            >
-                                                                {w.name}
-                                                            </SelectItem>
-                                                        ))}
+                                                        {witnesses.map(
+                                                            (w: any) => (
+                                                                <SelectItem
+                                                                    key={w.id}
+                                                                    value={`${w.id}`}
+                                                                >
+                                                                    {w.name}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
                                                     </SelectContent>
                                                 </Select>
-                                                {stockForm.errors.witnessed_by && (
+                                                {stockForm.errors
+                                                    .witnessed_by && (
                                                     <div className="mt-1 text-xs text-status-critical">
-                                                        {stockForm.errors.witnessed_by}
+                                                        {
+                                                            stockForm.errors
+                                                                .witnessed_by
+                                                        }
                                                     </div>
                                                 )}
                                             </div>
@@ -1441,7 +1647,9 @@ export default function ClientMedical({
                                         <Label>Last counted (optional)</Label>
                                         <Input
                                             type="date"
-                                            value={stockForm.data.last_counted_at}
+                                            value={
+                                                stockForm.data.last_counted_at
+                                            }
                                             onChange={(e) =>
                                                 stockForm.setData(
                                                     'last_counted_at',
@@ -1462,19 +1670,70 @@ export default function ClientMedical({
                                             }
                                         />
                                     </div>
+                                    {stockDiscrepancyWillBeRaised && (
+                                        <div className="md:col-span-2">
+                                            <Label>
+                                                Immediate action actually taken
+                                                (required)
+                                            </Label>
+                                            <Textarea
+                                                value={
+                                                    stockForm.data
+                                                        .immediate_action_taken
+                                                }
+                                                onChange={(e) =>
+                                                    stockForm.setData(
+                                                        'immediate_action_taken',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="What was done immediately to protect the client and secure or reconcile the stock?"
+                                            />
+                                            {stockForm.errors
+                                                .immediate_action_taken && (
+                                                <div className="mt-1 text-xs text-status-critical">
+                                                    {
+                                                        stockForm.errors
+                                                            .immediate_action_taken
+                                                    }
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="mt-3">
                                     <Button
                                         onClick={() => {
                                             stockForm.clearErrors();
-                                            if (!stockForm.data.medication_id) return;
-                                            if (selectedStockMedication?.controlled_drug) {
+                                            if (!stockForm.data.medication_id)
+                                                return;
+                                            if (
+                                                selectedStockMedication?.controlled_drug
+                                            ) {
                                                 if (!stockForm.data.reason) {
-                                                    stockForm.setError('reason', 'Reason is required for controlled drug stock updates.');
+                                                    stockForm.setError(
+                                                        'reason',
+                                                        'Reason is required for controlled drug stock updates.',
+                                                    );
                                                     return;
                                                 }
-                                                if (!stockForm.data.witnessed_by) {
-                                                    stockForm.setError('witnessed_by', 'Witness is required for controlled drug stock updates.');
+                                                if (
+                                                    !stockForm.data.witnessed_by
+                                                ) {
+                                                    stockForm.setError(
+                                                        'witnessed_by',
+                                                        'Witness is required for controlled drug stock updates.',
+                                                    );
+                                                    return;
+                                                }
+                                                if (
+                                                    stockDiscrepancyWillBeRaised &&
+                                                    !stockForm.data.immediate_action_taken.trim()
+                                                ) {
+                                                    stockForm.setError(
+                                                        'immediate_action_taken',
+                                                        'Record the immediate action actually taken for this discrepancy.',
+                                                    );
                                                     return;
                                                 }
                                             }
@@ -1512,9 +1771,11 @@ export default function ClientMedical({
                                         </div>
                                     </div>
                                     {m.stock?.reorder_level !== null &&
-                                        m.stock?.reorder_level !== undefined && (
+                                        m.stock?.reorder_level !==
+                                            undefined && (
                                             <div className="mt-1 text-xs text-muted-foreground">
-                                                Reorder at: {m.stock.reorder_level}
+                                                Reorder at:{' '}
+                                                {m.stock.reorder_level}
                                             </div>
                                         )}
                                     {m.stock?.notes && (
@@ -1544,7 +1805,10 @@ export default function ClientMedical({
                         </CardHeader>
                         <CardContent className="space-y-2">
                             {controlled_entries.map((e: any) => (
-                                <div key={e.id} className="rounded-md border p-3">
+                                <div
+                                    key={e.id}
+                                    className="rounded-md border p-3"
+                                >
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="text-sm font-medium">
                                             {e.medication?.name || 'Medication'}
@@ -1557,13 +1821,21 @@ export default function ClientMedical({
                                         </div>
                                     </div>
                                     <div className="mt-1 text-xs text-muted-foreground">
-                                        {e.recordedBy?.name ? `By: ${e.recordedBy.name}` : ''}
-                                        {e.witnessedBy?.name ? ` • Witness: ${e.witnessedBy.name}` : ''}
-                                        {e.serviceContext?.name ? ` • Context: ${e.serviceContext.name}` : ''}
+                                        {e.recordedBy?.name
+                                            ? `By: ${e.recordedBy.name}`
+                                            : ''}
+                                        {e.witnessedBy?.name
+                                            ? ` • Witness: ${e.witnessedBy.name}`
+                                            : ''}
+                                        {e.serviceContext?.name
+                                            ? ` • Context: ${e.serviceContext.name}`
+                                            : ''}
                                     </div>
-                                    {(e.on_hand_before !== null || e.on_hand_after !== null) && (
+                                    {(e.on_hand_before !== null ||
+                                        e.on_hand_after !== null) && (
                                         <div className="mt-1 text-xs text-muted-foreground">
-                                            Stock: {e.on_hand_before ?? '—'} → {e.on_hand_after ?? '—'}
+                                            Stock: {e.on_hand_before ?? '—'} →{' '}
+                                            {e.on_hand_after ?? '—'}
                                             {e.unit ? ` ${e.unit}` : ''}
                                         </div>
                                     )}
@@ -1599,12 +1871,17 @@ export default function ClientMedical({
                         </CardHeader>
                         <CardContent className="space-y-2">
                             {controlled_discrepancies.map((d: any) => (
-                                <div key={d.id} className="rounded-md border p-3">
+                                <div
+                                    key={d.id}
+                                    className="rounded-md border p-3"
+                                >
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="text-sm font-medium">
                                             {d.medication?.name || 'Medication'}
                                         </div>
-                                        <div className={`text-xs ${d.status === 'open' ? 'text-status-warning' : 'text-muted-foreground'}`}>
+                                        <div
+                                            className={`text-xs ${d.status === 'open' ? 'text-status-warning' : 'text-muted-foreground'}`}
+                                        >
                                             {d.status}
                                             {d.reported_at
                                                 ? ` • ${new Date(d.reported_at).toLocaleString()}`
@@ -1612,13 +1889,21 @@ export default function ClientMedical({
                                         </div>
                                     </div>
                                     <div className="mt-1 text-xs text-muted-foreground">
-                                        {d.reportedBy?.name ? `Reported by: ${d.reportedBy.name}` : ''}
-                                        {d.witnessedBy?.name ? ` • Witness: ${d.witnessedBy.name}` : ''}
-                                        {d.serviceContext?.name ? ` • Context: ${d.serviceContext.name}` : ''}
+                                        {d.reportedBy?.name
+                                            ? `Reported by: ${d.reportedBy.name}`
+                                            : ''}
+                                        {d.witnessedBy?.name
+                                            ? ` • Witness: ${d.witnessedBy.name}`
+                                            : ''}
+                                        {d.serviceContext?.name
+                                            ? ` • Context: ${d.serviceContext.name}`
+                                            : ''}
                                     </div>
                                     <div className="mt-2 text-xs text-muted-foreground">
-                                        Stock: {d.on_hand_before ?? '—'} → {d.on_hand_after ?? '—'}
-                                        {d.difference !== null && d.difference !== undefined
+                                        Stock: {d.on_hand_before ?? '—'} →{' '}
+                                        {d.on_hand_after ?? '—'}
+                                        {d.difference !== null &&
+                                        d.difference !== undefined
                                             ? ` • Difference: ${d.difference}`
                                             : ''}
                                     </div>
@@ -1627,27 +1912,43 @@ export default function ClientMedical({
                                             Reason: {d.reason}
                                         </div>
                                     )}
-                                    {d.status === 'closed' && (d.resolution_notes || d.resolvedBy?.name) && (
+                                    {d.immediate_action_taken && (
                                         <div className="mt-2 text-xs text-muted-foreground">
-                                            Closed{d.resolvedBy?.name ? ` by ${d.resolvedBy.name}` : ''}
-                                            {d.resolution_notes ? ` • ${d.resolution_notes}` : ''}
+                                            Immediate action:{' '}
+                                            {d.immediate_action_taken}
                                         </div>
                                     )}
+                                    {d.status === 'closed' &&
+                                        (d.resolution_notes ||
+                                            d.resolvedBy?.name) && (
+                                            <div className="mt-2 text-xs text-muted-foreground">
+                                                Closed
+                                                {d.resolvedBy?.name
+                                                    ? ` by ${d.resolvedBy.name}`
+                                                    : ''}
+                                                {d.resolution_notes
+                                                    ? ` • ${d.resolution_notes}`
+                                                    : ''}
+                                            </div>
+                                        )}
 
-                                    {d.status === 'open' && can_controlled_record && (
-                                        <div className="mt-3 flex justify-end">
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => {
-                                                    setSelectedDiscId(d.id);
-                                                    closeDiscForm.reset('resolution_notes');
-                                                    setCloseDiscOpen(true);
-                                                }}
-                                            >
-                                                Close discrepancy
-                                            </Button>
-                                        </div>
-                                    )}
+                                    {d.status === 'open' &&
+                                        can_controlled_record && (
+                                            <div className="mt-3 flex justify-end">
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        setSelectedDiscId(d.id);
+                                                        closeDiscForm.reset(
+                                                            'resolution_notes',
+                                                        );
+                                                        setCloseDiscOpen(true);
+                                                    }}
+                                                >
+                                                    Close discrepancy
+                                                </Button>
+                                            </div>
+                                        )}
                                 </div>
                             ))}
 
@@ -1670,7 +1971,12 @@ export default function ClientMedical({
                         <Label>Resolution notes (optional)</Label>
                         <Textarea
                             value={closeDiscForm.data.resolution_notes}
-                            onChange={(e) => closeDiscForm.setData('resolution_notes', e.target.value)}
+                            onChange={(e) =>
+                                closeDiscForm.setData(
+                                    'resolution_notes',
+                                    e.target.value,
+                                )
+                            }
                         />
                     </div>
                     <DialogFooter>

@@ -2,14 +2,14 @@
  * Add-Client wizard chrome (MedsWizardDialog + wizard/primitives). Posts to
  * emar.errors.store (MedicationErrorController@store). */
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
     InfoCard,
     SelectInput,
     StepHead,
 } from '@/components/wizard/primitives';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { router } from '@inertiajs/react';
 import { AlertTriangle, ClipboardList, Info, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
@@ -18,9 +18,24 @@ import { toast } from 'sonner';
 export type ClientOption = { id: number; name: string; site: string | null };
 
 const STEPS = [
-    { key: 'what', label: 'What happened', blurb: 'Client & type', icon: AlertTriangle },
-    { key: 'class', label: 'Classification', blurb: 'Severity & factors', icon: ClipboardList },
-    { key: 'sign', label: 'Actions & sign', blurb: 'Submit report', icon: ShieldCheck },
+    {
+        key: 'what',
+        label: 'What happened',
+        blurb: 'Client & type',
+        icon: AlertTriangle,
+    },
+    {
+        key: 'class',
+        label: 'Classification',
+        blurb: 'Severity & factors',
+        icon: ClipboardList,
+    },
+    {
+        key: 'sign',
+        label: 'Actions & sign',
+        blurb: 'Submit report',
+        icon: ShieldCheck,
+    },
 ];
 
 const ERROR_TYPES = [
@@ -59,7 +74,9 @@ export function ReportErrorModal({
 }) {
     const [step, setStep] = useState(0);
     const [saving, setSaving] = useState(false);
-    const [clientId, setClientId] = useState(initialClientId ? String(initialClientId) : '');
+    const [clientId, setClientId] = useState(
+        initialClientId ? String(initialClientId) : '',
+    );
     const [errorType, setErrorType] = useState('');
     const [description, setDescription] = useState('');
     const [severity, setSeverity] = useState('');
@@ -89,6 +106,8 @@ export function ReportErrorModal({
 
     const step1Ok = clientId && errorType && description.trim().length > 0;
     const step2Ok = severity.length > 0;
+    const seriousIncidentNeedsAction =
+        createIncident === 'yes' && ['major', 'critical'].includes(severity);
 
     const submit = () => {
         setSaving(true);
@@ -117,7 +136,8 @@ export function ReportErrorModal({
         );
     };
 
-    const clientName = clients.find((c) => String(c.id) === clientId)?.name ?? '—';
+    const clientName =
+        clients.find((c) => String(c.id) === clientId)?.name ?? '—';
 
     const footer = (
         <>
@@ -131,12 +151,20 @@ export function ReportErrorModal({
             {step < 2 ? (
                 <Button
                     onClick={() => setStep((s) => s + 1)}
-                    disabled={(step === 0 && !step1Ok) || (step === 1 && !step2Ok)}
+                    disabled={
+                        (step === 0 && !step1Ok) || (step === 1 && !step2Ok)
+                    }
                 >
                     Continue
                 </Button>
             ) : (
-                <Button onClick={submit} disabled={saving}>
+                <Button
+                    onClick={submit}
+                    disabled={
+                        saving ||
+                        (seriousIncidentNeedsAction && !immediate.trim())
+                    }
+                >
                     <ShieldCheck className="h-4 w-4" />
                     {saving ? 'Submitting…' : 'Submit error report'}
                 </Button>
@@ -172,7 +200,9 @@ export function ReportErrorModal({
                             placeholder="Select client"
                             options={clients.map((c) => ({
                                 value: String(c.id),
-                                label: c.site ? `${c.name} · ${c.site}` : c.name,
+                                label: c.site
+                                    ? `${c.name} · ${c.site}`
+                                    : c.name,
                             }))}
                         />
                     </Field>
@@ -193,8 +223,9 @@ export function ReportErrorModal({
                         />
                     </Field>
                     <InfoCard icon={Info}>
-                        An undocumented omission is itself a medication error in NZ practice. Reporting
-                        near misses helps prevent harm — this is a no-blame record.
+                        An undocumented omission is itself a medication error in
+                        NZ practice. Reporting near misses helps prevent harm —
+                        this is a no-blame record.
                     </InfoCard>
                 </div>
             ) : step === 1 ? (
@@ -218,8 +249,14 @@ export function ReportErrorModal({
                             onChange={setReachedClient}
                             placeholder="Choose"
                             options={[
-                                { value: 'no', label: 'No — intercepted (near miss territory)' },
-                                { value: 'yes', label: 'Yes — reached the client' },
+                                {
+                                    value: 'no',
+                                    label: 'No — intercepted (near miss territory)',
+                                },
+                                {
+                                    value: 'yes',
+                                    label: 'Yes — reached the client',
+                                },
                                 { value: 'unknown', label: 'Unknown' },
                             ]}
                         />
@@ -240,12 +277,20 @@ export function ReportErrorModal({
                         title="Actions & sign"
                         blurb="Record what was done and submit."
                     />
-                    <Field label="Immediate action taken" span>
+                    <Field
+                        label="Immediate action taken"
+                        required={seriousIncidentNeedsAction}
+                        span
+                    >
                         <Textarea
                             value={immediate}
                             onChange={(e) => setImmediate(e.target.value)}
                             rows={3}
-                            placeholder="Clinical response, who was notified, observations (optional)"
+                            placeholder={
+                                seriousIncidentNeedsAction
+                                    ? 'Required: record the clinical or safety action actually taken.'
+                                    : 'Clinical response, who was notified, observations (optional)'
+                            }
                         />
                     </Field>
                     <Field label="Raise an incident?">
@@ -255,7 +300,10 @@ export function ReportErrorModal({
                             placeholder="Choose"
                             options={[
                                 { value: 'no', label: 'No — error log only' },
-                                { value: 'yes', label: 'Yes — also create an incident' },
+                                {
+                                    value: 'yes',
+                                    label: 'Yes — also create an incident',
+                                },
                             ]}
                         />
                     </Field>
@@ -274,17 +322,32 @@ export function ReportErrorModal({
                     <div className="col-span-full rounded-lg border border-border">
                         <div className="px-4">
                             <SummaryRow label="Client" value={clientName} />
-                            <SummaryRow label="Error type" value={labelOf(ERROR_TYPES, errorType)} />
+                            <SummaryRow
+                                label="Error type"
+                                value={labelOf(ERROR_TYPES, errorType)}
+                            />
                             <SummaryRow
                                 label="Severity"
                                 value={labelOf(SEVERITIES, severity)}
-                                tone={['major', 'critical'].includes(severity) ? 'crit' : undefined}
+                                tone={
+                                    ['major', 'critical'].includes(severity)
+                                        ? 'crit'
+                                        : undefined
+                                }
                             />
-                            <SummaryRow label="Incident" value={createIncident === 'yes' ? 'Will be raised' : 'No'} />
+                            <SummaryRow
+                                label="Incident"
+                                value={
+                                    createIncident === 'yes'
+                                        ? 'Will be raised'
+                                        : 'No'
+                                }
+                            />
                         </div>
                     </div>
                     <InfoCard icon={Info}>
-                        Submitting records this to the medication error register with an audit entry.
+                        Submitting records this to the medication error register
+                        with an audit entry.
                     </InfoCard>
                 </div>
             )}

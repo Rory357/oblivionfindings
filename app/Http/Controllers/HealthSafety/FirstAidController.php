@@ -16,14 +16,19 @@ use App\Models\FirstAidRecord;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Incidents\IncidentJourneyService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -44,10 +49,10 @@ class FirstAidController extends Controller
     private const REPORTABLE_OUTCOME = 'sent_to_hospital';
 
     /* ================================================================== */
-    /*  Register page                                                      */
+    /*  Register page */
     /* ================================================================== */
 
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): Response
     {
         abort_unless((bool) $request->user()?->canDo('hazards.view'), 403);
 
@@ -131,7 +136,7 @@ class FirstAidController extends Controller
     }
 
     /* ================================================================== */
-    /*  CRUD                                                               */
+    /*  CRUD */
     /* ================================================================== */
 
     public function store(StoreFirstAidRecordRequest $request): RedirectResponse|JsonResponse
@@ -195,7 +200,7 @@ class FirstAidController extends Controller
     }
 
     /* ================================================================== */
-    /*  Detail-modal actions                                               */
+    /*  Detail-modal actions */
     /* ================================================================== */
 
     /**
@@ -209,6 +214,15 @@ class FirstAidController extends Controller
 
         $data = $request->validate([
             'related_incident_id' => ['nullable', 'exists:client_incidents,id'],
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn () => ! $record->related_incident_id
+                    && empty($request->input('related_incident_id'))
+                    && ($record->ambulance_called || $record->treatment_outcome === self::REPORTABLE_OUTCOME)
+                ),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
         ]);
 
         if ($record->related_incident_id) {
@@ -231,26 +245,36 @@ class FirstAidController extends Controller
             return back()->with('error', 'Only client treatments can create a new incident. Link an existing incident instead.');
         }
 
-        $incident = ClientIncident::create([
-            'client_id' => $record->client_id,
-            'title' => 'First aid: '.str_replace('_', ' ', (string) $record->injury_illness_type),
-            'description' => $record->injury_illness_description,
-            'occurred_at' => $record->treatment_date,
-            'reported_by' => $request->user()->id,
-            'severity' => ($record->ambulance_called || $record->treatment_outcome === self::REPORTABLE_OUTCOME) ? 'high' : 'medium',
-            'status' => 'submitted',
-            'submitted_at' => now(),
-            'type' => 'first_aid',
-            // Hospital admission (sent_to_hospital) is WorkSafe-notifiable (HSWA s.23); ambulance-only
-            // (assessed, not admitted) is NOT — matching FirstAidObserver so the linked and unlinked
-            // escalation paths return the same verdict for the same treatment.
-            'is_notifiable' => $record->treatment_outcome === self::REPORTABLE_OUTCOME,
-        ]);
+        $incident = DB::transaction(function () use ($data, $record, $request): ClientIncident {
+            $incident = ClientIncident::create([
+                'client_id' => $record->client_id,
+                'site_id' => $record->site_id,
+                'title' => 'First aid: '.str_replace('_', ' ', (string) $record->injury_illness_type),
+                'description' => $record->injury_illness_description,
+                'occurred_at' => $record->treatment_date,
+                'reported_by' => $request->user()->id,
+                'severity' => ($record->ambulance_called || $record->treatment_outcome === self::REPORTABLE_OUTCOME) ? 'high' : 'medium',
+                'status' => 'submitted',
+                'submitted_at' => now(),
+                'type' => 'first_aid',
+                'immediate_action_taken' => filled($data['immediate_action_taken'] ?? null)
+                    ? trim((string) $data['immediate_action_taken'])
+                    : null,
+                // Hospital admission (sent_to_hospital) is WorkSafe-notifiable (HSWA s.23); ambulance-only
+                // (assessed, not admitted) is NOT — matching FirstAidObserver so the linked and unlinked
+                // escalation paths return the same verdict for the same treatment.
+                'is_notifiable' => $record->treatment_outcome === self::REPORTABLE_OUTCOME,
+            ]);
 
-        $record->update([
-            'incident_reported' => true,
-            'related_incident_id' => $incident->id,
-        ]);
+            $record->update([
+                'incident_reported' => true,
+                'related_incident_id' => $incident->id,
+            ]);
+
+            return app(IncidentJourneyService::class)
+                ->ensureForSubmittedIncident($incident, $request->user())
+                ->incident;
+        }, 3);
 
         AuditLogger::log('firstaidrecord.escalated', $record, ['incident_id' => $incident->id]);
 
@@ -277,7 +301,7 @@ class FirstAidController extends Controller
         ]);
 
         // Audited against the record (not the followup's own morph) so it shows in History.
-        AuditLogger::log('firstaidrecord.followup.add', $record, ['notes' => \Illuminate\Support\Str::limit($data['notes'], 80)]);
+        AuditLogger::log('firstaidrecord.followup.add', $record, ['notes' => Str::limit($data['notes'], 80)]);
 
         return $this->inertiaOrJson($request, 'Follow-up added.');
     }
@@ -295,7 +319,7 @@ class FirstAidController extends Controller
     }
 
     /* ================================================================== */
-    /*  Attachments (premium document upload)                              */
+    /*  Attachments (premium document upload) */
     /* ================================================================== */
 
     public function uploadAttachment(Request $request, FirstAidRecord $record): RedirectResponse|JsonResponse
@@ -361,7 +385,7 @@ class FirstAidController extends Controller
     }
 
     /* ================================================================== */
-    /*  Query building                                                     */
+    /*  Query building */
     /* ================================================================== */
 
     /**
@@ -437,7 +461,7 @@ class FirstAidController extends Controller
     }
 
     /* ================================================================== */
-    /*  Payload builders                                                   */
+    /*  Payload builders */
     /* ================================================================== */
 
     /**
@@ -661,7 +685,7 @@ class FirstAidController extends Controller
     }
 
     /* ================================================================== */
-    /*  Form options                                                       */
+    /*  Form options */
     /* ================================================================== */
 
     /**
@@ -742,7 +766,7 @@ class FirstAidController extends Controller
     }
 
     /* ================================================================== */
-    /*  Permissions / helpers                                              */
+    /*  Permissions / helpers */
     /* ================================================================== */
 
     /**

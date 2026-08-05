@@ -8,8 +8,10 @@ use App\Models\ClientIncident;
 use App\Models\RespiteAuditLog;
 use App\Models\RespiteDailyNote;
 use App\Models\RespiteStay;
+use App\Services\Incidents\IncidentJourneyService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -292,32 +294,49 @@ class RespiteDailyNoteController extends Controller
 
     private function createIncidentFromNoteWhenNeeded(RespiteDailyNote $note): void
     {
-        if (! $note->incident_occurred || $note->linked_incident_id) {
-            return;
-        }
+        DB::transaction(function () use ($note): void {
+            $lockedNote = RespiteDailyNote::query()
+                ->whereKey($note->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $incident = ClientIncident::create([
-            'client_id' => $note->client_id,
-            'reported_by' => auth()->id(),
-            'respite_stay_id' => $note->stay_id,
-            'type' => 'daily_note',
-            'severity' => $note->sensitive_flag ? 'medium' : 'low',
-            'status' => 'submitted',
-            'submitted_at' => now(),
-            'occurred_at' => $note->note_date,
-            'title' => 'Daily note incident flag',
-            'description' => $note->concerns ?: $note->observations ?: 'Incident was flagged from a respite daily note.',
-            'requires_followup' => (bool) $note->sensitive_flag,
-            'metadata' => [
-                'source' => 'respite_daily_note',
-                'daily_note_id' => $note->id,
-                'stay_id' => $note->stay_id,
-            ],
-        ]);
+            if (! $lockedNote->incident_occurred || $lockedNote->linked_incident_id) {
+                return;
+            }
 
-        $note->forceFill([
-            'linked_incident_id' => $incident->id,
-            'updated_by' => auth()->id(),
-        ])->save();
+            $lockedNote->loadMissing(['client:id,site_id', 'stay.booking', 'stay.client:id,site_id']);
+            $siteId = $lockedNote->stay?->booking?->location_id
+                ?: $lockedNote->stay?->client?->site_id
+                ?: $lockedNote->client?->site_id;
+            $actor = auth()->user();
+
+            $incident = ClientIncident::create([
+                'client_id' => $lockedNote->client_id,
+                'site_id' => $siteId,
+                'reported_by' => $actor?->id,
+                'respite_stay_id' => $lockedNote->stay_id,
+                'type' => 'daily_note',
+                'severity' => $lockedNote->sensitive_flag ? 'medium' : 'low',
+                'status' => 'submitted',
+                'submitted_at' => now(),
+                'occurred_at' => $lockedNote->note_date,
+                'title' => 'Daily note incident flag',
+                'description' => $lockedNote->concerns ?: $lockedNote->observations ?: 'Incident was flagged from a respite daily note.',
+                'requires_followup' => (bool) $lockedNote->sensitive_flag,
+                'metadata' => [
+                    'source' => 'respite_daily_note',
+                    'daily_note_id' => $lockedNote->id,
+                    'stay_id' => $lockedNote->stay_id,
+                ],
+            ]);
+
+            $journey = app(IncidentJourneyService::class)
+                ->ensureForSubmittedIncident($incident, $actor);
+
+            $lockedNote->forceFill([
+                'linked_incident_id' => $journey->incident->id,
+                'updated_by' => $actor?->id,
+            ])->save();
+        }, 3);
     }
 }

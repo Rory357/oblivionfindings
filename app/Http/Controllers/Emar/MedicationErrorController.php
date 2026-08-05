@@ -18,6 +18,8 @@ use App\Support\EmarUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Throwable;
 
@@ -170,7 +172,13 @@ class MedicationErrorController extends Controller
             'reached_client' => 'nullable|in:no,yes,unknown',
             'open_disclosure' => 'nullable|in:na,pending,done',
             'description' => 'required|string|max:5000',
-            'immediate_action' => 'nullable|string|max:5000',
+            'immediate_action' => [
+                Rule::requiredIf(fn (): bool => $request->boolean('create_incident')
+                    && in_array($request->input('severity'), ['major', 'critical'], true)),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
             'contributing_factors' => 'nullable|string|max:5000',
             'create_incident' => 'nullable|boolean',
         ]);
@@ -329,7 +337,18 @@ class MedicationErrorController extends Controller
      */
     public function linkIncident(Request $request, MedicationError $error)
     {
-        $incidentId = DB::transaction(function () use ($request, $error): int {
+        $validated = $request->validate([
+            'immediate_action' => [
+                Rule::requiredIf(fn (): bool => $error->client_incident_id === null
+                    && in_array($error->severity, ['major', 'critical'], true)
+                    && blank($error->immediate_action)),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
+        ]);
+
+        $incidentId = DB::transaction(function () use ($request, $error, $validated): int {
             $lockedError = MedicationError::query()
                 ->whereKey($error->getKey())
                 ->lockForUpdate()
@@ -339,6 +358,19 @@ class MedicationErrorController extends Controller
                 return (int) $lockedError->client_incident_id;
             }
 
+            $immediateAction = trim((string) ($validated['immediate_action'] ?? $lockedError->immediate_action));
+            if (in_array($lockedError->severity, ['major', 'critical'], true)
+                && $immediateAction === ''
+            ) {
+                throw ValidationException::withMessages([
+                    'immediate_action' => 'Record the immediate action actually taken before creating a major or critical incident.',
+                ]);
+            }
+
+            if ($immediateAction !== '' && $immediateAction !== $lockedError->immediate_action) {
+                $lockedError->forceFill(['immediate_action' => $immediateAction])->save();
+            }
+
             $client = Client::query()->findOrFail($lockedError->client_id);
 
             $incident = ClientIncident::withoutEvents(fn () => ClientIncident::query()->create([
@@ -346,7 +378,7 @@ class MedicationErrorController extends Controller
                 'site_id' => $client->site_id,
                 'title' => 'Medication Error: '.str_replace('_', ' ', (string) $lockedError->error_type),
                 'description' => $lockedError->description ?: 'Linked from medication error '.$lockedError->id.'.',
-                'immediate_action_taken' => $lockedError->immediate_action,
+                'immediate_action_taken' => $immediateAction === '' ? null : $immediateAction,
                 'occurred_at' => $lockedError->reported_at ?? now(),
                 'reported_by' => $request->user()->id,
                 'severity' => match ($lockedError->severity) {

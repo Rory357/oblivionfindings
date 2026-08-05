@@ -130,6 +130,21 @@ class HealthClinicalModuleRecordingTest extends TestCase
                 'occurred_at' => now()->toDateTimeString(),
                 'description' => 'Unwitnessed fall in the bathroom; no obvious injury.',
             ])
+            ->assertSessionHasErrors('immediate_action_taken');
+
+        $this->assertDatabaseCount('clinical_events', 0);
+        $this->assertDatabaseCount('hs_events', 0);
+
+        $this->actingAs($user)
+            ->from('/health-clinical')
+            ->post('/health-clinical/events', [
+                'client_id' => $this->client->id,
+                'event_type' => 'fall',
+                'severity' => 'high',
+                'occurred_at' => now()->toDateTimeString(),
+                'description' => 'Unwitnessed fall in the bathroom; no obvious injury.',
+                'immediate_action_taken' => 'Assisted the client, checked for injury, and contacted the RN.',
+            ])
             ->assertRedirect('/health-clinical');
 
         $event = ClinicalEvent::where('client_id', $this->client->id)->firstOrFail();
@@ -138,7 +153,9 @@ class HealthClinicalModuleRecordingTest extends TestCase
             'id' => $event->linked_hs_event_id,
             'source_type' => ClinicalEvent::class,
             'source_id' => $event->id,
+            'site_id' => $this->site->id,
         ]);
+        $this->assertSame('Assisted the client, checked for injury, and contacted the RN.', $event->immediate_action_taken);
     }
 
     public function test_module_observation_store_requires_client_id(): void

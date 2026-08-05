@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\BehaviourSupportPlan;
 use App\Models\Client;
+use App\Models\ClientIncident;
 use App\Models\DataBreachLog;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
@@ -138,6 +139,8 @@ test('a privacy breach incident on a respite stay creates a breach log', functio
     expect($breach->breach_type)->toBe('respite_stay');
     expect($breach->requires_authority_notification)->toBeTrue();
     expect($breach->affected_data_categories)->toContain('respite_record');
+    expect(ClientIncident::query()->sole()->site_id)->toBe($this->site->id);
+    expect(ClientIncident::query()->sole()->hs_event_id)->not->toBeNull();
 });
 
 test('recording a within-plan restraint auto-links the clients active behaviour support plan', function () {

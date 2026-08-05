@@ -797,7 +797,17 @@ class IncidentController extends Controller
             'occurred_at' => ['nullable', 'date'],
             'description' => ['nullable', 'string'],
             'requires_followup' => ['sometimes', 'boolean'],
-            'immediate_action_taken' => ['nullable', 'string'],
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn () => $request->input('intent') === 'submit'
+                    && (
+                        $request->input('severity') === 'high'
+                        || $request->input('reported_severity') === 'critical'
+                    )
+                ),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
             'witnesses' => ['nullable', 'string'],
             'harm_or_injury' => ['nullable', 'string', 'max:2000'],
             'consequence' => ['nullable', 'string', 'max:2000'],
@@ -895,7 +905,9 @@ class IncidentController extends Controller
             'occurred_at' => $data['occurred_at'] ?? now(),
             'description' => $data['description'] ?? null,
             'requires_followup' => (bool) ($data['requires_followup'] ?? false) || ! empty($data['followups']),
-            'immediate_action_taken' => $data['immediate_action_taken'] ?? null,
+            'immediate_action_taken' => filled($data['immediate_action_taken'] ?? null)
+                ? trim((string) $data['immediate_action_taken'])
+                : null,
             'witnesses' => $data['witnesses'] ?? null,
             'title' => $data['type'].' incident',
             'metadata' => $metadata,
@@ -972,6 +984,7 @@ class IncidentController extends Controller
 
                 if (! $created) {
                     if ($incident->status === 'submitted' && $isSubmit) {
+                        $this->recordMissingImmediateActionForSubmission($incident, $data);
                         $journey = $journeys->ensureForSubmittedIncident($incident, $actor);
 
                         return [$journey->incident, $journey, false, false];
@@ -1172,6 +1185,36 @@ class IncidentController extends Controller
         }
 
         return $metadata === [] ? null : $metadata;
+    }
+
+    /**
+     * A serious submission must carry the reporter's actual immediate response.
+     * A retry may repair a missing historical value, but must never replace one.
+     *
+     * @param  array<string, mixed>  $input
+     */
+    private function recordMissingImmediateActionForSubmission(
+        ClientIncident $incident,
+        array $input = [],
+    ): void {
+        if (blank($incident->immediate_action_taken)) {
+            $providedAction = trim((string) ($input['immediate_action_taken'] ?? ''));
+
+            if ($providedAction !== '') {
+                $incident->forceFill([
+                    'immediate_action_taken' => $providedAction,
+                ])->save();
+            }
+        }
+
+        if (
+            in_array($incident->severity, ['high', 'critical'], true)
+            && blank($incident->immediate_action_taken)
+        ) {
+            throw ValidationException::withMessages([
+                'immediate_action_taken' => 'Record the immediate action taken before submitting a high or critical incident.',
+            ]);
+        }
     }
 
     /** @return array<string, string> */
@@ -1428,12 +1471,16 @@ class IncidentController extends Controller
             $this->authorize('submit', $incident);
         }
 
+        $submission = $request->validate([
+            'immediate_action_taken' => ['nullable', 'string', 'max:5000'],
+        ]);
+
         $siteAccess = app(UserSiteAccessService::class);
         $siteBypassPermissions = $this->incidentReportSiteBypassPermissions();
         $siteAccess->assertCanAccessClientIncident($actor, $incident, $siteBypassPermissions);
 
         [$incident, $journey, $submittedNow] = DB::transaction(
-            function () use ($actor, $incident, $journeys, $siteAccess, $siteBypassPermissions): array {
+            function () use ($actor, $incident, $journeys, $siteAccess, $siteBypassPermissions, $submission): array {
                 $locked = ClientIncident::query()
                     ->whereKey($incident->id)
                     ->lockForUpdate()
@@ -1449,6 +1496,7 @@ class IncidentController extends Controller
                 $siteAccess->assertCanAccessClientIncident($actor, $locked, $siteBypassPermissions);
 
                 if ($locked->status === 'submitted') {
+                    $this->recordMissingImmediateActionForSubmission($locked, $submission);
                     $journey = $journeys->ensureForSubmittedIncident($locked, $actor);
 
                     return [$journey->incident, $journey, false];
@@ -1472,6 +1520,7 @@ class IncidentController extends Controller
                     'submitted_at' => now(),
                 ])->save();
 
+                $this->recordMissingImmediateActionForSubmission($locked, $submission);
                 $journey = $journeys->ensureForSubmittedIncident($locked, $actor);
 
                 return [$journey->incident, $journey, true];
@@ -1492,19 +1541,34 @@ class IncidentController extends Controller
     {
         $this->authorize('review', $incident);
 
-        // Guardrail: review is only valid for submitted incidents.
-        abort_unless($incident->status === 'submitted', 403);
-
         $data = $request->validate([
             'review_notes' => ['nullable', 'string'],
         ]);
 
-        $incident->update([
-            'status' => 'reviewed',
-            'reviewed_by' => $request->user()?->id,
-            'reviewed_at' => now(),
-            'review_notes' => $data['review_notes'] ?? $incident->review_notes,
-        ]);
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        $incident = DB::transaction(function () use ($actor, $data, $incident): ClientIncident {
+            $lockedIncident = ClientIncident::query()
+                ->whereKey($incident->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Re-authorize the locked record so a concurrent state change cannot
+            // move a different lifecycle snapshot through this action.
+            $this->authorize('review', $lockedIncident);
+            abort_unless($lockedIncident->status === 'submitted', 403);
+
+            $lockedIncident->update([
+                'status' => 'reviewed',
+                'reviewed_by' => $actor->id,
+                'reviewed_at' => now(),
+                'review_notes' => $data['review_notes'] ?? $lockedIncident->review_notes,
+            ]);
+
+            return $this->journeys
+                ->ensureForSubmittedIncident($lockedIncident, $actor)
+                ->incident;
+        }, 3);
 
         $incident->load(['client:id,first_name,last_name']);
         $client = $incident->client;
@@ -1543,7 +1607,9 @@ class IncidentController extends Controller
             'closed_notes' => ['nullable', 'string'],
         ]);
 
-        [$incident, $closeError] = DB::transaction(function () use ($incident, $data, $request): array {
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        [$incident, $closeError] = DB::transaction(function () use ($actor, $incident, $data): array {
             $lockedIncident = ClientIncident::query()
                 ->whereKey($incident->id)
                 ->lockForUpdate()
@@ -1551,6 +1617,7 @@ class IncidentController extends Controller
 
             // Every close/follow-up writer locks this parent first. Whichever
             // operation wins is visible to the other before it can continue.
+            $this->authorize('close', $lockedIncident);
             abort_unless($lockedIncident->status === 'reviewed', 403);
 
             $gate = $this->journeys->closeGate($lockedIncident);
@@ -1563,13 +1630,18 @@ class IncidentController extends Controller
 
             $lockedIncident->update([
                 'status' => 'closed',
-                'closed_by' => $request->user()?->id,
+                'closed_by' => $actor->id,
                 'closed_at' => now(),
                 'closed_outcome' => $data['closed_outcome'],
                 'closed_notes' => $data['closed_notes'] ?? null,
             ]);
 
-            return [$lockedIncident, null];
+            $journey = $this->journeys->ensureForSubmittedIncident(
+                $lockedIncident,
+                $actor,
+            );
+
+            return [$journey->incident, null];
         }, 3);
 
         if ($closeError !== null) {
@@ -1711,7 +1783,14 @@ class IncidentController extends Controller
                 ]);
             }
 
-            return $lockedIncident->refresh();
+            // Verify and repair only the canonical links inside this transaction.
+            // attachAlertToIncident/ensureForSubmittedIncident never reopen the
+            // independently governed H&S, Control Room, or linked IT lifecycles.
+            $journey = $alert
+                ? $this->journeys->attachAlertToIncident($lockedIncident, $alert, $actor)
+                : $this->journeys->ensureForSubmittedIncident($lockedIncident, $actor);
+
+            return $journey->incident;
         }, 3);
 
         $incident->load(['client:id,first_name,last_name']);

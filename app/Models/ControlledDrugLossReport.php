@@ -26,6 +26,7 @@ class ControlledDrugLossReport extends Model
         'quantity_lost',
         'unit',
         'circumstances',
+        'immediate_action_taken',
         'accountable_officer_name',
         'discovered_by',
         'discovered_at',

@@ -60,6 +60,78 @@ class IncidentJourneyServiceTest extends TestCase
         );
     }
 
+    public function test_direct_submitted_journey_freezes_the_clients_canonical_site(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'site_id' => null,
+        ]);
+
+        $journey = app(IncidentJourneyService::class)
+            ->ensureForSubmittedIncident($incident, $actor);
+
+        $this->assertSame($site->id, $journey->incident->site_id);
+        $this->assertSame($site->id, $journey->hsEvent?->site_id);
+
+        $client->update(['site_id' => Site::factory()->create()->id]);
+        $retry = app(IncidentJourneyService::class)
+            ->ensureForSubmittedIncident($journey->incident, $actor);
+
+        $this->assertSame($site->id, $retry->incident->site_id);
+        $this->assertSame($site->id, $retry->hsEvent?->site_id);
+    }
+
+    public function test_direct_serious_journey_requires_recorded_immediate_action(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'severity' => 'high',
+            'immediate_action_taken' => null,
+        ]);
+
+        try {
+            app(IncidentJourneyService::class)->ensureForSubmittedIncident($incident, $actor);
+            $this->fail('A serious incident without immediate action must fail closed.');
+        } catch (\DomainException $exception) {
+            $this->assertSame(
+                'Immediate action is required for a high or critical incident.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertNull($incident->fresh()->hs_event_id);
+        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+    }
+
+    public function test_direct_journey_rejects_a_client_without_a_canonical_site(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => null]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'site_id' => null,
+        ]);
+
+        try {
+            app(IncidentJourneyService::class)->ensureForSubmittedIncident($incident, $actor);
+            $this->fail('A submitted incident without canonical Site provenance must fail closed.');
+        } catch (\DomainException $exception) {
+            $this->assertSame(
+                'A canonical Site is required before an incident can enter the H&S journey.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertNull($incident->fresh()->site_id);
+        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+    }
+
     public function test_incident_journey_is_a_readonly_value_object_that_allows_legacy_gaps(): void
     {
         $incident = $this->incidentWithoutEvents();
@@ -345,7 +417,7 @@ class IncidentJourneyServiceTest extends TestCase
 
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage(
-            'Immediate action is required for a high or critical Control Room incident.',
+            'Immediate action is required for a high or critical incident.',
         );
 
         app(IncidentJourneyService::class)->submitFromAlert(
@@ -421,7 +493,7 @@ class IncidentJourneyServiceTest extends TestCase
 
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage(
-            'Immediate action is required for a high or critical Control Room incident.',
+            'Immediate action is required for a high or critical incident.',
         );
 
         app(IncidentJourneyService::class)->submitFromAlert(
@@ -455,7 +527,7 @@ class IncidentJourneyServiceTest extends TestCase
 
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage(
-            'Immediate action is required for a high or critical Control Room incident.',
+            'Immediate action is required for a high or critical incident.',
         );
 
         app(IncidentJourneyService::class)->attachAlertToIncident(
@@ -487,7 +559,7 @@ class IncidentJourneyServiceTest extends TestCase
 
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage(
-            'Immediate action is required for a high or critical Control Room incident.',
+            'Immediate action is required for a high or critical incident.',
         );
 
         app(IncidentJourneyService::class)->submitFromAlert(
@@ -2644,6 +2716,7 @@ class IncidentJourneyServiceTest extends TestCase
             'submitted_at' => now(),
             'type' => 'fall',
             'severity' => 'low',
+            'immediate_action_taken' => 'Resident checked and immediate hazards controlled.',
             'title' => 'Submitted incident',
             'description' => 'Submitted without model events for journey testing.',
             'occurred_at' => now()->subMinutes(5),

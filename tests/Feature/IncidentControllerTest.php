@@ -11,6 +11,7 @@ use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\IncidentFollowup;
 use App\Models\IncidentTemplate;
+use App\Models\ItTicket;
 use App\Models\Role;
 use App\Models\SafeguardingConcern;
 use App\Models\Shift;
@@ -108,6 +109,7 @@ class IncidentControllerTest extends TestCase
             'severity' => 'low',
             'occurred_at' => now()->format('Y-m-d H:i:s'),
             'description' => 'Client slipped beside the dining table.',
+            'immediate_action_taken' => 'Resident checked and the immediate area made safe.',
         ], $overrides);
     }
 
@@ -1014,6 +1016,23 @@ class IncidentControllerTest extends TestCase
         $this->assertSame($hsEvent->id, $incident->hs_event_id);
         $this->assertSame($alert->id, $incident->control_room_alert_id);
         $this->assertSame($alert->id, $hsEvent->control_room_alert_id);
+    }
+
+    public function test_store_high_submit_requires_truthful_immediate_action(): void
+    {
+        $payload = $this->reportPayload([
+            'intent' => 'submit',
+            'severity' => 'high',
+            'immediate_action_taken' => null,
+        ]);
+
+        $this->actingAs($this->staff)
+            ->post('/incidents', $payload)
+            ->assertSessionHasErrors(['immediate_action_taken']);
+
+        $this->assertSame(0, ClientIncident::query()->count());
+        $this->assertSame(0, HsEvent::query()->count());
+        $this->assertSame(0, ControlRoomAlert::query()->count());
     }
 
     public function test_task5_hardening_direct_submit_response_loss_retry_reuses_one_uuid_backed_journey(): void
@@ -2117,6 +2136,7 @@ class IncidentControllerTest extends TestCase
             'status' => 'draft',
             'client_id' => $this->client->id,
             'reported_by' => $this->staff->id,
+            'immediate_action_taken' => 'Resident checked and immediate hazards controlled.',
         ]);
 
         $this->actingAs($this->staff)
@@ -2235,6 +2255,53 @@ class IncidentControllerTest extends TestCase
         $this->assertEquals('Reviewed and noted.', $incident->review_notes);
     }
 
+    public function test_review_rolls_back_incident_and_journey_mutations_when_synchronous_verification_fails(): void
+    {
+        $incident = ClientIncident::factory()->submitted()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'reported_by' => $this->staff->id,
+            'review_notes' => 'Original review note.',
+        ]);
+        $hsEvent = $incident->fresh()->hsEvent()->firstOrFail();
+        $originalHsStatus = $hsEvent->status;
+        $originalHsSummary = $hsEvent->closure_summary;
+
+        $journeys = \Mockery::mock(IncidentJourneyService::class);
+        $journeys->shouldReceive('ensureForSubmittedIncident')
+            ->once()
+            ->andReturnUsing(function (ClientIncident $lockedIncident) use ($hsEvent): never {
+                $lockedIncident->forceFill(['hs_event_id' => null])->saveQuietly();
+                $hsEvent->newQuery()->whereKey($hsEvent->id)->update([
+                    'status' => HsEvent::STATUS_CLOSED,
+                    'closure_summary' => 'Injected partial review mutation.',
+                ]);
+
+                throw new \RuntimeException('Injected review journey failure');
+            });
+        $this->app->instance(IncidentJourneyService::class, $journeys);
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($this->coordinator)
+                ->post("/incidents/{$incident->id}/review", [
+                    'review_notes' => 'This must roll back.',
+                ]);
+            $this->fail('The injected review journey failure was not thrown.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Injected review journey failure', $exception->getMessage());
+        }
+
+        $incident->refresh();
+        $this->assertSame('submitted', $incident->status);
+        $this->assertNull($incident->reviewed_by);
+        $this->assertNull($incident->reviewed_at);
+        $this->assertSame('Original review note.', $incident->review_notes);
+        $this->assertSame($hsEvent->id, $incident->hs_event_id);
+        $this->assertSame($originalHsStatus, $hsEvent->fresh()->status);
+        $this->assertSame($originalHsSummary, $hsEvent->fresh()->closure_summary);
+    }
+
     public function test_review_sends_notification(): void
     {
         $mock = $this->mockNotificationService();
@@ -2319,6 +2386,58 @@ class IncidentControllerTest extends TestCase
         $this->assertNotNull($incident->closed_at);
         $this->assertEquals('Resolved with no further action', $incident->closed_outcome);
         $this->assertEquals('No issues remain.', $incident->closed_notes);
+    }
+
+    public function test_close_rolls_back_incident_and_journey_mutations_when_synchronous_verification_fails(): void
+    {
+        $incident = ClientIncident::factory()->reviewed()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
+        $this->markLinkedHealthSafetyGovernanceClosed($incident);
+        $incident->refresh();
+        $hsEvent = $incident->hsEvent()->firstOrFail();
+        $originalHsSummary = $hsEvent->closure_summary;
+        $closeGate = app(IncidentJourneyService::class)->closeGate($incident);
+        $this->assertTrue($closeGate->allowed);
+
+        $journeys = \Mockery::mock(IncidentJourneyService::class);
+        $journeys->shouldReceive('closeGate')
+            ->once()
+            ->andReturn($closeGate);
+        $journeys->shouldReceive('ensureForSubmittedIncident')
+            ->once()
+            ->andReturnUsing(function (ClientIncident $lockedIncident) use ($hsEvent): never {
+                $lockedIncident->forceFill(['hs_event_id' => null])->saveQuietly();
+                $hsEvent->newQuery()->whereKey($hsEvent->id)->update([
+                    'closure_summary' => 'Injected partial close mutation.',
+                ]);
+
+                throw new \RuntimeException('Injected close journey failure');
+            });
+        $this->app->instance(IncidentJourneyService::class, $journeys);
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($this->coordinator)
+                ->post("/incidents/{$incident->id}/close", [
+                    'closed_outcome' => 'This must roll back.',
+                    'closed_notes' => 'No partial closure may remain.',
+                ]);
+            $this->fail('The injected close journey failure was not thrown.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Injected close journey failure', $exception->getMessage());
+        }
+
+        $incident->refresh();
+        $this->assertSame('reviewed', $incident->status);
+        $this->assertNull($incident->closed_by);
+        $this->assertNull($incident->closed_at);
+        $this->assertNull($incident->closed_outcome);
+        $this->assertNull($incident->closed_notes);
+        $this->assertSame($hsEvent->id, $incident->hs_event_id);
+        $this->assertSame(HsEvent::STATUS_CLOSED, $hsEvent->fresh()->status);
+        $this->assertSame($originalHsSummary, $hsEvent->fresh()->closure_summary);
     }
 
     public function test_closing_incident_does_not_silently_resolve_linked_control_room_alert(): void
@@ -2418,7 +2537,12 @@ class IncidentControllerTest extends TestCase
     {
         $this->mockNotificationService();
 
-        $incident = ClientIncident::factory()->reviewed()->create(['severity' => 'high']);
+        $incident = ClientIncident::factory()->reviewed()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->client->site_id,
+            'severity' => 'high',
+            'immediate_action_taken' => 'Resident assessed and immediate hazards controlled.',
+        ]);
         $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         $this->actingAs($this->coordinator)
@@ -2433,7 +2557,12 @@ class IncidentControllerTest extends TestCase
     {
         $this->mockNotificationService();
 
-        $incident = ClientIncident::factory()->reviewed()->create(['severity' => 'high']);
+        $incident = ClientIncident::factory()->reviewed()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->client->site_id,
+            'severity' => 'high',
+            'immediate_action_taken' => 'Resident assessed and immediate hazards controlled.',
+        ]);
         $hsEvent = HsEvent::query()
             ->where('source_type', ClientIncident::class)
             ->where('source_id', $incident->id)
@@ -2473,7 +2602,12 @@ class IncidentControllerTest extends TestCase
         // investigation is completed but the incident column was never mirrored.
         $this->mockNotificationService();
 
-        $incident = ClientIncident::factory()->reviewed()->create(['severity' => 'critical']);
+        $incident = ClientIncident::factory()->reviewed()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->client->site_id,
+            'severity' => 'critical',
+            'immediate_action_taken' => 'Resident assessed and immediate hazards controlled.',
+        ]);
         $hsEvent = HsEvent::query()
             ->where('source_type', ClientIncident::class)
             ->where('source_id', $incident->id)
@@ -2719,6 +2853,98 @@ class IncidentControllerTest extends TestCase
         $this->assertNull($incident->closed_at);
         $this->assertNull($incident->closed_outcome);
         $this->assertNull($incident->closed_notes);
+    }
+
+    public function test_reopen_preserves_terminal_health_safety_and_control_room_lifecycles(): void
+    {
+        $this->mockNotificationService();
+        $this->assignCoordinatorToPrimarySite();
+        [$incident, $hsEvent, $alert] = $this->closedCanonicalIncidentJourney();
+        $itTicket = ItTicket::factory()->create([
+            'requester_user_id' => $this->coordinator->id,
+            'site_id' => $this->site->id,
+            'status' => 'closed',
+            'resolved_at' => now()->subDays(2),
+            'closed_at' => now()->subDay(),
+        ]);
+        $itTicket->links()->create([
+            'relationship' => 'source_alert',
+            'linkable_type' => $alert->getMorphClass(),
+            'linkable_id' => $alert->id,
+            'created_by_user_id' => $this->coordinator->id,
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->post("/incidents/{$incident->id}/reopen", [
+                'reopened_reason' => 'New factual evidence requires incident review.',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame('reviewed', $incident->fresh()->status);
+        $this->assertSame(HsEvent::STATUS_CLOSED, $hsEvent->fresh()->status);
+        $this->assertSame(ControlRoomAlert::STATUS_CLOSED, $alert->fresh()->status);
+        $this->assertSame('closed', $itTicket->fresh()->status);
+        $this->assertNotNull($itTicket->fresh()->closed_at);
+        $this->assertTrue($itTicket->links()->where('linkable_id', $alert->id)->exists());
+        $this->assertSame('incident_reopened', data_get($alert->fresh()->context, 'journey_attention.type'));
+        $this->assertTrue((bool) data_get($alert->fresh()->context, 'journey_attention.requires_operational_reopen'));
+    }
+
+    public function test_reopen_rolls_back_incident_and_journey_mutations_when_synchronous_verification_fails(): void
+    {
+        $this->assignCoordinatorToPrimarySite();
+        [$incident, $hsEvent, $alert] = $this->closedCanonicalIncidentJourney();
+        $originalAlertContext = $alert->context;
+        $originalClosedAt = $incident->closed_at?->getTimestamp();
+
+        $journeys = \Mockery::mock(IncidentJourneyService::class);
+        $journeys->shouldReceive('attachAlertToIncident')
+            ->once()
+            ->andReturnUsing(function (
+                ClientIncident $lockedIncident,
+                ControlRoomAlert $lockedAlert,
+            ) use ($hsEvent): never {
+                $lockedIncident->forceFill(['hs_event_id' => null])->saveQuietly();
+                $hsEvent->newQuery()->whereKey($hsEvent->id)->update([
+                    'status' => HsEvent::STATUS_OPEN,
+                    'closure_summary' => 'Injected partial reopen mutation.',
+                ]);
+                $lockedAlert->forceFill([
+                    'status' => ControlRoomAlert::STATUS_OPEN,
+                    'context' => array_replace((array) $lockedAlert->context, [
+                        'injected_partial_reopen' => true,
+                    ]),
+                ])->saveQuietly();
+
+                throw new \RuntimeException('Injected reopen journey failure');
+            });
+        $journeys->shouldNotReceive('ensureForSubmittedIncident');
+        $this->app->instance(IncidentJourneyService::class, $journeys);
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($this->coordinator)
+                ->post("/incidents/{$incident->id}/reopen", [
+                    'reopened_reason' => 'This must roll back.',
+                ]);
+            $this->fail('The injected reopen journey failure was not thrown.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Injected reopen journey failure', $exception->getMessage());
+        }
+
+        $incident->refresh();
+        $this->assertSame('closed', $incident->status);
+        $this->assertSame($this->coordinator->id, $incident->closed_by);
+        $this->assertSame($originalClosedAt, $incident->closed_at?->getTimestamp());
+        $this->assertSame('Previously resolved', $incident->closed_outcome);
+        $this->assertNull($incident->reopened_by);
+        $this->assertNull($incident->reopened_at);
+        $this->assertNull($incident->reopened_reason);
+        $this->assertSame($hsEvent->id, $incident->hs_event_id);
+        $this->assertSame(HsEvent::STATUS_CLOSED, $hsEvent->fresh()->status);
+        $this->assertSame('Closed H&S journey fixture.', $hsEvent->fresh()->closure_summary);
+        $this->assertSame(ControlRoomAlert::STATUS_CLOSED, $alert->fresh()->status);
+        $this->assertSame($originalAlertContext, $alert->fresh()->context);
     }
 
     public function test_reopen_requires_reopened_reason(): void
@@ -3628,6 +3854,46 @@ class IncidentControllerTest extends TestCase
             'closed_by' => $this->coordinator->id,
             'closure_summary' => 'Governance closed for the incident closure fixture.',
         ])->saveQuietly();
+    }
+
+    /** @return array{0: ClientIncident, 1: HsEvent, 2: ControlRoomAlert} */
+    private function closedCanonicalIncidentJourney(): array
+    {
+        $incident = ClientIncident::factory()->highSeverity()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'reported_by' => $this->coordinator->id,
+            'status' => 'closed',
+            'submitted_at' => now()->subDays(3),
+            'immediate_action_taken' => 'Resident assessed and immediate hazards controlled.',
+            'reviewed_by' => $this->coordinator->id,
+            'reviewed_at' => now()->subDays(2),
+            'closed_by' => $this->coordinator->id,
+            'closed_at' => now()->subDay(),
+            'closed_outcome' => 'Previously resolved',
+        ])->fresh();
+        $hsEvent = $incident->hsEvent()->firstOrFail();
+        $alert = $incident->controlRoomAlert()->firstOrFail();
+
+        $hsEvent->forceFill([
+            'status' => HsEvent::STATUS_CLOSED,
+            'closed_at' => now()->subDay(),
+            'closed_by' => $this->coordinator->id,
+            'closure_summary' => 'Closed H&S journey fixture.',
+        ])->saveQuietly();
+        $alert->forceFill([
+            'status' => ControlRoomAlert::STATUS_CLOSED,
+            'resolved_at' => now()->subDays(2),
+            'resolved_by_user_id' => $this->coordinator->id,
+            'resolution_code' => 'resolved',
+            'closed_at' => now()->subDay(),
+            'closed_by_user_id' => $this->coordinator->id,
+            'context' => array_replace((array) $alert->context, [
+                'fixture_marker' => 'preserved',
+            ]),
+        ])->saveQuietly();
+
+        return [$incident->fresh(), $hsEvent->fresh(), $alert->fresh()];
     }
 
     /** @return list<array{query: string, bindings: array<mixed>, time: float}> */

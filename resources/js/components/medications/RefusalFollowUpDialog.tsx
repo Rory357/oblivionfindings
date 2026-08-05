@@ -297,15 +297,20 @@ export default function RefusalFollowUpDialog({
 
                     {/* Follow-Up Action */}
                     <div>
-                        <Label>Follow-Up Action</Label>
+                        <Label>Immediate / Follow-Up Action</Label>
                         <Textarea
                             value={form.data.follow_up_action}
                             onChange={(e) =>
                                 form.setData('follow_up_action', e.target.value)
                             }
-                            placeholder="Describe any follow-up actions required..."
+                            placeholder="Record what was done now and any follow-up action required. This is mandatory if a high-risk refusal pattern is escalated."
                             className="min-h-[60px]"
                         />
+                        {form.errors.follow_up_action && (
+                            <p className="mt-1 text-xs text-status-critical">
+                                {form.errors.follow_up_action}
+                            </p>
+                        )}
                     </div>
 
                     {/* Follow-Up Due Date */}

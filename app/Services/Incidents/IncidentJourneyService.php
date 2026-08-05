@@ -807,7 +807,7 @@ class IncidentJourneyService
             && $immediateAction === ''
         ) {
             throw new \DomainException(
-                'Immediate action is required for a high or critical Control Room incident.',
+                'Immediate action is required for a high or critical incident.',
             );
         }
         if ($hasImmediateActionInput) {
@@ -858,16 +858,16 @@ class IncidentJourneyService
 
     private function assertSeriousIncidentHasImmediateAction(
         ClientIncident $incident,
-        ControlRoomAlert $alert,
+        ?ControlRoomAlert $alert = null,
     ): void {
         $severity = HsEventService::normaliseSeverity((string) $incident->severity);
-        $isSerious = $alert->severity === HsEvent::SEVERITY_CRITICAL
+        $isSerious = $alert?->severity === HsEvent::SEVERITY_CRITICAL
             || in_array($severity, [HsEvent::SEVERITY_HIGH, HsEvent::SEVERITY_CRITICAL], true);
         if ($isSerious
             && blank($incident->immediate_action_taken)
         ) {
             throw new \DomainException(
-                'Immediate action is required for a high or critical Control Room incident.',
+                'Immediate action is required for a high or critical incident.',
             );
         }
     }
@@ -894,8 +894,34 @@ class IncidentJourneyService
             : 'control_room';
     }
 
+    private function ensureCanonicalIncidentSite(ClientIncident $incident): void
+    {
+        if ($incident->site_id !== null) {
+            return;
+        }
+
+        $client = Client::query()
+            ->select(['id', 'site_id'])
+            ->whereKey($incident->client_id)
+            ->lockForUpdate()
+            ->first();
+        if ($client?->site_id === null) {
+            throw new \DomainException(
+                'A canonical Site is required before an incident can enter the H&S journey.',
+            );
+        }
+
+        $incident->forceFill(['site_id' => (int) $client->site_id])->saveQuietly();
+        $incident->site_id = (int) $client->site_id;
+    }
+
     private function lockedOrCreatedHsEvent(ClientIncident $incident, ?User $actor): HsEvent
     {
+        $this->ensureCanonicalIncidentSite($incident);
+        if ($incident->isSubmitted()) {
+            $this->assertSeriousIncidentHasImmediateAction($incident);
+        }
+
         $this->ensureOfficialIncidentReference($incident);
         $hsEvent = null;
 
@@ -1502,15 +1528,15 @@ class IncidentJourneyService
         return ($rank[$current] ?? 0) >= ($rank[$target] ?? 0) ? $current : $target;
     }
 
-    private function incidentSiteId(ClientIncident $incident): ?int
+    private function incidentSiteId(ClientIncident $incident): int
     {
-        if ($incident->site_id !== null) {
-            return (int) $incident->site_id;
+        if ($incident->site_id === null) {
+            throw new \DomainException(
+                'A canonical Site is required before an incident can enter the H&S journey.',
+            );
         }
 
-        $clientSiteId = Client::query()->whereKey($incident->client_id)->value('site_id');
-
-        return $clientSiteId === null ? null : (int) $clientSiteId;
+        return (int) $incident->site_id;
     }
 
     private function readHsEventForIncident(

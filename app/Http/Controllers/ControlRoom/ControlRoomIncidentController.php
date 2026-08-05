@@ -515,6 +515,7 @@ class ControlRoomIncidentController extends Controller
             $incident = ClientIncident::withoutEvents(
                 fn () => ClientIncident::create([
                     'client_id' => $client->id,
+                    'site_id' => $client->site_id,
                     'reported_by' => $user->id,
                     'type' => $data['type'],
                     'source' => 'control_room',

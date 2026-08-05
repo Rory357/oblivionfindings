@@ -15,10 +15,14 @@ use App\Models\RespiteComplaint;
 use App\Models\RespiteMedicationReconciliation;
 use App\Models\RespiteStay;
 use App\Models\RestraintEvent;
+use App\Services\Incidents\IncidentJourneyService;
+use App\Services\References\ReferenceNumberGenerator;
 use App\Services\Respite\RespiteShiftSync;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -350,7 +354,7 @@ class RespiteStayController extends Controller
 
     public function recordIncident(Request $request, RespiteStay $stay): RedirectResponse
     {
-        $stay->loadMissing('client');
+        $stay->loadMissing(['client', 'booking']);
         $this->authorize('view', $stay->client);
 
         $validated = $request->validate([
@@ -359,71 +363,87 @@ class RespiteStayController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'occurred_at' => 'nullable|date',
-            'immediate_action_taken' => 'nullable|string',
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn () => in_array($request->input('severity'), ['high', 'critical'], true)),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
             'witnesses' => 'nullable|string',
             'is_notifiable' => 'nullable|boolean',
             'notification_authority' => 'nullable|in:worksafe,health_nz,privacy_commissioner,charities_services',
             'incident_type' => 'nullable|in:death,serious_harm,serious_injury,health_safety,privacy_breach',
         ]);
 
-        $incident = ClientIncident::create([
-            'client_id' => $stay->client_id,
-            'reported_by' => auth()->id(),
-            'respite_stay_id' => $stay->id,
-            'type' => $validated['type'],
-            'severity' => $validated['severity'],
-            'status' => 'submitted',
-            'submitted_at' => now(),
-            'occurred_at' => $validated['occurred_at'] ?? now(),
-            'title' => $validated['title'],
-            'description' => $validated['description'],
-            'requires_followup' => in_array($validated['severity'], ['high', 'critical'], true),
-            'immediate_action_taken' => $validated['immediate_action_taken'] ?? null,
-            'witnesses' => $validated['witnesses'] ?? null,
-            'is_notifiable' => (bool) ($validated['is_notifiable'] ?? false),
-            'metadata' => [
-                'source' => 'respite_stay',
-                'stay_id' => $stay->id,
-            ],
-        ]);
-
-        if ($incident->is_notifiable) {
-            NotifiableIncident::create([
-                'incident_type' => $validated['incident_type'] ?? 'health_safety',
-                'notification_authority' => $validated['notification_authority'] ?? 'health_nz',
+        $actor = $request->user();
+        $siteId = $stay->booking?->location_id ?: $stay->client?->site_id;
+        $incident = DB::transaction(function () use ($actor, $siteId, $stay, $validated): ClientIncident {
+            $incident = ClientIncident::create([
+                'client_id' => $stay->client_id,
+                'site_id' => $siteId,
+                'reported_by' => $actor?->id,
+                'respite_stay_id' => $stay->id,
+                'type' => $validated['type'],
+                'severity' => $validated['severity'],
+                'status' => 'submitted',
+                'submitted_at' => now(),
+                'occurred_at' => $validated['occurred_at'] ?? now(),
                 'title' => $validated['title'],
                 'description' => $validated['description'],
-                'related_incident_id' => $incident->id,
-                'severity' => $validated['severity'],
-                'status' => 'pending',
-                'occurred_at' => $incident->occurred_at,
-                'discovered_at' => now(),
-                'notification_deadline' => now()->addDay(),
-                'submitted_by' => auth()->id(),
-                'evidence' => [
-                    ['type' => 'respite_stay', 'id' => $stay->id],
+                'requires_followup' => in_array($validated['severity'], ['high', 'critical'], true),
+                'immediate_action_taken' => filled($validated['immediate_action_taken'] ?? null)
+                    ? trim((string) $validated['immediate_action_taken'])
+                    : null,
+                'witnesses' => $validated['witnesses'] ?? null,
+                'is_notifiable' => (bool) ($validated['is_notifiable'] ?? false),
+                'metadata' => [
+                    'source' => 'respite_stay',
+                    'stay_id' => $stay->id,
                 ],
             ]);
-        }
 
-        if (($validated['incident_type'] ?? null) === 'privacy_breach') {
-            DataBreachLog::create([
-                'breach_reference' => $this->nextBreachReference(),
-                'breach_type' => 'respite_stay',
-                'severity' => $validated['severity'],
-                'discovered_at' => $incident->occurred_at ?? now(),
-                'discovered_by_user_id' => auth()->id(),
-                'nature_of_breach' => $validated['title']."\n\n".$validated['description'],
-                'affected_data_categories' => ['health_information', 'respite_record'],
-                'approximate_individuals_affected' => 1,
-                'likely_consequences' => '',
-                'measures_taken' => $validated['immediate_action_taken'] ?? '',
-                'requires_authority_notification' => ($validated['notification_authority'] ?? null) === 'privacy_commissioner' || (bool) ($validated['is_notifiable'] ?? false),
-                'requires_subject_notification' => false,
-                'status' => 'discovered',
-                'created_by' => auth()->id(),
-            ]);
-        }
+            if ($incident->is_notifiable) {
+                NotifiableIncident::create([
+                    'incident_type' => $validated['incident_type'] ?? 'health_safety',
+                    'notification_authority' => $validated['notification_authority'] ?? 'health_nz',
+                    'title' => $validated['title'],
+                    'description' => $validated['description'],
+                    'related_incident_id' => $incident->id,
+                    'severity' => $validated['severity'],
+                    'status' => 'pending',
+                    'occurred_at' => $incident->occurred_at,
+                    'discovered_at' => now(),
+                    'notification_deadline' => now()->addDay(),
+                    'submitted_by' => $actor?->id,
+                    'evidence' => [
+                        ['type' => 'respite_stay', 'id' => $stay->id],
+                    ],
+                ]);
+            }
+
+            if (($validated['incident_type'] ?? null) === 'privacy_breach') {
+                DataBreachLog::create([
+                    'breach_reference' => $this->nextBreachReference(),
+                    'breach_type' => 'respite_stay',
+                    'severity' => $validated['severity'],
+                    'discovered_at' => $incident->occurred_at ?? now(),
+                    'discovered_by_user_id' => $actor?->id,
+                    'nature_of_breach' => $validated['title']."\n\n".$validated['description'],
+                    'affected_data_categories' => ['health_information', 'respite_record'],
+                    'approximate_individuals_affected' => 1,
+                    'likely_consequences' => '',
+                    'measures_taken' => $validated['immediate_action_taken'] ?? '',
+                    'requires_authority_notification' => ($validated['notification_authority'] ?? null) === 'privacy_commissioner' || (bool) ($validated['is_notifiable'] ?? false),
+                    'requires_subject_notification' => false,
+                    'status' => 'discovered',
+                    'created_by' => $actor?->id,
+                ]);
+            }
+
+            return app(IncidentJourneyService::class)
+                ->ensureForSubmittedIncident($incident, $actor)
+                ->incident;
+        }, 3);
 
         event(new RespiteEvent('respite.stay.incident_recorded', [
             'id' => $incident->id,
@@ -507,7 +527,7 @@ class RespiteStayController extends Controller
 
     private function nextBreachReference(): string
     {
-        return app(\App\Services\References\ReferenceNumberGenerator::class)->next('BR');
+        return app(ReferenceNumberGenerator::class)->next('BR');
     }
 
     /**

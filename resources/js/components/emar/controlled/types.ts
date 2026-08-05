@@ -53,6 +53,7 @@ export interface CdDiscrepancy {
     on_hand_after?: number | string | null;
     reason: string | null;
     notes: string | null;
+    immediate_action_taken?: string | null;
     status: string;
     reported_at: string | null;
     reported_by_name?: string | null;
@@ -89,6 +90,7 @@ export interface CdLossReport {
     quantity_lost: number | string | null;
     unit: string | null;
     circumstances: string | null;
+    immediate_action_taken?: string | null;
     accountable_officer_name?: string | null;
     reported_to_police: boolean;
     police_reference: string | null;
@@ -130,13 +132,20 @@ export const ENTRY_TYPES: { value: string; label: string }[] = [
 /** Whether a movement adds to (+1), removes from (−1), or doesn't constrain (0) the balance. */
 export function entryDirection(type: string): 1 | -1 | 0 {
     if (type === 'receipt' || type === 'transfer_in') return 1;
-    if (type === 'administration' || type === 'disposal' || type === 'transfer_out') return -1;
+    if (
+        type === 'administration' ||
+        type === 'disposal' ||
+        type === 'transfer_out'
+    )
+        return -1;
     return 0;
 }
 
 export function statusTone(status: string): string {
     const s = status.toLowerCase();
-    if (s === 'open' || s === 'reported') return 'bg-status-critical-bg text-status-critical';
-    if (s === 'under_review' || s === 'investigating') return 'bg-status-warning-bg text-status-warning';
+    if (s === 'open' || s === 'reported')
+        return 'bg-status-critical-bg text-status-critical';
+    if (s === 'under_review' || s === 'investigating')
+        return 'bg-status-warning-bg text-status-warning';
     return 'bg-muted text-muted-foreground'; // closed / resolved
 }

@@ -1,6 +1,7 @@
 import ClientSafetyRibbon, {
     type ClientSafety,
 } from '@/components/client-safety-ribbon';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,9 +26,8 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -188,6 +188,7 @@ export default function ClientMedical({
         notes: '',
         reason: '',
         witnessed_by: '',
+        immediate_action_taken: '',
     });
 
     const [closeDiscOpen, setCloseDiscOpen] = useState(false);
@@ -198,6 +199,14 @@ export default function ClientMedical({
 
     const selectedStockMedication = medications.find(
         (m) => `${m.id}` === `${stockForm.data.medication_id}`,
+    );
+    const stockDiscrepancyWillBeRaised = Boolean(
+        selectedStockMedication?.controlled_drug &&
+        selectedStockMedication?.stock?.on_hand !== null &&
+        selectedStockMedication?.stock?.on_hand !== undefined &&
+        stockForm.data.on_hand !== '' &&
+        Number(stockForm.data.on_hand) !==
+            Number(selectedStockMedication.stock.on_hand),
     );
     const conditionForm = useForm({
         label: '',
@@ -262,7 +271,8 @@ export default function ClientMedical({
                                 label: 'Active meds',
                                 value: medications.filter(
                                     (m: any) =>
-                                        m.active !== false && m.state !== 'ceased',
+                                        m.active !== false &&
+                                        m.state !== 'ceased',
                                 ).length,
                             },
                             { label: 'Conditions', value: conditions.length },
@@ -1281,7 +1291,7 @@ export default function ClientMedical({
                                 </Button>
                             )}
                             {can_edit && showAddMed && (
-                                <div className="bg-primary/10 rounded-xl border border-dashed border-primary p-4">
+                                <div className="rounded-xl border border-dashed border-primary bg-primary/10 p-4">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2 text-sm font-medium text-primary">
                                             <Plus className="h-4 w-4" />
@@ -2283,7 +2293,8 @@ export default function ClientMedical({
                                                     <Select
                                                         value={
                                                             administrationForm
-                                                                .data.reason_code
+                                                                .data
+                                                                .reason_code
                                                         }
                                                         onValueChange={(v) =>
                                                             administrationForm.setData(
@@ -2800,7 +2811,7 @@ export default function ClientMedical({
                             {can_stock &&
                                 medications.length > 0 &&
                                 showStockForm && (
-                                    <div className="bg-primary/10 rounded-xl border border-dashed border-primary p-4">
+                                    <div className="rounded-xl border border-dashed border-primary bg-primary/10 p-4">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2 text-sm font-medium text-primary">
                                                 <Plus className="h-4 w-4" />
@@ -3000,6 +3011,37 @@ export default function ClientMedical({
                                                     }
                                                 />
                                             </div>
+                                            {stockDiscrepancyWillBeRaised && (
+                                                <div className="md:col-span-2">
+                                                    <Label>
+                                                        Immediate action
+                                                        actually taken
+                                                        (required)
+                                                    </Label>
+                                                    <Textarea
+                                                        value={
+                                                            stockForm.data
+                                                                .immediate_action_taken
+                                                        }
+                                                        onChange={(e) =>
+                                                            stockForm.setData(
+                                                                'immediate_action_taken',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        placeholder="What was done immediately to protect the client and secure or reconcile the stock?"
+                                                    />
+                                                    {stockForm.errors
+                                                        .immediate_action_taken && (
+                                                        <div className="mt-1 text-xs text-status-critical">
+                                                            {
+                                                                stockForm.errors
+                                                                    .immediate_action_taken
+                                                            }
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="mt-3">
                                             <Button
@@ -3031,6 +3073,16 @@ export default function ClientMedical({
                                                             stockForm.setError(
                                                                 'witnessed_by',
                                                                 'Witness is required for controlled drug stock updates.',
+                                                            );
+                                                            return;
+                                                        }
+                                                        if (
+                                                            stockDiscrepancyWillBeRaised &&
+                                                            !stockForm.data.immediate_action_taken.trim()
+                                                        ) {
+                                                            stockForm.setError(
+                                                                'immediate_action_taken',
+                                                                'Record the immediate action actually taken for this discrepancy.',
                                                             );
                                                             return;
                                                         }
@@ -3233,6 +3285,12 @@ export default function ClientMedical({
                                         {d.reason && (
                                             <div className="mt-2 text-xs text-muted-foreground">
                                                 Reason: {d.reason}
+                                            </div>
+                                        )}
+                                        {d.immediate_action_taken && (
+                                            <div className="mt-2 text-xs text-muted-foreground">
+                                                Immediate action:{' '}
+                                                {d.immediate_action_taken}
                                             </div>
                                         )}
                                         {d.status === 'closed' &&

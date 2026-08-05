@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
+use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\FleetIncident;
 use App\Models\FleetIncidentAttachment;
@@ -16,11 +17,16 @@ use App\Models\Site;
 use App\Models\User;
 use App\Notifications\Fleet\FleetIncidentReportedNotification;
 use App\Services\AuditLogger;
+use App\Services\Fleet\FleetSignalService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
+use App\Services\Incidents\IncidentJourneyService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -139,7 +145,7 @@ class IncidentController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate($this->captureRules(forCreate: true));
+        $data = $request->validate($this->captureRules($request, forCreate: true));
 
         $asset = Asset::find($data['asset_id']);
 
@@ -154,23 +160,29 @@ class IncidentController extends Controller
 
         $attributes = $this->applyRegulatory($attributes);
 
-        $incident = FleetIncident::create($attributes);
+        $incident = DB::transaction(function () use ($attributes, $request): FleetIncident {
+            $incident = FleetIncident::create($attributes);
 
-        AuditLogger::log('fleet.incident.create', $incident, [
-            'asset_id' => $incident->asset_id,
-            'incident_type' => $incident->incident_type,
-            'severity' => $incident->severity,
-            'is_notifiable' => $incident->is_notifiable,
-        ]);
+            AuditLogger::log('fleet.incident.create', $incident, [
+                'asset_id' => $incident->asset_id,
+                'incident_type' => $incident->incident_type,
+                'severity' => $incident->severity,
+                'is_notifiable' => $incident->is_notifiable,
+            ]);
 
+            $this->processIncidentChain($incident, $request);
+
+            return $incident;
+        });
+
+        // External signal dispatch and user notifications happen only after the
+        // Fleet + resident incident journey has committed successfully.
         $this->emitSignal($incident, 'incident.reported', $incident->occurred_at);
 
         $incident->load('asset:id,name');
         User::whereHas('roles', function ($q) {
             $q->whereHas('permissions', fn ($p) => $p->where('key', 'fleet.incidents.manage'));
         })->get()->each->notify(new FleetIncidentReportedNotification($incident));
-
-        $this->processIncidentChain($incident, $request);
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -199,7 +211,7 @@ class IncidentController extends Controller
 
     public function update(Request $request, FleetIncident $incident)
     {
-        $data = $request->validate($this->captureRules(forCreate: false));
+        $data = $request->validate($this->captureRules($request, forCreate: false));
 
         $attributes = $this->mapCaptureToColumns($data);
         $attributes = $this->applyRegulatory($attributes, $incident);
@@ -437,7 +449,7 @@ class IncidentController extends Controller
     }
 
     /* ================================================================== */
-    /*  Filters / stats / payloads                                        */
+    /*  Filters / stats / payloads */
     /* ================================================================== */
 
     private function applyFilters($query, Request $request)
@@ -770,11 +782,11 @@ class IncidentController extends Controller
     }
 
     /* ================================================================== */
-    /*  Validation + column mapping + regulatory                          */
+    /*  Validation + column mapping + regulatory */
     /* ================================================================== */
 
     /** @return array<string, mixed> */
-    private function captureRules(bool $forCreate): array
+    private function captureRules(Request $request, bool $forCreate): array
     {
         $req = fn (array $rules) => $forCreate ? $rules : array_merge(['sometimes'], $rules);
 
@@ -784,6 +796,16 @@ class IncidentController extends Controller
             'severity' => $req(['required', 'string', 'in:'.implode(',', FleetIncident::SEVERITIES)]),
             'occurred_at' => $req(['required', 'date']),
             'description' => $req(['required', 'string', 'max:10000']),
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn (): bool => $forCreate && in_array(
+                    $request->input('severity'),
+                    ['major', 'critical'],
+                    true,
+                )),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
 
             'driver_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'supervisor_user_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -896,7 +918,9 @@ class IncidentController extends Controller
     private function mapCaptureToColumns(array $data): array
     {
         // Everything in captureRules() maps to a fillable column of the same name.
-        unset($data['sometimes']);
+        // This is explicit operator evidence for the linked resident incident,
+        // not a FleetIncident column. Never replace it with inferred wording.
+        unset($data['sometimes'], $data['immediate_action_taken']);
 
         return $data;
     }
@@ -919,7 +943,7 @@ class IncidentController extends Controller
         // s22: injury/fatal crash → a 24-hour Police-report window from occurred_at.
         if (($injury || $fatal) && $occurredAt) {
             if (! ($existing?->police_report_due_at) || isset($attributes['occurred_at'])) {
-                $attributes['police_report_due_at'] = \Illuminate\Support\Carbon::parse($occurredAt)->addHours(FleetIncident::POLICE_REPORT_WINDOW_HOURS);
+                $attributes['police_report_due_at'] = Carbon::parse($occurredAt)->addHours(FleetIncident::POLICE_REPORT_WINDOW_HOURS);
             }
         }
 
@@ -935,7 +959,7 @@ class IncidentController extends Controller
     }
 
     /* ================================================================== */
-    /*  Cross-module cascade (existing — now sets the direct FK)           */
+    /*  Cross-module cascade (existing — now sets the direct FK) */
     /* ================================================================== */
 
     private function processIncidentChain(FleetIncident $incident, Request $request): void
@@ -950,75 +974,98 @@ class IncidentController extends Controller
         }
 
         $clientSeverity = FleetIncident::mapSeverityToHs($incident->severity);
+        $immediateActionTaken = filled($request->input('immediate_action_taken'))
+            ? trim((string) $request->input('immediate_action_taken'))
+            : null;
 
-        if (Schema::hasTable('client_incidents')) {
-            foreach ($transports as $transport) {
-                $clientId = $transport->resident_id;
-                if (! $clientId) {
-                    continue;
-                }
-
-                try {
-                    $clientIncident = ClientIncident::create([
-                        'client_id' => $clientId,
-                        'fleet_incident_id' => $incident->id, // Gap F1 — direct reverse link
-                        'reported_by' => $request->user()->id,
-                        'type' => 'transport_incident',
-                        'severity' => $clientSeverity,
-                        'status' => 'submitted',
-                        'occurred_at' => $incident->occurred_at,
-                        'description' => $incident->description,
-                        'location' => $incident->location,
-                        'title' => "Transport Incident: {$incident->incident_type}",
-                    ]);
-
-                    AuditLogger::log('fleet.incident.chain.client_incident', $clientIncident, [
-                        'fleet_incident_id' => $incident->id,
-                        'client_id' => $clientId,
-                        'auto_created' => true,
-                    ]);
-                } catch (\Throwable $e) {
-                    report($e);
-                }
-            }
+        $residentTransports = $transports->filter(
+            fn (FleetResidentTransport $transport): bool => $transport->resident_id !== null,
+        );
+        if ($residentTransports->isEmpty()) {
+            return;
         }
 
-        if ($incident->isHighSeverity() && Schema::hasTable('safeguarding_alerts')) {
-            foreach ($transports as $transport) {
-                $clientId = $transport->resident_id;
-                if (! $clientId) {
-                    continue;
-                }
+        if (! Schema::hasTable('client_incidents')) {
+            throw new \DomainException('Resident transport incidents require the canonical client incident store.');
+        }
 
-                try {
-                    // alert_type + severity are enums (requires_monitoring + low/medium/high/
-                    // critical) — pass valid values. (The previous raw 'transport_incident'
-                    // + fleet-vocab 'major' silently failed the enum constraints.)
-                    $alert = SafeguardingAlert::create([
-                        'alertable_type' => 'App\\Models\\Client',
-                        'alertable_id' => $clientId,
-                        'alert_type' => 'requires_monitoring',
-                        'alert_summary' => "Transport incident ({$incident->severity}): {$incident->incident_type}",
-                        'alert_details' => $incident->description,
-                        'severity' => $clientSeverity,
-                        'active' => true,
-                        'created_by' => $request->user()->id,
-                    ]);
+        foreach ($residentTransports as $transport) {
+            $clientId = (int) $transport->resident_id;
+            $client = Client::query()->findOrFail($clientId);
+            $siteIds = collect([
+                $transport->site_id,
+                $incident->asset?->site_id,
+                $client->site_id,
+            ])->filter(fn ($siteId): bool => is_numeric($siteId))
+                ->map(fn ($siteId): int => (int) $siteId)
+                ->unique()
+                ->values();
+            if ($siteIds->count() !== 1) {
+                throw new \DomainException(
+                    'Transport incident Site provenance must agree before creating a resident incident.',
+                );
+            }
 
-                    AuditLogger::log('fleet.incident.chain.safeguarding_alert', $alert, [
-                        'fleet_incident_id' => $incident->id,
-                        'client_id' => $clientId,
-                        'auto_created' => true,
-                    ]);
-                } catch (\Throwable $e) {
-                    report($e);
-                }
+            $clientIncident = ClientIncident::withoutEvents(fn () => ClientIncident::query()->create([
+                'client_id' => $clientId,
+                'site_id' => $siteIds->first(),
+                'service_context_id' => $transport->service_context_id,
+                'fleet_incident_id' => $incident->id, // Gap F1 — direct reverse link
+                'reported_by' => $request->user()->id,
+                'type' => 'transport_incident',
+                'severity' => $clientSeverity,
+                'status' => 'submitted',
+                'submitted_at' => now(),
+                'occurred_at' => $incident->occurred_at,
+                'description' => $incident->description,
+                'immediate_action_taken' => $immediateActionTaken,
+                'location' => $incident->location,
+                'title' => "Transport Incident: {$incident->incident_type}",
+            ]));
+
+            app(IncidentJourneyService::class)
+                ->ensureForSubmittedIncident($clientIncident, $request->user());
+            AuditLogger::log('fleet.incident.chain.client_incident', $clientIncident, [
+                'fleet_incident_id' => $incident->id,
+                'client_id' => $clientId,
+                'site_id' => $siteIds->first(),
+                'auto_created' => true,
+            ]);
+        }
+
+        if ($incident->isHighSeverity()) {
+            if (! Schema::hasTable('safeguarding_alerts')) {
+                throw new \DomainException('Serious resident transport incidents require the safeguarding alert store.');
+            }
+
+            foreach ($residentTransports as $transport) {
+                $clientId = (int) $transport->resident_id;
+
+                // alert_type + severity are enums (requires_monitoring + low/medium/high/
+                // critical) — pass valid values. (The previous raw 'transport_incident'
+                // + fleet-vocab 'major' silently failed the enum constraints.)
+                $alert = SafeguardingAlert::create([
+                    'alertable_type' => 'App\\Models\\Client',
+                    'alertable_id' => $clientId,
+                    'alert_type' => 'requires_monitoring',
+                    'alert_summary' => "Transport incident ({$incident->severity}): {$incident->incident_type}",
+                    'alert_details' => $incident->description,
+                    'severity' => $clientSeverity,
+                    'active' => true,
+                    'created_by' => $request->user()->id,
+                ]);
+
+                AuditLogger::log('fleet.incident.chain.safeguarding_alert', $alert, [
+                    'fleet_incident_id' => $incident->id,
+                    'client_id' => $clientId,
+                    'auto_created' => true,
+                ]);
             }
         }
     }
 
     /* ================================================================== */
-    /*  Small helpers                                                      */
+    /*  Small helpers */
     /* ================================================================== */
 
     private function emitSignal(FleetIncident $incident, string $signalType, $occurredAt): void
@@ -1027,7 +1074,7 @@ class IncidentController extends Controller
             return;
         }
 
-        app(\App\Services\Fleet\FleetSignalService::class)->emit([
+        app(FleetSignalService::class)->emit([
             'asset_id' => $incident->asset_id,
             'signal_type' => $signalType,
             'severity_hint' => $incident->severity === 'critical' ? 'critical' : 'high',

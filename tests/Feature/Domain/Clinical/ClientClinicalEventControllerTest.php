@@ -103,6 +103,24 @@ class ClientClinicalEventControllerTest extends TestCase
         ]);
     }
 
+    public function test_client_hs_linked_event_requires_immediate_action(): void
+    {
+        $user = $this->createUserWithRole('coordinator');
+
+        $this->actingAs($user)
+            ->postJson("/clients/{$this->client->id}/clinical/events", [
+                'event_type' => 'seizure',
+                'severity' => 'high',
+                'occurred_at' => now()->toDateTimeString(),
+                'description' => 'Seizure requiring clinical support.',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('immediate_action_taken');
+
+        $this->assertDatabaseCount('clinical_events', 0);
+        $this->assertDatabaseCount('hs_events', 0);
+    }
+
     public function test_user_without_event_permission_cannot_record_client_event(): void
     {
         $user = User::factory()->create(['approved_at' => now()]);
