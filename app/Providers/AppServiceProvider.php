@@ -63,9 +63,12 @@ use App\Domain\Roadmap\Events\InitiativeScored;
 use App\Domain\Roadmap\Events\QuarterlyPlanPublished;
 use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerLeaseIssuer;
 use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerRestoreProbe;
+use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerSecretStore;
 use App\Domain\SecurityDevices\Credentials\Services\GovernedCredentialLeaseBroker;
 use App\Domain\SecurityDevices\Credentials\Services\HashicorpVaultLeaseIssuer;
+use App\Domain\SecurityDevices\Credentials\Services\HashicorpVaultSecretStore;
 use App\Domain\SecurityDevices\Credentials\Services\UnavailableSecretManagerLeaseIssuer;
+use App\Domain\SecurityDevices\Credentials\Services\UnavailableSecretManagerSecretStore;
 use App\Domain\SecurityDevices\Management\Adapters\QueclinkTrackingCommandAdapter;
 use App\Domain\SecurityDevices\Management\Adapters\UnifiAccessCommandAdapter;
 use App\Domain\SecurityDevices\Management\Contracts\CommandHttpTransport;
@@ -229,6 +232,12 @@ class AppServiceProvider extends ServiceProvider
             return match ((string) config('monitoring.credentials.driver', 'unavailable')) {
                 'vault' => $app->make(HashicorpVaultLeaseIssuer::class),
                 default => $app->make(UnavailableSecretManagerLeaseIssuer::class),
+            };
+        });
+        $this->app->singleton(SecretManagerSecretStore::class, function ($app): SecretManagerSecretStore {
+            return match ((string) config('monitoring.credentials.driver', 'unavailable')) {
+                'vault' => $app->make(HashicorpVaultSecretStore::class),
+                default => $app->make(UnavailableSecretManagerSecretStore::class),
             };
         });
         $this->app->bind(CollectorCertificateIssuer::class, OpenSslCollectorCertificateIssuer::class);

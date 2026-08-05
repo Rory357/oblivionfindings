@@ -2108,7 +2108,11 @@ class ClientController extends Controller
                 'recordedBy:id,name',
                 'site:id,name',
                 'room:id,site_id,name',
-                'trackerDevice',
+                'trackerDevice.assignments' => fn ($query) => $query
+                    ->active()
+                    ->where('assignable_type', 'client')
+                    ->where('assignable_id', $client->id)
+                    ->with('consent.consentType'),
             ])
             ->orderByDesc('created_at')
             ->get()
@@ -2118,6 +2122,12 @@ class ClientController extends Controller
                     ? $asset->room
                     : null;
                 $tracker = $asset->trackerDevice;
+                $trackerAssignment = $tracker?->assignments->first();
+                if (! $trackerAssignment
+                    || ! app(PersonalTrackingPrivacyService::class)
+                        ->assignmentAuthorisesClient($trackerAssignment, (int) $asset->client_id)) {
+                    $tracker = null;
+                }
                 $trackerMeta = $tracker?->meta ?? [];
 
                 return [
@@ -2133,7 +2143,7 @@ class ClientController extends Controller
                     'site_name' => $site?->name,
                     'room_id' => $room?->id,
                     'room_name' => $room?->name,
-                    'tracker_hardware_id' => $canManageTrackers ? $tracker?->id : null,
+                    'tracker_device_id' => $canManageTrackers ? $tracker?->id : null,
                     'tracker' => $canViewLocation && $tracker ? [
                         'id' => $tracker->id,
                         'name' => $tracker->name,
@@ -2210,13 +2220,6 @@ class ClientController extends Controller
             }
 
             $trackers = $access->unassignedTrackingDevicesForClient($viewer, $client)
-                ->whereNotExists(function ($query) use ($client): void {
-                    $query->selectRaw('1')
-                        ->from('client_personal_assets')
-                        ->whereColumn('client_personal_assets.tracker_hardware_id', 'devices.legacy_location_hardware_id')
-                        ->where('client_personal_assets.client_id', '!=', $client->id)
-                        ->whereNull('client_personal_assets.deleted_at');
-                })
                 ->orderBy('name')
                 ->get([
                     'id',
@@ -2228,6 +2231,40 @@ class ClientController extends Controller
                     'battery_level',
                     'meta',
                 ]);
+            $currentTrackerIds = ClientPersonalAsset::query()
+                ->where('client_id', $client->id)
+                ->whereNotIn('status', ['disposed', 'returned'])
+                ->whereNotNull('tracker_device_id')
+                ->pluck('tracker_device_id');
+            if ($currentTrackerIds->isNotEmpty()) {
+                $currentTrackers = $access->visibleDevices($viewer)
+                    ->whereKey($currentTrackerIds)
+                    ->where('domain', 'tracking')
+                    ->whereHas('assignments', fn ($assignment) => $assignment
+                        ->active()
+                        ->where('assignable_type', 'client')
+                        ->where('assignable_id', $client->id))
+                    ->with(['assignments' => fn ($assignment) => $assignment
+                        ->active()
+                        ->where('assignable_type', 'client')
+                        ->where('assignable_id', $client->id)
+                        ->with('consent.consentType')])
+                    ->get([
+                        'id',
+                        'legacy_location_hardware_id',
+                        'name',
+                        'status',
+                        'last_seen_at',
+                        'serial_number',
+                        'battery_level',
+                        'meta',
+                    ])
+                    ->filter(fn (Device $tracker): bool => $tracker->assignments->contains(
+                        fn ($assignment): bool => app(PersonalTrackingPrivacyService::class)
+                            ->assignmentAuthorisesClient($assignment, $client),
+                    ));
+                $trackers = $trackers->concat($currentTrackers)->unique('id')->values();
+            }
 
             $hardwareById = LocationHardware::query()
                 ->whereIn('id', $trackers->pluck('legacy_location_hardware_id'))

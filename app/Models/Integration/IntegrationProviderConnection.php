@@ -26,6 +26,8 @@ class IntegrationProviderConnection extends Model
 
     public const STATUS_DISCONNECTED = 'disconnected';
 
+    public const STATUS_DISABLED = 'disabled';
+
     public const STATUS_ERROR = 'error';
 
     protected $table = 'integration_tenant_secrets';
@@ -40,6 +42,12 @@ class IntegrationProviderConnection extends Model
         'last_error',
         'config',
         'rotated_at',
+        'disabled_at',
+        'disabled_by',
+        'disabled_reason',
+        'requires_credential_replacement',
+        'recovery_credentials_replaced_at',
+        'recovery_credentials_replaced_by',
         'created_by',
     ];
 
@@ -48,6 +56,9 @@ class IntegrationProviderConnection extends Model
         'last_tested_at' => 'datetime',
         'last_synced_at' => 'datetime',
         'rotated_at' => 'datetime',
+        'disabled_at' => 'datetime',
+        'requires_credential_replacement' => 'boolean',
+        'recovery_credentials_replaced_at' => 'datetime',
     ];
 
     protected $hidden = [
@@ -74,6 +85,8 @@ class IntegrationProviderConnection extends Model
 
     public function scopeConnected(Builder $query): Builder
     {
-        return $query->where('status', self::STATUS_CONNECTED);
+        return $query
+            ->where('status', self::STATUS_CONNECTED)
+            ->where('requires_credential_replacement', false);
     }
 }

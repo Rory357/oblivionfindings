@@ -3,9 +3,12 @@
 namespace Tests\Feature\SecurityDevices;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Monitoring\Models\ProviderCapabilityCursor;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\AuditLog;
+use App\Models\Integration\Integration;
+use App\Models\Integration\IntegrationEvent;
 use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSyncLog;
@@ -15,12 +18,14 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
+use App\Services\Integration\Contracts\ConnectionHealthCapability;
 use App\Services\Integration\Contracts\DeviceSyncCapability;
 use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Services\Integration\SyncResult;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
 use Tests\TestCase;
 
 class UnifiSettingsRefactorTest extends TestCase
@@ -63,6 +68,239 @@ class UnifiSettingsRefactorTest extends TestCase
         $this->actingAs($this->admin)
             ->get('/security-devices/integrations/unifi')
             ->assertOk();
+    }
+
+    public function test_disable_requires_the_exact_integration_management_permission(): void
+    {
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        $viewAny = Permission::query()->where('key', 'securityDevices.viewAny')->firstOrFail();
+        $viewer->permissionOverrides()->attach($viewAny->id, ['allowed' => true]);
+        IntegrationProviderConnection::create([
+            'provider' => 'unifi',
+            'secret_encrypted' => Crypt::encryptString('permission-test-key'),
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
+        ]);
+
+        $this->actingAs($viewer)
+            ->post('/security-devices/integrations/unifi/disable', [
+                'reason' => 'provider_outage',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas((new IntegrationProviderConnection)->getTable(), [
+            'provider' => 'unifi',
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
+            'disabled_at' => null,
+        ]);
+    }
+
+    public function test_disable_requires_a_governed_reason(): void
+    {
+        IntegrationProviderConnection::create([
+            'provider' => 'unifi',
+            'secret_encrypted' => Crypt::encryptString('reason-test-key'),
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post('/security-devices/integrations/unifi/disable')
+            ->assertSessionHasErrors('reason');
+        $this->actingAs($this->admin)
+            ->post('/security-devices/integrations/unifi/disable', [
+                'reason' => 'free text that is not an approved reason',
+            ])
+            ->assertSessionHasErrors('reason');
+
+        $this->assertDatabaseHas((new IntegrationProviderConnection)->getTable(), [
+            'provider' => 'unifi',
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
+            'requires_credential_replacement' => false,
+        ]);
+    }
+
+    public function test_disable_is_audited_fail_closed_and_preserves_provider_history_and_cursors(): void
+    {
+        $site = Site::factory()->create();
+        $lastTestedAt = now()->subHours(3)->startOfSecond();
+        $lastSyncedAt = now()->subHours(2)->startOfSecond();
+        $encryptedSecret = Crypt::encryptString('existing-unifi-key');
+        $connection = IntegrationProviderConnection::create([
+            'provider' => 'unifi',
+            'secret_encrypted' => $encryptedSecret,
+            'secret_last4' => '-key',
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
+            'last_tested_at' => $lastTestedAt,
+            'last_synced_at' => $lastSyncedAt,
+            'last_error' => 'Existing bounded failure evidence.',
+            'config' => ['discovered_sites' => [['external_id' => 'preserved-site']]],
+        ]);
+        Integration::create([
+            'provider' => 'unifi',
+            'display_name' => 'UniFi',
+            'status' => Integration::STATUS_ACTIVE,
+        ]);
+        $siteConfig = IntegrationSiteConfig::create([
+            'site_id' => $site->id,
+            'provider' => 'unifi',
+            'mapped_external_site_id' => 'preserved-site',
+            'is_active' => true,
+        ]);
+        $cursor = ProviderCapabilityCursor::create([
+            'site_id' => $site->id,
+            'provider' => 'unifi',
+            'capability' => 'event_collection',
+            'cursor' => 'preserved-cursor',
+            'last_completed_at' => now()->subMinute(),
+        ]);
+        $syncLog = IntegrationSyncLog::create([
+            'site_id' => $site->id,
+            'provider' => 'unifi',
+            'action' => 'pull_events',
+            'status' => IntegrationSyncLog::STATUS_SUCCESS,
+            'started_at' => now()->subMinutes(2),
+            'completed_at' => now()->subMinute(),
+        ]);
+        $event = IntegrationEvent::factory()->create([
+            'site_id' => $site->id,
+            'provider' => 'unifi',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post('/security-devices/integrations/unifi/disable', [
+                'reason' => 'provider_outage',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $fresh = $connection->fresh();
+        $this->assertSame(IntegrationProviderConnection::STATUS_DISABLED, $fresh->status);
+        $this->assertTrue($fresh->requires_credential_replacement);
+        $this->assertSame('provider_outage', $fresh->disabled_reason);
+        $this->assertSame($this->admin->id, $fresh->disabled_by);
+        $this->assertNotNull($fresh->disabled_at);
+        $this->assertSame('existing-unifi-key', Crypt::decryptString($fresh->secret_encrypted));
+        $this->assertSame($lastTestedAt->toDateTimeString(), $fresh->last_tested_at?->toDateTimeString());
+        $this->assertSame($lastSyncedAt->toDateTimeString(), $fresh->last_synced_at?->toDateTimeString());
+        $this->assertSame('Existing bounded failure evidence.', $fresh->last_error);
+        $this->assertSame('preserved-site', data_get($fresh->config, 'discovered_sites.0.external_id'));
+        $this->assertFalse(IntegrationProviderConnection::query()->forProvider('unifi')->connected()->exists());
+        $this->assertSame(Integration::STATUS_INACTIVE, Integration::query()->where('provider', 'unifi')->value('status'));
+        $this->assertTrue(IntegrationSiteConfig::query()->whereKey($siteConfig->id)->exists());
+        $this->assertSame('preserved-cursor', ProviderCapabilityCursor::query()->findOrFail($cursor->id)->cursor);
+        $this->assertTrue(IntegrationSyncLog::query()->whereKey($syncLog->id)->exists());
+        $this->assertTrue(IntegrationEvent::query()->whereKey($event->id)->exists());
+        $this->assertDatabaseHas('audit_logs', [
+            'user_id' => $this->admin->id,
+            'action' => 'securityDevices.integration.unifi.disabled.provider_outage',
+            'auditable_type' => IntegrationProviderConnection::class,
+            'auditable_id' => $connection->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/integrations/unifi')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('providerConnection.status', IntegrationProviderConnection::STATUS_DISABLED)
+                ->where('providerConnection.disabled_reason', 'provider_outage')
+                ->where('providerConnection.requires_credential_replacement', true));
+    }
+
+    public function test_disabled_connection_cannot_be_tested_or_collect_inventory_through_manual_paths(): void
+    {
+        $site = Site::factory()->create();
+        IntegrationProviderConnection::create([
+            'provider' => 'unifi',
+            'secret_encrypted' => Crypt::encryptString('disabled-unifi-key'),
+            'status' => IntegrationProviderConnection::STATUS_DISABLED,
+            'requires_credential_replacement' => true,
+        ]);
+        $registry = \Mockery::mock(IntegrationAdapterRegistry::class);
+        $registry->shouldNotReceive('hasCapability');
+        $registry->shouldNotReceive('capability');
+        $this->instance(IntegrationAdapterRegistry::class, $registry);
+
+        $this->actingAs($this->admin)
+            ->post('/security-devices/integrations/unifi/test')
+            ->assertRedirect()
+            ->assertSessionHas('error');
+        $this->actingAs($this->admin)
+            ->post('/security-devices/integrations/unifi/sync-sites')
+            ->assertRedirect()
+            ->assertSessionHas('error');
+        $this->actingAs($this->admin)
+            ->post("/sites/{$site->id}/integrations/unifi/test")
+            ->assertRedirect()
+            ->assertSessionHas('error');
+        $this->actingAs($this->admin)
+            ->post("/sites/{$site->id}/integrations/unifi/sync-sites")
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseCount('integration_sync_logs', 0);
+        $this->assertDatabaseHas((new IntegrationProviderConnection)->getTable(), [
+            'provider' => 'unifi',
+            'status' => IntegrationProviderConnection::STATUS_DISABLED,
+            'requires_credential_replacement' => true,
+        ]);
+    }
+
+    public function test_recovery_requires_a_replacement_key_then_a_successful_connection_test(): void
+    {
+        $connection = IntegrationProviderConnection::create([
+            'provider' => 'unifi',
+            'secret_encrypted' => Crypt::encryptString('disabled-old-key'),
+            'secret_last4' => '-key',
+            'status' => IntegrationProviderConnection::STATUS_DISABLED,
+            'disabled_at' => now()->subHour(),
+            'disabled_by' => $this->admin->id,
+            'disabled_reason' => 'security_review',
+            'requires_credential_replacement' => true,
+        ]);
+        Integration::create([
+            'provider' => 'unifi',
+            'display_name' => 'UniFi',
+            'status' => Integration::STATUS_INACTIVE,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post('/security-devices/integrations/unifi/rotate', [
+                'api_key' => 'replacement-unifi-key',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $replacement = $connection->fresh();
+        $this->assertSame(IntegrationProviderConnection::STATUS_DISCONNECTED, $replacement->status);
+        $this->assertFalse($replacement->requires_credential_replacement);
+        $this->assertSame('replacement-unifi-key', Crypt::decryptString($replacement->secret_encrypted));
+        $this->assertNotNull($replacement->recovery_credentials_replaced_at);
+        $this->assertSame($this->admin->id, $replacement->recovery_credentials_replaced_by);
+        $this->assertSame('security_review', $replacement->disabled_reason);
+        $this->assertFalse(IntegrationProviderConnection::query()->forProvider('unifi')->connected()->exists());
+        $this->assertDatabaseHas('audit_logs', [
+            'user_id' => $this->admin->id,
+            'action' => 'securityDevices.integration.unifi.recovery_credential_replaced',
+            'auditable_id' => $connection->id,
+        ]);
+
+        $adapter = \Mockery::mock(ConnectionHealthCapability::class);
+        $adapter->shouldReceive('testConnection')
+            ->once()
+            ->withArgs(fn (IntegrationProviderConnection $candidate): bool => $candidate->is($connection))
+            ->andReturnTrue();
+        $registry = \Mockery::mock(IntegrationAdapterRegistry::class);
+        $registry->shouldReceive('hasCapability')->once()->with('unifi', ConnectionHealthCapability::class)->andReturnTrue();
+        $registry->shouldReceive('capability')->once()->with('unifi', ConnectionHealthCapability::class)->andReturn($adapter);
+        $this->instance(IntegrationAdapterRegistry::class, $registry);
+
+        $this->actingAs($this->admin)
+            ->post('/security-devices/integrations/unifi/test')
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(IntegrationProviderConnection::STATUS_CONNECTED, $connection->fresh()->status);
+        $this->assertSame($connection->id, IntegrationProviderConnection::query()->forProvider('unifi')->connected()->value('id'));
+        $this->assertSame(Integration::STATUS_ACTIVE, Integration::query()->where('provider', 'unifi')->value('status'));
     }
 
     public function test_provider_read_model_redacts_raw_discovery_config_errors_and_external_references(): void

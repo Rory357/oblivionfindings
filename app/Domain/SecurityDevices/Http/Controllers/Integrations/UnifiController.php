@@ -12,6 +12,7 @@ use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Site;
 use App\Models\SiteRoom;
+use App\Services\AuditLogger;
 use App\Services\Integration\Contracts\ConnectionHealthCapability;
 use App\Services\Integration\Contracts\DeviceSyncCapability;
 use App\Services\Integration\Contracts\InventoryDiscoveryCapability;
@@ -20,6 +21,8 @@ use App\Services\Integration\UnifiOperationalBridgeService;
 use App\Support\SafeOperationalData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class UnifiController extends Controller
@@ -27,6 +30,14 @@ class UnifiController extends Controller
     private const PROVIDER = 'unifi';
 
     private const PERMISSION_MANAGE = 'securityDevices.integrations.manage';
+
+    private const DISABLE_REASONS = [
+        'provider_outage',
+        'credential_compromise',
+        'planned_maintenance',
+        'security_review',
+        'other_operational_reason',
+    ];
 
     public function __construct(
         private readonly IntegrationSiteCredentialsPresenter $siteCredentials,
@@ -175,6 +186,12 @@ class UnifiController extends Controller
                 'last_tested_at' => $providerConnection->last_tested_at?->toDateTimeString(),
                 'last_synced_at' => $providerConnection->last_synced_at?->toDateTimeString(),
                 'sites_synced_at' => $connectionConfig['sites_synced_at'] ?? null,
+                'disabled_at' => $providerConnection->disabled_at?->toDateTimeString(),
+                'disabled_reason' => in_array($providerConnection->disabled_reason, self::DISABLE_REASONS, true)
+                    ? $providerConnection->disabled_reason
+                    : null,
+                'requires_credential_replacement' => (bool) $providerConnection->requires_credential_replacement,
+                'recovery_credentials_replaced_at' => $providerConnection->recovery_credentials_replaced_at?->toDateTimeString(),
                 'defaults' => collect($connectionConfig)->only([
                     'refresh_interval_minutes', 'alert_motion_events', 'alert_device_offline',
                     'quiet_hours_start', 'quiet_hours_end',
@@ -205,34 +222,68 @@ class UnifiController extends Controller
         abort_unless($this->userCanManage($user), 403);
 
         $request->validate([
-            'api_key' => ['required', 'string'],
+            'api_key' => ['required', 'string', 'max:4096'],
         ]);
 
-        IntegrationProviderConnection::updateOrCreate(
-            [
-                'provider' => self::PROVIDER,
-            ],
-            [
+        $isRecovery = DB::transaction(function () use ($request, $user): bool {
+            $connection = IntegrationProviderConnection::query()
+                ->forProvider(self::PROVIDER)
+                ->lockForUpdate()
+                ->first();
+            $isRecovery = $connection?->status === IntegrationProviderConnection::STATUS_DISABLED
+                || (bool) $connection?->requires_credential_replacement;
+            $values = [
                 'secret_encrypted' => Crypt::encryptString($request->string('api_key')->toString()),
                 'secret_last4' => substr($request->string('api_key')->toString(), -4),
                 'status' => IntegrationProviderConnection::STATUS_DISCONNECTED,
                 'last_error' => null,
+                'requires_credential_replacement' => false,
+                'recovery_credentials_replaced_at' => $isRecovery ? now() : null,
+                'recovery_credentials_replaced_by' => $isRecovery ? $user->id : null,
                 'created_by' => $user->id,
-            ],
-        );
+            ];
+            if ($connection) {
+                $connection->update($values);
+            } else {
+                $connection = IntegrationProviderConnection::create([
+                    'provider' => self::PROVIDER,
+                    ...$values,
+                ]);
+            }
 
-        Integration::updateOrCreate(
-            [
-                'provider' => self::PROVIDER,
-            ],
-            [
-                'display_name' => 'UniFi',
-                'status' => Integration::STATUS_INACTIVE,
-                'last_error' => null,
-            ],
-        );
+            Integration::updateOrCreate(
+                [
+                    'provider' => self::PROVIDER,
+                ],
+                [
+                    'display_name' => 'UniFi',
+                    'status' => Integration::STATUS_INACTIVE,
+                    'last_error' => null,
+                ],
+            );
 
-        return redirect()->back()->with('success', 'UniFi API key saved.');
+            if ($isRecovery) {
+                AuditLogger::logOrFail(
+                    'securityDevices.integration.unifi.recovery_credential_replaced',
+                    $connection,
+                    [
+                        'fields' => ['status'],
+                        'before' => ['status' => IntegrationProviderConnection::STATUS_DISABLED],
+                        'after' => ['status' => IntegrationProviderConnection::STATUS_DISCONNECTED],
+                    ],
+                    $request,
+                );
+            }
+
+            return $isRecovery;
+        });
+
+        return redirect()->back()->with(
+            'success',
+            $isRecovery
+                ? 'Replacement UniFi API key saved. Test Connection must pass before collection resumes.'
+                : 'UniFi API key saved. Run Test Connection before collection starts.',
+        );
     }
 
     /**
@@ -246,6 +297,11 @@ class UnifiController extends Controller
         $connection = IntegrationProviderConnection::query()
             ->forProvider(self::PROVIDER)
             ->firstOrFail();
+
+        if ($connection->status === IntegrationProviderConnection::STATUS_DISABLED
+            || $connection->requires_credential_replacement) {
+            return redirect()->back()->with('error', 'The UniFi connection is disabled. Replace the API key before testing or resuming collection.');
+        }
 
         if (! $registry->hasCapability(self::PROVIDER, ConnectionHealthCapability::class)) {
             return redirect()->back()->with('error', 'UniFi connection testing is not available.');
@@ -307,22 +363,121 @@ class UnifiController extends Controller
         abort_unless($this->userCanManage($user), 403);
 
         $request->validate([
-            'api_key' => ['required', 'string'],
+            'api_key' => ['required', 'string', 'max:4096'],
         ]);
 
-        $connection = IntegrationProviderConnection::query()
-            ->forProvider(self::PROVIDER)
-            ->firstOrFail();
+        $isRecovery = DB::transaction(function () use ($request, $user): bool {
+            $connection = IntegrationProviderConnection::query()
+                ->forProvider(self::PROVIDER)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $isRecovery = $connection->status === IntegrationProviderConnection::STATUS_DISABLED
+                || (bool) $connection->requires_credential_replacement;
 
-        $connection->update([
-            'secret_encrypted' => Crypt::encryptString($request->string('api_key')->toString()),
-            'secret_last4' => substr($request->string('api_key')->toString(), -4),
-            'rotated_at' => now(),
-            'status' => IntegrationProviderConnection::STATUS_DISCONNECTED,
-            'last_error' => null,
+            $connection->update([
+                'secret_encrypted' => Crypt::encryptString($request->string('api_key')->toString()),
+                'secret_last4' => substr($request->string('api_key')->toString(), -4),
+                'rotated_at' => now(),
+                'status' => IntegrationProviderConnection::STATUS_DISCONNECTED,
+                'last_error' => null,
+                'requires_credential_replacement' => false,
+                'recovery_credentials_replaced_at' => $isRecovery ? now() : null,
+                'recovery_credentials_replaced_by' => $isRecovery ? $user->id : null,
+            ]);
+
+            Integration::updateOrCreate(
+                ['provider' => self::PROVIDER],
+                [
+                    'display_name' => 'UniFi',
+                    'status' => Integration::STATUS_INACTIVE,
+                    'last_error' => null,
+                ],
+            );
+
+            if ($isRecovery) {
+                AuditLogger::logOrFail(
+                    'securityDevices.integration.unifi.recovery_credential_replaced',
+                    $connection,
+                    [
+                        'fields' => ['status'],
+                        'before' => ['status' => IntegrationProviderConnection::STATUS_DISABLED],
+                        'after' => ['status' => IntegrationProviderConnection::STATUS_DISCONNECTED],
+                    ],
+                    $request,
+                );
+            }
+
+            return $isRecovery;
+        });
+
+        return redirect()->back()->with(
+            'success',
+            $isRecovery
+                ? 'Replacement API key saved. Test Connection must pass before collection resumes.'
+                : 'API key rotated. Run Test Connection.',
+        );
+    }
+
+    /** Stop all UniFi collection and webhook intake while preserving evidence. */
+    public function disable(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($this->userCanManage($user), 403);
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', Rule::in(self::DISABLE_REASONS)],
         ]);
+        $reason = (string) $validated['reason'];
+        $changed = DB::transaction(function () use ($request, $user, $reason): bool {
+            $connection = IntegrationProviderConnection::query()
+                ->forProvider(self::PROVIDER)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        return redirect()->back()->with('success', 'API key rotated. Run Test Connection.');
+            if ($connection->status === IntegrationProviderConnection::STATUS_DISABLED
+                && $connection->requires_credential_replacement) {
+                return false;
+            }
+
+            $previousStatus = $connection->status;
+            $connection->update([
+                'status' => IntegrationProviderConnection::STATUS_DISABLED,
+                'disabled_at' => now(),
+                'disabled_by' => $user->id,
+                'disabled_reason' => $reason,
+                'requires_credential_replacement' => true,
+                'recovery_credentials_replaced_at' => null,
+                'recovery_credentials_replaced_by' => null,
+            ]);
+
+            Integration::updateOrCreate(
+                ['provider' => self::PROVIDER],
+                [
+                    'display_name' => 'UniFi',
+                    'status' => Integration::STATUS_INACTIVE,
+                ],
+            );
+
+            AuditLogger::logOrFail(
+                "securityDevices.integration.unifi.disabled.{$reason}",
+                $connection,
+                [
+                    'fields' => ['status'],
+                    'before' => ['status' => $previousStatus],
+                    'after' => ['status' => IntegrationProviderConnection::STATUS_DISABLED],
+                ],
+                $request,
+            );
+
+            return true;
+        });
+
+        return redirect()->back()->with(
+            $changed ? 'success' : 'info',
+            $changed
+                ? 'UniFi collection and webhook intake disabled. Existing Devices, mappings, cursors, sync history and evidence were preserved.'
+                : 'The UniFi connection is already disabled and still requires a replacement API key.',
+        );
     }
 
     /**
@@ -335,7 +490,12 @@ class UnifiController extends Controller
 
         $connection = IntegrationProviderConnection::query()
             ->forProvider(self::PROVIDER)
-            ->firstOrFail();
+            ->connected()
+            ->first();
+
+        if (! $connection) {
+            return redirect()->back()->with('error', 'Test and connect a replacement UniFi API key before collecting locations.');
+        }
 
         if (! $registry->hasCapability(self::PROVIDER, InventoryDiscoveryCapability::class)) {
             return redirect()->back()->with('error', 'UniFi inventory discovery is not available.');

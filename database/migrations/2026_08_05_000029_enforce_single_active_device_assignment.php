@@ -1,9 +1,7 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -11,7 +9,7 @@ return new class extends Migration
     {
         $this->releaseDuplicateActiveAssignments();
 
-        if (DB::getDriverName() === 'sqlite') {
+        if (in_array(DB::getDriverName(), ['sqlite', 'pgsql'], true)) {
             DB::statement(
                 'CREATE UNIQUE INDEX device_assignments_one_active_device_uq '
                 .'ON device_assignments (device_id) WHERE released_at IS NULL',
@@ -20,30 +18,32 @@ return new class extends Migration
             return;
         }
 
-        Schema::table('device_assignments', function (Blueprint $table): void {
-            // MySQL allows multiple NULL values in a unique index. Released
-            // history therefore remains unrestricted while an active row
-            // exposes its device id and is unique per device.
-            $table->unsignedBigInteger('active_device_id')
-                ->nullable()
-                ->storedAs('CASE WHEN released_at IS NULL THEN device_id ELSE NULL END')
-                ->after('device_id');
-            $table->unique('active_device_id', 'device_assignments_one_active_device_uq');
-        });
+        if (DB::getDriverName() !== 'mysql') {
+            throw new LogicException('Single-active Device assignments require a supported database driver.');
+        }
+
+        // MySQL 8 functional indexes allow multiple NULL values. Released
+        // history is therefore unrestricted while active Device ids remain
+        // unique, without rebuilding the table around a stored column.
+        DB::statement(
+            'CREATE UNIQUE INDEX device_assignments_one_active_device_uq '
+            .'ON device_assignments ((CASE WHEN released_at IS NULL THEN device_id ELSE NULL END))',
+        );
     }
 
     public function down(): void
     {
-        if (DB::getDriverName() === 'sqlite') {
+        if (in_array(DB::getDriverName(), ['sqlite', 'pgsql'], true)) {
             DB::statement('DROP INDEX IF EXISTS device_assignments_one_active_device_uq');
 
             return;
         }
 
-        Schema::table('device_assignments', function (Blueprint $table): void {
-            $table->dropUnique('device_assignments_one_active_device_uq');
-            $table->dropColumn('active_device_id');
-        });
+        if (DB::getDriverName() !== 'mysql') {
+            throw new LogicException('Single-active Device assignments require a supported database driver.');
+        }
+
+        DB::statement('DROP INDEX device_assignments_one_active_device_uq ON device_assignments');
     }
 
     private function releaseDuplicateActiveAssignments(): void

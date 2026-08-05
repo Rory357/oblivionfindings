@@ -109,7 +109,7 @@ type PersonalAsset = {
     site_name?: string | null;
     room_id?: number | null;
     room_name?: string | null;
-    tracker_hardware_id?: number | null;
+    tracker_device_id?: number | null;
     tracker?: AssetTracker | null;
     photo_url?: string | null;
     acquired_at?: string | null;
@@ -1236,7 +1236,7 @@ export function PersonalAssetsTab({
         location: string;
         site_id: string;
         room_id: string;
-        tracker_hardware_id: string;
+        tracker_device_id: string;
         photo: File | null;
         acquired_at: string;
         notes: string;
@@ -1261,7 +1261,7 @@ export function PersonalAssetsTab({
         location: '',
         site_id: clientSiteId ? String(clientSiteId) : '',
         room_id: '',
-        tracker_hardware_id: '',
+        tracker_device_id: '',
         photo: null,
         acquired_at: '',
         notes: '',
@@ -1299,8 +1299,8 @@ export function PersonalAssetsTab({
                   ? String(clientSiteId)
                   : '',
             room_id: a.room_id ? String(a.room_id) : '',
-            tracker_hardware_id: a.tracker_hardware_id
-                ? String(a.tracker_hardware_id)
+            tracker_device_id: a.tracker_device_id
+                ? String(a.tracker_device_id)
                 : '',
             photo: null,
             acquired_at: a.acquired_at ?? '',
@@ -2327,12 +2327,12 @@ export function PersonalAssetsTab({
                                         <Label>GPS Tracker</Label>
                                         <Select
                                             value={
-                                                form.data.tracker_hardware_id ||
+                                                form.data.tracker_device_id ||
                                                 'none'
                                             }
                                             onValueChange={(v) =>
                                                 form.setData(
-                                                    'tracker_hardware_id',
+                                                    'tracker_device_id',
                                                     v === 'none' ? '' : v,
                                                 )
                                             }

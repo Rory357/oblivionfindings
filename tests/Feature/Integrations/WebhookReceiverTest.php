@@ -49,6 +49,24 @@ class WebhookReceiverTest extends TestCase
         $this->assertDatabaseCount('integration_events', 0);
     }
 
+    public function test_disabled_provider_rejects_webhook_intake_without_staging_evidence(): void
+    {
+        $key = 'disabled-unifi-secret-1234';
+        $connection = $this->createProviderConnection(provider: 'unifi', key: $key);
+        $connection->update([
+            'status' => IntegrationProviderConnection::STATUS_DISABLED,
+            'requires_credential_replacement' => true,
+        ]);
+        $payload = $this->payload();
+
+        $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, $key))
+            ->assertUnauthorized()
+            ->assertJson(['error' => 'Webhook rejected']);
+
+        $this->assertDatabaseCount('monitoring_outbox', 0);
+        $this->assertDatabaseCount('integration_events', 0);
+    }
+
     public function test_invalid_integration_key_is_rejected(): void
     {
         $this->createProviderConnection(provider: 'unifi', key: 'correct-secret-1234');

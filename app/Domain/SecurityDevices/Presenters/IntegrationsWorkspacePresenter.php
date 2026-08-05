@@ -187,6 +187,7 @@ class IntegrationsWorkspacePresenter
             $credentialConfigured = ! $nativeRuntimeOnly && ($connection !== null || $siteSecretTotal > 0);
             $connectionStatus = $nativeRuntimeOnly ? 'unavailable' : match (true) {
                 $erroredSiteSecretCount > 0 => IntegrationProviderConnection::STATUS_ERROR,
+                $connection?->requires_credential_replacement => IntegrationProviderConnection::STATUS_DISABLED,
                 $connection !== null => $connection->status,
                 $connectedSiteSecretCount > 0 => IntegrationProviderConnection::STATUS_CONNECTED,
                 $untestedSiteSecretCount > 0 => IntegrationSiteCredentialsPresenter::STATE_UNTESTED,
@@ -227,6 +228,9 @@ class IntegrationsWorkspacePresenter
                 $exceptions->push($this->exception('integration_error', 'The latest provider sync did not complete successfully.', 'Review sync diagnostics', $canManage ? "/security-devices/integrations/{$slug}" : null, max(1, $sync['items_errored'])));
             } elseif (! $nativeRuntimeOnly && $connection?->status === IntegrationProviderConnection::STATUS_ERROR) {
                 $exceptions->push($this->exception('integration_error', 'The provider connection needs attention.', 'Test the connection', $canManage ? "/security-devices/integrations/{$slug}" : null));
+            }
+            if (! $nativeRuntimeOnly && $connectionStatus === IntegrationProviderConnection::STATUS_DISABLED) {
+                $exceptions->push($this->exception('connection_disabled', 'Provider collection and webhook intake are deliberately disabled until a replacement credential is tested.', 'Replace and test credentials', $canManage ? "/security-devices/integrations/{$slug}" : null));
             }
             if (! $nativeRuntimeOnly && $syncFreshness === 'stale') {
                 $exceptions->push($this->exception('stale_sync', 'One or more latest sync scopes are more than 24 hours old.', 'Review sync schedule', $canManage ? "/security-devices/integrations/{$slug}" : null, max(1, (int) ($sync['stale_site_count'] ?? 0))));
@@ -305,8 +309,10 @@ class IntegrationsWorkspacePresenter
                         ? Carbon::parse($providerRuntimeExceptions->max('occurred_at'))->toIso8601String()
                         : null,
                     'exception_codes' => $providerRuntimeExceptions->pluck('code')->filter()->unique()->sort()->values(),
-                    'disconnect_ready' => $canManage && $credentialConfigured && ! $nativeRuntimeOnly,
-                    'revoke_ready' => $canManage && $credentialConfigured && ! $nativeRuntimeOnly,
+                    'disconnect_ready' => $canManage && $credentialConfigured && ! $nativeRuntimeOnly
+                        && $connectionStatus !== IntegrationProviderConnection::STATUS_DISABLED,
+                    'revoke_ready' => $canManage && $credentialConfigured && ! $nativeRuntimeOnly
+                        && $connectionStatus !== IntegrationProviderConnection::STATUS_DISABLED,
                 ],
                 'exceptions' => $exceptions->values()->all(),
                 'exception_count' => $exceptions->sum('count'),

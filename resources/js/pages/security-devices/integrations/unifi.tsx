@@ -1,4 +1,14 @@
 import { PageHero, PageLayout } from '@/components/page';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,11 +48,15 @@ import {
 } from './site-credentials';
 
 type ProviderConnection = {
-    status: 'connected' | 'disconnected' | 'error';
+    status: 'connected' | 'disconnected' | 'disabled' | 'error';
     secret_last4?: string;
     last_tested_at?: string;
     last_synced_at?: string;
     sites_synced_at?: string;
+    disabled_at?: string | null;
+    disabled_reason?: DisableReason | null;
+    requires_credential_replacement?: boolean;
+    recovery_credentials_replaced_at?: string | null;
     defaults?: {
         refresh_interval_minutes?: number;
         alert_motion_events?: boolean;
@@ -51,6 +65,13 @@ type ProviderConnection = {
         quiet_hours_end?: string;
     };
 } | null;
+
+type DisableReason =
+    | 'provider_outage'
+    | 'credential_compromise'
+    | 'planned_maintenance'
+    | 'security_review'
+    | 'other_operational_reason';
 
 type DiscoveredSite = {
     mapping_token: string;
@@ -136,7 +157,28 @@ const connectionStatusConfig: Record<
             'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
         icon: ShieldAlert,
     },
+    disabled: {
+        label: 'Disabled',
+        className:
+            'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
+        icon: ShieldAlert,
+    },
 };
+
+const disableReasons: Array<{ value: DisableReason; label: string }> = [
+    { value: 'provider_outage', label: 'Provider outage or instability' },
+    { value: 'credential_compromise', label: 'Credential compromise' },
+    { value: 'planned_maintenance', label: 'Planned maintenance' },
+    { value: 'security_review', label: 'Security review' },
+    { value: 'other_operational_reason', label: 'Other operational reason' },
+];
+
+function disableReasonLabel(reason?: DisableReason | null): string {
+    return (
+        disableReasons.find((option) => option.value === reason)?.label ??
+        'Operational decision'
+    );
+}
 
 const syncStatusConfig: Record<string, string> = {
     success:
@@ -239,6 +281,11 @@ export default function UnifiIntegration({
         null,
     );
     const [savingDefaults, setSavingDefaults] = useState(false);
+    const [disableOpen, setDisableOpen] = useState(false);
+    const [disableReason, setDisableReason] = useState<DisableReason | null>(
+        null,
+    );
+    const [disabling, setDisabling] = useState(false);
     const [deviceSiteFilter, setDeviceSiteFilter] = useState<string>('all');
     const [deviceRoomDraft, setDeviceRoomDraft] = useState<
         Record<number, string>
@@ -253,6 +300,11 @@ export default function UnifiIntegration({
     );
 
     const hasKey = !!providerConnection;
+    const connectionDisabled =
+        providerConnection?.status === 'disabled' ||
+        providerConnection?.requires_credential_replacement === true;
+    const collectionReady =
+        providerConnection?.status === 'connected' && !connectionDisabled;
     const connStatus = providerConnection
         ? (connectionStatusConfig[providerConnection.status] ??
           connectionStatusConfig.disconnected)
@@ -281,7 +333,8 @@ export default function UnifiIntegration({
             providerConnection?.defaults?.alert_motion_events ?? false,
         alert_device_offline:
             providerConnection?.defaults?.alert_device_offline ?? true,
-        quiet_hours_start: providerConnection?.defaults?.quiet_hours_start ?? '',
+        quiet_hours_start:
+            providerConnection?.defaults?.quiet_hours_start ?? '',
         quiet_hours_end: providerConnection?.defaults?.quiet_hours_end ?? '',
     });
 
@@ -305,6 +358,22 @@ export default function UnifiIntegration({
             {
                 preserveScroll: true,
                 onFinish: () => setSavingDefaults(false),
+            },
+        );
+    };
+
+    const disableConnection = (event: React.MouseEvent<HTMLButtonElement>) => {
+        event.preventDefault();
+        if (!disableReason || disabling) return;
+
+        setDisabling(true);
+        router.post(
+            '/security-devices/integrations/unifi/disable',
+            { reason: disableReason },
+            {
+                preserveScroll: true,
+                onSuccess: () => setDisableOpen(false),
+                onFinish: () => setDisabling(false),
             },
         );
     };
@@ -377,7 +446,8 @@ export default function UnifiIntegration({
                                     <span className="text-sm">
                                         Key ending in{' '}
                                         <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                                            •••{providerConnection?.secret_last4}
+                                            •••
+                                            {providerConnection?.secret_last4}
                                         </code>
                                     </span>
                                     {connStatus && (
@@ -390,13 +460,65 @@ export default function UnifiIntegration({
                                 <div className="space-y-1 text-sm text-muted-foreground">
                                     <p>
                                         Last tested:{' '}
-                                        {fmt(providerConnection?.last_tested_at)}
+                                        {fmt(
+                                            providerConnection?.last_tested_at,
+                                        )}
                                     </p>
                                     <p>
                                         Last sync:{' '}
-                                        {fmt(providerConnection?.last_synced_at)}
+                                        {fmt(
+                                            providerConnection?.last_synced_at,
+                                        )}
                                     </p>
                                 </div>
+                                {connectionDisabled && (
+                                    <div
+                                        className="space-y-2 rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 text-sm"
+                                        role="status"
+                                    >
+                                        <p className="font-medium text-status-warning">
+                                            Provider traffic is disabled
+                                        </p>
+                                        <p className="text-muted-foreground">
+                                            Scheduled collection, manual
+                                            provider sync and webhook intake are
+                                            stopped. Canonical Devices, Site
+                                            mappings, cursors, sync history and
+                                            monitoring evidence remain
+                                            available.
+                                        </p>
+                                        <p className="text-muted-foreground">
+                                            Reason:{' '}
+                                            <span className="font-medium text-foreground">
+                                                {disableReasonLabel(
+                                                    providerConnection?.disabled_reason,
+                                                )}
+                                            </span>
+                                            {providerConnection?.disabled_at
+                                                ? ` · ${fmt(providerConnection.disabled_at)}`
+                                                : ''}
+                                        </p>
+                                        <p className="text-muted-foreground">
+                                            Replace the API key below, then run
+                                            a successful connection test. The
+                                            disabled key cannot be re-enabled
+                                            implicitly.
+                                        </p>
+                                    </div>
+                                )}
+                                {!connectionDisabled &&
+                                    providerConnection?.status ===
+                                        'disconnected' &&
+                                    providerConnection?.recovery_credentials_replaced_at && (
+                                        <div className="rounded-lg border border-status-info/30 bg-status-info-bg p-4 text-sm text-muted-foreground">
+                                            A replacement key was saved at{' '}
+                                            {fmt(
+                                                providerConnection.recovery_credentials_replaced_at,
+                                            )}
+                                            . Collection remains stopped until
+                                            Test Connection succeeds.
+                                        </div>
+                                    )}
                                 <div className="flex flex-wrap gap-2">
                                     <Button
                                         variant="outline"
@@ -415,7 +537,15 @@ export default function UnifiIntegration({
                                                 },
                                             );
                                         }}
-                                        disabled={testingConnection}
+                                        disabled={
+                                            testingConnection ||
+                                            connectionDisabled
+                                        }
+                                        title={
+                                            connectionDisabled
+                                                ? 'Replace the disabled API key before testing.'
+                                                : undefined
+                                        }
                                     >
                                         {testingConnection ? (
                                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -431,8 +561,20 @@ export default function UnifiIntegration({
                                             setShowRotateForm((p) => !p)
                                         }
                                     >
-                                        Rotate Key
+                                        {connectionDisabled
+                                            ? 'Replace Key to Recover'
+                                            : 'Rotate Key'}
                                     </Button>
+                                    {!connectionDisabled && (
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() => setDisableOpen(true)}
+                                        >
+                                            <ShieldAlert className="mr-2 h-4 w-4" />
+                                            Disable connection
+                                        </Button>
+                                    )}
                                 </div>
                                 {showRotateForm && (
                                     <form
@@ -456,7 +598,9 @@ export default function UnifiIntegration({
                                         className="space-y-3 rounded-lg border p-4"
                                     >
                                         <Label htmlFor="rotate_api_key">
-                                            New API Key
+                                            {connectionDisabled
+                                                ? 'Replacement API Key'
+                                                : 'New API Key'}
                                         </Label>
                                         <Input
                                             id="rotate_api_key"
@@ -480,7 +624,9 @@ export default function UnifiIntegration({
                                             >
                                                 {rotateKeyForm.processing
                                                     ? 'Saving...'
-                                                    : 'Save New Key'}
+                                                    : connectionDisabled
+                                                      ? 'Save Replacement Key'
+                                                      : 'Save New Key'}
                                             </Button>
                                             <Button
                                                 type="button"
@@ -522,7 +668,12 @@ export default function UnifiIntegration({
                                         },
                                     );
                                 }}
-                                disabled={syncingSites}
+                                disabled={syncingSites || !collectionReady}
+                                title={
+                                    collectionReady
+                                        ? undefined
+                                        : 'Connect and test the UniFi API key before syncing locations.'
+                                }
                             >
                                 {syncingSites ? (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -582,7 +733,8 @@ export default function UnifiIntegration({
                                                                 size="sm"
                                                                 variant="outline"
                                                                 aria-describedby={
-                                                                    !c.is_active
+                                                                    !c.is_active ||
+                                                                    !collectionReady
                                                                         ? `unifi-site-config-${c.id}-sync-help`
                                                                         : undefined
                                                                 }
@@ -608,11 +760,13 @@ export default function UnifiIntegration({
                                                                 }}
                                                                 disabled={
                                                                     !c.is_active ||
+                                                                    !collectionReady ||
                                                                     syncingSiteConfigId ===
                                                                         c.id
                                                                 }
                                                             >
-                                                                {!c.is_active
+                                                                {!c.is_active ||
+                                                                !collectionReady
                                                                     ? 'Sync unavailable'
                                                                     : syncingSiteConfigId ===
                                                                         c.id
@@ -634,17 +788,15 @@ export default function UnifiIntegration({
                                                                 Remove
                                                             </Button>
                                                         </div>
-                                                        {!c.is_active && (
+                                                        {(!c.is_active ||
+                                                            !collectionReady) && (
                                                             <p
                                                                 id={`unifi-site-config-${c.id}-sync-help`}
                                                                 className="max-w-xs text-xs text-muted-foreground"
                                                             >
-                                                                This mapping is
-                                                                inactive. Remove
-                                                                it and map the
-                                                                location again
-                                                                before syncing
-                                                                devices.
+                                                                {!c.is_active
+                                                                    ? 'This mapping is inactive. Remove it and map the location again before syncing devices.'
+                                                                    : 'The UniFi connection must be enabled and successfully tested before syncing devices.'}
                                                             </p>
                                                         )}
                                                     </div>
@@ -1215,6 +1367,84 @@ export default function UnifiIntegration({
                         </CardContent>
                     </Card>
                 )}
+
+                <AlertDialog
+                    open={disableOpen}
+                    onOpenChange={(open) => {
+                        setDisableOpen(open);
+                        if (!open) setDisableReason(null);
+                    }}
+                >
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>
+                                Disable the UniFi connection?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This is a fail-closed operational containment
+                                action. Choose the exact reason before
+                                continuing.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+
+                        <div className="space-y-4 text-sm">
+                            <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-muted-foreground">
+                                Scheduled collection, manual provider sync and
+                                webhook event intake stop immediately. Existing
+                                Devices, mappings, cursors, sync history and
+                                monitoring evidence are preserved.
+                            </div>
+
+                            <fieldset className="space-y-2">
+                                <legend className="font-medium">
+                                    Reason for disabling
+                                </legend>
+                                {disableReasons.map((option) => (
+                                    <label
+                                        key={option.value}
+                                        className="flex cursor-pointer items-start gap-3 rounded-lg border p-3"
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="disable_reason"
+                                            value={option.value}
+                                            checked={
+                                                disableReason === option.value
+                                            }
+                                            onChange={() =>
+                                                setDisableReason(option.value)
+                                            }
+                                            className="mt-0.5 h-4 w-4"
+                                        />
+                                        <span>{option.label}</span>
+                                    </label>
+                                ))}
+                            </fieldset>
+
+                            <p className="text-muted-foreground">
+                                Recovery requires a replacement API key and a
+                                successful connection test. Oblivion will not
+                                reuse the disabled key. If compromise is
+                                suspected, revoke that key in UniFi as well.
+                            </p>
+                        </div>
+
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={disabling}>
+                                Keep connection enabled
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={disableConnection}
+                                disabled={!disableReason || disabling}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                                {disabling
+                                    ? 'Disabling...'
+                                    : 'Disable and revoke use'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </PageLayout>
         </AppLayout>
     );

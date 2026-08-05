@@ -73,6 +73,39 @@ class DeviceAssignmentService
     }
 
     /**
+     * Release only when every active row still belongs to the expected target.
+     * Stale projections must never release a Device that has since moved to a
+     * different Client, staff member, Site, room or vehicle.
+     */
+    public function releaseForTarget(
+        Device $device,
+        string $assignableType,
+        int $assignableId,
+        int $releasedByUserId,
+        string $reason = 'assignment_released',
+    ): ?DeviceAssignment {
+        $this->validateTarget($assignableType);
+
+        return DB::transaction(function () use (
+            $device,
+            $assignableType,
+            $assignableId,
+            $releasedByUserId,
+            $reason,
+        ): ?DeviceAssignment {
+            $lockedDevice = $this->lockDevice($device);
+
+            return $this->releaseActiveAssignments(
+                $lockedDevice,
+                $releasedByUserId,
+                $reason,
+                $assignableType,
+                $assignableId,
+            );
+        });
+    }
+
+    /**
      * Transfer a device from its current assignment to a new one in a single transaction.
      */
     public function transfer(
@@ -101,6 +134,8 @@ class DeviceAssignmentService
         Device $device,
         ?int $userId,
         string $reason,
+        ?string $expectedAssignableType = null,
+        ?int $expectedAssignableId = null,
     ): ?DeviceAssignment {
         $activeAssignments = DeviceAssignment::query()
             ->where('device_id', $device->id)
@@ -111,6 +146,12 @@ class DeviceAssignmentService
             ->get();
 
         if ($activeAssignments->isEmpty()) {
+            return null;
+        }
+
+        if ($expectedAssignableType !== null
+            && $activeAssignments->contains(fn (DeviceAssignment $assignment): bool => $assignment->assignable_type !== $expectedAssignableType
+                || (int) $assignment->assignable_id !== $expectedAssignableId)) {
             return null;
         }
 

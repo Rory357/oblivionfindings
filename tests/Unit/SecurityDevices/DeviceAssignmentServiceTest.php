@@ -114,6 +114,31 @@ class DeviceAssignmentServiceTest extends TestCase
         $this->assertNull($result);
     }
 
+    public function test_target_scoped_release_does_not_release_a_device_that_has_moved_elsewhere(): void
+    {
+        $device = Device::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create();
+        $user = User::factory()->create();
+        $assignment = $this->service->assign(
+            $device,
+            DeviceAssignment::TARGET_SITE,
+            $site->id,
+            $user->id,
+        );
+
+        $released = $this->service->releaseForTarget(
+            $device,
+            DeviceAssignment::TARGET_CLIENT,
+            $client->id,
+            $user->id,
+        );
+
+        $this->assertNull($released);
+        $this->assertNull($assignment->fresh()->released_at);
+        $this->assertSame(1, $device->assignments()->active()->count());
+    }
+
     public function test_transfer_releases_old_and_creates_new(): void
     {
         $device = Device::factory()->create();

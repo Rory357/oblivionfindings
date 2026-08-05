@@ -40,10 +40,102 @@ beforeEach(() => {
 });
 
 describe('UniFi integration', () => {
+    it('requires a reason before confirming the fail-closed disable workflow', () => {
+        render(
+            <UnifiIntegration
+                providerConnection={{
+                    status: 'connected',
+                    secret_last4: '0042',
+                }}
+                discoveredSites={[]}
+                siteConfigs={[]}
+                sites={[]}
+                rooms={[]}
+                syncedDevices={[]}
+                syncLogs={[]}
+                siteCredentials={[]}
+            />,
+        );
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Disable connection' }),
+        );
+
+        expect(
+            screen.getByRole('heading', {
+                name: 'Disable the UniFi connection?',
+            }),
+        ).toBeVisible();
+        expect(
+            screen.getByText(/Scheduled collection, manual provider sync/),
+        ).toBeVisible();
+        expect(
+            screen.getByText(
+                /Existing Devices, mappings, cursors, sync history/,
+            ),
+        ).toBeVisible();
+
+        const confirm = screen.getByRole('button', {
+            name: 'Disable and revoke use',
+        });
+        expect(confirm).toBeDisabled();
+
+        fireEvent.click(
+            screen.getByLabelText('Provider outage or instability'),
+        );
+        expect(confirm).toBeEnabled();
+        fireEvent.click(confirm);
+
+        expect(inertiaMocks.router.post).toHaveBeenCalledWith(
+            '/security-devices/integrations/unifi/disable',
+            { reason: 'provider_outage' },
+            expect.objectContaining({ preserveScroll: true }),
+        );
+    });
+
+    it('explains disabled containment and requires credential replacement before recovery', () => {
+        render(
+            <UnifiIntegration
+                providerConnection={{
+                    status: 'disabled',
+                    secret_last4: '0042',
+                    disabled_at: '2026-08-05T08:00:00Z',
+                    disabled_reason: 'security_review',
+                    requires_credential_replacement: true,
+                }}
+                discoveredSites={[]}
+                siteConfigs={[]}
+                sites={[]}
+                rooms={[]}
+                syncedDevices={[]}
+                syncLogs={[]}
+                siteCredentials={[]}
+            />,
+        );
+
+        expect(screen.getByText('Provider traffic is disabled')).toBeVisible();
+        expect(screen.getByText('Security review')).toBeVisible();
+        expect(
+            screen.getByRole('button', { name: 'Test Connection' }),
+        ).toBeDisabled();
+        expect(
+            screen.getByRole('button', { name: 'Sync UniFi Locations' }),
+        ).toBeDisabled();
+        expect(
+            screen.getByRole('button', { name: 'Replace Key to Recover' }),
+        ).toBeEnabled();
+        expect(
+            screen.queryByRole('button', { name: 'Disable connection' }),
+        ).not.toBeInTheDocument();
+    });
+
     it('disables inactive mapping sync with an accessible recovery explanation', () => {
         render(
             <UnifiIntegration
-                providerConnection={{ status: 'connected', secret_last4: '0042' }}
+                providerConnection={{
+                    status: 'connected',
+                    secret_last4: '0042',
+                }}
                 discoveredSites={[]}
                 siteConfigs={[
                     {

@@ -380,6 +380,8 @@ Route::middleware([
                 ->name('security-devices.integrations.unifi.test');
             Route::post('/rotate', [UnifiController::class, 'rotateKey'])
                 ->name('security-devices.integrations.unifi.rotate');
+            Route::post('/disable', [UnifiController::class, 'disable'])
+                ->name('security-devices.integrations.unifi.disable');
             Route::post('/sync-sites', [UnifiController::class, 'syncSites'])
                 ->name('security-devices.integrations.unifi.sync-sites');
             Route::post('/map-site', [UnifiController::class, 'mapSite'])

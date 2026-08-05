@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Domain\SecurityDevices\Models\Device;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 
@@ -24,7 +23,7 @@ class ClientPersonalAsset extends Model
         'location',
         'site_id',
         'room_id',
-        'tracker_hardware_id',
+        'tracker_device_id',
         'photo_path',
         'acquired_at',
         'notes',
@@ -83,21 +82,20 @@ class ClientPersonalAsset extends Model
         return $this->belongsTo(SiteHouseRoom::class, 'room_id');
     }
 
+    /**
+     * Read-only compatibility evidence from the retired tracker write path.
+     * New mutations must use tracker_device_id and canonical assignments.
+     *
+     * @deprecated Use trackerDevice() for the canonical Device.
+     */
     public function tracker(): BelongsTo
     {
         return $this->belongsTo(LocationHardware::class, 'tracker_hardware_id');
     }
 
-    /**
-     * Canonical device represented by the temporary LocationHardware bridge.
-     *
-     * client_personal_assets.tracker_hardware_id still references the legacy
-     * compatibility table, so profile mutations resolve a canonical Device and
-     * persist only its legacy_location_hardware_id until that bridge is retired.
-     */
-    public function trackerDevice(): HasOne
+    public function trackerDevice(): BelongsTo
     {
-        return $this->hasOne(Device::class, 'legacy_location_hardware_id', 'tracker_hardware_id');
+        return $this->belongsTo(Device::class, 'tracker_device_id');
     }
 
     public function getPhotoUrlAttribute(): ?string

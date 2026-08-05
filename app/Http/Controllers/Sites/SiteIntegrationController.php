@@ -65,6 +65,7 @@ class SiteIntegrationController extends Controller
                     'status' => in_array($connection->status, [
                         IntegrationProviderConnection::STATUS_CONNECTED,
                         IntegrationProviderConnection::STATUS_DISCONNECTED,
+                        IntegrationProviderConnection::STATUS_DISABLED,
                         IntegrationProviderConnection::STATUS_ERROR,
                     ], true) ? $connection->status : 'unknown',
                     'failure_category' => filled($connection->last_error) ? 'provider_failure' : null,
@@ -144,10 +145,11 @@ class SiteIntegrationController extends Controller
 
         $providerConnection = IntegrationProviderConnection::query()
             ->forProvider($provider)
+            ->connected()
             ->first();
 
         if (! $providerConnection) {
-            return redirect()->back()->with('error', 'No provider connection is configured for this integration.');
+            return redirect()->back()->with('error', 'The provider connection must be enabled and successfully tested in Security & Devices before collecting inventory.');
         }
 
         if (! $registry->hasCapability($provider, InventoryDiscoveryCapability::class)) {
@@ -229,6 +231,11 @@ class SiteIntegrationController extends Controller
 
         if (! $providerConnection) {
             return redirect()->back()->with('error', 'No provider connection is configured for this integration.');
+        }
+
+        if ($providerConnection->status === IntegrationProviderConnection::STATUS_DISABLED
+            || $providerConnection->requires_credential_replacement) {
+            return redirect()->back()->with('error', 'This provider connection is disabled centrally. Replace its credential in Security & Devices before testing it.');
         }
 
         if (! $registry->hasCapability($provider, ConnectionHealthCapability::class)) {

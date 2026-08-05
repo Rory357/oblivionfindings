@@ -194,6 +194,29 @@ it('does not create runtime state when a provider capability is absent', functio
         ->and(MonitoringOutbox::query()->count())->toBe(0);
 });
 
+it('discards an in-flight provider result when the connection is disabled before persistence', function () {
+    $site = providerCapabilitySite();
+    $adapter = registerObservationFixture(
+        new ProviderObservationPage(
+            items: [providerObservation($site->id, 'discarded-cursor', 'discarded-source')],
+            nextCursor: 'discarded-cursor',
+        ),
+        function (IntegrationProviderConnection $connection): void {
+            $connection->update([
+                'status' => IntegrationProviderConnection::STATUS_DISABLED,
+                'requires_credential_replacement' => true,
+            ]);
+        },
+    );
+
+    (new PullProviderCapability('fixture', $site->id))
+        ->handle(app(IntegrationAdapterRegistry::class), app(MonitoringOutboxPublisher::class));
+
+    expect($adapter->requestedLimit)->toBe(25)
+        ->and(ProviderCapabilityCursor::query()->sole()->cursor)->toBeNull()
+        ->and(MonitoringOutbox::query()->count())->toBe(0);
+});
+
 it('collects provider snapshots through the declared capability and advances only persisted evidence', function () {
     $site = providerCapabilitySite('snapshot-fixture');
     $device = Device::factory()->itInfrastructure()->create();
@@ -272,9 +295,11 @@ function providerCapabilitySite(string $provider = 'fixture'): Site
     return $site;
 }
 
-function registerObservationFixture(ProviderObservationPage $page): ProviderCapabilityFixtureAdapter
-{
-    $adapter = new ProviderCapabilityFixtureAdapter($page);
+function registerObservationFixture(
+    ProviderObservationPage $page,
+    ?Closure $beforeReturn = null,
+): ProviderCapabilityFixtureAdapter {
+    $adapter = new ProviderCapabilityFixtureAdapter($page, $beforeReturn);
     app()->instance(ProviderCapabilityFixtureAdapter::class, $adapter);
     app(IntegrationAdapterRegistry::class)->register(
         'fixture',
@@ -341,7 +366,10 @@ final class ProviderCapabilityFixtureAdapter implements IntegrationAdapterInterf
 
     public ?int $requestedLimit = null;
 
-    public function __construct(private readonly ProviderObservationPage $page) {}
+    public function __construct(
+        private readonly ProviderObservationPage $page,
+        private readonly ?Closure $beforeReturn = null,
+    ) {}
 
     public function provider(): string
     {
@@ -386,6 +414,9 @@ final class ProviderCapabilityFixtureAdapter implements IntegrationAdapterInterf
     ): ProviderObservationPage {
         $this->requestedCursor = $cursor;
         $this->requestedLimit = $limit;
+        if ($this->beforeReturn) {
+            ($this->beforeReturn)($providerConnection);
+        }
 
         return $this->page;
     }

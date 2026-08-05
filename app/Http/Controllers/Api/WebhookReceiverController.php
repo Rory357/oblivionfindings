@@ -101,7 +101,22 @@ class WebhookReceiverController extends Controller
                 return response()->json(['error' => 'Webhook Site is not mapped'], 422);
             }
 
-            $result = DB::transaction(function () use ($provider, $publisher, $verified): array {
+            $result = DB::transaction(function () use ($provider, $providerConnection, $publisher, $verified): array {
+                $activeConnection = IntegrationProviderConnection::query()
+                    ->whereKey($providerConnection->id)
+                    ->forProvider($provider)
+                    ->connected()
+                    ->sharedLock()
+                    ->first(['id']);
+                if ($activeConnection === null) {
+                    return [
+                        'connection_disabled' => true,
+                        'message_ids' => [],
+                        'duplicates' => 0,
+                        'existing_event_id' => null,
+                    ];
+                }
+
                 $messageIds = [];
                 $duplicates = 0;
                 $existingEventId = null;
@@ -152,11 +167,16 @@ class WebhookReceiverController extends Controller
                 }
 
                 return [
+                    'connection_disabled' => false,
                     'message_ids' => $messageIds,
                     'duplicates' => $duplicates,
                     'existing_event_id' => $existingEventId,
                 ];
             });
+
+            if ($result['connection_disabled']) {
+                return response()->json(['error' => 'Webhook rejected'], 401);
+            }
 
             $accepted = count($result['message_ids']);
             $response = [

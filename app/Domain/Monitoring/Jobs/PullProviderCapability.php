@@ -150,6 +150,11 @@ final class PullProviderCapability implements ShouldQueue
                     $cursor->cursor,
                     min($manifest->pageLimit, $manifest->backfillLimit),
                 );
+                if (! $this->connectionStillUsable((int) $connection->id)) {
+                    $this->recordDisabledDuringCollection();
+
+                    return;
+                }
                 [$persistedCursor, $scopeExceptions] = $this->persistEventPage($page, $outbox);
                 $exceptions = $scopeExceptions;
             } elseif ($this->capability === ObservationCollectionCapability::class
@@ -160,6 +165,11 @@ final class PullProviderCapability implements ShouldQueue
                     $cursor->cursor,
                     min($manifest->pageLimit, $manifest->backfillLimit),
                 );
+                if (! $this->connectionStillUsable((int) $connection->id)) {
+                    $this->recordDisabledDuringCollection();
+
+                    return;
+                }
                 [$persistedCursor, $scopeExceptions] = $this->persistPage($page, $outbox);
                 $exceptions = [...$page->exceptions, ...$scopeExceptions];
             } elseif ($this->capability === SnapshotCollectionCapability::class
@@ -170,6 +180,11 @@ final class PullProviderCapability implements ShouldQueue
                     $cursor->cursor,
                     min($manifest->pageLimit, $manifest->backfillLimit),
                 );
+                if (! $this->connectionStillUsable((int) $connection->id)) {
+                    $this->recordDisabledDuringCollection();
+
+                    return;
+                }
                 [$persistedCursor, $scopeExceptions] = $this->persistSnapshotPage(
                     $page,
                     $capability,
@@ -227,6 +242,24 @@ final class PullProviderCapability implements ShouldQueue
 
             throw $exception;
         }
+    }
+
+    private function connectionStillUsable(int $connectionId): bool
+    {
+        return IntegrationProviderConnection::query()
+            ->whereKey($connectionId)
+            ->forProvider($this->provider)
+            ->connected()
+            ->exists();
+    }
+
+    private function recordDisabledDuringCollection(): void
+    {
+        Log::info('Provider capability result was discarded after the connection was disabled.', [
+            'provider' => $this->provider,
+            'site_id' => $this->siteId,
+            'capability' => $this->capability,
+        ]);
     }
 
     /**

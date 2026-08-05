@@ -51,6 +51,8 @@ return [
             'url' => env('MONITORING_VAULT_URL'),
             'token' => env('MONITORING_VAULT_TOKEN'),
             'namespace' => env('MONITORING_VAULT_NAMESPACE'),
+            'kv_v2_mount' => env('MONITORING_VAULT_KV_V2_MOUNT', 'secret'),
+            'provider_secret_prefix' => env('MONITORING_VAULT_PROVIDER_SECRET_PREFIX', 'oblivion/provider-integrations'),
             'connect_timeout_seconds' => 3,
             'response_timeout_seconds' => 10,
         ],

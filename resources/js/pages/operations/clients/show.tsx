@@ -197,7 +197,7 @@ type PersonalAsset = {
     site_name?: string | null;
     room_id?: number | null;
     room_name?: string | null;
-    tracker_hardware_id?: number | null;
+    tracker_device_id?: number | null;
     tracker?: AssetTracker | null;
     photo_url?: string | null;
     acquired_at?: string | null;

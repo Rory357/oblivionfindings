@@ -174,7 +174,7 @@ it('denies finance and client-only viewers all staff location actions and tracke
     ClientPersonalAsset::query()->create([
         'client_id' => $client->id,
         'name' => 'Tracked wheelchair',
-        'tracker_hardware_id' => $hardware->id,
+        'tracker_device_id' => $device->id,
         'status' => 'active',
         'ownership' => 'client',
     ]);
@@ -322,7 +322,7 @@ it('does not expose telemetry to fleet or asset viewers without the telemetry ca
     ClientPersonalAsset::query()->create([
         'client_id' => $client->id,
         'name' => 'Telemetry restricted asset',
-        'tracker_hardware_id' => $hardware->id,
+        'tracker_device_id' => $device->id,
         'status' => 'active',
         'ownership' => 'client',
     ]);
@@ -338,7 +338,7 @@ it('does not expose telemetry to fleet or asset viewers without the telemetry ca
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->missing('location')
-            ->where('personal_assets.0.tracker_hardware_id', null)
+            ->where('personal_assets.0.tracker_device_id', null)
             ->where('personal_assets.0.tracker', null));
 
     $this->get("/operations/clients/{$client->id}/location/history")
@@ -437,9 +437,29 @@ it('does not emit tracker choices to ordinary client editors and rejects direct 
         ->post("/operations/clients/{$client->id}/personal-assets", [
             'name' => 'Injected tracker asset',
             'site_id' => $site->id,
-            'tracker_hardware_id' => $device->id,
+            'tracker_device_id' => $device->id,
         ])
         ->assertRedirect("/operations/clients/{$client->id}?tab=personal_assets")
+        ->assertSessionHasErrors('tracker_device_id');
+
+    expect(ClientPersonalAsset::query()->count())->toBe(0);
+});
+
+it('rejects the retired legacy tracker hardware write field', function () {
+    $site = makeClientLocationAssetSite('Legacy Tracker Write Home');
+    $user = makeClientLocationAssetStaff($site, [
+        'clients.viewAny',
+        'clients.update',
+        'assets.trackers.manage',
+    ]);
+    $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+    $hardware = makeClientLocationAssetHardware($site, 'Historical tracker hardware');
+
+    $this->actingAs($user)
+        ->post("/operations/clients/{$client->id}/personal-assets", [
+            'name' => 'Rejected compatibility write',
+            'tracker_hardware_id' => $hardware->id,
+        ])
         ->assertSessionHasErrors('tracker_hardware_id');
 
     expect(ClientPersonalAsset::query()->count())->toBe(0);
@@ -462,6 +482,7 @@ it('enforces the canonical client site on asset writes and persists eligible lin
         'site_id' => $localSite->id,
         'status' => 'active',
     ]);
+    $consent = grantClientLocationAssetTrackingConsent($client, $user);
 
     $localHardware = makeClientLocationAssetHardware($localSite, 'Eligible Shadow');
     $eligibleDevice = makeClientLocationAssetTracker('Eligible Tracker', $localHardware);
@@ -499,32 +520,32 @@ it('enforces the canonical client site on asset writes and persists eligible lin
         ->post("/operations/clients/{$client->id}/personal-assets", $basePayload + [
             'site_id' => $localSite->id,
             'room_id' => $localRoom->id,
-            'tracker_hardware_id' => $otherSiteDevice->id,
+            'tracker_device_id' => $otherSiteDevice->id,
         ])
-        ->assertSessionHasErrors('tracker_hardware_id');
+        ->assertSessionHasErrors('tracker_device_id');
 
     $this->from($returnUrl)
         ->post("/operations/clients/{$client->id}/personal-assets", $basePayload + [
             'site_id' => $localSite->id,
             'room_id' => $localRoom->id,
-            'tracker_hardware_id' => $thirdSiteDevice->id,
+            'tracker_device_id' => $thirdSiteDevice->id,
         ])
-        ->assertSessionHasErrors('tracker_hardware_id');
+        ->assertSessionHasErrors('tracker_device_id');
 
     $this->from($returnUrl)
         ->post("/operations/clients/{$client->id}/personal-assets", $basePayload + [
             'site_id' => $localSite->id,
             'room_id' => $localRoom->id,
-            'tracker_hardware_id' => $unbridgedDevice->id,
+            'tracker_device_id' => $unbridgedDevice->id,
         ])
-        ->assertSessionHasErrors('tracker_hardware_id');
+        ->assertSessionHasErrors('tracker_device_id');
 
     $this->from($returnUrl)
         ->post("/operations/clients/{$client->id}/personal-assets", $basePayload + [
             'name' => 'Safely tracked item',
             'site_id' => $localSite->id,
             'room_id' => $localRoom->id,
-            'tracker_hardware_id' => $eligibleDevice->id,
+            'tracker_device_id' => $eligibleDevice->id,
         ])
         ->assertRedirect($returnUrl)
         ->assertSessionHasNoErrors();
@@ -533,7 +554,15 @@ it('enforces the canonical client site on asset writes and persists eligible lin
 
     expect($asset->site_id)->toBe($localSite->id)
         ->and($asset->room_id)->toBe($localRoom->id)
-        ->and($asset->tracker_hardware_id)->toBe($localHardware->id);
+        ->and($asset->tracker_device_id)->toBe($eligibleDevice->id)
+        ->and($asset->tracker_hardware_id)->toBeNull();
+    $assignment = DeviceAssignment::query()
+        ->where('device_id', $eligibleDevice->id)
+        ->active()
+        ->sole();
+    expect($assignment->assignable_type)->toBe(DeviceAssignment::TARGET_CLIENT)
+        ->and($assignment->assignable_id)->toBe($client->id)
+        ->and($assignment->consent_id)->toBe($consent->id);
 });
 
 it('records multiple personal asset status transitions with actor and source context', function () {
@@ -581,6 +610,131 @@ it('records multiple personal asset status transitions with actor and source con
         ->and($events->pluck('meta.to_status')->all())->toBe(['lost', 'damaged']);
 });
 
+it('replaces a personal asset tracker through canonical assignment history and consent', function () {
+    $site = makeClientLocationAssetSite('Tracker Replacement Home');
+    $user = makeClientLocationAssetStaff($site, [
+        'clients.viewAny',
+        'clients.update',
+        'assets.trackers.manage',
+    ]);
+    $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+    $consent = grantClientLocationAssetTrackingConsent($client, $user);
+    $oldDevice = makeClientLocationAssetTracker(
+        'Original personal asset tracker',
+        makeClientLocationAssetHardware($site, 'Original tracker shadow'),
+    );
+    $newDevice = makeClientLocationAssetTracker(
+        'Replacement personal asset tracker',
+        makeClientLocationAssetHardware($site, 'Replacement tracker shadow'),
+    );
+    $oldAssignment = DeviceAssignment::query()->create([
+        'device_id' => $oldDevice->id,
+        'assignable_type' => DeviceAssignment::TARGET_CLIENT,
+        'assignable_id' => $client->id,
+        'assigned_at' => now()->subDay(),
+        'assigned_by_user_id' => $user->id,
+        'consent_id' => $consent->id,
+    ]);
+    $asset = ClientPersonalAsset::query()->create([
+        'client_id' => $client->id,
+        'name' => 'Tracked wheelchair',
+        'status' => 'active',
+        'ownership' => 'client',
+        'tracker_device_id' => $oldDevice->id,
+        'recorded_by_user_id' => $user->id,
+    ]);
+
+    $this->actingAs($user)
+        ->put("/operations/clients/{$client->id}/personal-assets/{$asset->id}", [
+            'name' => $asset->name,
+            'status' => 'active',
+            'tracker_device_id' => $newDevice->id,
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $newAssignment = DeviceAssignment::query()
+        ->where('device_id', $newDevice->id)
+        ->active()
+        ->sole();
+    expect($asset->fresh()->tracker_device_id)->toBe($newDevice->id)
+        ->and($asset->fresh()->tracker_hardware_id)->toBeNull()
+        ->and($oldAssignment->fresh()->released_at)->not->toBeNull()
+        ->and($oldAssignment->fresh()->collection_stopped_at)->not->toBeNull()
+        ->and($newAssignment->assignable_type)->toBe(DeviceAssignment::TARGET_CLIENT)
+        ->and($newAssignment->assignable_id)->toBe($client->id)
+        ->and($newAssignment->consent_id)->toBe($consent->id)
+        ->and(DeviceAssignment::query()->where('device_id', $oldDevice->id)->count())->toBe(1);
+});
+
+it('releases tracker collection on personal asset return disposal and deletion while retaining history', function () {
+    $site = makeClientLocationAssetSite('Tracker Lifecycle Home');
+    $user = makeClientLocationAssetStaff($site, [
+        'clients.viewAny',
+        'clients.update',
+    ]);
+    $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+    $consent = grantClientLocationAssetTrackingConsent($client, $user);
+
+    $records = collect(['returned', 'disposed', 'deleted'])->mapWithKeys(function (string $lifecycle) use (
+        $site,
+        $client,
+        $consent,
+        $user,
+    ): array {
+        $device = makeClientLocationAssetTracker(
+            ucfirst($lifecycle).' tracker',
+            makeClientLocationAssetHardware($site, ucfirst($lifecycle).' tracker shadow'),
+        );
+        $assignment = DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_CLIENT,
+            'assignable_id' => $client->id,
+            'assigned_at' => now()->subHour(),
+            'assigned_by_user_id' => $user->id,
+            'consent_id' => $consent->id,
+        ]);
+        $asset = ClientPersonalAsset::query()->create([
+            'client_id' => $client->id,
+            'name' => ucfirst($lifecycle).' tracked asset',
+            'status' => 'active',
+            'ownership' => 'client',
+            'tracker_device_id' => $device->id,
+            'recorded_by_user_id' => $user->id,
+        ]);
+
+        return [$lifecycle => compact('device', 'assignment', 'asset')];
+    });
+
+    $returned = $records->get('returned');
+    $this->actingAs($user)
+        ->patch("/operations/clients/{$client->id}/personal-assets/{$returned['asset']->id}/status", [
+            'status' => 'returned',
+        ])
+        ->assertRedirect();
+
+    $disposed = $records->get('disposed');
+    $this->put("/operations/clients/{$client->id}/personal-assets/{$disposed['asset']->id}", [
+        'name' => $disposed['asset']->name,
+        'status' => 'disposed',
+        'disposal_reason' => 'End of service life',
+    ])->assertRedirect();
+
+    $deleted = $records->get('deleted');
+    $this->delete("/operations/clients/{$client->id}/personal-assets/{$deleted['asset']->id}")
+        ->assertRedirect();
+
+    foreach ($records as $lifecycle => $record) {
+        $freshAsset = ClientPersonalAsset::withTrashed()->findOrFail($record['asset']->id);
+        expect($record['assignment']->fresh()->released_at)->not->toBeNull()
+            ->and($record['assignment']->fresh()->collection_stopped_at)->not->toBeNull()
+            ->and($freshAsset->tracker_device_id)->toBe($record['device']->id);
+    }
+    expect($returned['asset']->fresh()->status)->toBe('returned')
+        ->and($disposed['asset']->fresh()->status)->toBe('disposed')
+        ->and(ClientPersonalAsset::withTrashed()->findOrFail($deleted['asset']->id)->trashed())->toBeTrue();
+});
+
 it('rolls back a personal asset status endpoint when timeline emission fails', function () {
     $site = makeClientLocationAssetSite('Asset Status Rollback Home');
     $user = makeClientLocationAssetStaff($site, [
@@ -588,11 +742,25 @@ it('rolls back a personal asset status endpoint when timeline emission fails', f
         'clients.update',
     ]);
     $client = Client::factory()->create(['site_id' => $site->id]);
+    $consent = grantClientLocationAssetTrackingConsent($client, $user);
+    $device = makeClientLocationAssetTracker(
+        'Rollback tracker',
+        makeClientLocationAssetHardware($site, 'Rollback tracker shadow'),
+    );
+    $assignment = DeviceAssignment::query()->create([
+        'device_id' => $device->id,
+        'assignable_type' => DeviceAssignment::TARGET_CLIENT,
+        'assignable_id' => $client->id,
+        'assigned_at' => now(),
+        'assigned_by_user_id' => $user->id,
+        'consent_id' => $consent->id,
+    ]);
     $asset = ClientPersonalAsset::query()->create([
         'client_id' => $client->id,
         'name' => 'Communication tablet',
         'status' => 'active',
         'ownership' => 'client',
+        'tracker_device_id' => $device->id,
         'recorded_by_user_id' => $user->id,
     ]);
     $emitter = Mockery::mock(TimelineEmitter::class);
@@ -604,10 +772,12 @@ it('rolls back a personal asset status endpoint when timeline emission fails', f
 
     expect(fn () => $this->actingAs($user)
         ->patch("/operations/clients/{$client->id}/personal-assets/{$asset->id}/status", [
-            'status' => 'lost',
+            'status' => 'returned',
         ]))->toThrow(RuntimeException::class, 'Timeline unavailable');
 
-    expect($asset->fresh()->status)->toBe('active');
+    expect($asset->fresh()->status)->toBe('active')
+        ->and($assignment->fresh()->released_at)->toBeNull()
+        ->and($assignment->fresh()->collection_stopped_at)->toBeNull();
 });
 
 it('rolls back a full personal asset update when timeline emission fails', function () {
