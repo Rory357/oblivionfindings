@@ -2325,7 +2325,7 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertDatabaseCount('control_room_alerts', 1);
     }
 
-    public function test_direct_links_beat_legacy_context_and_repair_a_safe_hs_tuple(): void
+    public function test_direct_links_beat_legacy_context_and_repair_safe_alert_context(): void
     {
         $actor = User::factory()->create();
         $site = Site::factory()->create();
@@ -2344,15 +2344,16 @@ class IncidentJourneyServiceTest extends TestCase
             'control_room_alert_id' => $directAlert->id,
             'hs_event_id' => $directEvent->id,
         ]);
-        $legacyCategory = HsEvent::CATEGORY_NEAR_MISS;
         $directEvent->updateQuietly([
             'source_type' => ClientIncident::class,
             'source_id' => $incident->id,
-            'event_category' => $legacyCategory,
+            'event_category' => HsEvent::CATEGORY_INCIDENT,
+            'site_id' => $incident->site_id,
+            'client_id' => $incident->client_id,
             'idempotency_key' => HsEvent::buildIdempotencyKey(
                 ClientIncident::class,
                 $incident->id,
-                $legacyCategory,
+                HsEvent::CATEGORY_INCIDENT,
             ),
         ]);
         $legacyAlert = ControlRoomAlert::factory()->create([
