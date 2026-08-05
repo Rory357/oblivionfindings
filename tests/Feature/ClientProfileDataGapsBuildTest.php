@@ -77,10 +77,14 @@ class ClientProfileDataGapsBuildTest extends TestCase
                 ->where('client.room.notes', 'West Wing'));
 
         $this->actingAs($this->admin)
-            ->get("/sites/{$site->id}")
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('clients.0.room.id', $room->id)
-                ->where('clients.0.room.name', 'Room 3'));
+            ->get(
+                "/sites/{$site->id}",
+                $this->inertiaPartialHeaders('sites/show', 'clientsData'),
+            )
+            ->assertOk()
+            ->assertHeader('X-Inertia', 'true')
+            ->assertJsonPath('props.clientsData.items.0.room.id', $room->id)
+            ->assertJsonPath('props.clientsData.items.0.room.name', 'Room 3');
     }
 
     public function test_meal_log_stores_worker_time_and_feeds_profile_meal_summary(): void

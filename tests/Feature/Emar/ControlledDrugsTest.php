@@ -186,7 +186,7 @@ class ControlledDrugsTest extends TestCase
     {
         ['user' => $user, 'witness' => $witness, 'client' => $client] = $this->setupCd();
 
-        $this->actingAs($user)
+        $response = $this->actingAs($user)
             ->from('/emar/controlled')
             ->post('/emar/controlled/balance-check', [
                 'client_id' => $client->id,
@@ -195,12 +195,23 @@ class ControlledDrugsTest extends TestCase
                 'actual_balance' => 8,
                 'witnessed_by' => $witness->id,
                 'discrepancy_notes' => 'Two tablets unaccounted for.',
-            ])
-            ->assertSessionHasNoErrors();
+            ]);
+
+        $response
+            ->assertRedirect('/emar/controlled')
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success');
 
         $discrepancy = ClientControlledDrugDiscrepancy::first();
         $this->assertNotNull($discrepancy);
         $this->assertNotNull($discrepancy->incident_id, 'Balance-check discrepancy should link the auto-created incident.');
+        $this->assertDatabaseHas('client_incidents', [
+            'id' => $discrepancy->incident_id,
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+            'status' => 'submitted',
+            'immediate_action_taken' => 'Witnessed controlled-drug balance mismatch recorded and escalated for immediate reconciliation.',
+        ]);
     }
 
     public function test_overdue_cd_check_command_raises_then_balance_check_resolves_alert(): void

@@ -33,7 +33,7 @@ class DismissedAlertScopeTest extends TestCase
 
     private User $admin;
 
-    private Site $tenantSite;
+    private Site $site;
 
     protected function setUp(): void
     {
@@ -43,12 +43,12 @@ class DismissedAlertScopeTest extends TestCase
         $this->seed(SecurityDevicesPermissionsSeeder::class);
 
         $this->admin = User::factory()->create([
-            'organization_id' => 1,
             'role' => 'admin',
             'approved_at' => now(),
         ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->firstOrFail());
-        $this->tenantSite = Site::factory()->create(['tenant_id' => 1]);
+        $this->site = Site::factory()->create();
+        $this->attachCurrentHrProfile($this->admin, $this->site, 'admin');
     }
 
     public function test_health_and_safety_dashboard_does_not_count_dismissed_lone_worker_alerts_as_active(): void
@@ -96,7 +96,7 @@ class DismissedAlertScopeTest extends TestCase
 
     public function test_integration_context_omits_dismissed_alerts_from_live_summary_and_worklist(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create();
         $this->makeAlert([
             'site_id' => $site->id,
             'source' => 'integration_nurse_call',
@@ -123,9 +123,8 @@ class DismissedAlertScopeTest extends TestCase
 
     public function test_fleet_dashboard_omits_dismissed_alerts_from_live_stats_and_worklist(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create();
         $client = Client::factory()->create([
-            'organization_id' => 1,
             'site_id' => $site->id,
             'status' => 'active',
         ]);
@@ -158,7 +157,7 @@ class DismissedAlertScopeTest extends TestCase
 
     public function test_fleet_live_map_does_not_count_dismissed_alerts_as_open(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create();
         $this->makeAlert([
             'site_id' => $site->id,
             'status' => ControlRoomAlert::STATUS_OPEN,
@@ -179,8 +178,7 @@ class DismissedAlertScopeTest extends TestCase
     public function test_resident_tracking_omits_dismissed_alerts_from_live_stats_and_wandering_worklist(): void
     {
         $client = Client::factory()->create([
-            'organization_id' => 1,
-            'site_id' => Site::factory()->create(['tenant_id' => 1])->id,
+            'site_id' => Site::factory()->create()->id,
             'status' => 'active',
         ]);
         $this->createTrackingAssignment($client);
@@ -224,7 +222,7 @@ class DismissedAlertScopeTest extends TestCase
             'context' => $context,
         ]);
         $openSla = $this->attachSla($open);
-        $triageActor = User::factory()->create(['organization_id' => 1]);
+        $triageActor = User::factory()->create();
         $triageAcknowledgedAt = now()->subHour()->startOfSecond();
         $triaging = $this->makeAlert([
             'source' => 'lone_worker',
@@ -257,9 +255,8 @@ class DismissedAlertScopeTest extends TestCase
 
     public function test_resident_tracking_panic_acknowledgement_only_transitions_open_alerts(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create();
         $client = Client::factory()->create([
-            'organization_id' => 1,
             'site_id' => $site->id,
             'status' => 'active',
         ]);
@@ -270,7 +267,7 @@ class DismissedAlertScopeTest extends TestCase
             'status' => ControlRoomAlert::STATUS_OPEN,
         ]);
         $openSla = $this->attachSla($open);
-        $triageActor = User::factory()->create(['organization_id' => 1]);
+        $triageActor = User::factory()->create();
         $triageAcknowledgedAt = now()->subHour()->startOfSecond();
         $triaging = $this->makeAlert([
             'client_id' => $client->id,
@@ -421,12 +418,10 @@ class DismissedAlertScopeTest extends TestCase
             'clients.viewAny',
         ]);
         $visibleClient = Client::factory()->create([
-            'organization_id' => 1,
             'site_id' => $visibleSite->id,
             'status' => 'active',
         ]);
         $hiddenClient = Client::factory()->create([
-            'organization_id' => 1,
             'site_id' => $hiddenSite->id,
             'status' => 'active',
         ]);
@@ -598,14 +593,10 @@ class DismissedAlertScopeTest extends TestCase
 
     public function test_lone_worker_own_worker_check_in_remains_ownership_authorized(): void
     {
-        $worker = User::factory()->create([
-            'organization_id' => 1,
-            'role' => 'support_worker',
-            'approved_at' => now(),
-        ]);
+        $worker = $this->siteScopedUser($this->site, []);
         $session = $this->makeLoneWorkerSession([
             'user_id' => $worker->id,
-            'site_id' => $this->tenantSite->id,
+            'site_id' => $this->site->id,
         ]);
 
         $this->actingAs($worker)
@@ -676,7 +667,6 @@ class DismissedAlertScopeTest extends TestCase
     {
         [$visibleSite, $hiddenSite] = [Site::factory()->create(), Site::factory()->create()];
         $hiddenClient = Client::factory()->create([
-            'organization_id' => (int) $hiddenSite->tenant_id,
             'site_id' => $hiddenSite->id,
             'status' => 'active',
         ]);
@@ -748,7 +738,7 @@ class DismissedAlertScopeTest extends TestCase
 
     private function makeAlert(array $overrides = []): ControlRoomAlert
     {
-        $siteId = $this->tenantSite->id;
+        $siteId = $this->site->id;
         if (! array_key_exists('site_id', $overrides) && ! empty($overrides['client_id'])) {
             $siteId = (int) (Client::query()->whereKey($overrides['client_id'])->value('site_id') ?: $siteId);
         }
@@ -765,9 +755,16 @@ class DismissedAlertScopeTest extends TestCase
 
     private function makeLoneWorkerSession(array $overrides = []): LoneWorkerSession
     {
+        $siteId = (int) ($overrides['site_id'] ?? $this->site->id);
+        if (! array_key_exists('user_id', $overrides)) {
+            $overrides['user_id'] = $this->siteScopedUser(
+                Site::query()->findOrFail($siteId),
+                [],
+            )->id;
+        }
+
         return LoneWorkerSession::create(array_merge([
-            'user_id' => User::factory()->create(['organization_id' => 1])->id,
-            'site_id' => $this->tenantSite->id,
+            'site_id' => $siteId,
             'started_at' => now()->subHour(),
             'expected_end_at' => now()->addHours(2),
             'last_check_in_at' => now()->subMinutes(10),
@@ -782,7 +779,6 @@ class DismissedAlertScopeTest extends TestCase
     private function monitorableShift(Site $site, Client $client, User $worker): Shift
     {
         return Shift::factory()->inProgress()->create([
-            'organization_id' => (int) $site->tenant_id,
             'site_id' => $site->id,
             'client_id' => $client->id,
             'user_id' => $worker->id,
@@ -801,7 +797,6 @@ class DismissedAlertScopeTest extends TestCase
     private function siteScopedUser(Site $site, array $permissionKeys): User
     {
         $user = User::factory()->create([
-            'organization_id' => (int) $site->tenant_id,
             'role' => 'support_worker',
             'approved_at' => now(),
         ]);
@@ -809,14 +804,22 @@ class DismissedAlertScopeTest extends TestCase
         $user->permissionOverrides()->sync(
             $permissionIds->mapWithKeys(fn ($id) => [$id => ['allowed' => true]]),
         );
-        HrEmployeeProfile::factory()->create([
-            'tenant_id' => (int) $site->tenant_id,
-            'user_id' => $user->id,
-            'primary_site_id' => $site->id,
-            'secondary_site_ids' => [],
-        ]);
+        $this->attachCurrentHrProfile($user, $site, 'support_worker');
 
         return $user;
+    }
+
+    private function attachCurrentHrProfile(User $user, Site $site, string $positionRole): void
+    {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'position_role' => $positionRole,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
     }
 
     private function createTrackingConsent(Client $client): ClientConsent

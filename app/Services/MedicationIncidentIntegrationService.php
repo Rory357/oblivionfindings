@@ -52,6 +52,7 @@ class MedicationIncidentIntegrationService
                 if ($incident === null) {
                     $incident = new ClientIncident;
                     $incident->client_id = $client->id;
+                    $incident->site_id = $client->site_id;
                     $incident->title = "Missed medication: {$medication->name}";
                     $incident->description = $this->buildMissedDoseDescription($locked, $medication);
                     $incident->category = 'medication';
@@ -145,6 +146,7 @@ class MedicationIncidentIntegrationService
 
             $incident = new ClientIncident;
             $incident->client_id = $lockedClient->id;
+            $incident->site_id = $lockedClient->site_id;
             $incident->title = "PRN limit exceeded: {$lockedMedication->name}";
             $incident->description = "Attempted to administer PRN medication {$lockedMedication->name} when limit already reached.\n\n".
                 "Maximum per 24h: {$maxPerDay}\n".
@@ -233,6 +235,7 @@ class MedicationIncidentIntegrationService
             if ($incident === null) {
                 $incident = new ClientIncident;
                 $incident->client_id = $client->id;
+                $incident->site_id = $client->site_id;
                 $incident->title = "Controlled drug discrepancy: {$medication->name}";
                 $incident->description = $this->buildDiscrepancyDescription($lockedDiscrepancy, $medication);
                 $incident->category = 'controlled_drug';
@@ -241,6 +244,7 @@ class MedicationIncidentIntegrationService
                 $incident->submitted_at = now();
                 $incident->occurred_at = $lockedDiscrepancy->reported_at ?? now();
                 $incident->reported_by = $actor->id;
+                $incident->immediate_action_taken = 'Witnessed controlled-drug balance mismatch recorded and escalated for immediate reconciliation.';
                 $this->assignIncidentServiceContext($incident, $lockedDiscrepancy->service_context_id);
                 $incident->save();
 
@@ -317,6 +321,7 @@ class MedicationIncidentIntegrationService
                 if ($incident === null) {
                     $incident = new ClientIncident;
                     $incident->client_id = $client->id;
+                    $incident->site_id = $client->site_id;
                     $incident->title = "Medication correction after {$hoursSince}h: {$medication->name}";
                     $incident->description = $this->buildCorrectionDescription($lockedOriginal, $correctionData, $hoursSince);
                     $incident->category = 'medication';
@@ -385,6 +390,7 @@ class MedicationIncidentIntegrationService
                 if ($incident === null) {
                     $incident = new ClientIncident;
                     $incident->client_id = $client->id;
+                    $incident->site_id = $client->site_id;
                     $incident->title = "Late medication: {$medication->name} ({$hoursLate}h late)";
                     $incident->description = "Medication {$medication->name} was administered {$hoursLate} hours after scheduled time.\n\n".
                         'Scheduled: '.($locked->scheduled_for?->format('d/m/Y H:i') ?? 'Unknown')."\n".
@@ -456,6 +462,7 @@ class MedicationIncidentIntegrationService
                 if ($incident === null) {
                     $incident = new ClientIncident;
                     $incident->client_id = $client->id;
+                    $incident->site_id = $client->site_id;
                     $incident->title = "Refused medication: {$medication->name}";
                     $incident->description = "Client refused {$medication->name}.\n\n".
                         'Classification: '.($medication->high_risk ? 'High Risk' : '').
@@ -538,6 +545,7 @@ class MedicationIncidentIntegrationService
             if (! $incident) {
                 $incident = new ClientIncident;
                 $incident->client_id = $client->id;
+                $incident->site_id = $client->site_id;
                 $incident->title = "Repeated medication refusal: {$medicationName}";
                 $incident->description = $this->buildRefusalEscalationDescription(
                     $lockedFollowup,
@@ -550,6 +558,7 @@ class MedicationIncidentIntegrationService
                 $incident->submitted_at = now();
                 $incident->occurred_at = $lockedFollowup->created_at ?? now();
                 $incident->reported_by = $actor->id;
+                $incident->immediate_action_taken = 'Repeated medication refusal recorded and escalated for clinical follow-up.';
                 $incident->metadata = [
                     'medication_refusal_followup_id' => $lockedFollowup->id,
                 ];
@@ -632,6 +641,7 @@ class MedicationIncidentIntegrationService
             if (! $incident) {
                 $incident = new ClientIncident;
                 $incident->client_id = $client->id;
+                $incident->site_id = $client->site_id;
                 $incident->title = "Controlled drug loss: {$medicationName}";
                 $incident->description = $this->buildControlledLossDescription($lockedReport, $medicationName);
                 $incident->category = 'controlled_drug';
@@ -640,6 +650,7 @@ class MedicationIncidentIntegrationService
                 $incident->submitted_at = now();
                 $incident->occurred_at = $lockedReport->discovered_at ?? now();
                 $incident->reported_by = $actor->id;
+                $incident->immediate_action_taken = 'Controlled-drug loss report recorded and escalated for accountable-officer review.';
                 $this->assignIncidentServiceContext($incident, $client->service_context_id);
                 $incident->save();
 
