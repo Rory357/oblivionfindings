@@ -4,10 +4,12 @@ namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
+use App\Models\ControlRoom\AlertTask;
 use App\Services\References\ReferenceNumberGenerator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HsCorrectiveAction extends Model
@@ -62,6 +64,7 @@ class HsCorrectiveAction extends Model
     protected $fillable = [
         'hs_event_id',
         'hs_investigation_id',
+        'source_control_room_task_id',
         'reference_number',
         'recommendation_index',
         'action_type',
@@ -113,6 +116,21 @@ class HsCorrectiveAction extends Model
         return $this->belongsTo(HsInvestigation::class, 'hs_investigation_id');
     }
 
+    public function sourceControlRoomTask(): BelongsTo
+    {
+        return $this->belongsTo(AlertTask::class, 'source_control_room_task_id');
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(HsAttachment::class, 'attachable');
+    }
+
+    public function auditLogs(): MorphMany
+    {
+        return $this->morphMany(AuditLog::class, 'auditable');
+    }
+
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');
@@ -162,6 +180,14 @@ class HsCorrectiveAction extends Model
     public function scopeAwaitingVerification($query)
     {
         return $query->where('status', self::STATUS_COMPLETED);
+    }
+
+    public function acceptsEvidenceChanges(): bool
+    {
+        return ! in_array($this->status, [
+            self::STATUS_VERIFIED,
+            self::STATUS_CLOSED,
+        ], true);
     }
 
     public function scopeForAssignee($query, int $userId)

@@ -9,6 +9,7 @@ use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\IncidentJourneyTaskContext;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskSearch;
 use App\Services\UserSiteAccessService;
 use Illuminate\Validation\ValidationException;
 
@@ -77,15 +78,41 @@ class IncidentFollowupProvider implements AssignableTaskProvider, HasModelClass,
 
     public function tasks(User $user, array $filters = []): array
     {
+        $includeSearchContext = TaskSearch::hasQuery($filters);
+        $with = [
+            $includeSearchContext
+                ? 'incident:id,reference_number,title,description,immediate_action_taken,immediate_action,witnesses,potential_consequence,client_id,site_id,hs_event_id,control_room_alert_id,investigation_assigned_to,source,occurred_at'
+                : 'incident:id,reference_number,title,client_id,site_id,hs_event_id,control_room_alert_id,source,occurred_at',
+            'incident.site:id,name',
+            'incident.client:id,first_name,last_name',
+            $includeSearchContext
+                ? 'incident.controlRoomAlert:id,reference_number,assigned_to_user_id'
+                : 'incident.controlRoomAlert:id,reference_number',
+            $includeSearchContext
+                ? 'incident.hsEvent:id,reference_number,owner_user_id'
+                : 'incident.hsEvent:id,reference_number',
+            'assignedTo:id,name',
+        ];
+
+        if ($includeSearchContext) {
+            array_push(
+                $with,
+                'incident.investigator:id,name',
+                'incident.followups:id,client_incident_id,assigned_to_user_id',
+                'incident.followups.assignedTo:id,name',
+                'incident.controlRoomAlert.assignedTo:id,name',
+                'incident.controlRoomAlert.tasks:id,alert_id,title,description,assigned_to_user_id',
+                'incident.controlRoomAlert.tasks.assignedTo:id,name',
+                'incident.hsEvent.owner:id,name',
+                'incident.hsEvent.investigations:id,hs_event_id,reference_number,lead_investigator_id',
+                'incident.hsEvent.investigations.leadInvestigator:id,name',
+                'incident.hsEvent.correctiveActions:id,hs_event_id,reference_number,assigned_to_user_id',
+                'incident.hsEvent.correctiveActions.assignedTo:id,name',
+            );
+        }
+
         $query = IncidentFollowup::query()
-            ->with([
-                'incident:id,reference_number,title,client_id,site_id,hs_event_id,control_room_alert_id,source,occurred_at',
-                'incident.site:id,name',
-                'incident.controlRoomAlert:id,reference_number',
-                'incident.hsEvent:id,reference_number',
-                'incident.client:id,first_name,last_name',
-                'assignedTo:id,name',
-            ])
+            ->with($with)
             ->whereHas('incident', fn ($q) => app(UserSiteAccessService::class)->applyClientIncidentScope(
                 $q,
                 $user,
@@ -96,16 +123,27 @@ class IncidentFollowupProvider implements AssignableTaskProvider, HasModelClass,
                 ! $user->canDo('incidents.viewAny') && $user->canDo('incidents.viewAssigned'),
                 fn ($q) => $q->whereHas('incident.client.supportWorkers', fn ($qq) => $qq->whereKey($user->id)),
             )
+            ->when(
+                $includeSearchContext,
+                fn ($q) => $q->whereHas(
+                    'incident',
+                    fn ($incident) => TaskSearch::applyIncidentJourneyPredicate($incident, $filters),
+                ),
+            )
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('created_at')
-            ->limit(300);
+            ->when(! $includeSearchContext, fn ($q) => $q->limit(300));
 
         if (empty($filters['include_done'])) {
             $query->whereNull('completed_at');
         }
 
-        return $query->get()->map(function (IncidentFollowup $followup) {
+        return $query->get()->map(function (IncidentFollowup $followup) use ($includeSearchContext) {
             $incident = $followup->incident;
-            $journey = IncidentJourneyTaskContext::make($incident);
+            $journey = IncidentJourneyTaskContext::make(
+                $incident,
+                includeSearchContext: $includeSearchContext,
+            );
 
             return new TaskItem(
                 id: 'followup-'.$followup->id,

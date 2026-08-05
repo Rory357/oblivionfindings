@@ -12,26 +12,42 @@ import { Bell } from 'lucide-react';
  * Deep-link / shareable alert view. The full alert surface is the
  * AlertWorkspaceDialog (opened over any Control Room list via ?alert=); this
  * thin shell renders the same modal for a direct /control-room/alerts/{id}
- * link. Closing returns to the alerts list.
+ * link. Closing returns to the validated invoking surface.
  */
-export default function ControlRoomAlertShow(props: AlertWorkspaceDetail) {
+export default function ControlRoomAlertShow(
+    props: AlertWorkspaceDetail & { return_to: string },
+) {
     const ref = props.alert.reference_number ?? `Alert ${props.alert.id}`;
+    const returnTo = props.return_to;
+    const cameFromTasks = returnTo.startsWith('/tasks');
+    const alertHref = cameFromTasks
+        ? `/control-room/alerts/${props.alert.id}?return_to=${encodeURIComponent(returnTo)}`
+        : `/control-room/alerts/${props.alert.id}`;
+
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Control Room', href: '/control-room' },
-                { title: 'Alerts', href: '/control-room/alerts' },
-                { title: ref, href: `/control-room/alerts/${props.alert.id}` },
+                cameFromTasks
+                    ? { title: 'Tasks', href: returnTo }
+                    : { title: 'Control Room', href: '/control-room' },
+                ...(cameFromTasks
+                    ? []
+                    : [{ title: 'Alerts', href: '/control-room/alerts' }]),
+                { title: ref, href: alertHref },
             ]}
         >
             <Head title={`Alert ${ref}`} />
             <div className="p-6">
                 <CommandCentrePage
                     variant="compact"
-                    current={`/control-room/alerts/${props.alert.id}`}
+                    current={alertHref}
                     icon={Bell}
                     title={ref}
-                    description="Continue the alert response in its canonical Control Room workspace."
+                    description={
+                        props.can.manage
+                            ? 'Continue the alert response in its canonical Control Room workspace.'
+                            : 'Review the alert response in read-only mode.'
+                    }
                     status="Alert workspace"
                 >
                     <Card>
@@ -44,7 +60,7 @@ export default function ControlRoomAlertShow(props: AlertWorkspaceDetail) {
             <AlertWorkspaceDialog
                 detail={props}
                 open
-                onClose={() => router.visit('/control-room/alerts')}
+                onClose={() => router.visit(returnTo)}
             />
         </AppLayout>
     );

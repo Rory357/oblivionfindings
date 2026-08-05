@@ -1,11 +1,13 @@
 import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
 import { AlertStatus } from '@/components/control-room/alert-worklist/alert-status';
+import { AlertWorklist } from '@/components/control-room/alert-worklist/alert-worklist';
+import type { AlertWorklistRow } from '@/components/control-room/alert-worklist/types';
 import {
     AlertWorkspaceDialog,
     ConfirmChip,
     type AlertWorkspaceDetail,
 } from '@/components/control-room/alert-workspace-dialog';
-import { KpiCard } from '@/components/dashboard/kpi-card';
+import { buildControlRoomAlertRowActions } from '@/components/control-room/control-room-alert-row-actions';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,33 +22,15 @@ import {
     Calendar,
     CheckCircle,
     Clock,
-    ExternalLink,
     ListChecks,
     Plus,
     Shield,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // --- TypeScript Interfaces ---
 
-interface AlertAsset {
-    id: number;
-    name: string;
-    asset_tag: string;
-}
-
-interface MyAlert {
-    id: number;
-    reference_number: string | null;
-    source: string;
-    alert_type: string;
-    severity: string;
-    status: string;
-    escalation_level: number | null;
-    triggered_at: string | null;
-    acknowledged_at: string | null;
-    asset: AlertAsset | null;
-    client_name: string | null;
+interface MyAlert extends AlertWorklistRow {
     sla_status: 'on_track' | 'at_risk' | 'breached' | null;
 }
 
@@ -130,6 +114,7 @@ export default function MyTasks({
     can,
     detail = null,
 }: Props) {
+    const [selected, setSelected] = useState<Set<number>>(new Set());
     // Auto-refresh every 30 seconds
     const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -171,6 +156,14 @@ export default function MyTasks({
         );
     }, []);
 
+    const rowActions = (alert: MyAlert) =>
+        buildControlRoomAlertRowActions(alert, {
+            openWorkspace,
+            post: (href) => router.post(href, {}, { preserveScroll: true }),
+            visit: (href) => router.visit(href),
+            copy: (value) => void navigator.clipboard?.writeText(value),
+        });
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="My Tasks - Control Room" />
@@ -184,6 +177,47 @@ export default function MyTasks({
                     status="Personal operational queue"
                     freshness="Auto-refreshing every 30 seconds"
                     badges={{ '/control-room/my-tasks': stats.my_open }}
+                    metricGroups={[
+                        {
+                            title: 'My workload',
+                            icon: ListChecks,
+                            metrics: [
+                                {
+                                    label: 'Open',
+                                    value: String(stats.my_open),
+                                    caption: 'assigned to me',
+                                    tone:
+                                        stats.my_open > 0
+                                            ? 'warning'
+                                            : 'success',
+                                },
+                                {
+                                    label: 'Critical',
+                                    value: String(stats.my_critical),
+                                    caption: 'needs attention',
+                                    tone:
+                                        stats.my_critical > 0
+                                            ? 'critical'
+                                            : 'success',
+                                },
+                                {
+                                    label: 'Follow-ups',
+                                    value: String(my_followups.length),
+                                    caption: 'due or upcoming',
+                                    tone:
+                                        my_followups.length > 0
+                                            ? 'neutral'
+                                            : 'success',
+                                },
+                                {
+                                    label: 'Resolved',
+                                    value: String(stats.my_resolved_today),
+                                    caption: 'today',
+                                    tone: 'success',
+                                },
+                            ],
+                        },
+                    ]}
                     actions={
                         <Button
                             variant="outline"
@@ -198,146 +232,22 @@ export default function MyTasks({
                         </Button>
                     }
                 >
-                    {/* KPI Row */}
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                        <KpiCard
-                            label="My Open Alerts"
-                            value={stats.my_open}
-                            icon={Bell}
-                        />
-                        <KpiCard
-                            label="Resolved Today"
-                            value={stats.my_resolved_today}
-                            icon={CheckCircle}
-                            className={
-                                stats.my_resolved_today > 0
-                                    ? 'border-status-success/30 dark:border-status-success/30'
-                                    : undefined
-                            }
-                        />
-                        <KpiCard
-                            label="Critical"
-                            value={stats.my_critical}
-                            icon={AlertTriangle}
-                            className={
-                                stats.my_critical > 0
-                                    ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
-                                    : undefined
-                            }
-                        />
-                    </div>
-
                     {/* Two-Column Layout */}
-                    <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                         {/* Left Column (2/3) */}
                         <div className="space-y-6 lg:col-span-2">
                             {/* My Alerts */}
-                            <Card>
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="flex items-center gap-2 text-lg">
-                                        <Bell className="h-5 w-5 text-muted-foreground" />
-                                        My Alerts
-                                        {my_alerts.length > 0 && (
-                                            <Badge
-                                                variant="secondary"
-                                                className="ml-1"
-                                            >
-                                                {my_alerts.length}
-                                            </Badge>
-                                        )}
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {my_alerts.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-                                            <CheckCircle className="mb-2 h-10 w-10 text-status-success" />
-                                            <p className="text-sm">
-                                                No alerts assigned to you
-                                            </p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {my_alerts.map((alert) => (
-                                                <div
-                                                    key={alert.id}
-                                                    className="flex items-center justify-between rounded-lg border-l-4 border-l-primary/50 bg-muted/30 px-4 py-3 transition-colors hover:bg-muted/50"
-                                                >
-                                                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <Button
-                                                                    unstyled
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        openWorkspace(
-                                                                            alert.id,
-                                                                        )
-                                                                    }
-                                                                    className="truncate text-left font-semibold hover:underline"
-                                                                >
-                                                                    {
-                                                                        alert.alert_type
-                                                                    }
-                                                                </Button>
-                                                                {alert.client_name && (
-                                                                    <span className="truncate text-xs text-muted-foreground">
-                                                                        -{' '}
-                                                                        {
-                                                                            alert.client_name
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <div className="mt-1 flex flex-wrap items-center gap-2">
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className="text-xs"
-                                                                >
-                                                                    {
-                                                                        alert.source
-                                                                    }
-                                                                </Badge>
-                                                                <AlertStatus
-                                                                    status={
-                                                                        alert.status
-                                                                    }
-                                                                    severity={
-                                                                        alert.severity
-                                                                    }
-                                                                    slaStatus={
-                                                                        alert.sla_status
-                                                                    }
-                                                                />
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    {formatRelative(
-                                                                        alert.triggered_at,
-                                                                    )}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Work happens in the guided workspace */}
-                                                    <div className="ml-3 flex shrink-0 items-center gap-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                openWorkspace(
-                                                                    alert.id,
-                                                                )
-                                                            }
-                                                        >
-                                                            <ExternalLink className="mr-1.5 h-4 w-4" />
-                                                            Open
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                            <AlertWorklist
+                                rows={my_alerts}
+                                selected={selected}
+                                onSelectionChange={setSelected}
+                                onSort={() => undefined}
+                                onOpen={openWorkspace}
+                                getActions={rowActions}
+                                heading="My alerts"
+                                description="Assigned to you, ordered by severity and age."
+                                allowSorting={false}
+                            />
 
                             {/* Follow-ups Due */}
                             <Card>

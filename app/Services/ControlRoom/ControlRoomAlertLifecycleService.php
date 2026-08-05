@@ -5,6 +5,7 @@ namespace App\Services\ControlRoom;
 use App\Models\ClientIncident;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\AlertTask;
+use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoomAlert;
@@ -13,7 +14,9 @@ use App\Models\HsEvent;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\HealthSafety\HsCorrectiveActionService;
+use App\Services\Incidents\IncidentJourneyService;
 use App\Services\UserSiteAccessService;
+use App\Support\Journeys\JourneyGate;
 use Carbon\CarbonInterface;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +38,7 @@ class ControlRoomAlertLifecycleService
         private readonly HsCorrectiveActionService $correctiveActions,
         private readonly UserSiteAccessService $siteAccess,
         private readonly ControlRoomAlertProvenanceService $provenance,
+        private readonly IncidentJourneyService $journeys,
     ) {}
 
     public function acknowledge(
@@ -276,7 +280,7 @@ class ControlRoomAlertLifecycleService
                 ControlRoomAlert::STATUS_TRIAGING,
                 ControlRoomAlert::STATUS_CONFIRMED,
             ], 'resolve');
-            $this->assertNoActiveTasks($locked);
+            $this->assertGateAllowed($this->resolveGate($locked, lockTasks: true));
             $at = now();
             $context = $this->appendActivity(
                 $locked->context ?? [],
@@ -323,6 +327,7 @@ class ControlRoomAlertLifecycleService
         return DB::transaction(function () use ($alert, $actor, $notes): ControlRoomAlert {
             $locked = $this->lockAlert($alert);
             $this->assertStatus($locked, [ControlRoomAlert::STATUS_RESOLVED], 'close');
+            $this->assertGateAllowed($this->closeGate($locked, lockTasks: true));
             $at = now();
             $context = $locked->context ?? [];
             if ($notes !== null) {
@@ -515,7 +520,11 @@ class ControlRoomAlertLifecycleService
             if (! $locked->isActionable()) {
                 throw new InvalidArgumentException("Alert {$locked->id} is not actionable.");
             }
-            $this->assertNoActiveTasks($locked);
+            $this->assertGateAllowed($this->resolveGate(
+                $locked,
+                includeStatus: false,
+                lockTasks: true,
+            ));
 
             $at = now();
             $resolvedByUserId = is_numeric($metadata['resolved_by_user_id'] ?? null)
@@ -569,25 +578,52 @@ class ControlRoomAlertLifecycleService
         User $actor,
         string $content,
         string $transition,
-    ): ControlRoomAlert {
+        string $type = OperatorNote::TYPE_NOTE,
+        string $purpose = OperatorNote::PURPOSE_GENERAL,
+    ): OperatorNote {
         $content = trim($content);
         if ($content === '') {
-            return $alert;
+            throw new InvalidArgumentException('Operator note content is required.');
+        }
+        if (! in_array($type, OperatorNote::TYPES, true)) {
+            throw new InvalidArgumentException("Unsupported operator note type '{$type}'.");
+        }
+        if (! in_array($purpose, OperatorNote::PURPOSES, true)) {
+            throw new InvalidArgumentException("Unsupported operator note purpose '{$purpose}'.");
         }
 
-        return DB::transaction(function () use ($alert, $actor, $content, $transition): ControlRoomAlert {
+        return DB::transaction(function () use ($alert, $actor, $content, $transition, $type, $purpose): OperatorNote {
             $locked = $this->lockAlert($alert);
+            $at = now();
+            $note = OperatorNote::query()->create([
+                'alert_id' => $locked->id,
+                'user_id' => $actor->id,
+                'type' => $type,
+                'purpose' => $purpose,
+                'content' => $content,
+            ]);
             $locked->forceFill([
-                'context' => $this->appendActivity($locked->context ?? [], $actor, $content, $transition, now()),
+                'context' => $this->appendActivity(
+                    $locked->context ?? [],
+                    $actor,
+                    $content,
+                    $transition,
+                    $at,
+                    $purpose,
+                    $note->id,
+                ),
             ])->save();
 
             AuditLogger::logOrFail('controlRoom.alert.addNote', $locked, [
                 'actor_id' => $actor->id,
                 'alert_id' => $locked->id,
+                'note_id' => $note->id,
+                'note_type' => $type,
+                'note_purpose' => $purpose,
                 'transition' => $transition,
             ]);
 
-            return $locked->refresh();
+            return $note->refresh();
         }, self::TRANSACTION_ATTEMPTS);
     }
 
@@ -631,11 +667,15 @@ class ControlRoomAlertLifecycleService
         return DB::transaction(function () use ($task, $actor): HsCorrectiveAction {
             $alert = $this->lockAlertForTask($task);
             $locked = $this->lockTaskForAlert($task, $alert);
+            $hasReciprocalAction = HsCorrectiveAction::query()
+                ->where('source_control_room_task_id', $locked->id)
+                ->exists();
 
             if ($locked->status === AlertTask::STATUS_TRANSFERRED
                 || $locked->transferred_to_hs_corrective_action_id !== null
                 || $locked->transferred_at !== null
-                || $locked->transferred_by_user_id !== null) {
+                || $locked->transferred_by_user_id !== null
+                || $hasReciprocalAction) {
                 $event = $this->lockCanonicalHealthSafetyEvent($alert);
                 $this->assertHealthSafetyTransferBoundary($alert, $event, $actor);
 
@@ -655,13 +695,14 @@ class ControlRoomAlertLifecycleService
             $action = $this->correctiveActions->createStandalone($event, [
                 'title' => $locked->title,
                 'description' => $locked->description,
+                'source_control_room_task_id' => $locked->id,
                 'action_type' => HsCorrectiveAction::TYPE_CORRECTIVE,
                 'priority' => $locked->priority ?: HsCorrectiveAction::PRIORITY_MEDIUM,
                 'assigned_to_user_id' => $owner->id,
                 'assigned_by_user_id' => $actor->id,
                 'due_date' => $locked->due_at?->toDateString(),
                 'created_by' => $actor->id,
-            ]);
+            ], $actor);
             $at = now();
             $locked->forceFill([
                 'status' => AlertTask::STATUS_TRANSFERRED,
@@ -794,6 +835,24 @@ class ControlRoomAlertLifecycleService
         AlertTask $task,
         HsEvent $event,
     ): HsCorrectiveAction {
+        $reciprocalAction = HsCorrectiveAction::query()
+            ->where('source_control_room_task_id', $task->id)
+            ->where('hs_event_id', $event->id)
+            ->lockForUpdate()
+            ->first();
+
+        if ($reciprocalAction) {
+            if ($task->status !== AlertTask::STATUS_TRANSFERRED
+                || $task->transferred_at === null
+                || $task->transferred_by_user_id === null) {
+                throw new InvalidArgumentException(
+                    "Task '{$task->title}' already sources a corrective action but its transfer record is incomplete.",
+                );
+            }
+
+            return $reciprocalAction;
+        }
+
         if ($task->status !== AlertTask::STATUS_TRANSFERRED
             || $task->transferred_to_hs_corrective_action_id === null
             || $task->transferred_at === null
@@ -878,42 +937,199 @@ class ControlRoomAlertLifecycleService
             ->exists();
     }
 
-    private function assertNoActiveTasks(ControlRoomAlert $alert): void
-    {
-        $tasks = $alert->tasks()
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get([
-                'id',
-                'title',
-                'status',
-                'transferred_to_hs_corrective_action_id',
-                'transferred_at',
-                'transferred_by_user_id',
-            ]);
-        $activeTasks = $tasks->whereNotIn('status', AlertTask::TERMINAL_STATUSES);
+    public function resolveGate(
+        ControlRoomAlert $alert,
+        bool $includeStatus = true,
+        bool $lockTasks = false,
+    ): JourneyGate {
+        $requirements = [];
+        if ($includeStatus) {
+            $statusReady = in_array($alert->status, [
+                ControlRoomAlert::STATUS_TRIAGING,
+                ControlRoomAlert::STATUS_CONFIRMED,
+            ], true);
+            $requirements[] = [
+                'key' => 'operational_status',
+                'complete' => $statusReady,
+                'label' => $statusReady
+                    ? 'Operational response is ready to resolve'
+                    : 'Acknowledge and triage the alert before resolving it.',
+                'href' => "/control-room/alerts/{$alert->id}",
+            ];
+        }
 
+        $requirements[] = $this->operationalTaskRequirement($alert, $lockTasks);
+
+        return JourneyGate::fromRequirements($requirements);
+    }
+
+    public function closeGate(
+        ControlRoomAlert $alert,
+        bool $lockTasks = false,
+    ): JourneyGate {
+        $incident = $this->journeys->incidentForAlert($alert);
+        $hsEvent = $incident
+            ? $this->journeys->journeyForIncident($incident)->hsEvent
+            : $this->standaloneHealthSafetyEventForClosure($alert, $lockTasks);
+        $requirements = [
+            [
+                'key' => 'operationally_resolved',
+                'complete' => in_array($alert->status, [
+                    ControlRoomAlert::STATUS_RESOLVED,
+                    ControlRoomAlert::STATUS_CLOSED,
+                ], true),
+                'label' => in_array($alert->status, [
+                    ControlRoomAlert::STATUS_RESOLVED,
+                    ControlRoomAlert::STATUS_CLOSED,
+                ], true)
+                    ? 'Operational response resolved'
+                    : 'Resolve the operational response before closing the alert.',
+                'href' => "/control-room/alerts/{$alert->id}",
+            ],
+            $this->operationalTaskRequirement($alert, $lockTasks),
+        ];
+
+        if ($incident) {
+            $requirements[] = [
+                'key' => 'incident_closed',
+                'complete' => $incident->status === 'closed',
+                'label' => $incident->status === 'closed'
+                    ? 'Linked incident closed'
+                    : 'Close linked incident '.($incident->reference_number ?: "INC-{$incident->id}").' before closing this alert.',
+                'href' => "/incidents/{$incident->id}",
+            ];
+        }
+
+        if ($hsEvent) {
+            $requirements[] = [
+                'key' => 'health_safety_closed',
+                'complete' => $hsEvent->status === HsEvent::STATUS_CLOSED,
+                'label' => $hsEvent->status === HsEvent::STATUS_CLOSED
+                    ? 'Linked H&S governance closed'
+                    : 'Close linked H&S governance '.($hsEvent->reference_number ?: "HS-{$hsEvent->id}").' before closing this alert.',
+                'href' => "/health-safety/events/{$hsEvent->id}",
+            ];
+        }
+
+        return JourneyGate::fromRequirements($requirements);
+    }
+
+    /**
+     * @return array{key: string, complete: bool, label: string, href: string}
+     */
+    private function operationalTaskRequirement(
+        ControlRoomAlert $alert,
+        bool $lockTasks,
+    ): array {
+        $taskQuery = $alert->tasks()->orderBy('id');
+        if ($lockTasks) {
+            $taskQuery->lockForUpdate();
+        }
+        $tasks = $taskQuery->get([
+            'id',
+            'title',
+            'status',
+            'transferred_to_hs_corrective_action_id',
+            'transferred_at',
+            'transferred_by_user_id',
+        ]);
+        $activeTasks = $tasks->whereNotIn('status', AlertTask::TERMINAL_STATUSES);
         if ($activeTasks->isNotEmpty()) {
             $summary = $activeTasks
                 ->take(3)
-                ->map(fn (AlertTask $task): string => "{$task->title} ({$task->status})")
+                ->pluck('title')
                 ->implode(', ');
 
-            throw new InvalidArgumentException(
-                'Complete, cancel with a reason, or transfer all operational tasks before resolving this alert: '.$summary,
-            );
+            return [
+                'key' => 'operational_tasks',
+                'complete' => false,
+                'label' => 'Complete, cancel with a reason, or transfer '.$summary,
+                'href' => "/control-room/alerts/{$alert->id}",
+            ];
         }
 
         $transferredTasks = $tasks->where('status', AlertTask::STATUS_TRANSFERRED);
-        if ($transferredTasks->isEmpty()) {
+        if ($transferredTasks->isNotEmpty()) {
+            try {
+                $event = $lockTasks
+                    ? $this->lockCanonicalHealthSafetyEvent($alert)
+                    : $this->canonicalHealthSafetyEvent($alert);
+                $this->assertHealthSafetyHandoverAccepted($event);
+                foreach ($transferredTasks as $transferredTask) {
+                    $this->canonicalTransferredCorrectiveAction($transferredTask, $event);
+                }
+            } catch (InvalidArgumentException $exception) {
+                return [
+                    'key' => 'operational_tasks',
+                    'complete' => false,
+                    'label' => $exception->getMessage(),
+                    'href' => "/control-room/alerts/{$alert->id}",
+                ];
+            }
+        }
+
+        return [
+            'key' => 'operational_tasks',
+            'complete' => true,
+            'label' => 'All operational tasks have a final outcome',
+            'href' => "/control-room/alerts/{$alert->id}",
+        ];
+    }
+
+    private function assertGateAllowed(JourneyGate $gate): void
+    {
+        if ($gate->allowed) {
             return;
         }
 
-        $event = $this->lockCanonicalHealthSafetyEvent($alert);
-        $this->assertHealthSafetyHandoverAccepted($event);
-        foreach ($transferredTasks as $transferredTask) {
-            $this->canonicalTransferredCorrectiveAction($transferredTask, $event);
+        throw new InvalidArgumentException(implode(' ', $gate->blockers()));
+    }
+
+    private function standaloneHealthSafetyEventForClosure(
+        ControlRoomAlert $alert,
+        bool $lockForUpdate,
+    ): ?HsEvent {
+        $query = HsEvent::query()
+            ->where('control_room_alert_id', $alert->id)
+            ->orderBy('id')
+            ->limit(2);
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
         }
+
+        $events = $query->get();
+        if ($events->isEmpty()) {
+            return null;
+        }
+        if ($events->count() !== 1) {
+            throw new InvalidArgumentException(
+                'This alert does not have one canonical H&S event for closure.',
+            );
+        }
+
+        /** @var HsEvent $event */
+        $event = $events->first();
+        try {
+            $this->provenance->assertHealthSafetyEventTuple($alert, $event);
+        } catch (DomainException $exception) {
+            throw new InvalidArgumentException($exception->getMessage(), previous: $exception);
+        }
+
+        return $event;
+    }
+
+    private function canonicalHealthSafetyEvent(ControlRoomAlert $alert): HsEvent
+    {
+        $events = HsEvent::query()
+            ->where('control_room_alert_id', $alert->id)
+            ->limit(2)
+            ->get();
+
+        if ($events->count() !== 1) {
+            throw new InvalidArgumentException('This alert does not have one canonical H&S event for the transfer.');
+        }
+
+        return $events->first();
     }
 
     private function normalizeOptionalNote(?string $note): ?string
@@ -933,9 +1149,11 @@ class ControlRoomAlertLifecycleService
         string $content,
         string $transition,
         \DateTimeInterface $at,
+        ?string $purpose = null,
+        ?int $operatorNoteId = null,
     ): array {
         $activity = $context['activity_log'] ?? [];
-        $activity[] = [
+        $entry = [
             'type' => 'lifecycle_note',
             'transition' => $transition,
             'content' => $content,
@@ -943,6 +1161,13 @@ class ControlRoomAlertLifecycleService
             'user_name' => $actor->name,
             'created_at' => $at->format(DATE_ATOM),
         ];
+        if ($purpose !== null) {
+            $entry['purpose'] = $purpose;
+        }
+        if ($operatorNoteId !== null) {
+            $entry['operator_note_id'] = $operatorNoteId;
+        }
+        $activity[] = $entry;
         $context['activity_log'] = $activity;
 
         return $context;

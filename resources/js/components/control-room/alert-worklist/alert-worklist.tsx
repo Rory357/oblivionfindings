@@ -1,21 +1,32 @@
 import { AlertWorklistRow } from '@/components/control-room/alert-worklist/alert-worklist-row';
 import type { AlertWorklistRow as AlertWorklistRowType } from '@/components/control-room/alert-worklist/types';
+import type { ControlRoomRowAction } from '@/components/control-room/control-room-row-actions';
 import { Button } from '@/components/ui/button';
 import { ArrowDownUp, Inbox } from 'lucide-react';
+import { useId } from 'react';
 
-export function AlertWorklist({
+export function AlertWorklist<Row extends AlertWorklistRowType>({
     rows,
     selected,
     onSelectionChange,
     onSort,
     onOpen,
+    getActions,
+    heading = 'Actionable alerts',
+    description = 'Ordered by SLA breach, severity, escalation, next deadline, then oldest.',
+    allowSorting = true,
 }: {
-    rows: AlertWorklistRowType[];
+    rows: Row[];
     selected: Set<number>;
     onSelectionChange: (selected: Set<number>) => void;
     onSort: (field: string) => void;
     onOpen: (id: number) => void;
+    getActions?: (row: Row) => readonly ControlRoomRowAction[];
+    heading?: string;
+    description?: string;
+    allowSorting?: boolean;
 }) {
+    const headingId = useId();
     const toggleRow = (id: number, checked: boolean) => {
         const next = new Set(selected);
         if (checked) next.add(id);
@@ -24,38 +35,45 @@ export function AlertWorklist({
     };
 
     return (
-        <section className="overflow-hidden rounded-xl border border-border bg-card">
-            <div className="flex items-center justify-between gap-4 border-b border-border bg-muted/30 px-4 py-3">
+        <section
+            aria-labelledby={headingId}
+            className="overflow-hidden rounded-xl border border-border bg-card"
+        >
+            <div className="sticky top-0 z-10 flex flex-col gap-3 border-b border-border bg-card/95 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h2 className="text-sm font-semibold text-foreground">
-                        Actionable alerts
+                    <h2
+                        id={headingId}
+                        className="text-sm font-semibold text-foreground"
+                    >
+                        {heading}
                     </h2>
                     <p className="text-xs text-muted-foreground">
-                        Ordered by SLA breach, severity, escalation, next
-                        deadline, then oldest.
+                        {description}
                     </p>
                 </div>
-                <div className="flex items-center gap-1">
-                    {['severity', 'status', 'triggered_at'].map((field) => (
-                        <Button
-                            key={field}
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            aria-label={`Sort by ${field === 'triggered_at' ? 'raised time' : field}`}
-                            onClick={() => onSort(field)}
-                        >
-                            <ArrowDownUp
-                                className="mr-1.5 h-3.5 w-3.5"
-                                aria-hidden
-                            />
-                            {field === 'triggered_at'
-                                ? 'Raised'
-                                : field.charAt(0).toUpperCase() +
-                                  field.slice(1)}
-                        </Button>
-                    ))}
-                </div>
+                {allowSorting ? (
+                    <div className="flex flex-wrap items-center gap-1">
+                        {['severity', 'status', 'triggered_at'].map((field) => (
+                            <Button
+                                key={field}
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                aria-label={`Sort by ${field === 'triggered_at' ? 'raised time' : field}`}
+                                onClick={() => onSort(field)}
+                            >
+                                <ArrowDownUp
+                                    className="mr-1.5 h-3.5 w-3.5"
+                                    aria-hidden
+                                />
+                                {field === 'triggered_at'
+                                    ? 'Raised'
+                                    : field.charAt(0).toUpperCase() +
+                                      field.slice(1)}
+                            </Button>
+                        ))}
+                    </div>
+                ) : null}
             </div>
 
             {rows.length ? (
@@ -68,6 +86,7 @@ export function AlertWorklist({
                             toggleRow(row.id, checked)
                         }
                         onOpen={onOpen}
+                        actions={getActions?.(row) ?? []}
                     />
                 ))
             ) : (

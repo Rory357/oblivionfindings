@@ -198,6 +198,9 @@ export function SelectInput({
     ariaLabel?: string;
 }) {
     return (
+        // Keep the empty string as a real controlled value. Converting it to
+        // undefined makes Radix switch ownership mid-session and can commit a
+        // highlighted option instead of the option the worker clicked.
         <Select value={value} onValueChange={onChange}>
             <SelectTrigger
                 className="w-full"

@@ -7,10 +7,13 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoom\AlertTask;
 use App\Models\ControlRoom\Communication;
+use App\Models\ControlRoom\EvidenceItem;
 use App\Models\ControlRoom\EvidencePack;
+use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\Playbook;
 use App\Models\ControlRoom\PlaybookRun;
 use App\Models\ControlRoomAlert;
+use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\Permission;
 use App\Models\Site;
@@ -90,18 +93,55 @@ class IncidentJourneyPresenterTest extends TestCase
             'total_steps' => 4,
         ]);
         $alert->update(['playbook_run_id' => $run->id]);
-        AlertTask::query()->create([
+        $operationalTask = AlertTask::query()->create([
             'alert_id' => $alert->id,
             'title' => 'Contact the on-call nurse',
             'status' => AlertTask::STATUS_IN_PROGRESS,
             'priority' => 'high',
+            'assigned_to_user_id' => $owner->id,
+            'due_at' => '2026-07-15 09:30:00',
         ]);
-        EvidencePack::query()->create([
+        $transferredTask = AlertTask::query()->create([
+            'alert_id' => $alert->id,
+            'title' => 'Preserve the fall-scene evidence',
+            'status' => AlertTask::STATUS_TRANSFERRED,
+            'priority' => 'critical',
+        ]);
+        $correctiveAction = HsCorrectiveAction::factory()->create([
+            'hs_event_id' => $hsEvent->id,
+            'source_control_room_task_id' => $transferredTask->id,
+            'reference_number' => 'CA-2026-0120',
+            'title' => 'Retain and review the fall-scene evidence',
+            'assigned_to_user_id' => $owner->id,
+        ]);
+        $transferredTask->update([
+            'transferred_to_hs_corrective_action_id' => $correctiveAction->id,
+            'transferred_at' => '2026-07-15 09:00:00',
+            'transferred_by_user_id' => $viewer->id,
+        ]);
+        OperatorNote::query()->create([
+            'alert_id' => $alert->id,
+            'type' => OperatorNote::TYPE_ACTION,
+            'purpose' => OperatorNote::PURPOSE_IMMEDIATE_CONTROLS,
+            'content' => 'Room isolated and nurse called.',
+            'user_id' => $viewer->id,
+        ]);
+        $pack = EvidencePack::query()->create([
             'alert_id' => $alert->id,
             'title' => 'Room and response evidence',
             'status' => 'collecting',
             'items' => [],
-            'item_count' => 2,
+            'item_count' => 1,
+        ]);
+        EvidenceItem::query()->create([
+            'evidence_pack_id' => $pack->id,
+            'type' => 'document',
+            'title' => 'Room preservation record',
+            'description' => 'Duty manager confirmed the room stayed isolated.',
+            'storage_path' => 'control-room/room-preservation.txt',
+            'mime_type' => 'text/plain',
+            'captured_at' => '2026-07-15 09:05:00',
+            'captured_by_user_id' => $viewer->id,
         ]);
         Communication::query()->create([
             'alert_id' => $alert->id,
@@ -130,10 +170,27 @@ class IncidentJourneyPresenterTest extends TestCase
         $this->assertSame('Contact the on-call nurse', $payload['control_room']['tasks'][0]['title']);
         $this->assertSame('Room and response evidence', $payload['control_room']['evidence'][0]['title']);
         $this->assertSame('Nurse notified', $payload['control_room']['communications'][0]['subject']);
+        $this->assertSame('Linked Control Room evidence', $payload['linked_operational_evidence']['label']);
+        $this->assertTrue($payload['linked_operational_evidence']['read_only']);
+        $this->assertSame('CR-2026-1204', $payload['linked_operational_evidence']['source']['reference']);
+        $this->assertSame('Rimu House', $payload['linked_operational_evidence']['source']['site']['name']);
+        $this->assertSame('Wiremu Tane', $payload['linked_operational_evidence']['source']['client']['name']);
+        $this->assertSame('immediate_controls', $payload['linked_operational_evidence']['notes'][0]['purpose']);
+        $this->assertSame('Immediate controls', $payload['linked_operational_evidence']['notes'][0]['purpose_label']);
+        $this->assertSame($operationalTask->id, $payload['linked_operational_evidence']['tasks'][0]['id']);
+        $this->assertSame('open', $payload['linked_operational_evidence']['tasks'][0]['transfer']['state']);
+        $this->assertSame('transferred', $payload['linked_operational_evidence']['tasks'][1]['transfer']['state']);
+        $this->assertSame('CA-2026-0120', $payload['linked_operational_evidence']['tasks'][1]['transfer']['corrective_action_reference']);
+        $this->assertSame(
+            "/incidents/{$incident->id}/control-room-evidence/".$payload['linked_operational_evidence']['evidence_packs'][0]['items'][0]['id'].'/download',
+            $payload['linked_operational_evidence']['evidence_packs'][0]['items'][0]['download_url'],
+        );
+        $this->assertSame('Nurse notified', $payload['linked_operational_evidence']['communications'][0]['subject']);
         $this->assertSame('awaiting_acceptance', $payload['health_safety']['handover']['status']);
         $this->assertSame('H&S Lead', $payload['health_safety']['handover']['owner']['name']);
         $this->assertTrue($payload['health_safety']['worksafe']['notifiable']);
         $this->assertSame('pending', $payload['health_safety']['worksafe']['status']);
+        $this->assertSame('Operational response active', $payload['journey_state']);
         $this->assertSame(['in_progress', 'complete', 'waiting'], array_column($payload['lifecycle'], 'state'));
         $this->assertSame('Accept H&S handover', $payload['next_action']['label']);
         $this->assertSame('/health-safety/events/'.$hsEvent->id, $payload['next_action']['href']);
@@ -141,6 +198,103 @@ class IncidentJourneyPresenterTest extends TestCase
         $json = json_encode($payload, JSON_THROW_ON_ERROR);
         $this->assertStringNotContainsString('CR-'.$alert->id.'"', $json);
         $this->assertStringNotContainsString('INC-'.$incident->id.'"', $json);
+    }
+
+    public function test_it_reports_each_cross_module_journey_state_from_canonical_records(): void
+    {
+        $site = Site::factory()->create();
+        $client = Client::factory()->create([
+            'site_id' => $site->id,
+            'organization_id' => 1,
+        ]);
+        $owner = User::factory()->create();
+        $acceptor = User::factory()->create();
+        $alert = ControlRoomAlert::factory()->triaging()->create([
+            'site_id' => $site->id,
+            'client_id' => $client->id,
+        ]);
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->submitted()->create([
+            'site_id' => $site->id,
+            'client_id' => $client->id,
+            'control_room_alert_id' => $alert->id,
+        ]));
+        $hsEvent = HsEvent::factory()
+            ->forClientIncident($incident)
+            ->awaitingHandoverAcceptance($owner)
+            ->create([
+                'control_room_alert_id' => $alert->id,
+                'site_id' => $site->id,
+                'client_id' => $client->id,
+            ]);
+        $presenter = app(IncidentJourneyPresenter::class);
+
+        $this->assertSame(
+            'Operational response active',
+            $presenter->journeyState($incident, $alert, $hsEvent),
+        );
+
+        $alert->forceFill([
+            'status' => ControlRoomAlert::STATUS_RESOLVED,
+            'resolved_at' => now(),
+        ])->save();
+        $this->assertSame(
+            'Operationally resolved',
+            $presenter->journeyState($incident, $alert->fresh(), $hsEvent),
+        );
+
+        $incident->forceFill([
+            'status' => 'reviewed',
+            'reviewed_at' => now(),
+            'reviewed_by' => $owner->id,
+        ])->save();
+        $this->assertSame(
+            'Incident review complete',
+            $presenter->journeyState($incident->fresh(), $alert->fresh(), null),
+        );
+        $this->assertSame(
+            'H&S acceptance pending',
+            $presenter->journeyState($incident->fresh(), $alert->fresh(), $hsEvent),
+        );
+
+        $hsEvent->forceFill([
+            'handover_status' => HsEvent::HANDOVER_ACCEPTED,
+            'accepted_by_user_id' => $acceptor->id,
+            'accepted_at' => now(),
+        ])->save();
+        $this->assertSame(
+            'H&S governance active',
+            $presenter->journeyState($incident->fresh(), $alert->fresh(), $hsEvent->fresh()),
+        );
+
+        HsCorrectiveAction::factory()->completed()->create([
+            'hs_event_id' => $hsEvent->id,
+        ]);
+        $this->assertSame(
+            'Awaiting independent verification',
+            $presenter->journeyState($incident->fresh(), $alert->fresh(), $hsEvent->fresh()),
+        );
+
+        $hsEvent->forceFill([
+            'status' => HsEvent::STATUS_CLOSED,
+            'closed_at' => now(),
+            'closed_by' => $owner->id,
+            'closure_summary' => 'Governance work completed.',
+        ])->save();
+        $this->assertSame(
+            'Governance closed',
+            $presenter->journeyState($incident->fresh(), $alert->fresh(), $hsEvent->fresh()),
+        );
+
+        $incident->forceFill(['status' => 'closed'])->save();
+        $alert->forceFill([
+            'status' => ControlRoomAlert::STATUS_CLOSED,
+            'closed_at' => now(),
+            'closed_by_user_id' => $owner->id,
+        ])->save();
+        $this->assertSame(
+            'Journey closed',
+            $presenter->journeyState($incident->fresh(), $alert->fresh(), $hsEvent->fresh()),
+        );
     }
 
     public function test_missing_official_references_remain_null_and_links_follow_viewer_permissions(): void
@@ -165,6 +319,18 @@ class IncidentJourneyPresenterTest extends TestCase
         $this->assertSame('View incident', $payload['next_action']['label']);
         $this->assertSame('/incidents?incident='.$incident->id, $payload['next_action']['href']);
         $this->assertStringNotContainsString('INC-'.$incident->id, json_encode($payload, JSON_THROW_ON_ERROR));
+    }
+
+    public function test_standalone_terminal_alerts_never_report_an_active_response(): void
+    {
+        $presenter = app(IncidentJourneyPresenter::class);
+        $closed = ControlRoomAlert::factory()->closed()->create();
+        $dismissed = ControlRoomAlert::factory()->create([
+            'status' => ControlRoomAlert::STATUS_DISMISSED,
+        ]);
+
+        $this->assertSame('Journey closed', $presenter->journeyState(null, $closed, null));
+        $this->assertSame('Journey closed', $presenter->journeyState(null, $dismissed, null));
     }
 
     /** @param list<string> $permissionKeys */

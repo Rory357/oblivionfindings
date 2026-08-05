@@ -8,7 +8,7 @@ use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class MedicationErrorProvider implements TaskProvider, HasModelClass
+class MedicationErrorProvider implements HasModelClass, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -34,6 +34,7 @@ class MedicationErrorProvider implements TaskProvider, HasModelClass
     {
         $query = MedicationError::query()
             ->with('client:id,first_name,last_name')
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('reported_at')
             ->limit(300);
 

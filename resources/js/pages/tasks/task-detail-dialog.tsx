@@ -4,6 +4,7 @@
  * used to live on the row itself. Uses the shared Dialog chrome so it matches
  * every other modal in the app. Assignment / watch / split mirror the queue's
  * write actions. */
+import { JourneyTermHelp } from '@/components/journey-term-help';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import {
@@ -15,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatDateTime } from '@/lib/datetime';
+import { journeyActivityLabel } from '@/lib/journey-labels';
 import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -34,6 +36,7 @@ import {
     useRef,
     useState,
     type ReactNode,
+    type RefObject,
 } from 'react';
 import { JourneyReferenceStrip } from './journey-reference-strip';
 import {
@@ -42,6 +45,8 @@ import {
     humanise,
     SEVERITY_VARIANT,
     taskNumericId,
+    taskRecordSource,
+    taskStateLabel,
     type NamedRef,
     type TaskDetail,
     type TaskItem,
@@ -312,10 +317,14 @@ export function TaskDetailDialog({
     item,
     currentUserId,
     onClose,
+    returnTo,
+    triggerRef,
 }: {
     item: TaskItem | null;
     currentUserId: number;
     onClose: () => void;
+    returnTo: string;
+    triggerRef: RefObject<HTMLElement | null>;
 }) {
     const [detail, setDetail] = useState<TaskDetail | null>(null);
     const [loading, setLoading] = useState(false);
@@ -327,32 +336,37 @@ export function TaskDetailDialog({
     const [splitBusy, setSplitBusy] = useState(false);
     // Guards against a slow response landing after the user opened another row.
     const seq = useRef(0);
+    const titleRef = useRef<HTMLHeadingElement>(null);
 
-    const fetchDetail = useCallback(async (target: TaskItem) => {
-        const mySeq = ++seq.current;
-        setLoading(true);
-        setError(null);
-        try {
-            const params = new URLSearchParams({
-                source: target.source,
-                id: taskNumericId(target),
-            });
-            const res = await fetch(`/tasks/detail?${params.toString()}`, {
-                headers: { Accept: 'application/json' },
-                credentials: 'same-origin',
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = (await res.json()) as TaskDetail;
-            if (seq.current === mySeq) setDetail(data);
-        } catch {
-            if (seq.current === mySeq)
-                setError(
-                    'Could not load this task. It may have been removed, or you may not have access.',
-                );
-        } finally {
-            if (seq.current === mySeq) setLoading(false);
-        }
-    }, []);
+    const fetchDetail = useCallback(
+        async (target: TaskItem) => {
+            const mySeq = ++seq.current;
+            setLoading(true);
+            setError(null);
+            try {
+                const params = new URLSearchParams({
+                    source: taskRecordSource(target),
+                    id: taskNumericId(target),
+                    return_to: returnTo,
+                });
+                const res = await fetch(`/tasks/detail?${params.toString()}`, {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = (await res.json()) as TaskDetail;
+                if (seq.current === mySeq) setDetail(data);
+            } catch {
+                if (seq.current === mySeq)
+                    setError(
+                        'Could not load this task. It may have been removed, or you may not have access.',
+                    );
+            } finally {
+                if (seq.current === mySeq) setLoading(false);
+            }
+        },
+        [returnTo],
+    );
 
     useEffect(() => {
         if (!item) return;
@@ -370,7 +384,7 @@ export function TaskDetailDialog({
         if (!item) return;
         setAssigning(true);
         router.post(
-            `/tasks/${item.source}/${taskNumericId(item)}/assign`,
+            `/tasks/${taskRecordSource(item)}/${taskNumericId(item)}/assign`,
             { assignee_id: assigneeId },
             {
                 preserveState: true,
@@ -387,8 +401,11 @@ export function TaskDetailDialog({
         if (!item) return;
         setWatchBusy(true);
         router.post(
-            `/tasks/${item.source}/${taskNumericId(item)}/watch`,
-            { watching: !detail?.isWatching },
+            `/tasks/${taskRecordSource(item)}/${taskNumericId(item)}/watch`,
+            {
+                watching: !detail?.isWatching,
+                return_to: returnTo,
+            },
             {
                 preserveState: true,
                 preserveScroll: true,
@@ -405,7 +422,7 @@ export function TaskDetailDialog({
         if (!item) return;
         setSplitBusy(true);
         router.post(
-            `/tasks/${item.source}/${taskNumericId(item)}/split`,
+            `/tasks/${taskRecordSource(item)}/${taskNumericId(item)}/split`,
             data,
             {
                 preserveScroll: true,
@@ -421,6 +438,7 @@ export function TaskDetailDialog({
     const due = display ? dueInfo(display) : null;
     const assignedToMe = display?.assignee?.id === currentUserId;
     const childLabel = item ? childLabelFor(item.source) : 'follow-up';
+    const canOpen = detail?.canOpen ?? Boolean(display?.link);
 
     return (
         <Dialog
@@ -430,6 +448,14 @@ export function TaskDetailDialog({
             <DialogContent
                 data-test="tasks-detail-dialog"
                 className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
+                onOpenAutoFocus={(event) => {
+                    event.preventDefault();
+                    titleRef.current?.focus();
+                }}
+                onCloseAutoFocus={(event) => {
+                    event.preventDefault();
+                    requestAnimationFrame(() => triggerRef.current?.focus());
+                }}
             >
                 {display ? (
                     <>
@@ -447,10 +473,18 @@ export function TaskDetailDialog({
                                     {humanise(display.severity)}
                                 </StatusBadge>
                                 <StatusBadge variant="neutral" size="sm">
-                                    {humanise(display.status)}
+                                    {taskStateLabel(display)}
                                 </StatusBadge>
+                                <JourneyTermHelp
+                                    terms={['severity', 'status']}
+                                    label="Explain task status terms"
+                                />
                             </div>
-                            <DialogTitle className="text-base leading-snug">
+                            <DialogTitle
+                                ref={titleRef}
+                                tabIndex={-1}
+                                className="text-base leading-snug outline-none"
+                            >
                                 {display.title}
                             </DialogTitle>
                             <DialogDescription>
@@ -467,6 +501,11 @@ export function TaskDetailDialog({
                             {display.description ? (
                                 <p className="mb-4 text-sm whitespace-pre-line text-muted-foreground">
                                     {display.description}
+                                </p>
+                            ) : null}
+                            {display.actionHelp ? (
+                                <p className="mb-4 rounded-lg border border-status-info/30 bg-status-info-bg px-3 py-2 text-sm text-foreground">
+                                    {display.actionHelp}
                                 </p>
                             ) : null}
 
@@ -599,7 +638,9 @@ export function TaskDetailDialog({
                                                 />
                                                 <div className="min-w-0 text-sm">
                                                     <div className="font-medium">
-                                                        {humanise(entry.action)}
+                                                        {journeyActivityLabel(
+                                                            entry.action,
+                                                        )}
                                                     </div>
                                                     <div className="text-xs text-muted-foreground">
                                                         {entry.user ?? 'System'}
@@ -621,17 +662,16 @@ export function TaskDetailDialog({
 
                         {/* ── Footer actions ── */}
                         <div className="flex flex-wrap items-center gap-2 border-t border-border p-4">
-                            <Button
-                                className="flex-1"
-                                disabled={!display.link}
-                                onClick={() =>
-                                    display.link && router.visit(display.link)
-                                }
-                            >
-                                <ExternalLink className="h-4 w-4" />
-                                {display.actionLabel ?? 'Open record'}
-                            </Button>
-                            {detail ? (
+                            {canOpen && display.link ? (
+                                <Button
+                                    className="flex-1"
+                                    onClick={() => router.visit(display.link!)}
+                                >
+                                    <ExternalLink className="h-4 w-4" />
+                                    {display.actionLabel ?? 'Open record'}
+                                </Button>
+                            ) : null}
+                            {detail?.canWatch ? (
                                 <Button
                                     variant={
                                         detail.isWatching

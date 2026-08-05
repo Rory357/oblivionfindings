@@ -313,6 +313,47 @@ class SiteTypePlanService
     }
 
     /**
+     * Bounded Site Profile projection. The full plan builder owns layouts,
+     * pins, taxonomy, and device records; the profile needs status only.
+     *
+     * @return array{summary: array<string, bool|int|string>, inventory_href: string, inventory_label: string}
+     */
+    public function profileSummaryFor(Site $site, ?int $visibleDeviceCount = null): array
+    {
+        $draft = $this->currentDraft($site);
+        $published = $this->currentPublished($site);
+        $status = $draft && $published
+            ? 'draft_over_published'
+            : ($draft ? 'draft' : ($published ? 'published' : 'empty'));
+
+        $spaces = match ($site->type) {
+            'head_office' => SiteHoResource::query()->where('site_id', $site->id)->active()->count(),
+            'facility' => SiteFacilityZone::query()->where('site_id', $site->id)->active()->count(),
+            default => SiteHouseRoom::query()->where('site_id', $site->id)->active()->count(),
+        };
+
+        $summary = [
+            'status' => $status,
+            'spaces' => $spaces,
+            'is_published' => (bool) $published,
+            'emergency_layer' => $published
+                ? $published->pins()->where('kind', SiteTypePlanPin::KIND_ASSEMBLY_POINT)->exists()
+                    && $published->pins()->where('kind', SiteTypePlanPin::KIND_EMERGENCY_EXIT)->exists()
+                : false,
+        ];
+
+        if ($visibleDeviceCount !== null) {
+            $summary['devices'] = $visibleDeviceCount;
+        }
+
+        return [
+            'summary' => $summary,
+            'inventory_href' => $this->inventoryHref($site),
+            'inventory_label' => $this->inventoryLabel($site),
+        ];
+    }
+
+    /**
      * Surface the rooms and devices that the builder is allowed to reference.
      */
     public function siteInventory(Site $site): array

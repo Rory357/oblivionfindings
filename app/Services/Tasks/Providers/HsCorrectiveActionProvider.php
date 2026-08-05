@@ -9,6 +9,7 @@ use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\IncidentJourneyTaskContext;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskSearch;
 use App\Services\UserSiteAccessService;
 use Illuminate\Validation\ValidationException;
 
@@ -97,31 +98,70 @@ class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClas
 
     public function tasks(User $user, array $filters = []): array
     {
+        $includeSearchContext = TaskSearch::hasQuery($filters);
+        $with = [
+            'assignedTo:id,name',
+            'hsEvent.client:id,first_name,last_name',
+            'hsEvent.site:id,name',
+            $includeSearchContext
+                ? 'hsEvent.controlRoomAlert:id,reference_number,assigned_to_user_id'
+                : 'hsEvent.controlRoomAlert:id,reference_number',
+            $includeSearchContext
+                ? 'hsEvent.clientIncident:id,client_id,site_id,hs_event_id,investigation_assigned_to,reference_number,source,occurred_at,title,description,immediate_action_taken,immediate_action,witnesses,potential_consequence'
+                : 'hsEvent.clientIncident:id,client_id,site_id,hs_event_id,reference_number,source,occurred_at',
+            'hsEvent.clientIncident.client:id,first_name,last_name',
+            'hsEvent.clientIncident.site:id,name',
+        ];
+
+        if ($includeSearchContext) {
+            array_push(
+                $with,
+                'sourceControlRoomTask:id,title,description',
+                'hsInvestigation:id,reference_number',
+                'hsEvent.owner:id,name',
+                'hsEvent.controlRoomAlert.assignedTo:id,name',
+                'hsEvent.controlRoomAlert.tasks:id,alert_id,title,description,assigned_to_user_id',
+                'hsEvent.controlRoomAlert.tasks.assignedTo:id,name',
+                'hsEvent.investigations:id,hs_event_id,reference_number,lead_investigator_id',
+                'hsEvent.investigations.leadInvestigator:id,name',
+                'hsEvent.correctiveActions:id,hs_event_id,reference_number,assigned_to_user_id',
+                'hsEvent.correctiveActions.assignedTo:id,name',
+                'hsEvent.clientIncident.investigator:id,name',
+                'hsEvent.clientIncident.followups:id,client_incident_id,assigned_to_user_id',
+                'hsEvent.clientIncident.followups.assignedTo:id,name',
+            );
+        }
+
         $query = HsCorrectiveAction::query()
-            ->with([
-                'assignedTo:id,name',
-                'hsEvent.client:id,first_name,last_name',
-                'hsEvent.site:id,name',
-                'hsEvent.controlRoomAlert:id,reference_number',
-                'hsEvent.clientIncident:id,client_id,site_id,hs_event_id,control_room_alert_id,reference_number,source,occurred_at',
-                'hsEvent.clientIncident.client:id,first_name,last_name',
-                'hsEvent.clientIncident.site:id,name',
-            ])
+            ->with($with)
             ->whereHas('hsEvent', fn ($q) => app(UserSiteAccessService::class)->applyHsEventScope(
                 $q,
                 $user,
                 self::SITE_BYPASS_PERMISSIONS,
             ))
+            ->when(
+                $includeSearchContext,
+                fn ($q) => $q->whereHas(
+                    'hsEvent.clientIncident',
+                    fn ($incident) => TaskSearch::applyIncidentJourneyPredicate($incident, $filters),
+                ),
+            )
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('created_at')
-            ->limit(300);
+            ->when(! $includeSearchContext, fn ($q) => $q->limit(300));
 
         if (empty($filters['include_done'])) {
             $query->where('status', '!=', HsCorrectiveAction::STATUS_CLOSED);
         }
 
-        return $query->get()->map(function (HsCorrectiveAction $action) {
+        return $query->get()->map(function (HsCorrectiveAction $action) use ($includeSearchContext) {
             $event = $action->hsEvent;
-            $journey = IncidentJourneyTaskContext::make($event?->clientIncident, $event?->controlRoomAlert, $event);
+            $journey = IncidentJourneyTaskContext::make(
+                $event?->clientIncident,
+                $event?->controlRoomAlert,
+                $event,
+                $includeSearchContext,
+            );
             $client = $journey['person'] ?? ($event?->client ? [
                 'id' => $event->client->id,
                 'name' => trim($event->client->first_name.' '.$event->client->last_name),
@@ -164,6 +204,27 @@ class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClas
                     HsCorrectiveAction::STATUS_COMPLETED => 'Verify corrective action',
                     HsCorrectiveAction::STATUS_VERIFIED => 'Close corrective action',
                     default => 'Review corrective action',
+                },
+                displayState: match ($action->status) {
+                    HsCorrectiveAction::STATUS_OPEN => 'Not started',
+                    HsCorrectiveAction::STATUS_IN_PROGRESS => 'In progress',
+                    HsCorrectiveAction::STATUS_COMPLETED => 'Awaiting independent verification',
+                    HsCorrectiveAction::STATUS_VERIFIED => 'Verified — ready to close',
+                    HsCorrectiveAction::STATUS_CLOSED => 'Closed',
+                    default => ucfirst(str_replace('_', ' ', (string) $action->status)),
+                },
+                searchTerms: $includeSearchContext
+                    ? array_values(array_filter([
+                        $action->assignedTo?->name,
+                        $action->sourceControlRoomTask?->title,
+                        $action->sourceControlRoomTask?->description,
+                        $action->hsInvestigation?->reference_number,
+                    ]))
+                    : [],
+                actionHelp: match ($action->status) {
+                    HsCorrectiveAction::STATUS_COMPLETED => 'A different H&S manager must review the retained evidence.',
+                    HsCorrectiveAction::STATUS_VERIFIED => 'The evidence is verified; close the action to finish the responsibility.',
+                    default => null,
                 },
             );
         })->all();

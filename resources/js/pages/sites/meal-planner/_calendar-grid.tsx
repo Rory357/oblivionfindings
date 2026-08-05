@@ -1135,7 +1135,10 @@ export default function CalendarGrid(props: CalendarGridProps) {
             </div>
 
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto]">
-                <GuardrailCard unstyled className="flex items-center gap-5 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+                <GuardrailCard
+                    unstyled
+                    className="flex min-w-0 flex-col gap-4 rounded-xl border border-border bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:gap-5"
+                >
                     <div className="shrink-0">
                         <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Plan completeness</div>
                         <div className="mt-0.5 flex items-baseline gap-1.5">
@@ -1143,8 +1146,8 @@ export default function CalendarGrid(props: CalendarGridProps) {
                             <span className="text-[12px] text-muted-foreground">{coreFilled}/21 core meals</span>
                         </div>
                     </div>
-                    <div className="h-9 w-px bg-border" />
-                    <div className="flex flex-1 items-end justify-between gap-2">
+                    <div className="hidden h-9 w-px bg-border sm:block" />
+                    <div className="flex w-full min-w-0 flex-1 items-end justify-between gap-1 sm:gap-2">
                         {dayStats.map((s, i) => {
                             const isToday = s.iso === todayIso;
                             return (

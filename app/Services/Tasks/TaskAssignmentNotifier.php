@@ -2,7 +2,6 @@
 
 namespace App\Services\Tasks;
 
-use App\Models\TaskWatcher;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\Tasks\Contracts\TaskProvider;
@@ -14,8 +13,13 @@ use App\Services\Tasks\Contracts\TaskProvider;
  */
 class TaskAssignmentNotifier
 {
-    public static function notify(User $actor, TaskProvider $provider, int $id, ?int $assigneeId): void
-    {
+    public static function notify(
+        User $actor,
+        TaskProvider $provider,
+        int $id,
+        ?int $assigneeId,
+        TaskAggregator $aggregator,
+    ): void {
         if ($assigneeId === null || $assigneeId === $actor->id) {
             return; // Unassignment and self-assignment need no ping.
         }
@@ -50,12 +54,11 @@ class TaskAssignmentNotifier
         // FYI the item's watchers of the reassignment — everyone "Following"
         // except the actor and the new assignee (who got the ping above). One
         // fan-out call for the whole watcher set.
-        $watcherIds = TaskWatcher::query()
-            ->where('source', $provider->sourceKey())
-            ->where('item_id', $id)
-            ->whereNotIn('user_id', array_filter([$actor->id, $assigneeId]))
-            ->pluck('user_id')
-            ->all();
+        $watcherIds = $aggregator->authorizedWatcherIdsFor(
+            $provider->sourceKey(),
+            $id,
+            array_filter([$actor->id, $assigneeId]),
+        );
 
         if ($watcherIds !== []) {
             $notifications->notifyCrud(

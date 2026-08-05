@@ -197,9 +197,9 @@ class ControlRoomAlert extends Model
         return $this->hasMany(Signal::class, 'alert_id');
     }
 
-    public function sla()
+    public function sla(): HasOne
     {
-        return $this->hasOne(AlertSla::class, 'alert_id');
+        return $this->hasOne(AlertSla::class, 'alert_id')->chaperone();
     }
 
     public function evidencePacks()

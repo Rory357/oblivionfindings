@@ -23,7 +23,7 @@ class AlertWorklistQuery
         $query = ControlRoomAlert::query()
             ->select('control_room_alerts.*')
             ->with([
-                'site:id,name',
+                'site:id,name,tenant_id',
                 'client:id,first_name,last_name,site_id,organization_id',
                 'client.site:id,name,tenant_id',
                 'assignedTo' => function ($assignee) use ($user): void {
@@ -44,6 +44,16 @@ class AlertWorklistQuery
 
         if (filled($filters['site_id'] ?? null)) {
             $this->siteAccess->applyAlertSiteScopeForSiteIds($query, [(int) $filters['site_id']]);
+        }
+
+        if (array_key_exists('ids', $filters)) {
+            $ids = collect(is_array($filters['ids']) ? $filters['ids'] : [])
+                ->filter(fn ($id): bool => is_numeric($id))
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+            $query->whereIn('control_room_alerts.id', $ids);
         }
 
         $query
@@ -73,6 +83,8 @@ class AlertWorklistQuery
         match ($lens) {
             'history' => $query->whereIn('control_room_alerts.status', ControlRoomAlert::TERMINAL_STATUSES),
             'snoozed' => $query->snoozed(),
+            'all_active' => $query->actionable(),
+            'all_records' => $query,
             'my_queue' => $query->actionable()->notSnoozed()->where('control_room_alerts.assigned_to_user_id', $user->id),
             'safety_handover' => $query->actionable()->notSnoozed()->whereHas(
                 'hsEvent',

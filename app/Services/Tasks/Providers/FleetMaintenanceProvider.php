@@ -5,6 +5,7 @@ namespace App\Services\Tasks\Providers;
 use App\Models\FleetServiceSchedule;
 use App\Models\FleetWorkOrder;
 use App\Models\User;
+use App\Services\Tasks\Contracts\ProvidesTaskSourceAliases;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
@@ -16,7 +17,7 @@ use App\Services\Tasks\TaskItem;
  * (routes/fleet-assets.php: permission:fleet.viewAny|assets.viewAny) — the
  * same gate FleetIncidentProvider uses.
  */
-class FleetMaintenanceProvider implements TaskProvider
+class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, TaskProvider
 {
     /** How far ahead a due date counts as actionable. */
     private const HORIZON_DAYS = 7;
@@ -31,6 +32,29 @@ class FleetMaintenanceProvider implements TaskProvider
         return 'Fleet Maintenance';
     }
 
+    public function sourceAliases(): array
+    {
+        return [
+            'fleet_work_order',
+            'fleet_service_schedule',
+        ];
+    }
+
+    public function legacySourceAliasForId(int $id): ?string
+    {
+        // Historical provider order was work orders first, then schedules.
+        // Resolve by record existence, never by due horizon or lifecycle state.
+        if (FleetWorkOrder::query()->whereKey($id)->exists()) {
+            return 'fleet_work_order';
+        }
+
+        if (FleetServiceSchedule::query()->whereKey($id)->exists()) {
+            return 'fleet_service_schedule';
+        }
+
+        return null;
+    }
+
     public function canView(User $user): bool
     {
         return $user->canDo('fleet.viewAny') || $user->canDo('assets.viewAny');
@@ -40,7 +64,7 @@ class FleetMaintenanceProvider implements TaskProvider
     {
         return array_merge(
             $this->workOrders($filters),
-            $this->serviceSchedules(),
+            $this->serviceSchedules($filters),
         );
     }
 
@@ -55,6 +79,7 @@ class FleetMaintenanceProvider implements TaskProvider
             ->with(['asset:id,name', 'assignedTo:id,name'])
             ->whereNotNull('due_at')
             ->where('due_at', '<=', now()->addDays(self::HORIZON_DAYS))
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderBy('due_at')
             ->limit(300);
 
@@ -106,13 +131,14 @@ class FleetMaintenanceProvider implements TaskProvider
      *
      * @return TaskItem[]
      */
-    private function serviceSchedules(): array
+    private function serviceSchedules(array $filters): array
     {
         return FleetServiceSchedule::query()
             ->where('is_active', true)
             ->whereNotNull('next_due_at')
             ->where('next_due_at', '<=', now()->addDays(self::HORIZON_DAYS))
             ->with('asset:id,name')
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderBy('next_due_at')
             ->limit(300)
             ->get()

@@ -7,13 +7,13 @@ use App\Models\SiteDocument;
 use App\Models\SiteDocumentFolder;
 use App\Services\AuditLogger;
 use App\Services\NotificationService;
-use App\Support\SiteRecommendedDocuments;
+use App\Services\Sites\Profile\SiteProfileAdminPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class SiteDocumentController extends Controller
 {
-    public function index(Request $request, Site $site)
+    public function index(Request $request, Site $site, SiteProfileAdminPresenter $profile)
     {
         $this->authorize('view', $site);
 
@@ -21,59 +21,10 @@ class SiteDocumentController extends Controller
             'site_id' => $site->id,
         ]);
 
-        $documents = SiteDocument::query()
-            ->where('site_id', $site->id)
-            ->orderByDesc('created_at')
-            ->with(['uploadedBy:id,name,email'])
-            ->get();
+        $payload = $profile->documents($request->user(), $site);
+        unset($payload['locked'], $payload['href']);
 
-        $folderRecords = SiteDocumentFolder::query()
-            ->where('site_id', $site->id)
-            ->orderBy('name')
-            ->get(['id', 'name', 'created_at']);
-
-        $folderNames = $folderRecords
-            ->pluck('name')
-            ->merge($documents->pluck('folder')->filter())
-            ->map(fn ($folder) => trim((string) $folder))
-            ->filter(fn ($folder) => $folder !== '')
-            ->unique()
-            ->sort()
-            ->values();
-
-        return inertia('sites/documents', [
-            'site' => [
-                'id' => $site->id,
-                'name' => $site->name,
-                'type' => $site->type,
-                'display_type' => $site->display_type,
-            ],
-            'can_edit' => (bool) ($request->user()?->canDo('sites.update') && $request->user()?->can('update', $site)),
-            'recommendedDocuments' => SiteRecommendedDocuments::forType($site->type),
-            'folders' => $folderNames->map(fn ($name) => [
-                'id' => $folderRecords->firstWhere('name', $name)?->id,
-                'name' => $name,
-            ])->values(),
-            'documents' => $documents->map(fn ($d) => [
-                'id' => $d->id,
-                'title' => $d->title,
-                'category' => $d->category,
-                'folder' => $d->folder,
-                'version' => $d->version,
-                'effective_date' => optional($d->effective_date)->toDateString(),
-                'expiry_date' => optional($d->expiry_date)->toDateString(),
-                'notes' => $d->notes,
-                'original_name' => $d->original_name,
-                'mime_type' => $d->mime_type,
-                'size_bytes' => $d->size_bytes,
-                'created_at' => optional($d->created_at)->toISOString(),
-                'uploaded_by' => $d->uploadedBy ? [
-                    'id' => $d->uploadedBy->id,
-                    'name' => $d->uploadedBy->name,
-                    'email' => $d->uploadedBy->email,
-                ] : null,
-            ])->values(),
-        ]);
+        return inertia('sites/documents', $payload);
     }
 
     public function store(Request $request, Site $site)

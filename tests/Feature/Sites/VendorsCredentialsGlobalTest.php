@@ -79,7 +79,7 @@ test('global index exposes enriched vendor/credential fields and manage flags', 
         );
 });
 
-test('vendor compliance fields persist and are exposed in global and site profile surfaces', function () {
+test('vendor compliance fields persist globally and remain complete in the site profile workspace', function () {
     $this->actingAs($this->admin)
         ->from('/vendors')
         ->post("/sites/{$this->site->id}/vendors", [
@@ -131,14 +131,17 @@ test('vendor compliance fields persist and are exposed in global and site profil
         );
 
     $this->actingAs($this->admin)
-        ->get("/sites/{$this->site->id}")
+        ->get("/sites/{$this->site->id}", $this->inertiaPartialHeaders('sites/show', 'vendorsCredentialsData'))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->where('vendors.0.company_name', 'SafeWorks NZ')
-            ->where('vendors.0.hs_induction_completed', true)
-            ->where('vendors.0.insurance_expiry', '2026-12-31')
-            ->where('vendors.0.hs_performance_rating', 'good')
-        );
+        ->assertJsonPath('props.vendorsCredentialsData.vendors.0.company_name', 'SafeWorks NZ')
+        ->assertJsonPath('props.vendorsCredentialsData.vendors.0.hs_induction_completed', true)
+        ->assertJsonPath('props.vendorsCredentialsData.vendors.0.qualifications_verified', true)
+        ->assertJsonPath('props.vendorsCredentialsData.vendors.0.insurance_verified', true)
+        ->assertJsonPath('props.vendorsCredentialsData.can.vendors', true)
+        ->assertJsonPath('props.vendorsCredentialsData.can.vendorsManage', true)
+        ->assertJsonPath('props.vendorsCredentialsData.href', route('sites.vendors.global', ['site_id' => $this->site->id]))
+        ->assertJsonMissingPath('props.vendors')
+        ->assertJsonMissingPath('props.adminData');
 });
 
 test('vendor flags endpoint toggles preferred and active', function () {

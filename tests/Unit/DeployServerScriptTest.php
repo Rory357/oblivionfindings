@@ -26,3 +26,16 @@ it('fails closed into the monitoring Supervisor installer unless explicitly skip
     expect(strpos($script, 'scripts/monitoring/install-supervisor.sh'))
         ->toBeLessThan(strpos($script, 'run_app php artisan queue:restart'));
 });
+
+it('creates deploy artifacts with web-readable permissions even under a restrictive login umask', function () {
+    $script = file_get_contents(__DIR__.'/../../scripts/deploy-server.sh');
+
+    $umaskPosition = strpos($script, 'umask 002');
+    $composerPosition = strpos($script, 'run_app composer install');
+    $npmPosition = strpos($script, 'run_app npm ci');
+
+    expect($umaskPosition)
+        ->not->toBeFalse()
+        ->toBeLessThan($composerPosition)
+        ->toBeLessThan($npmPosition);
+});

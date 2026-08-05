@@ -22,6 +22,8 @@ class ServiceContext extends Model
     use AuditableChanges;
     use HasFactory;
 
+    public const PROFILE_LIMIT = 12;
+
     protected $fillable = [
         'type',
         'name',

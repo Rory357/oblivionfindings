@@ -11,11 +11,15 @@ class AlertWorklistPresenter
     public function __construct(
         private readonly AlertPriorityService $priority,
         private readonly ControlRoomAlertProvenanceService $provenance,
+        private readonly ControlRoomAlertAccessService $access,
     ) {}
 
     /** @return array<string, mixed> */
-    public function present(ControlRoomAlert $alert, User $viewer): array
-    {
+    public function present(
+        ControlRoomAlert $alert,
+        User $viewer,
+        ?bool $canManageAlerts = null,
+    ): array {
         $alert->loadMissing([
             'site:id,name',
             'client:id,first_name,last_name,site_id,organization_id',
@@ -24,6 +28,7 @@ class AlertWorklistPresenter
             'queue:id,name,tier',
             'clientIncident:id,reference_number,control_room_alert_id,status',
             'hsEvent:id,reference_number,control_room_alert_id,handover_status,status',
+            'playbookRun.playbook:id,name',
         ]);
 
         $client = $this->provenance->safeClient($alert);
@@ -70,10 +75,50 @@ class AlertWorklistPresenter
                 'health_safety_reference' => $alert->hsEvent?->reference_number ?: null,
                 'handover_status' => $alert->hsEvent?->handover_status,
             ],
-            'next_action' => $viewer->canDo('controlRoom.alerts.manage')
+            'next_action' => ($canManageAlerts ?? $viewer->canDo('controlRoom.alerts.manage'))
                 ? ['label' => 'Continue response', 'href' => '/control-room/alerts/'.$alert->id]
                 : ['label' => 'View alert', 'href' => '/control-room/alerts/'.$alert->id],
+            'actions' => $this->actions($alert, $viewer),
             'href' => '/control-room/alerts/'.$alert->id,
+        ];
+    }
+
+    /** @return array<string, bool|string|null> */
+    private function actions(ControlRoomAlert $alert, User $viewer): array
+    {
+        $capabilities = $this->access->capabilitiesForScopedAlert($viewer);
+        $actionable = $alert->isActionable();
+        $canViewIncident = $alert->clientIncident !== null
+            && $viewer->can('view', $alert->clientIncident);
+        $canViewHealthSafety = $alert->hsEvent !== null
+            && $viewer->canDo('hazards.view');
+
+        return [
+            'can_claim' => $actionable
+                && $capabilities['assign']
+                && $alert->assigned_to_user_id === null,
+            'can_acknowledge' => $actionable
+                && $capabilities['manage']
+                && $alert->status === ControlRoomAlert::STATUS_OPEN,
+            'can_move_queue' => $actionable && $capabilities['manage'],
+            'can_escalate' => $actionable && $capabilities['escalate'],
+            'can_create_incident' => $actionable
+                && $capabilities['create_incident']
+                && $alert->clientIncident === null,
+            'can_snooze' => $actionable
+                && $capabilities['manage']
+                && ! $alert->isSnoozed()
+                && $alert->severity !== 'critical',
+            'can_unsnooze' => $actionable
+                && $capabilities['manage']
+                && $alert->isSnoozed(),
+            'can_copy_reference' => true,
+            'incident_href' => $canViewIncident
+                ? '/incidents/'.$alert->clientIncident->id
+                : null,
+            'health_safety_href' => $canViewHealthSafety
+                ? '/health-safety/events/'.$alert->hsEvent->id
+                : null,
         ];
     }
 

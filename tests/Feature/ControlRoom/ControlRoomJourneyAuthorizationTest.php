@@ -314,6 +314,7 @@ class ControlRoomJourneyAuthorizationTest extends TestCase
                 'client_id' => $clientB->id,
                 'type' => 'fall',
                 'severity' => 'high',
+                'immediate_action_taken' => 'Resident checked while access was being verified.',
             ])
             ->assertForbidden();
 

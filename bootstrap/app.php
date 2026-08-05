@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\RecoverableTaskAuthorizationException;
 use App\Http\Middleware\AddContentSecurityPolicy;
 use App\Http\Middleware\AuthenticateItServiceIdentity;
 use App\Http\Middleware\AuthenticateMonitoringCollector;
@@ -18,6 +19,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Route;
 
@@ -80,4 +82,18 @@ return Application::configure(basePath: dirname(__DIR__))
             'private_key',
             'passphrase',
         ]);
+
+        $exceptions->render(function (
+            RecoverableTaskAuthorizationException $exception,
+            Request $request,
+        ) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $exception->getMessage(),
+                ], 403);
+            }
+
+            return redirect($exception->returnTo)
+                ->with('error', $exception->getMessage());
+        });
     })->create();

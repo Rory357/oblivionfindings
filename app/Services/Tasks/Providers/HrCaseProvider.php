@@ -77,6 +77,7 @@ class HrCaseProvider implements AssignableTaskProvider, HasModelClass, TaskProvi
         $query = app(HrCaseAccessService::class)
             ->applyVisibleCaseScope(HrCase::query(), $user)
             ->with('assignedTo:id,name')
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('opened_at')
             ->limit(300);
 

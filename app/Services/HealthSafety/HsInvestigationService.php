@@ -3,7 +3,6 @@
 namespace App\Services\HealthSafety;
 
 use App\Models\ClientIncident;
-use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRecommendationDisposition;
@@ -42,42 +41,44 @@ class HsInvestigationService
      */
     public function create(HsEvent $hsEvent, array $data = []): HsInvestigation
     {
-        // Guard: event must be open
-        if (! $hsEvent->isOpen()) {
-            throw new \InvalidArgumentException(
-                "Cannot create investigation for closed HsEvent [{$hsEvent->reference_number}]."
-            );
-        }
-
-        // Guard: no active investigation already exists
-        $existingActive = HsInvestigation::where('hs_event_id', $hsEvent->id)
-            ->whereNotIn('status', [HsInvestigation::STATUS_COMPLETED])
-            ->exists();
-
-        if ($existingActive) {
-            throw new \InvalidArgumentException(
-                "HsEvent [{$hsEvent->reference_number}] already has an active investigation."
-            );
-        }
-
         return DB::transaction(function () use ($hsEvent, $data) {
+            $lockedEvent = HsEvent::query()
+                ->whereKey($hsEvent->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            if (! $lockedEvent->isOpen()) {
+                throw new \InvalidArgumentException(
+                    "Cannot create investigation for closed HsEvent [{$lockedEvent->reference_number}]."
+                );
+            }
+
+            $existingActive = HsInvestigation::query()
+                ->where('hs_event_id', $lockedEvent->id)
+                ->whereNotIn('status', [HsInvestigation::STATUS_COMPLETED])
+                ->exists();
+            if ($existingActive) {
+                throw new \InvalidArgumentException(
+                    "HsEvent [{$lockedEvent->reference_number}] already has an active investigation."
+                );
+            }
+
             $investigation = HsInvestigation::create([
-                'hs_event_id' => $hsEvent->id,
+                'hs_event_id' => $lockedEvent->id,
                 'reference_number' => HsInvestigation::generateReferenceNumber(),
-                'investigation_type' => $data['investigation_type'] ?? $this->inferInvestigationType($hsEvent),
+                'investigation_type' => $data['investigation_type'] ?? $this->inferInvestigationType($lockedEvent),
                 'status' => HsInvestigation::STATUS_DRAFT,
                 'methodology' => $data['methodology'] ?? null,
                 'lead_investigator_id' => $data['lead_investigator_id'] ?? null,
                 'team_member_ids' => $data['team_member_ids'] ?? null,
-                'target_completion_date' => $data['target_completion_date'] ?? $this->suggestTargetDate($hsEvent),
+                'target_completion_date' => $data['target_completion_date'] ?? $this->suggestTargetDate($lockedEvent),
                 'created_by' => $data['created_by'] ?? auth()->id(),
             ]);
 
             Log::info('HsInvestigationService: investigation created', [
                 'investigation_id' => $investigation->id,
                 'reference' => $investigation->reference_number,
-                'hs_event_id' => $hsEvent->id,
-                'hs_event_reference' => $hsEvent->reference_number,
+                'hs_event_id' => $lockedEvent->id,
+                'hs_event_reference' => $lockedEvent->reference_number,
                 'type' => $investigation->investigation_type,
             ]);
 
@@ -318,7 +319,33 @@ class HsInvestigationService
         string $disposition,
         User $actor,
         ?string $reason = null,
+        ?array $actionData = null,
     ): HsRecommendationDisposition {
+        if (! in_array($disposition, HsRecommendationDisposition::VALID_DISPOSITIONS, true)) {
+            throw new \InvalidArgumentException('The selected recommendation disposition is not supported.');
+        }
+
+        if ($disposition === HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION) {
+            if ($actionData === null) {
+                throw new \InvalidArgumentException(
+                    'Corrective-action ownership, due date and responsibility source are required.',
+                );
+            }
+
+            $this->correctiveActions->createFromRecommendation(
+                $investigation,
+                $index,
+                $actionData,
+                $actor,
+            );
+
+            return HsRecommendationDisposition::query()
+                ->where('hs_investigation_id', $investigation->id)
+                ->where('recommendation_index', $index)
+                ->with(['correctiveAction', 'decidedBy'])
+                ->firstOrFail();
+        }
+
         return DB::transaction(function () use ($investigation, $index, $disposition, $actor, $reason): HsRecommendationDisposition {
             $locked = HsInvestigation::query()->lockForUpdate()->findOrFail($investigation->id);
 
@@ -333,28 +360,16 @@ class HsInvestigationService
                 );
             }
 
-            if (! in_array($disposition, HsRecommendationDisposition::VALID_DISPOSITIONS, true)) {
-                throw new \InvalidArgumentException('The selected recommendation disposition is not supported.');
-            }
-
             $normalisedReason = filled($reason) ? trim((string) $reason) : null;
-            if ($disposition !== HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION && $normalisedReason === null) {
+            if ($normalisedReason === null) {
                 throw new \InvalidArgumentException('A reason is required when no corrective action will be raised.');
             }
 
-            $action = HsCorrectiveAction::query()
-                ->where('hs_investigation_id', $locked->id)
+            $actionExists = $locked->correctiveActions()
                 ->where('recommendation_index', $index)
                 ->lockForUpdate()
-                ->first();
-
-            if ($disposition === HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION) {
-                $action ??= $this->correctiveActions->createFromRecommendation($locked, $index, [
-                    'created_by' => $actor->id,
-                    'assigned_by_user_id' => $actor->id,
-                ]);
-                $normalisedReason = null;
-            } elseif ($action !== null) {
+                ->exists();
+            if ($actionExists) {
                 throw new \InvalidArgumentException(
                     'This recommendation already has a corrective action and must use the corrective-action disposition.'
                 );
@@ -369,7 +384,7 @@ class HsInvestigationService
             if ($existing
                 && $existing->disposition === $disposition
                 && $existing->reason === $normalisedReason
-                && $existing->hs_corrective_action_id === $action?->id) {
+                && $existing->hs_corrective_action_id === null) {
                 return $existing;
             }
 
@@ -388,7 +403,7 @@ class HsInvestigationService
             $record->fill([
                 'disposition' => $disposition,
                 'reason' => $normalisedReason,
-                'hs_corrective_action_id' => $action?->id,
+                'hs_corrective_action_id' => null,
                 'decided_by_user_id' => $actor->id,
                 'decided_at' => now(),
             ]);
@@ -399,7 +414,7 @@ class HsInvestigationService
                 'recommendation_index' => $index,
                 'disposition' => $disposition,
                 'reason' => $normalisedReason,
-                'hs_corrective_action_id' => $action?->id,
+                'hs_corrective_action_id' => null,
                 'previous' => $previous,
             ]);
 

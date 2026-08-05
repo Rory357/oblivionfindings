@@ -149,9 +149,21 @@ interface IconNavItem {
     badge?: number;
 }
 
-interface SubPanelGroup {
+export interface SubPanelGroup {
     label: string;
     items: NavItem[];
+}
+
+export function filterVisibleSidebarGroups(
+    groups: Array<SubPanelGroup | null | undefined>,
+): SubPanelGroup[] {
+    return groups.filter(
+        (group): group is SubPanelGroup =>
+            group !== null &&
+            group !== undefined &&
+            Array.isArray(group.items) &&
+            group.items.length > 0,
+    );
 }
 
 // ── URL matching (reused from nav-main) ────────────────────────────────────
@@ -2430,6 +2442,7 @@ function SubPanel({
     title?: string;
 }) {
     const panelRef = useRef<HTMLDivElement>(null);
+    const visibleGroups = filterVisibleSidebarGroups(groups);
 
     useEffect(() => {
         function handleClickOutside(e: MouseEvent) {
@@ -2481,7 +2494,7 @@ function SubPanel({
 
             {/* Panel groups */}
             <div className="py-2">
-                {groups.filter(Boolean).map((group) => (
+                {visibleGroups.map((group) => (
                     <div key={group.label} className="mb-1">
                         <div className="px-4 py-1.5 text-[11px] font-medium tracking-wider text-sidebar-foreground/40 uppercase">
                             {group.label}
@@ -3082,68 +3095,68 @@ export function AppSidebarMobile({
                                         />
                                     </Button>
                                     {isExpanded &&
-                                        (groups ?? [])
-                                            .filter(Boolean)
-                                            .map((group) => (
-                                                <div
-                                                    key={group.label}
-                                                    className="ml-4"
-                                                >
-                                                    <div className="px-4 py-1 text-[11px] font-medium tracking-wider text-sidebar-foreground/40 uppercase">
-                                                        {group.label}
-                                                    </div>
-                                                    {(group.items ?? []).map(
-                                                        (sub) => (
-                                                            <Link
-                                                                key={resolveUrl(
-                                                                    sub.href,
-                                                                )}
-                                                                href={sub.href}
-                                                                aria-current={
-                                                                    isSubItemActive(
-                                                                        currentUrl,
-                                                                        sub.href,
-                                                                    )
-                                                                        ? 'page'
-                                                                        : undefined
-                                                                }
-                                                                prefetch
-                                                                className={cn(
-                                                                    'flex items-center gap-3 px-4 py-2 text-sm transition-colors',
-                                                                    isSubItemActive(
-                                                                        currentUrl,
-                                                                        sub.href,
-                                                                    )
-                                                                        ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
-                                                                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
-                                                                )}
-                                                            >
-                                                                {sub.icon && (
-                                                                    <SidebarItemIcon
-                                                                        icon={
-                                                                            sub.icon
-                                                                        }
-                                                                    />
-                                                                )}
-                                                                <span>
-                                                                    {sub.title}
-                                                                </span>
-                                                                {sub.badge !=
-                                                                    null &&
-                                                                    sub.badge >
-                                                                        0 && (
-                                                                        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white">
-                                                                            {sub.badge >
-                                                                            9
-                                                                                ? '9+'
-                                                                                : sub.badge}
-                                                                        </span>
-                                                                    )}
-                                                            </Link>
-                                                        ),
-                                                    )}
+                                        filterVisibleSidebarGroups(
+                                            groups ?? [],
+                                        ).map((group) => (
+                                            <div
+                                                key={group.label}
+                                                className="ml-4"
+                                            >
+                                                <div className="px-4 py-1 text-[11px] font-medium tracking-wider text-sidebar-foreground/40 uppercase">
+                                                    {group.label}
                                                 </div>
-                                            ))}
+                                                {(group.items ?? []).map(
+                                                    (sub) => (
+                                                        <Link
+                                                            key={resolveUrl(
+                                                                sub.href,
+                                                            )}
+                                                            href={sub.href}
+                                                            aria-current={
+                                                                isSubItemActive(
+                                                                    currentUrl,
+                                                                    sub.href,
+                                                                )
+                                                                    ? 'page'
+                                                                    : undefined
+                                                            }
+                                                            prefetch
+                                                            className={cn(
+                                                                'flex items-center gap-3 px-4 py-2 text-sm transition-colors',
+                                                                isSubItemActive(
+                                                                    currentUrl,
+                                                                    sub.href,
+                                                                )
+                                                                    ? 'bg-sidebar-primary/10 font-medium text-foreground dark:text-foreground'
+                                                                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                                                            )}
+                                                        >
+                                                            {sub.icon && (
+                                                                <SidebarItemIcon
+                                                                    icon={
+                                                                        sub.icon
+                                                                    }
+                                                                />
+                                                            )}
+                                                            <span>
+                                                                {sub.title}
+                                                            </span>
+                                                            {sub.badge !=
+                                                                null &&
+                                                                sub.badge >
+                                                                    0 && (
+                                                                    <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white">
+                                                                        {sub.badge >
+                                                                        9
+                                                                            ? '9+'
+                                                                            : sub.badge}
+                                                                    </span>
+                                                                )}
+                                                        </Link>
+                                                    ),
+                                                )}
+                                            </div>
+                                        ))}
                                     {item.dividerAfter && (
                                         <div className="mx-4 my-1 border-b border-sidebar-border/30" />
                                     )}
@@ -3251,7 +3264,9 @@ export function buildNavSearchCatalog(ctx: {
         }
 
         if (icon.subPanel) {
-            const groups = subPanelMap[icon.id] ?? [];
+            const groups = filterVisibleSidebarGroups(
+                subPanelMap[icon.id] ?? [],
+            );
             for (const group of groups) {
                 for (const sub of group?.items ?? []) {
                     const href = resolveUrl(sub.href);

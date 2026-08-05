@@ -5,6 +5,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteHouseRoom;
 use App\Models\User;
+use App\Services\Sites\SiteProfileData;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SystemCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -123,13 +124,26 @@ test('site show exposes readiness and occupancy summaries for active incomplete 
             ->has('readiness.critical', 7)
             ->where('readiness.is_active_but_incomplete', true)
             ->where('readiness.critical_total', 7)
-            ->where('occupancy.label', 'Bedroom occupancy')
-            ->where('occupancy.noun', 'bedrooms')
-            ->where('occupancy.rooms_total', 2)
-            ->where('occupancy.rooms_occupied', 1)
-            ->where('occupancy.vacancies', 1)
-            ->where('occupancy.percent', 50)
+            ->where('hero.occupancy.label', 'Bedrooms')
+            ->where('hero.occupancy.total', 2)
+            ->where('hero.occupancy.occupied', 1)
         );
+});
+
+test('restricted safety payload exposes no record counts or rows', function () {
+    $user = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    $site = Site::factory()->create(['type' => 'house']);
+
+    $safety = app(SiteProfileData::class)->safety($user, $site);
+
+    expect($safety['locked'])->toBeTrue();
+    foreach (['hazards', 'risk_assessments', 'inspections', 'drills', 'first_aid', 'ppe'] as $key) {
+        expect($safety[$key]['items'])->toBe([])
+            ->and($safety[$key]['summary'])->toBeNull();
+    }
 });
 
 test('sites index capacity counts assignable bedrooms only', function () {

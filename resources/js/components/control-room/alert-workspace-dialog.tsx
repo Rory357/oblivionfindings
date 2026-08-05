@@ -1,5 +1,10 @@
 import { LinkedJourney } from '@/components/control-room/alert-workspace/linked-journey';
 import {
+    JourneyGateList,
+    type JourneyGateData,
+} from '@/components/incidents/journey-gate-list';
+import { JourneyTermHelp } from '@/components/journey-term-help';
+import {
     MonitoringIncidentEvidenceCard,
     type MonitoringIncidentEvidence,
 } from '@/components/monitoring/monitoring-incident-evidence-card';
@@ -15,6 +20,7 @@ import {
 } from '@/components/wizard/primitives';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
 import { formatDateTime, toDatetimeLocal } from '@/lib/datetime';
+import { journeyActivityLabel } from '@/lib/journey-labels';
 import {
     DndContext,
     KeyboardSensor,
@@ -134,6 +140,7 @@ export type WorkspaceAlert = {
 };
 
 export type AlertWorkspaceDetail = {
+    return_to?: string;
     alert: WorkspaceAlert;
     playbook_run: {
         id: number;
@@ -200,7 +207,9 @@ export type AlertWorkspaceDetail = {
         created_at: string;
     }>;
     can: {
+        view: boolean;
         manage: boolean;
+        watch: boolean;
         assign: boolean;
         escalate: boolean;
         create: boolean;
@@ -263,6 +272,14 @@ export type AlertWorkspaceDetail = {
         categories: Array<{ value: string; label: string }>;
         resolution_codes: Array<{ value: string; label: string }>;
     };
+    incident_defaults: {
+        immediate_action_taken: string;
+        source_note: {
+            id: number;
+            user_name: string | null;
+            created_at: string | null;
+        } | null;
+    };
     linked_incident: {
         id: number;
         reference_number: string;
@@ -305,6 +322,9 @@ export type AlertWorkspaceDetail = {
         href: string;
     } | null;
     monitoring_incident_evidence?: MonitoringIncidentEvidence | null;
+    resolve_gate: JourneyGateData;
+    close_gate: JourneyGateData;
+    journey_state: string;
 };
 
 type SectionKey =
@@ -324,6 +344,7 @@ type ActionKey =
     | 'escalate'
     | 'assign'
     | 'snooze'
+    | 'create_incident'
     | 'confirm_sensor'
     | 'dismiss_sensor'
     | 'edit_meta'
@@ -354,6 +375,32 @@ const SEV_TONE: Record<string, string> = {
     high: 'critical',
     critical: 'critical',
 };
+
+function isOperationalTaskOpen(status: string): boolean {
+    return !['completed', 'cancelled', 'transferred'].includes(status);
+}
+
+export function TaskAssigneeSelect({
+    value,
+    onChange,
+    staff,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    staff: Array<{ id: number; name: string }>;
+}) {
+    return (
+        <SelectInput
+            value={value}
+            onChange={onChange}
+            placeholder="Unassigned"
+            options={staff.map((person) => ({
+                value: String(person.id),
+                label: person.name,
+            }))}
+        />
+    );
+}
 
 const STATUS_META: Record<string, { label: string; tone: string }> = {
     open: { label: 'Open', tone: 'critical' },
@@ -571,8 +618,8 @@ export function AlertWorkspaceDialog({
     const alertRef = a.reference_number ?? `Alert ${a.id}`;
     const isSensor = a.source === 'sensor';
     const isActionable = OPEN_STATES.includes(a.status);
-    const openTasks = d.tasks.filter(
-        (t) => t.status !== 'completed' && t.status !== 'cancelled',
+    const openTasks = d.tasks.filter((t) =>
+        isOperationalTaskOpen(t.status),
     ).length;
     const statusMeta = STATUS_META[a.status] ?? {
         label: titleCase(a.status),
@@ -650,6 +697,7 @@ export function AlertWorkspaceDialog({
         escalate: 'Escalate alert',
         assign: a.assigned_to ? 'Reassign alert' : 'Assign alert',
         snooze: 'Snooze alert',
+        create_incident: 'Create incident and hand over',
         confirm_sensor: 'Confirm sensor detection',
         dismiss_sensor: 'Dismiss as false positive',
         edit_meta: 'Edit alert details',
@@ -665,7 +713,11 @@ export function AlertWorkspaceDialog({
     const footerEnd = action ? null : (
         <div className="flex flex-wrap items-center justify-end gap-2">
             <Link
-                href={`/control-room/alerts/${a.id}`}
+                href={
+                    d.return_to
+                        ? `/control-room/alerts/${a.id}?return_to=${encodeURIComponent(d.return_to)}`
+                        : `/control-room/alerts/${a.id}`
+                }
                 className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
             >
                 <ExternalLink className="h-4 w-4" /> Full page
@@ -757,7 +809,17 @@ export function AlertWorkspaceDialog({
                 />
                 {SEV_LABEL[a.severity] ?? titleCase(a.severity)}
             </span>
-            <span className="text-muted-foreground">{statusMeta.label}</span>
+            <span
+                className="inline-flex items-center gap-1 font-medium text-foreground"
+                aria-label={`Status: ${statusMeta.label}`}
+            >
+                <span
+                    className={`h-1.5 w-1.5 rounded-full ${DOT[statusMeta.tone] ?? DOT.neutral}`}
+                    aria-hidden
+                />
+                {statusMeta.label}
+            </span>
+            <span className="text-muted-foreground">{d.journey_state}</span>
             {a.escalation_level > 0 ? (
                 <span className="font-medium text-status-warning">
                     L{a.escalation_level}
@@ -766,7 +828,7 @@ export function AlertWorkspaceDialog({
         </div>
     );
 
-    const railExtra = <WatchToggle d={d} />;
+    const railExtra = d.can.watch ? <WatchToggle d={d} /> : null;
 
     return (
         <WizardShell
@@ -806,6 +868,9 @@ export function AlertWorkspaceDialog({
             {action === 'snooze' ? (
                 <SnoozePane d={d} onDone={closePane} />
             ) : null}
+            {action === 'create_incident' ? (
+                <CreateIncidentPane d={d} onDone={closePane} />
+            ) : null}
             {action === 'confirm_sensor' ? (
                 <SensorConfirmPane d={d} onDone={closePane} />
             ) : null}
@@ -831,6 +896,9 @@ export function AlertWorkspaceDialog({
                             d={d}
                             onEditMeta={() => setAction('edit_meta')}
                             onConfirmSensor={() => setAction('confirm_sensor')}
+                            onCreateIncident={() =>
+                                setAction('create_incident')
+                            }
                         />
                     ) : null}
                     {section === 'sla' ? <SlaTimelineSection d={d} /> : null}
@@ -854,7 +922,7 @@ export function AlertWorkspaceDialog({
 /*  Watch toggle (rail)                                                */
 /* ------------------------------------------------------------------ */
 
-function WatchToggle({ d }: { d: AlertWorkspaceDetail }) {
+export function WatchToggle({ d }: { d: AlertWorkspaceDetail }) {
     const a = d.alert;
     const [busy, setBusy] = useState(false);
     const [adding, setAdding] = useState(false);
@@ -862,6 +930,10 @@ function WatchToggle({ d }: { d: AlertWorkspaceDetail }) {
 
     const watcherIds = new Set(d.watchers.map((w) => w.user_id));
     const addable = d.staff.filter((s) => !watcherIds.has(s.id));
+
+    if (!d.can.watch) {
+        return null;
+    }
 
     const toggle = () => {
         setBusy(true);
@@ -1113,7 +1185,7 @@ function StartTriagePane({
     );
 }
 
-function ResolvePane({
+export function ResolvePane({
     d,
     onDone,
 }: {
@@ -1128,6 +1200,7 @@ function ResolvePane({
         },
     );
     const codes = d.config_options.resolution_codes ?? [];
+    const gate = d.resolve_gate;
 
     const submit = () => {
         // resolution_code travels via the meta endpoint pattern; resolve stores the notes.
@@ -1154,9 +1227,10 @@ function ResolvePane({
             <StepHead
                 icon={CheckCircle2}
                 title="Resolve alert"
-                blurb="Record what happened and how it was resolved — this stops the resolution SLA clock."
+                blurb="Resolve ends the live operational response. It does not close the linked incident or H&S governance."
             />
             <PaneError message={serverError(form.errors)} />
+            <JourneyGateList gate={gate} />
             {step === 0 ? (
                 <>
                     <ContextCard d={d} />
@@ -1192,7 +1266,9 @@ function ResolvePane({
                     <PaneNav
                         onCancel={onDone}
                         onNext={() => setStep(1)}
-                        nextDisabled={!form.data.resolution_notes.trim()}
+                        nextDisabled={
+                            !form.data.resolution_notes.trim() || !gate.allowed
+                        }
                         step={0}
                         stepCount={2}
                     />
@@ -1223,22 +1299,12 @@ function ResolvePane({
                             }
                         />
                     </ReviewCard>
-                    {d.tasks.some(
-                        (t) =>
-                            t.status !== 'completed' &&
-                            t.status !== 'cancelled',
-                    ) ? (
-                        <InfoCard icon={ListTodo} tone="warn">
-                            This alert still has open tasks — they stay open
-                            after resolving. Check the Tasks section if they
-                            should be completed first.
-                        </InfoCard>
-                    ) : null}
                     <PaneNav
                         onCancel={onDone}
                         onBack={() => setStep(0)}
                         onSubmit={submit}
                         submitLabel="Resolve alert"
+                        submitDisabled={!gate.allowed}
                         processing={form.processing}
                         step={1}
                         stepCount={2}
@@ -1249,7 +1315,7 @@ function ResolvePane({
     );
 }
 
-function ClosePane({
+export function ClosePane({
     d,
     onDone,
 }: {
@@ -1268,9 +1334,10 @@ function ClosePane({
             <StepHead
                 icon={CheckCircle2}
                 title="Close alert"
-                blurb="Final state — a closed alert can't be reopened. Make sure evidence and follow-up tasks are wrapped up first."
+                blurb="Close is available only when the incident and H&S governance are closed."
             />
             <PaneError message={serverError(form.errors)} />
+            <JourneyGateList gate={d.close_gate} />
             <ReviewCard icon={CheckCircle2} title="Resolution on record" span>
                 <ReviewRow
                     label="Resolved"
@@ -1296,6 +1363,7 @@ function ClosePane({
                 onCancel={onDone}
                 onSubmit={submit}
                 submitLabel="Close alert"
+                submitDisabled={!d.close_gate.allowed}
                 processing={form.processing}
             />
         </div>
@@ -1611,6 +1679,166 @@ const INCIDENT_TYPE_OPTIONS = [
     { value: 'other', label: 'Other' },
 ];
 
+function incidentTypeFromAlert(alertType: string): string {
+    const inferred = alertType.startsWith('incident.')
+        ? alertType.slice('incident.'.length)
+        : alertType === 'fall_detected'
+          ? 'fall'
+          : alertType;
+
+    return INCIDENT_TYPE_OPTIONS.some((option) => option.value === inferred)
+        ? inferred
+        : 'other';
+}
+
+function ImmediateControlsPrefillNotice({
+    d,
+    required,
+}: {
+    d: AlertWorkspaceDetail;
+    required: boolean;
+}) {
+    const source = d.incident_defaults?.source_note;
+    if (!source) {
+        return required ? (
+            <InfoCard icon={AlertTriangle} tone="warn">
+                No marked Immediate controls note was found. Record or confirm
+                the immediate action below before creating the incident.
+            </InfoCard>
+        ) : null;
+    }
+
+    return (
+        <InfoCard icon={ShieldAlert} tone="info">
+            Prefilled from an Immediate controls note
+            {source.user_name ? ` by ${source.user_name}` : ''}
+            {source.created_at
+                ? ` on ${formatDateTime(source.created_at)}`
+                : ''}
+            . Check and edit it before creating the incident.
+        </InfoCard>
+    );
+}
+
+export function CreateIncidentPane({
+    d,
+    onDone,
+}: {
+    d: AlertWorkspaceDetail;
+    onDone: () => void;
+}) {
+    const form = useForm<{
+        type: string;
+        severity: string;
+        description: string;
+        immediate_action_taken: string;
+    }>({
+        type: incidentTypeFromAlert(d.alert.alert_type),
+        severity: d.alert.severity,
+        description: d.alert.notes ?? '',
+        immediate_action_taken:
+            d.incident_defaults?.immediate_action_taken ?? '',
+    });
+    const serious =
+        d.alert.severity === 'critical' ||
+        ['high', 'critical'].includes(form.data.severity);
+
+    const submit = () => {
+        form.post(`/control-room/alerts/${d.alert.id}/create-incident`, {
+            preserveScroll: true,
+            onSuccess: onPaneSuccess(onDone),
+        });
+    };
+
+    return (
+        <div className="flex flex-col gap-4">
+            <StepHead
+                icon={ShieldAlert}
+                title="Create incident and hand over"
+                blurb="Create the official incident record and hand governance ownership to Health & Safety."
+            />
+            <PaneError message={serverError(form.errors)} />
+            <ContextCard d={d} />
+            <ImmediateControlsPrefillNotice d={d} required={serious} />
+            <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Incident type" error={form.errors.type}>
+                    <SelectInput
+                        value={form.data.type}
+                        onChange={(value) => form.setData('type', value)}
+                        placeholder="Select incident type"
+                        options={INCIDENT_TYPE_OPTIONS}
+                    />
+                </Field>
+                <Field label="Severity" error={form.errors.severity}>
+                    <SelectInput
+                        value={form.data.severity}
+                        onChange={(value) => form.setData('severity', value)}
+                        placeholder="Select severity"
+                        options={[
+                            { value: 'low', label: 'Low' },
+                            { value: 'medium', label: 'Medium' },
+                            { value: 'high', label: 'High' },
+                            { value: 'critical', label: 'Critical' },
+                        ]}
+                    />
+                </Field>
+            </div>
+            <Field
+                label="Immediate action taken"
+                required={serious}
+                error={form.errors.immediate_action_taken}
+                hint={
+                    serious
+                        ? 'Required for high and critical alerts'
+                        : 'Optional'
+                }
+            >
+                <Textarea
+                    rows={4}
+                    aria-label={
+                        serious
+                            ? 'Immediate action taken *'
+                            : 'Immediate action taken'
+                    }
+                    value={form.data.immediate_action_taken}
+                    onChange={(event) =>
+                        form.setData(
+                            'immediate_action_taken',
+                            event.target.value,
+                        )
+                    }
+                    placeholder="What was done immediately to keep people safe?"
+                />
+            </Field>
+            {serious && !form.data.immediate_action_taken.trim() ? (
+                <InfoCard icon={AlertTriangle} tone="warn">
+                    Record the controls taken. If none could be taken, enter “No
+                    immediate control was possible”.
+                </InfoCard>
+            ) : null}
+            <Field label="Incident description" hint="Optional">
+                <Textarea
+                    rows={3}
+                    value={form.data.description}
+                    onChange={(event) =>
+                        form.setData('description', event.target.value)
+                    }
+                    placeholder="What happened?"
+                />
+            </Field>
+            <PaneNav
+                onCancel={onDone}
+                onSubmit={submit}
+                submitLabel="Create incident and hand over"
+                processing={form.processing}
+                submitDisabled={
+                    serious && !form.data.immediate_action_taken.trim()
+                }
+            />
+        </div>
+    );
+}
+
 function SensorEvidenceCard({ d }: { d: AlertWorkspaceDetail }) {
     const a = d.alert;
     const ctx = (a.context ?? {}) as Record<string, any>;
@@ -1661,7 +1889,7 @@ function SensorEvidenceCard({ d }: { d: AlertWorkspaceDetail }) {
     );
 }
 
-function SensorConfirmPane({
+export function SensorConfirmPane({
     d,
     onDone,
 }: {
@@ -1669,11 +1897,21 @@ function SensorConfirmPane({
     onDone: () => void;
 }) {
     const [step, setStep] = useState(0);
-    const form = useForm<{ type: string; severity: string; note: string }>({
+    const form = useForm<{
+        type: string;
+        severity: string;
+        note: string;
+        immediate_action_taken: string;
+    }>({
         type: d.alert.alert_type === 'fall_detected' ? 'fall' : '',
         severity: 'high',
         note: '',
+        immediate_action_taken:
+            d.incident_defaults?.immediate_action_taken ?? '',
     });
+    const serious =
+        d.alert.severity === 'critical' ||
+        ['high', 'critical'].includes(form.data.severity);
 
     const submit = () => {
         form.post(`/control-room/alerts/${d.alert.id}/confirm`, {
@@ -1734,6 +1972,35 @@ function SensorConfirmPane({
                             />
                         </Field>
                     </div>
+                    <ImmediateControlsPrefillNotice d={d} required={serious} />
+                    <Field
+                        label="Immediate action taken"
+                        required={serious}
+                        error={form.errors.immediate_action_taken}
+                    >
+                        <Textarea
+                            rows={3}
+                            aria-label={
+                                serious
+                                    ? 'Immediate action taken *'
+                                    : 'Immediate action taken'
+                            }
+                            value={form.data.immediate_action_taken}
+                            onChange={(e) =>
+                                form.setData(
+                                    'immediate_action_taken',
+                                    e.target.value,
+                                )
+                            }
+                            placeholder="What was done immediately to keep people safe?"
+                        />
+                    </Field>
+                    {serious && !form.data.immediate_action_taken.trim() ? (
+                        <InfoCard icon={AlertTriangle} tone="warn">
+                            Record the controls taken. If none could be taken,
+                            enter “No immediate control was possible”.
+                        </InfoCard>
+                    ) : null}
                     <Field label="Note" hint="Optional — added to the incident">
                         <Textarea
                             rows={3}
@@ -1750,6 +2017,9 @@ function SensorConfirmPane({
                         onSubmit={submit}
                         submitLabel="Confirm — create incident"
                         processing={form.processing}
+                        submitDisabled={
+                            serious && !form.data.immediate_action_taken.trim()
+                        }
                         step={1}
                         stepCount={2}
                     />
@@ -2131,22 +2401,29 @@ function OverviewSection({
     d,
     onEditMeta,
     onConfirmSensor,
+    onCreateIncident,
 }: {
     d: AlertWorkspaceDetail;
     onEditMeta: () => void;
     onConfirmSensor: () => void;
+    onCreateIncident: () => void;
 }) {
     const a = d.alert;
     const fleet = (a.fleet_context ?? null) as Record<string, any> | null;
     return (
         <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex justify-end sm:col-span-2">
+                <JourneyTermHelp
+                    terms={['status', 'severity', 'priority', 'escalation']}
+                    label="Explain alert status terms"
+                />
+            </div>
             <div className="sm:col-span-2">
                 <StatusFlow a={a} />
             </div>
 
             <div className="sm:col-span-2">
                 <LinkedJourney
-                    alertId={a.id}
                     alertReference={a.reference_number ?? `Alert ${a.id}`}
                     alertStatus={a.status}
                     sensorConfirmationRequired={
@@ -2181,6 +2458,7 @@ function OverviewSection({
                         viewHealthSafety: d.can.view_health_safety,
                     }}
                     onConfirmSensor={onConfirmSensor}
+                    onCreateIncident={onCreateIncident}
                 />
             </div>
 
@@ -2438,9 +2716,12 @@ function SlaTimelineSection({ d }: { d: AlertWorkspaceDetail }) {
         <div className="flex flex-col gap-5">
             {d.sla ? (
                 <div>
-                    <p className="mb-2 text-sm font-semibold text-foreground">
-                        SLA deadlines
-                    </p>
+                    <div className="mb-2 flex items-center gap-1">
+                        <p className="text-sm font-semibold text-foreground">
+                            SLA deadlines
+                        </p>
+                        <JourneyTermHelp terms={['sla']} label="Explain SLA" />
+                    </div>
                     <div className="grid gap-2 sm:grid-cols-3">
                         <SlaCountdownRow
                             label="Acknowledge"
@@ -2517,11 +2798,7 @@ function SlaTimelineSection({ d }: { d: AlertWorkspaceDetail }) {
                                 className="flex items-baseline justify-between gap-3 rounded-md border border-border/60 px-2.5 py-1.5 text-xs"
                             >
                                 <span className="min-w-0 truncate text-foreground">
-                                    {titleCase(
-                                        log.action
-                                            .replace('controlRoom.', '')
-                                            .replace('alert.', ''),
-                                    )}
+                                    {journeyActivityLabel(log.action)}
                                     {log.user ? (
                                         <span className="text-muted-foreground">
                                             {' '}
@@ -3316,7 +3593,7 @@ function TaskRow({
 }) {
     const [editing, setEditing] = useState(false);
     const [addingSub, setAddingSub] = useState(false);
-    const live = t.status !== 'completed' && t.status !== 'cancelled';
+    const live = isOperationalTaskOpen(t.status);
 
     return (
         <div className="rounded-lg border border-border p-3">
@@ -3516,14 +3793,10 @@ function EditTaskForm({
                     />
                 </Field>
                 <Field label="Assign to">
-                    <SelectInput
+                    <TaskAssigneeSelect
                         value={form.data.assigned_to_user_id}
                         onChange={(v) => form.setData('assigned_to_user_id', v)}
-                        placeholder="Unassigned"
-                        options={d.staff.map((s) => ({
-                            value: String(s.id),
-                            label: s.name,
-                        }))}
+                        staff={d.staff}
                     />
                 </Field>
                 <Field label="Due">
@@ -3682,14 +3955,10 @@ function AddTaskForm({
                     />
                 </Field>
                 <Field label="Assign to">
-                    <SelectInput
+                    <TaskAssigneeSelect
                         value={form.data.assigned_to_user_id}
                         onChange={(v) => form.setData('assigned_to_user_id', v)}
-                        placeholder="Unassigned"
-                        options={d.staff.map((s) => ({
-                            value: String(s.id),
-                            label: s.name,
-                        }))}
+                        staff={d.staff}
                     />
                 </Field>
                 <Field label="Due">
@@ -4047,8 +4316,11 @@ function LogTimeForm({
     );
 }
 
-function AddNoteForm({ alertId }: { alertId: number }) {
-    const form = useForm<{ note: string }>({ note: '' });
+export function AddNoteForm({ alertId }: { alertId: number }) {
+    const form = useForm<{ note: string; purpose: string }>({
+        note: '',
+        purpose: 'general',
+    });
     const submit = (e: FormEvent) => {
         e.preventDefault();
         if (!form.data.note.trim()) return;
@@ -4058,20 +4330,45 @@ function AddNoteForm({ alertId }: { alertId: number }) {
         });
     };
     return (
-        <form onSubmit={submit} className="flex items-start gap-2">
-            <Textarea
-                rows={2}
-                className="flex-1"
-                value={form.data.note}
-                onChange={(e) => form.setData('note', e.target.value)}
-                placeholder="Add an operator note…"
-            />
+        <form
+            onSubmit={submit}
+            className="grid gap-2 sm:grid-cols-[13rem_1fr_auto] sm:items-start"
+        >
+            <Field label="Note purpose">
+                <SelectInput
+                    value={form.data.purpose}
+                    onChange={(value) => form.setData('purpose', value)}
+                    placeholder="Select note purpose"
+                    ariaLabel="Note purpose"
+                    options={[
+                        { value: 'general', label: 'General update' },
+                        {
+                            value: 'immediate_controls',
+                            label: 'Immediate controls',
+                        },
+                        {
+                            value: 'escalation_handover',
+                            label: 'Escalation or handover',
+                        },
+                    ]}
+                />
+            </Field>
+            <Field label="Operator note">
+                <Textarea
+                    rows={2}
+                    className="flex-1"
+                    value={form.data.note}
+                    onChange={(e) => form.setData('note', e.target.value)}
+                    placeholder="Add an operator note…"
+                />
+            </Field>
             <Button
                 type="submit"
                 size="sm"
+                className="sm:mt-7"
                 disabled={form.processing || !form.data.note.trim()}
             >
-                <Send className="mr-1.5 h-3.5 w-3.5" /> Note
+                <Send className="mr-1.5 h-3.5 w-3.5" /> Add note
             </Button>
         </form>
     );
@@ -4287,7 +4584,6 @@ export function LinkedSection({ d }: { d: AlertWorkspaceDetail }) {
     rows.push(
         <LinkedJourney
             key="journey"
-            alertId={a.id ?? 0}
             alertReference={
                 a.reference_number ??
                 (a.id ? `Alert ${a.id}` : 'Control Room alert')

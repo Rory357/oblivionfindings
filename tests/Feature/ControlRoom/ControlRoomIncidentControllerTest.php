@@ -3,13 +3,16 @@
 namespace Tests\Feature\ControlRoom;
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\Incidents\IncidentJourneyService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -334,6 +337,259 @@ class ControlRoomIncidentControllerTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_operator_notes_persist_supported_purposes_and_reject_unknown_purpose(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $this->site->id,
+        ]);
+
+        foreach ([
+            'general',
+            'immediate_controls',
+            'escalation_handover',
+        ] as $purpose) {
+            $this->actingAs($this->admin)
+                ->post("/control-room/alerts/{$alert->id}/note", [
+                    'note' => "Note for {$purpose}",
+                    'purpose' => $purpose,
+                ])
+                ->assertRedirect()
+                ->assertSessionDoesntHaveErrors();
+
+            $this->assertDatabaseHas('control_room_operator_notes', [
+                'alert_id' => $alert->id,
+                'user_id' => $this->admin->id,
+                'type' => 'note',
+                'purpose' => $purpose,
+                'content' => "Note for {$purpose}",
+            ]);
+        }
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/note", [
+                'note' => 'Unknown purpose must not persist.',
+                'purpose' => 'free_text_bucket',
+            ])
+            ->assertSessionHasErrors('purpose');
+
+        $this->assertDatabaseCount('control_room_operator_notes', 3);
+        $audit = AuditLog::query()
+            ->where('action', 'controlRoom.alert.addNote')
+            ->where('auditable_id', $alert->id)
+            ->latest('id')
+            ->firstOrFail();
+        $this->assertSame('note', data_get($audit->meta, 'note_type'));
+        $this->assertSame(
+            'escalation_handover',
+            data_get($audit->meta, 'note_purpose'),
+        );
+        $this->assertNotNull(data_get($audit->meta, 'note_id'));
+    }
+
+    public function test_workspace_uses_the_latest_immediate_controls_note_by_created_time_then_id(): void
+    {
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $this->site->id,
+        ]);
+        $alert = ControlRoomAlert::factory()->high()->open()->create([
+            'client_id' => $client->id,
+            'site_id' => $this->site->id,
+        ]);
+        $at = now()->subMinute()->startOfSecond();
+
+        $first = OperatorNote::unguarded(fn () => OperatorNote::query()->create([
+            'alert_id' => $alert->id,
+            'type' => 'note',
+            'purpose' => 'immediate_controls',
+            'content' => 'First controls at the same timestamp.',
+            'user_id' => $this->admin->id,
+            'created_at' => $at,
+            'updated_at' => $at,
+        ]));
+        $second = OperatorNote::unguarded(fn () => OperatorNote::query()->create([
+            'alert_id' => $alert->id,
+            'type' => 'note',
+            'purpose' => 'immediate_controls',
+            'content' => 'Second controls win by note id.',
+            'user_id' => $this->admin->id,
+            'created_at' => $at,
+            'updated_at' => $at,
+        ]));
+        OperatorNote::unguarded(fn () => OperatorNote::query()->create([
+            'alert_id' => $alert->id,
+            'type' => 'note',
+            'purpose' => 'general',
+            'content' => 'A later general update must not replace controls.',
+            'user_id' => $this->admin->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]));
+
+        $workspace = app(AlertWorkspaceService::class)->build(
+            $this->admin,
+            $alert->id,
+        );
+
+        $this->assertSame(
+            'Second controls win by note id.',
+            data_get($workspace, 'incident_defaults.immediate_action_taken'),
+        );
+        $this->assertSame(
+            $second->id,
+            data_get($workspace, 'incident_defaults.source_note.id'),
+        );
+        $this->assertSame(
+            $this->admin->name,
+            data_get($workspace, 'incident_defaults.source_note.user_name'),
+        );
+        $this->assertNotSame(
+            $first->id,
+            data_get($workspace, 'incident_defaults.source_note.id'),
+        );
+    }
+
+    public function test_serious_alert_incident_requires_immediate_action_and_accepts_an_edited_prefill(): void
+    {
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $this->site->id,
+        ]);
+        $alert = ControlRoomAlert::factory()->high()->open()->create([
+            'client_id' => $client->id,
+            'site_id' => $this->site->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/create-incident", [
+                'type' => 'fall',
+                'description' => 'Resident was found beside the bed.',
+            ])
+            ->assertSessionHasErrors('immediate_action_taken');
+
+        $this->assertDatabaseCount('client_incidents', 0);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/create-incident", [
+                'type' => 'fall',
+                'description' => 'Resident was found beside the bed.',
+                'immediate_action_taken' => 'Operator edited the prefill: area isolated and RN called.',
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertSame(
+            'Operator edited the prefill: area isolated and RN called.',
+            ClientIncident::query()->sole()->immediate_action_taken,
+        );
+    }
+
+    public function test_explicit_no_immediate_control_truth_is_accepted_for_a_critical_alert(): void
+    {
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $this->site->id,
+        ]);
+        $alert = ControlRoomAlert::factory()->critical()->open()->create([
+            'client_id' => $client->id,
+            'site_id' => $this->site->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/create-incident", [
+                'type' => 'injury',
+                'immediate_action_taken' => 'No immediate control was possible',
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertSame(
+            'No immediate control was possible',
+            ClientIncident::query()->sole()->immediate_action_taken,
+        );
+    }
+
+    public function test_task12_review_effective_high_incident_severity_requires_immediate_action_even_when_alert_is_low(): void
+    {
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $this->site->id,
+        ]);
+        $alert = ControlRoomAlert::factory()->create([
+            'severity' => 'low',
+            'client_id' => $client->id,
+            'site_id' => $this->site->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/create-incident", [
+                'type' => 'fall',
+                'severity' => 'high',
+            ])
+            ->assertSessionHasErrors('immediate_action_taken');
+
+        $this->assertDatabaseCount('client_incidents', 0);
+    }
+
+    public function test_low_and_medium_quick_flags_remain_valid_without_immediate_action(): void
+    {
+        foreach (['low', 'medium'] as $severity) {
+            $client = Client::factory()->create([
+                'organization_id' => 1,
+                'site_id' => $this->site->id,
+            ]);
+
+            $this->actingAs($this->admin)
+                ->post('/control-room/incidents/flag', [
+                    'client_id' => $client->id,
+                    'type' => 'other',
+                    'severity' => $severity,
+                    'note' => "Routine {$severity} incident.",
+                ])
+                ->assertRedirect()
+                ->assertSessionDoesntHaveErrors();
+        }
+
+        $this->assertDatabaseCount('client_incidents', 2);
+        $this->assertDatabaseCount('control_room_alerts', 2);
+    }
+
+    public function test_serious_quick_flag_requires_immediate_action_and_persists_explicit_truth(): void
+    {
+        $client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $this->site->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post('/control-room/incidents/flag', [
+                'client_id' => $client->id,
+                'type' => 'fall',
+                'severity' => 'high',
+                'note' => 'Resident on the floor.',
+            ])
+            ->assertSessionHasErrors('immediate_action_taken');
+
+        $this->assertDatabaseCount('client_incidents', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+
+        $this->actingAs($this->admin)
+            ->post('/control-room/incidents/flag', [
+                'client_id' => $client->id,
+                'type' => 'fall',
+                'severity' => 'critical',
+                'note' => 'Resident on the floor.',
+                'immediate_action_taken' => 'No immediate control was possible',
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertSame(
+            'No immediate control was possible',
+            ClientIncident::query()->sole()->immediate_action_taken,
+        );
+    }
+
     public function test_flag_as_incident_creates_linked_incident_and_alert(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
@@ -348,6 +604,7 @@ class ControlRoomIncidentControllerTest extends TestCase
                 'type' => 'fall',
                 'severity' => 'high',
                 'note' => 'Resident on the floor by the bed',
+                'immediate_action_taken' => 'Area isolated and the resident checked.',
             ])
             ->assertRedirect();
 
@@ -355,6 +612,10 @@ class ControlRoomIncidentControllerTest extends TestCase
         $this->assertNotNull($incident);
         $this->assertSame('submitted', $incident->status);
         $this->assertSame($client->id, $incident->client_id);
+        $this->assertSame(
+            'Area isolated and the resident checked.',
+            $incident->immediate_action_taken,
+        );
         $this->assertNotNull($incident->control_room_alert_id);
 
         // Bidirectional link: incident -> alert (FK) and alert -> incident (context).
@@ -381,6 +642,7 @@ class ControlRoomIncidentControllerTest extends TestCase
                 'client_id' => $client->id,
                 'type' => 'injury',
                 'severity' => 'critical',
+                'immediate_action_taken' => 'Emergency services called and the area secured.',
             ])
             ->assertRedirect();
 
@@ -414,6 +676,7 @@ class ControlRoomIncidentControllerTest extends TestCase
                     'client_id' => $client->id,
                     'type' => 'fall',
                     'severity' => 'high',
+                    'immediate_action_taken' => 'Resident checked while escalation was attempted.',
                 ]);
             $this->fail('Canonical attachment failure must abort incident flagging.');
         } catch (\RuntimeException $exception) {

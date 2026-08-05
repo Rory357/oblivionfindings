@@ -11,6 +11,8 @@ class SiteDocument extends Model
 {
     use AuditableChanges, WritesLegacyStorageContext;
 
+    public const PROFILE_LIMIT = 12;
+
     protected $fillable = [
         'tenant_id',
         'site_id',

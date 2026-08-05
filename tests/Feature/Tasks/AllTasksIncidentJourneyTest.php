@@ -13,8 +13,12 @@ use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
+use App\Services\Tasks\Providers\ClientIncidentProvider;
 use App\Services\Tasks\TaskAggregator;
+use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskSearch;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -222,6 +226,249 @@ it('finds every related responsibility by any official journey reference', funct
     }
 });
 
+it('keeps private journey search relations out of the normal capped incident feed', function () {
+    $site = Site::factory()->create(['tenant_id' => 1]);
+    $user = makeIncidentJourneyTasksUser($site, ['incidents.viewAny']);
+    $client = Client::factory()->create([
+        'organization_id' => $site->tenant_id,
+        'site_id' => $site->id,
+    ]);
+    makeUniversalIncidentJourney($site, $client, $user, 'manual');
+    $queries = [];
+    DB::listen(function ($query) use (&$queries): void {
+        $queries[] = strtolower($query->sql);
+    });
+
+    $items = (new ClientIncidentProvider)->tasks($user);
+
+    expect($items)->not->toBeEmpty()
+        ->and(collect($queries)->contains(fn (string $sql) => str_contains($sql, 'incident_followups')))->toBeFalse()
+        ->and(collect($queries)->contains(fn (string $sql) => str_contains($sql, 'control_room_alert_tasks')))->toBeFalse()
+        ->and(collect($queries)->contains(fn (string $sql) => str_contains($sql, 'hs_investigations')))->toBeFalse()
+        ->and(collect($queries)->contains(fn (string $sql) => str_contains($sql, 'hs_corrective_actions')))->toBeFalse();
+});
+
+it('keeps completed corrective actions active with truthful independent verification state', function () {
+    $site = Site::factory()->create(['tenant_id' => 1]);
+    $user = makeIncidentJourneyTasksUser($site, ['hazards.view']);
+    $event = HsEvent::factory()->create([
+        'organization_id' => 1,
+        'site_id' => $site->id,
+    ]);
+    $action = HsCorrectiveAction::factory()->completed()->create([
+        'hs_event_id' => $event->id,
+        'assigned_to_user_id' => $user->id,
+    ]);
+    $verified = HsCorrectiveAction::factory()->verified()->create([
+        'hs_event_id' => $event->id,
+        'assigned_to_user_id' => $user->id,
+    ]);
+
+    $items = collect((new TaskAggregator)->itemsFor(
+        $user,
+        ['include_done' => true],
+    ));
+    $item = $items->firstWhere('id', 'corrective_action-'.$action->id);
+    $verifiedItem = $items->firstWhere(
+        'id',
+        'corrective_action-'.$verified->id,
+    );
+
+    expect($item)->not->toBeNull()
+        ->and($item->status)->toBe(HsCorrectiveAction::STATUS_COMPLETED)
+        ->and($item->displayState)->toBe('Awaiting independent verification')
+        ->and($item->bucket)->toBe(TaskItem::BUCKET_IN_PROGRESS)
+        ->and($verifiedItem?->displayState)->toBe('Verified — ready to close')
+        ->and($verifiedItem?->bucket)->toBe(TaskItem::BUCKET_IN_PROGRESS);
+});
+
+it('finds the incident journey by people place source work narrative references and display state', function () {
+    $site = Site::factory()->create([
+        'tenant_id' => 1,
+        'name' => 'Playwright Incident Handover House',
+    ]);
+    $viewer = makeIncidentJourneyTasksUser($site, [
+        'incidents.viewAny',
+        'controlRoom.viewAny',
+        'hazards.view',
+    ]);
+    $viewer->forceFill(['name' => 'Playwright Queue Viewer'])->save();
+    $incidentOwner = User::factory()->create([
+        'organization_id' => $site->tenant_id,
+        'name' => 'Playwright Incident Investigator',
+        'approved_at' => now(),
+    ]);
+    $controlRoomOwner = User::factory()->create([
+        'organization_id' => $site->tenant_id,
+        'name' => 'Playwright Control Room Operator',
+        'approved_at' => now(),
+    ]);
+    $followupOwner = User::factory()->create([
+        'organization_id' => $site->tenant_id,
+        'name' => 'Playwright Follow-up Owner',
+        'approved_at' => now(),
+    ]);
+    $investigationOwner = User::factory()->create([
+        'organization_id' => $site->tenant_id,
+        'name' => 'Playwright H&S Investigator',
+        'approved_at' => now(),
+    ]);
+    $actionOwner = User::factory()->create([
+        'organization_id' => $site->tenant_id,
+        'name' => 'Playwright Corrective Action Owner',
+        'approved_at' => now(),
+    ]);
+    $client = Client::factory()->create([
+        'organization_id' => 1,
+        'site_id' => $site->id,
+        'first_name' => 'Playwright Aroha',
+        'last_name' => 'Handover',
+    ]);
+    $journey = makeUniversalIncidentJourney(
+        $site,
+        $client,
+        $viewer,
+        'control_room',
+    );
+    $journey['incident']->forceFill([
+        'title' => 'Playwright Aroha Handover',
+        'description' => 'The incident narrative records a bathroom rail failure.',
+        'investigation_assigned_to' => $incidentOwner->id,
+    ])->saveQuietly();
+    $journey['alert']->forceFill([
+        'assigned_to_user_id' => $controlRoomOwner->id,
+    ])->saveQuietly();
+    $journey['followup']->forceFill(['assigned_to_user_id' => $followupOwner->id])->saveQuietly();
+    $journey['investigation']->forceFill(['lead_investigator_id' => $investigationOwner->id])->saveQuietly();
+    $sourceTask = AlertTask::query()->create([
+        'alert_id' => $journey['alert']->id,
+        'title' => 'Replace the unsafe bathroom rail',
+        'description' => 'Permanent repair with a wide-angle completion photo.',
+        'assigned_to_user_id' => $controlRoomOwner->id,
+        'created_by_user_id' => $viewer->id,
+        'status' => AlertTask::STATUS_TRANSFERRED,
+        'priority' => 'high',
+        'transferred_at' => now(),
+        'transferred_by_user_id' => $viewer->id,
+        'transferred_to_hs_corrective_action_id' => $journey['action']->id,
+    ]);
+    $journey['action']->forceFill([
+        'source_control_room_task_id' => $sourceTask->id,
+        'assigned_to_user_id' => $actionOwner->id,
+        'status' => HsCorrectiveAction::STATUS_COMPLETED,
+        'completed_at' => now(),
+        'completed_by_user_id' => $actionOwner->id,
+        'completion_notes' => 'Permanent repair completed.',
+    ])->saveQuietly();
+
+    $serializedItems = collect((new TaskAggregator)->arrayFor($viewer));
+    $serializedAction = $serializedItems->firstWhere('id', 'corrective_action-'.$journey['action']->id);
+    $allJourneyIds = $serializedItems
+        ->where('journey.key', 'incident-'.$journey['incident']->id)
+        ->pluck('id')
+        ->sort()
+        ->values()
+        ->all();
+    $wholeJourneySearches = [
+        'Playwright Aroha Handover',
+        'Playwright Incident Handover House',
+        'Replace the unsafe bathroom rail',
+        'Permanent repair with a wide-angle completion photo.',
+        'Playwright Incident Investigator',
+        'Playwright Control Room Operator',
+        'Playwright Follow-up Owner',
+        'Playwright H&S Investigator',
+        'Playwright Corrective Action Owner',
+        $journey['alert']->reference_number,
+        $journey['incident']->reference_number,
+        $journey['event']->reference_number,
+        $journey['investigation']->reference_number,
+        $journey['action']->reference_number,
+        'bathroom rail failure',
+    ];
+
+    foreach ($wholeJourneySearches as $search) {
+        $found = collect((new TaskAggregator)->arrayFor($viewer, ['q' => $search]))
+            ->where('journey.key', 'incident-'.$journey['incident']->id)
+            ->pluck('id')
+            ->sort()
+            ->values()
+            ->all();
+
+        expect($found)->toBe($allJourneyIds, "Search [{$search}] did not find the full incident journey.");
+    }
+
+    $verificationResults = collect((new TaskAggregator)->arrayFor(
+        $viewer,
+        ['q' => 'awaiting independent verification'],
+    ));
+    expect($verificationResults->pluck('id'))
+        ->toContain('corrective_action-'.$journey['action']->id)
+        ->and($serializedAction)->not->toHaveKey('searchTerms')
+        ->and($serializedAction['journey'])->not->toHaveKey('search_terms');
+});
+
+it('searches incident journey responsibilities beyond each providers normal 300 row dashboard cap', function () {
+    $site = Site::factory()->create(['tenant_id' => 1]);
+    $viewer = makeIncidentJourneyTasksUser($site, [
+        'incidents.viewAny',
+        'controlRoom.viewAny',
+        'hazards.view',
+        'fleet.viewAny',
+    ]);
+    $client = Client::factory()->create([
+        'organization_id' => $site->tenant_id,
+        'site_id' => $site->id,
+    ]);
+    $journey = makeUniversalIncidentJourney($site, $client, $viewer, 'sensor');
+    $targetAction = $journey['action'];
+    $targetAction->forceFill([
+        'reference_number' => 'CA-BOUNDARY-TARGET',
+        'priority' => HsCorrectiveAction::PRIORITY_CRITICAL,
+        'due_date' => now()->subDay(),
+        'created_at' => now()->subYear(),
+        'updated_at' => now()->subYear(),
+    ])->saveQuietly();
+
+    $now = now();
+    DB::table('hs_corrective_actions')->insert(
+        collect(range(1, 301))
+            ->map(fn (int $index) => [
+                'hs_event_id' => $journey['event']->id,
+                'organization_id' => $site->tenant_id,
+                'reference_number' => sprintf('CA-DECOY-%04d', $index),
+                'action_type' => HsCorrectiveAction::TYPE_CORRECTIVE,
+                'priority' => HsCorrectiveAction::PRIORITY_LOW,
+                'title' => "Newer corrective action {$index}",
+                'status' => HsCorrectiveAction::STATUS_OPEN,
+                'due_date' => now()->addMonth()->toDateString(),
+                'created_by' => $viewer->id,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])
+            ->all(),
+    );
+    $queries = [];
+    DB::listen(function ($query) use (&$queries): void {
+        $queries[] = strtolower($query->sql);
+    });
+
+    $this->actingAs($viewer)
+        ->get('/tasks?sources=corrective_action&q='.$targetAction->reference_number)
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('items', fn ($items) => collect($items)
+                ->contains(fn ($item) => $item['id'] === 'corrective_action-'.$targetAction->id)));
+
+    expect(TaskSearch::hasQuery(['q' => '0']))->toBeTrue()
+        ->and(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'fleet_work_orders')))->toHaveCount(2)
+        ->and(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'fleet_service_schedules')))->toHaveCount(2)
+        ->and(collect($queries)->contains(
+            fn (string $sql) => str_contains($sql, 'hs_corrective_actions')
+                && str_contains($sql, ' like '),
+        ))->toBeTrue();
+});
+
 it('keeps completed journey work in explicit history only', function () {
     $site = Site::factory()->create(['tenant_id' => 1]);
     $user = makeIncidentJourneyTasksUser($site, ['hazards.view']);
@@ -268,6 +515,8 @@ it('replaces transferred operational work with one retry-safe H&S responsibility
 
     expect($retried->id)->toBe($first->id)
         ->and($task->fresh()->status)->toBe(AlertTask::STATUS_TRANSFERRED)
+        ->and($first->fresh()->source_control_room_task_id)->toBe($task->id)
+        ->and($task->fresh()->transferredCorrectiveAction->is($first))->toBeTrue()
         ->and($items->where('id', 'corrective_action-'.$first->id))->toHaveCount(1)
         ->and($items->pluck('id')->contains("alert_task-{$task->id}"))->toBeFalse()
         ->and(HsCorrectiveAction::query()->whereKey($first->id)->count())->toBe(1);

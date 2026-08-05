@@ -8,7 +8,7 @@ use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class SiteChecklistRunProvider implements TaskProvider, HasModelClass
+class SiteChecklistRunProvider implements HasModelClass, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -35,6 +35,7 @@ class SiteChecklistRunProvider implements TaskProvider, HasModelClass
     {
         $query = SiteChecklistRun::query()
             ->with(['site:id,name', 'template:id,name', 'assignedTo:id,name'])
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('scheduled_date')
             ->limit(300);
 

@@ -11,7 +11,7 @@ use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 use Illuminate\Validation\ValidationException;
 
-class SiteHazardProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
+class SiteHazardProvider implements AssignableTaskProvider, HasModelClass, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -83,6 +83,7 @@ class SiteHazardProvider implements TaskProvider, HasModelClass, AssignableTaskP
     {
         $query = SiteHazard::query()
             ->with(['site:id,name', 'assignedTo:id,name'])
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('created_at')
             ->limit(300);
 

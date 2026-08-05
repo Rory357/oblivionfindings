@@ -108,6 +108,7 @@ class ControlRoomSafetyHandoverTest extends TestCase
             'title' => 'Missed welfare check',
             'description' => 'The scheduled welfare check was missed.',
             'occurred_at' => now()->subMinutes(15)->toIso8601String(),
+            'immediate_action_taken' => 'The on-call worker completed an urgent welfare check.',
         ];
 
         foreach ([1, 2] as $attempt) {
@@ -205,6 +206,7 @@ class ControlRoomSafetyHandoverTest extends TestCase
                 'title' => 'Safety handover '.$reference,
                 'description' => 'Canonical handover test',
                 'occurred_at' => now(),
+                'immediate_action_taken' => 'Immediate safety controls were recorded for the handover.',
             ],
             $this->operator,
         );

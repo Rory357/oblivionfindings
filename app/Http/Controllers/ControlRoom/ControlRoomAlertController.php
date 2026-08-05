@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\ControlRoom;
 
+use App\Exceptions\RecoverableTaskAuthorizationException;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ControlRoom\AlertQueue;
 use App\Models\ControlRoom\AlertSla;
+use App\Models\ControlRoom\OperatorNote;
+use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
@@ -17,8 +20,10 @@ use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertWorklistPresenter;
 use App\Services\ControlRoom\AlertWorklistQuery;
 use App\Services\ControlRoom\AlertWorkspaceService;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
+use App\Services\ControlRoom\ControlRoomHandoverScopeService;
 use App\Services\ControlRoom\SensorIncidentBridgeService;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\UserSiteAccessService;
@@ -27,6 +32,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use InvalidArgumentException;
@@ -42,6 +48,7 @@ class ControlRoomAlertController extends Controller
         Request $request,
         AlertWorklistQuery $worklists,
         AlertWorklistPresenter $presenter,
+        ControlRoomHandoverScopeService $handoverScope,
     ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
@@ -55,8 +62,9 @@ class ControlRoomAlertController extends Controller
             default => 'active',
         };
         $assignedTo = (string) $request->input('assigned_to', '');
-        $query = $worklists->forUser($user, array_filter([
-            'lens' => $lens,
+        $carryForwardDrilldown = $request->input('handover') === 'carry-forward';
+        $worklistFilters = array_filter([
+            'lens' => $carryForwardDrilldown ? 'all_active' : $lens,
             'severity' => $request->input('severity'),
             'source' => $request->input('source'),
             'queue_id' => $request->input('queue_id'),
@@ -66,7 +74,11 @@ class ControlRoomAlertController extends Controller
             'q' => $request->input('search'),
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
-        ], fn ($value) => filled($value)));
+        ], fn ($value) => filled($value));
+        if ($carryForwardDrilldown) {
+            $worklistFilters['ids'] = $this->carryForwardAlertIds($user, $handoverScope);
+        }
+        $query = $worklists->forUser($user, $worklistFilters);
 
         if ($status !== '' && $status !== 'all') {
             $query->where('control_room_alerts.status', $status);
@@ -97,8 +109,9 @@ class ControlRoomAlertController extends Controller
         }
 
         $paginated = $query->paginate(30)->withQueryString();
-        $alerts = $paginated->through(function (ControlRoomAlert $alert) use ($presenter, $user): array {
-            $row = $presenter->present($alert, $user);
+        $canManageAlerts = $user->canDo('controlRoom.alerts.manage');
+        $alerts = $paginated->through(function (ControlRoomAlert $alert) use ($presenter, $user, $canManageAlerts): array {
+            $row = $presenter->present($alert, $user, $canManageAlerts);
 
             return array_merge($row, [
                 'alert_type' => $alert->alert_type,
@@ -197,6 +210,29 @@ class ControlRoomAlertController extends Controller
         ]);
     }
 
+    /** @return list<int> */
+    private function carryForwardAlertIds(
+        User $user,
+        ControlRoomHandoverScopeService $handoverScope,
+    ): array {
+        $shift = Shift::getCurrent();
+        if ($shift === null) {
+            return [];
+        }
+
+        $snapshotIds = data_get($shift->handover_snapshot, 'carry_forward_alert_ids');
+        if ($shift->handover_status === Shift::HANDOVER_PREPARED && is_array($snapshotIds)) {
+            return collect($snapshotIds)
+                ->filter(fn ($id): bool => is_numeric($id))
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        return $handoverScope->build($shift, $user)['carry_forward_alert_ids'];
+    }
+
     public function createIncident(
         Request $request,
         ControlRoomAlert $alert,
@@ -222,7 +258,15 @@ class ControlRoomAlertController extends Controller
             'occurred_at' => ['nullable', 'date'],
             'title' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
-            'immediate_action_taken' => ['nullable', 'string', 'max:5000'],
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn () => $this->requiresImmediateAction(
+                    $alert,
+                    $request->input('severity'),
+                )),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
             'requires_followup' => ['nullable', 'boolean'],
             'location' => ['nullable', 'string', 'max:255'],
         ]);
@@ -434,13 +478,24 @@ class ControlRoomAlertController extends Controller
     public function show(Request $request, ControlRoomAlert $alert)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
-        $this->assertCanAccessAlert($user, $alert);
+        abort_unless($user, 403);
+        $access = app(ControlRoomAlertAccessService::class);
+        $access->assertCanView(
+            $alert,
+            $user,
+            $request->query('return_to'),
+        );
+        $returnTo = RecoverableTaskAuthorizationException::validatedReturnTo(
+            $request->query('return_to'),
+        ) ?? ($user->canDo('controlRoom.viewAny')
+            ? '/control-room/alerts'
+            : '/tasks?sources=alert');
 
         // Deep-link fallback for the alert workspace: same payload as the
         // ?alert= modal-over-list on every Control Room surface.
         $detail = app(AlertWorkspaceService::class)->build($user, $alert->id);
         abort_unless($detail !== null, 404);
+        $detail['return_to'] = $returnTo;
 
         return Inertia::render('control-room/show', $detail);
     }
@@ -483,6 +538,15 @@ class ControlRoomAlertController extends Controller
             'type' => ['nullable', 'string', 'max:120'],
             'severity' => ['nullable', 'string', 'in:low,medium,high'],
             'note' => ['nullable', 'string', 'max:2000'],
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn () => $this->requiresImmediateAction(
+                    $alert,
+                    $request->input('severity'),
+                )),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
         ]);
 
         try {
@@ -658,7 +722,10 @@ class ControlRoomAlertController extends Controller
             return back()->withErrors(['alert' => $e->getMessage()]);
         }
 
-        return back()->with('success', 'Alert resolved.');
+        return back()->with(
+            'success',
+            'Operational response resolved. Linked incident and H&S governance remain open until their own closure gates are complete.',
+        );
     }
 
     /**
@@ -683,7 +750,7 @@ class ControlRoomAlertController extends Controller
             return back()->withErrors(['alert' => $e->getMessage()]);
         }
 
-        return back()->with('success', 'Alert closed.');
+        return back()->with('success', 'Journey closed.');
     }
 
     /**
@@ -934,9 +1001,17 @@ class ControlRoomAlertController extends Controller
 
         $data = $request->validate([
             'note' => ['required', 'string', 'max:2000'],
+            'purpose' => ['nullable', 'string', Rule::in(OperatorNote::PURPOSES)],
         ]);
 
-        $lifecycle->appendOperatorNote($alert, $user, $data['note'], 'note');
+        $lifecycle->appendOperatorNote(
+            $alert,
+            $user,
+            $data['note'],
+            'note',
+            OperatorNote::TYPE_NOTE,
+            $data['purpose'] ?? OperatorNote::PURPOSE_GENERAL,
+        );
 
         return back()->with('success', 'Note added.');
     }
@@ -1173,13 +1248,24 @@ class ControlRoomAlertController extends Controller
         return ['reports.viewAny'];
     }
 
+    private function requiresImmediateAction(
+        ControlRoomAlert $alert,
+        mixed $requestedSeverity,
+    ): bool {
+        $effectiveSeverity = $alert->severity === 'critical'
+            ? 'critical'
+            : (filled($requestedSeverity)
+                ? (string) $requestedSeverity
+                : (string) $alert->severity);
+
+        return in_array($effectiveSeverity, ['high', 'critical'], true);
+    }
+
     protected function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void
     {
-        $this->siteAccess()->assertCanAccessAlert(
-            $user,
+        app(ControlRoomAlertAccessService::class)->assertCanView(
             $alert,
-            $this->alertBypassPermissions(),
-            'You are not authorized to access alerts for this site.',
+            $user,
         );
     }
 

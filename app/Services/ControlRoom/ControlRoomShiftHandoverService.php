@@ -2,12 +2,11 @@
 
 namespace App\Services\ControlRoom;
 
+use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\Shift;
-use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -15,7 +14,8 @@ class ControlRoomShiftHandoverService
 {
     public function __construct(
         private readonly AlertWorklistQuery $worklist,
-        private readonly AlertWorklistPresenter $presenter,
+        private readonly ControlRoomHandoverScopeService $scope,
+        private readonly ControlRoomPreparedHandoverSnapshotService $preparedSnapshots,
     ) {}
 
     /**
@@ -26,11 +26,18 @@ class ControlRoomShiftHandoverService
         array $draft,
         User $actor,
         int $expectedVersion,
+        ?string $overrideReason = null,
     ): Shift {
-        return DB::transaction(function () use ($outgoing, $draft, $actor, $expectedVersion): Shift {
+        return DB::transaction(function () use (
+            $outgoing,
+            $draft,
+            $actor,
+            $expectedVersion,
+            $overrideReason,
+        ): Shift {
             $locked = $this->lockShift($outgoing);
+            $this->authorizePreparationActor($locked, $actor, $overrideReason);
             $this->assertVersion($locked, $expectedVersion);
-            $this->assertOutgoingLead($locked, $actor);
             $this->assertEditable($locked);
             $normalisedDraft = $this->normaliseDraft($draft);
             $this->assertDraftAlertsVisible($normalisedDraft, $actor);
@@ -55,11 +62,23 @@ class ControlRoomShiftHandoverService
         array $reviewedAlertIds,
         User $actor,
         int $expectedVersion,
+        ?string $overrideReason = null,
     ): Shift {
-        return DB::transaction(function () use ($outgoing, $incomingLead, $reviewedAlertIds, $actor, $expectedVersion): Shift {
+        return DB::transaction(function () use (
+            $outgoing,
+            $incomingLead,
+            $reviewedAlertIds,
+            $actor,
+            $expectedVersion,
+            $overrideReason,
+        ): Shift {
             $locked = $this->lockShift($outgoing);
+            $normalisedOverrideReason = $this->authorizePreparationActor(
+                $locked,
+                $actor,
+                $overrideReason,
+            );
             $this->assertVersion($locked, $expectedVersion);
-            $this->assertOutgoingLead($locked, $actor);
             $this->assertEditable($locked);
 
             if (! $incomingLead->canDo('controlRoom.alerts.manage')) {
@@ -75,8 +94,26 @@ class ControlRoomShiftHandoverService
                 ]);
             }
 
-            $alerts = $this->urgentAlertsFor($actor);
-            $requiredIds = $alerts->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+            $scope = $this->scope->build($locked, $actor);
+            $alerts = collect($scope['required_alerts']);
+            $requiredIds = $alerts
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->sort()
+                ->values()
+                ->all();
+            $incomingVisibleIds = $this->scope
+                ->visibleActiveAlertIds($incomingLead, $requiredIds)
+                ->sort()
+                ->values()
+                ->all();
+
+            if ($incomingVisibleIds !== $requiredIds) {
+                throw ValidationException::withMessages([
+                    'incoming_lead_user_id' => 'Choose an incoming lead who can access every required handover alert.',
+                ]);
+            }
+
             $reviewedIds = collect($reviewedAlertIds)
                 ->map(fn ($id) => (int) $id)
                 ->unique()
@@ -86,7 +123,7 @@ class ControlRoomShiftHandoverService
 
             if ($reviewedIds !== $requiredIds) {
                 throw ValidationException::withMessages([
-                    'reviewed_alert_ids' => 'Review every current critical and high alert before preparing the handover.',
+                    'reviewed_alert_ids' => 'Review every changed or decision-relevant alert before preparing the handover.',
                 ]);
             }
 
@@ -96,15 +133,25 @@ class ControlRoomShiftHandoverService
                 ->values();
             if ($priorityAlertIds->diff($requiredIds)->isNotEmpty()) {
                 throw ValidationException::withMessages([
-                    'priority_alert_ids' => 'Priority handover items must link to a reviewed critical or high alert.',
+                    'priority_alert_ids' => 'Priority handover items must link to reviewed required work.',
                 ]);
             }
 
             $preparedAt = now();
-            $alertSnapshots = $alerts
-                ->map(fn (ControlRoomAlert $alert) => $this->presentAlertSnapshot($alert, $actor))
-                ->values()
-                ->all();
+            $carryForward = $scope['carry_forward'];
+            $carryForwardTotal = (int) ($carryForward['total'] ?? 0);
+            $carryForwardAcknowledged = (bool) ($draft['carry_forward_acknowledged'] ?? false);
+            $carryForwardSignature = (string) ($draft['carry_forward_signature'] ?? '');
+            if ($carryForwardTotal > 0
+                && (
+                    ! $carryForwardAcknowledged
+                    || ! hash_equals((string) $carryForward['signature'], $carryForwardSignature)
+                )
+            ) {
+                throw ValidationException::withMessages([
+                    'carry_forward_acknowledged' => 'Acknowledge the current unchanged-alert summary before preparing the handover.',
+                ]);
+            }
 
             $incomingTeamIds = collect($draft['incoming_team_members'] ?? [])
                 ->map(fn ($id) => (int) $id)
@@ -122,6 +169,16 @@ class ControlRoomShiftHandoverService
                 'draft' => $draft,
                 'prepared_by' => ['id' => $actor->id, 'name' => $actor->name],
                 'prepared_at' => $preparedAt->toIso8601String(),
+                'override' => $normalisedOverrideReason === null
+                    ? null
+                    : [
+                        'actor' => ['id' => $actor->id, 'name' => $actor->name],
+                        'reason' => $normalisedOverrideReason,
+                        'at' => $preparedAt->toIso8601String(),
+                    ],
+                'criteria_at' => $scope['criteria_at'],
+                'next_expected_shift_at' => $scope['next_expected_shift_at'],
+                'criteria' => $scope['criteria'],
                 'handover_notes' => (string) ($draft['handover_notes'] ?? ''),
                 'incoming_shift' => [
                     'name' => filled($draft['incoming_shift_name'] ?? null)
@@ -130,9 +187,28 @@ class ControlRoomShiftHandoverService
                     'lead' => ['id' => $incomingLead->id, 'name' => $incomingLead->name],
                     'team_members' => $incomingTeam,
                 ],
+                'required_alert_ids' => $requiredIds,
                 'reviewed_alert_ids' => $reviewedIds,
                 'priority_alert_ids' => $priorityAlertIds->all(),
-                'alerts' => $alertSnapshots,
+                'alerts' => $alerts->values()->all(),
+                'carry_forward_alert_ids' => $scope['carry_forward_alert_ids'],
+                'carry_forward' => $carryForward,
+                'carry_forward_acknowledged' => $carryForwardTotal === 0 || $carryForwardAcknowledged,
+                'carry_forward_acknowledged_by' => [
+                    'id' => $actor->id,
+                    'name' => $actor->name,
+                ],
+                'carry_forward_acknowledged_at' => $preparedAt->toIso8601String(),
+                'pinned_notes' => $this->snapshotNotes(
+                    $locked,
+                    fn ($query) => $query->where('is_pinned', true),
+                ),
+                'followup_notes' => $this->snapshotNotes(
+                    $locked,
+                    fn ($query) => $query
+                        ->where('requires_followup', true)
+                        ->orderBy('followup_at'),
+                ),
             ];
 
             $locked->forceFill([
@@ -149,7 +225,17 @@ class ControlRoomShiftHandoverService
                 'incoming_lead_user_id' => $incomingLead->id,
                 'reviewed_alert_ids' => $reviewedIds,
                 'priority_alert_ids' => $priorityAlertIds->all(),
+                'required_alert_ids' => $requiredIds,
+                'carry_forward_total' => $carryForwardTotal,
+                'criteria_at' => $scope['criteria_at'],
                 'handover_version' => $locked->handover_version,
+                'override' => $normalisedOverrideReason === null
+                    ? null
+                    : [
+                        'actor_id' => $actor->id,
+                        'reason' => $normalisedOverrideReason,
+                        'at' => $preparedAt->toIso8601String(),
+                    ],
             ]);
 
             return $locked->fresh();
@@ -184,6 +270,19 @@ class ControlRoomShiftHandoverService
                 ]);
             }
 
+            $snapshot = $this->preparedSnapshots->validated($locked);
+            $requiredIds = $snapshot['required_alert_ids'];
+            $visibleRequiredIds = $this->scope
+                ->visibleAlertIds($actor, $requiredIds)
+                ->sort()
+                ->values()
+                ->all();
+            if ($visibleRequiredIds !== $requiredIds) {
+                throw ValidationException::withMessages([
+                    'handover' => 'Your current site access no longer covers every required handover alert. Ask the outgoing lead to choose an eligible incoming lead.',
+                ]);
+            }
+
             $activeShifts = Shift::query()->active()->lockForUpdate()->get(['id']);
             if ($activeShifts->contains(fn (Shift $shift) => $shift->id !== $locked->id)) {
                 throw ValidationException::withMessages([
@@ -191,7 +290,6 @@ class ControlRoomShiftHandoverService
                 ]);
             }
 
-            $snapshot = $locked->handover_snapshot ?? [];
             $incoming = data_get($snapshot, 'incoming_shift', []);
             $teamMemberIds = collect(data_get($incoming, 'team_members', []))
                 ->pluck('id')
@@ -253,11 +351,29 @@ class ControlRoomShiftHandoverService
         }
     }
 
-    private function assertOutgoingLead(Shift $shift, User $actor): void
-    {
-        if ((int) $shift->shift_lead_user_id !== $actor->id) {
+    private function authorizePreparationActor(
+        Shift $shift,
+        User $actor,
+        ?string $overrideReason,
+    ): ?string {
+        if ((int) $shift->shift_lead_user_id === $actor->id) {
+            return null;
+        }
+
+        if (! $shift->isHandoverStale()
+            || ! $actor->canDo('controlRoom.handovers.override')
+        ) {
             throw new AuthorizationException('Only the outgoing shift lead can prepare this handover.');
         }
+
+        $reason = trim((string) $overrideReason);
+        if (mb_strlen($reason) < 10 || mb_strlen($reason) > 2000) {
+            throw ValidationException::withMessages([
+                'override_reason' => 'Explain why the unavailable outgoing lead cannot complete this handover (10 to 2,000 characters).',
+            ]);
+        }
+
+        return $reason;
     }
 
     private function assertEditable(Shift $shift): void
@@ -267,38 +383,6 @@ class ControlRoomShiftHandoverService
                 'handover' => 'This handover can no longer be edited.',
             ]);
         }
-    }
-
-    /** @return Collection<int, ControlRoomAlert> */
-    private function urgentAlertsFor(User $actor)
-    {
-        return $this->worklist
-            ->forUser($actor, ['lens' => 'active'])
-            ->whereIn('control_room_alerts.severity', ['critical', 'high'])
-            ->with(['tasks' => fn ($query) => $query
-                ->whereNotIn('status', ['completed', 'cancelled', 'transferred'])
-                ->orderBy('due_at')
-                ->orderBy('id')])
-            ->get();
-    }
-
-    /** @return array<string, mixed> */
-    private function presentAlertSnapshot(ControlRoomAlert $alert, User $actor): array
-    {
-        $presented = $this->presenter->present($alert, $actor);
-        $presented['tasks'] = $alert->tasks
-            ->map(fn ($task) => [
-                'id' => $task->id,
-                'title' => $task->title,
-                'status' => $task->status,
-                'priority' => $task->priority,
-                'due_at' => $task->due_at?->toIso8601String(),
-                'href' => '/control-room/alerts/'.$alert->id,
-            ])
-            ->values()
-            ->all();
-
-        return $presented;
     }
 
     /** @param array<string, mixed> $draft */
@@ -313,11 +397,7 @@ class ControlRoomShiftHandoverService
             return;
         }
 
-        $visibleIds = $this->worklist
-            ->forUser($actor, ['lens' => 'active'])
-            ->whereIn('control_room_alerts.id', $ids)
-            ->pluck('control_room_alerts.id')
-            ->map(fn ($id) => (int) $id);
+        $visibleIds = $this->scope->visibleActiveAlertIds($actor, $ids->all());
 
         if ($visibleIds->count() !== $ids->count()) {
             throw ValidationException::withMessages([
@@ -348,6 +428,34 @@ class ControlRoomShiftHandoverService
             'incoming_team_members' => $normaliseIds($draft['incoming_team_members'] ?? []),
             'reviewed_alert_ids' => $normaliseIds($draft['reviewed_alert_ids'] ?? []),
             'priority_alert_ids' => $normaliseIds($draft['priority_alert_ids'] ?? []),
+            'carry_forward_acknowledged' => (bool) ($draft['carry_forward_acknowledged'] ?? false),
+            'carry_forward_signature' => filled($draft['carry_forward_signature'] ?? null)
+                ? trim((string) $draft['carry_forward_signature'])
+                : null,
         ];
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function snapshotNotes(Shift $shift, callable $scope): array
+    {
+        return OperatorNote::query()
+            ->where('shift_id', $shift->id)
+            ->tap($scope)
+            ->with('user:id,name')
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn (OperatorNote $note): array => [
+                'id' => $note->id,
+                'type' => $note->type,
+                'content' => $note->content,
+                'is_pinned' => $note->is_pinned,
+                'requires_followup' => $note->requires_followup,
+                'followup_at' => $note->followup_at?->toIso8601String(),
+                'user' => $note->user
+                    ? ['id' => $note->user->id, 'name' => $note->user->name]
+                    : null,
+                'created_at' => $note->created_at->toIso8601String(),
+            ])
+            ->all();
     }
 }

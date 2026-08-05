@@ -85,6 +85,7 @@ use App\Services\AuditLogger;
 use App\Services\Client\ActionsAggregator;
 use App\Services\Client\BehaviourPatternsService;
 use App\Services\Clients\ClientFamilyCommunicationAccess;
+use App\Services\Clients\ClientFormOptions;
 use App\Services\Clients\ClientOnboardingAccess;
 use App\Services\Clients\ClientPhotoMediaUrls;
 use App\Services\Clients\ClientPhotoStorage;
@@ -242,72 +243,9 @@ class ClientController extends Controller
             // Option lists for the in-context "Add client" wizard so it can
             // render without an extra round-trip.
             ...($user->canDo('clients.create')
-                ? $this->clientFormOptions($user)
+                ? app(ClientFormOptions::class)->forViewer($user)
                 : []),
         ]);
-    }
-
-    /**
-     * Shared option lists for the Add Client wizard (and the legacy create page):
-     * sites, service contexts, assignable key workers and monitored-home
-     * geofences, plus the application default service context.
-     */
-    private function clientFormOptions(?User $user): array
-    {
-        $availableSiteIds = app(UserSiteAccessService::class)->accessibleSiteIds(
-            $user,
-            ['clients.create'],
-        );
-        $defaultServiceContextId = ServiceContext::defaultId();
-        if (
-            $defaultServiceContextId !== null
-            && ! ServiceContext::query()
-                ->availableToSites($availableSiteIds)
-                ->whereKey($defaultServiceContextId)
-                ->exists()
-        ) {
-            $defaultServiceContextId = null;
-        }
-
-        $sites = Site::query()
-            ->whereIn('id', $availableSiteIds)
-            ->where('is_active', true)
-            ->with(['houseRooms' => fn ($query) => $query
-                ->where('is_active', true)
-                ->where('is_assignable', true)
-                ->orderBy('sort_order')
-                ->orderBy('name')])
-            ->orderBy('name')
-            ->get(['id', 'name']);
-        $availableSiteIds = $sites->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
-
-        return [
-            'sites' => $sites->map(fn (Site $site) => [
-                'id' => $site->id,
-                'name' => $site->name,
-                'rooms' => $site->houseRooms->map(fn (SiteHouseRoom $room) => [
-                    'id' => $room->id,
-                    'name' => $room->name,
-                    'notes' => $room->notes,
-                ])->values(),
-            ]),
-            'serviceContexts' => ServiceContext::query()
-                ->availableToSites($availableSiteIds)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(['id', 'site_id', 'type', 'name']),
-            'keyWorkers' => app(ClientWorkerEligibility::class)
-                ->queryForViewer($user, ['clients.create'])
-                ->orderBy('name')
-                ->get(['id', 'name']),
-            'geofences' => AssetGeofence::query()
-                ->where('is_active', true)
-                ->whereIn('site_id', $availableSiteIds)
-                ->whereIn('scope', ['house', 'resident'])
-                ->orderBy('name')
-                ->get(['id', 'site_id', 'name']),
-            'defaultServiceContextId' => $defaultServiceContextId,
-        ];
     }
 
     /** Two-letter initials from a display name (e.g. "Mere Tipene" → "MT"). */
@@ -446,9 +384,8 @@ class ClientController extends Controller
         )->canView($request->user(), $client);
         $onboardingAccess = app(ClientOnboardingAccess::class)
             ->forClient($request->user(), $client);
-        $clientTenantId = $this->clientTenantId($client);
         $profileRelations = [
-            'site:id,tenant_id,name',
+            'site:id,name',
             'room:id,site_id,name,notes',
             'serviceContext:id,type,name',
             'keyWorker:id,name',
@@ -1583,7 +1520,6 @@ class ClientController extends Controller
             'personal_assets' => $sectionAccess['personal_assets']
                 ? $this->buildPersonalAssetsData(
                     $client,
-                    $clientTenantId,
                     $canViewClientLocation,
                     $canManageClientTrackers,
                 )
@@ -2163,7 +2099,6 @@ class ClientController extends Controller
 
     private function buildPersonalAssetsData(
         Client $client,
-        int $tenantId,
         bool $canViewLocation,
         bool $canManageTrackers,
     ) {
@@ -2171,23 +2106,18 @@ class ClientController extends Controller
             ->where('client_id', $client->id)
             ->with([
                 'recordedBy:id,name',
-                'site:id,tenant_id,name',
-                'room:id,site_id,tenant_id,name',
+                'site:id,name',
+                'room:id,site_id,name',
                 'trackerDevice',
             ])
             ->orderByDesc('created_at')
             ->get()
-            ->map(function (ClientPersonalAsset $asset) use ($tenantId, $canViewLocation, $canManageTrackers): array {
-                $site = $asset->site && (int) $asset->site->tenant_id === $tenantId
-                    ? $asset->site
-                    : null;
+            ->map(function (ClientPersonalAsset $asset) use ($canViewLocation, $canManageTrackers): array {
+                $site = $asset->site;
                 $room = $site && $asset->room && (int) $asset->room->site_id === (int) $site->id
                     ? $asset->room
                     : null;
-                $tracker = $asset->trackerDevice
-                    && (int) $asset->trackerDevice->tenant_id === $tenantId
-                    ? $asset->trackerDevice
-                    : null;
+                $tracker = $asset->trackerDevice;
                 $trackerMeta = $tracker?->meta ?? [];
 
                 return [
@@ -2418,7 +2348,7 @@ class ClientController extends Controller
 
         return inertia(
             'operations/clients/create',
-            $this->clientFormOptions($request->user()),
+            app(ClientFormOptions::class)->forViewer($request->user()),
         );
     }
 
@@ -2465,8 +2395,26 @@ class ClientController extends Controller
             }
 
             $auth = $request->user();
+            $clientFields['organization_id'] = $auth->organization_id;
 
             $client = DB::transaction(function () use ($clientFields, $medical, $conditions, $emergencyContacts, $createPortalUser, $data, $auth, $portalMembership) {
+                if (! empty($clientFields['room_id'])) {
+                    $roomIsStillAvailable = SiteHouseRoom::query()
+                        ->whereKey((int) $clientFields['room_id'])
+                        ->where('site_id', $clientFields['site_id'] ?? null)
+                        ->where('is_active', true)
+                        ->where('is_assignable', true)
+                        ->whereNull('assigned_client_id')
+                        ->lockForUpdate()
+                        ->exists();
+
+                    if (! $roomIsStillAvailable) {
+                        throw ValidationException::withMessages([
+                            'room_id' => 'This room is no longer available.',
+                        ]);
+                    }
+                }
+
                 $client = Client::create($clientFields);
                 $this->syncClientRoomAssignment($client);
 
@@ -2566,6 +2514,8 @@ class ClientController extends Controller
             return redirect()
                 ->route('clients.index')
                 ->with('success', 'Client created successfully.');
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             report($e);
 
@@ -2989,7 +2939,7 @@ class ClientController extends Controller
                 'integer',
                 function (string $attribute, mixed $value, \Closure $fail) use ($client): void {
                     if (! app(ClientWorkerEligibility::class)->contains($client, (int) $value)) {
-                        $fail('Choose an eligible key worker from this organisation.');
+                        $fail('Choose a current key worker assigned to the selected Site.');
                     }
                 },
             ],
@@ -3281,25 +3231,6 @@ class ClientController extends Controller
             'medication_logs' => $medicationLogs,
             'bookings' => $bookings,
         ];
-    }
-
-    /**
-     * Build location/tracker data for the client profile.
-     * Reads from canonical Security & Devices registry.
-     */
-    private function clientTenantId(Client $client): int
-    {
-        if ($client->organization_id !== null) {
-            return (int) $client->organization_id;
-        }
-
-        $siteTenantId = $client->relationLoaded('site')
-            ? $client->site?->tenant_id
-            : $client->site()->value('tenant_id');
-
-        // Preserve the repository's single-tenant compatibility convention only
-        // after checking the client's real organisation and site tenant.
-        return (int) ($siteTenantId ?? 1);
     }
 
     private function canViewClientLocation(?User $user, Client $client): bool

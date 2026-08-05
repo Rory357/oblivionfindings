@@ -20,6 +20,8 @@ use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
+use App\Models\HsInvestigation;
+use App\Models\IncidentFollowup;
 use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
@@ -34,6 +36,7 @@ use App\Services\ControlRoom\IncidentAlertOperationalInitializer;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Support\Journeys\JourneyGate;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Contracts\Notifications\Dispatcher;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -66,6 +69,136 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertTrue($journey->incident->is($incident));
         $this->assertNull($journey->alert);
         $this->assertNull($journey->hsEvent);
+    }
+
+    public function test_alert_read_resolution_rejects_a_foreign_client_claim(): void
+    {
+        $alertClient = Client::factory()->create();
+        $incidentClient = Client::factory()->create();
+        $incident = $this->incidentWithoutEvents([
+            'client_id' => $incidentClient->id,
+        ]);
+        $alert = ControlRoomAlert::factory()->create([
+            'client_id' => $alertClient->id,
+            'context' => ['incident_id' => $incident->id],
+        ]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('alert client does not match');
+
+        app(IncidentJourneyService::class)->incidentForAlert($alert);
+    }
+
+    public function test_incident_close_gate_rejects_a_poisoned_direct_hs_link(): void
+    {
+        $incident = $this->incidentWithoutEvents([
+            'status' => 'reviewed',
+            'reviewed_at' => now(),
+            'reviewed_by' => User::factory()->create()->id,
+        ]);
+        $foreignEvent = HsEvent::factory()->closed()->create();
+        $incident->updateQuietly(['hs_event_id' => $foreignEvent->id]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('canonical incident tuple');
+
+        app(IncidentJourneyService::class)->closeGate($incident);
+    }
+
+    public function test_incident_close_gate_rejects_a_direct_hs_link_to_a_different_alert(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $incidentAlert = ControlRoomAlert::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+        $foreignAlert = ControlRoomAlert::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+        $incident = $this->incidentWithoutEvents([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'status' => 'reviewed',
+            'reviewed_at' => now(),
+            'reviewed_by' => $actor->id,
+            'control_room_alert_id' => $incidentAlert->id,
+        ]);
+        $event = HsEvent::factory()
+            ->forClientIncident($incident)
+            ->closed()
+            ->create([
+                'client_id' => $client->id,
+                'site_id' => $site->id,
+                'control_room_alert_id' => $foreignAlert->id,
+            ]);
+        $incident->updateQuietly(['hs_event_id' => $event->id]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('different direct alert');
+
+        app(IncidentJourneyService::class)->closeGate($incident);
+    }
+
+    public function test_incident_close_gate_requires_review_followups_investigation_and_linked_hs_closure(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'status' => 'reviewed',
+            'reviewed_at' => now(),
+            'reviewed_by' => $actor->id,
+            'severity' => 'high',
+            'investigation_status' => 'in_progress',
+        ]);
+        $followup = IncidentFollowup::factory()->create([
+            'client_incident_id' => $incident->id,
+            'completed_at' => null,
+        ]);
+        $event = HsEvent::factory()->forClientIncident($incident)->create([
+            'status' => HsEvent::STATUS_OPEN,
+            'investigation_required' => true,
+        ]);
+        $investigation = HsInvestigation::factory()->create([
+            'hs_event_id' => $event->id,
+        ]);
+        $incident->updateQuietly(['hs_event_id' => $event->id]);
+        $service = app(IncidentJourneyService::class);
+
+        $blocked = $service->closeGate($incident);
+
+        $this->assertInstanceOf(JourneyGate::class, $blocked);
+        $this->assertFalse($blocked->allowed);
+        $this->assertTrue(collect($blocked->requirements)->firstWhere('key', 'incident_review')['complete']);
+        $this->assertFalse(collect($blocked->requirements)->firstWhere('key', 'incident_followups')['complete']);
+        $this->assertFalse(collect($blocked->requirements)->firstWhere('key', 'incident_investigation')['complete']);
+        $this->assertSame(
+            "/health-safety/events/{$event->id}?section=investigation",
+            collect($blocked->requirements)->firstWhere('key', 'incident_investigation')['href'],
+        );
+        $this->assertFalse(collect($blocked->requirements)->firstWhere('key', 'health_safety_governance')['complete']);
+        foreach ($blocked->requirements as $requirement) {
+            $this->assertSame(['key', 'complete', 'label', 'href'], array_keys($requirement));
+        }
+
+        $followup->update(['completed_at' => now()]);
+        $investigation->forceFill([
+            'status' => HsInvestigation::STATUS_COMPLETED,
+            'completed_at' => now(),
+        ])->save();
+        $event->forceFill([
+            'status' => HsEvent::STATUS_CLOSED,
+            'closed_at' => now(),
+            'closed_by' => $actor->id,
+            'closure_summary' => 'Governance work is complete.',
+        ])->saveQuietly();
+
+        $ready = $service->closeGate($incident->fresh());
+        $this->assertTrue($ready->allowed);
+        $this->assertTrue(collect($ready->requirements)->every('complete'));
     }
 
     public function test_existing_triaging_alert_submits_one_linked_journey_and_retries_without_disturbing_operations(): void
@@ -152,6 +285,8 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertSame($site->id, $hsEvent->site_id);
         $this->assertSame($client->id, $hsEvent->client_id);
         $this->assertSame($actor->id, $hsEvent->staff_id);
+        $this->assertNull($hsEvent->worksafe_notifiable);
+        $this->assertNull($hsEvent->worksafe_decided_at);
         $this->assertSame(HsEvent::HANDOVER_AWAITING_ACCEPTANCE, $hsEvent->handover_status);
 
         $this->assertSame(ControlRoomAlert::STATUS_TRIAGING, $alert->status);
@@ -196,6 +331,170 @@ class IncidentJourneyServiceTest extends TestCase
         );
         $this->assertSame('metadata', $journey->incident->fresh()->metadata['original']);
         $this->assertSame('context', $journey->alert->fresh()->context['original']);
+    }
+
+    public function test_serious_alert_submission_requires_immediate_action_at_the_domain_boundary(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->high()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage(
+            'Immediate action is required for a high or critical Control Room incident.',
+        );
+
+        app(IncidentJourneyService::class)->submitFromAlert(
+            $alert,
+            $this->incidentInput($client, $site, [
+                'immediate_action_taken' => '   ',
+            ]),
+            $actor,
+        );
+    }
+
+    public function test_serious_alert_submission_accepts_explicit_no_control_truth(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->critical()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+
+        $journey = app(IncidentJourneyService::class)->submitFromAlert(
+            $alert,
+            $this->incidentInput($client, $site, [
+                'immediate_action_taken' => 'No immediate control was possible',
+            ]),
+            $actor,
+        );
+
+        $this->assertSame(
+            'No immediate control was possible',
+            $journey->incident->fresh()->immediate_action_taken,
+        );
+    }
+
+    public function test_low_and_medium_alert_submissions_allow_no_immediate_action(): void
+    {
+        foreach (['low', 'medium'] as $severity) {
+            $actor = User::factory()->create();
+            $site = Site::factory()->create();
+            $client = Client::factory()->create(['site_id' => $site->id]);
+            $alert = ControlRoomAlert::factory()->create([
+                'severity' => $severity,
+                'client_id' => $client->id,
+                'site_id' => $site->id,
+            ]);
+
+            $journey = app(IncidentJourneyService::class)->submitFromAlert(
+                $alert,
+                $this->incidentInput($client, $site, [
+                    'severity' => $severity,
+                    'immediate_action_taken' => null,
+                ]),
+                $actor,
+            );
+
+            $this->assertNull(
+                $journey->incident->fresh()->immediate_action_taken,
+            );
+        }
+    }
+
+    public function test_task12_review_effective_high_incident_severity_is_enforced_at_the_domain_boundary(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->create([
+            'severity' => 'low',
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage(
+            'Immediate action is required for a high or critical Control Room incident.',
+        );
+
+        app(IncidentJourneyService::class)->submitFromAlert(
+            $alert,
+            $this->incidentInput($client, $site, [
+                'severity' => 'high',
+                'immediate_action_taken' => null,
+            ]),
+            $actor,
+        );
+    }
+
+    public function test_task12_review_attach_rejects_a_submitted_serious_incident_without_immediate_action(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->high()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+        $incident = $this->incidentWithoutEvents([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'reported_by' => $actor->id,
+            'severity' => 'high',
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'immediate_action_taken' => null,
+        ]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage(
+            'Immediate action is required for a high or critical Control Room incident.',
+        );
+
+        app(IncidentJourneyService::class)->attachAlertToIncident(
+            $incident,
+            $alert,
+            $actor,
+        );
+    }
+
+    public function test_task12_review_critical_alert_floor_applies_to_a_submitted_medium_incident_repair(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->critical()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+        $this->incidentWithoutEvents([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'reported_by' => $actor->id,
+            'severity' => 'medium',
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'control_room_alert_id' => $alert->id,
+            'immediate_action_taken' => null,
+        ]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage(
+            'Immediate action is required for a high or critical Control Room incident.',
+        );
+
+        app(IncidentJourneyService::class)->submitFromAlert(
+            $alert,
+            [],
+            $actor,
+        );
     }
 
     public function test_reviewed_and_closed_incident_retries_are_link_only_and_preserve_the_record(): void
@@ -1728,6 +2027,7 @@ class IncidentJourneyServiceTest extends TestCase
         $client = Client::factory()->create(['site_id' => $site->id]);
         $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
             'severity' => 'high',
+            'immediate_action_taken' => 'Immediate controls recorded before the lock-order assertion.',
         ]);
         $alert = ControlRoomAlert::factory()->open()->create([
             'client_id' => $client->id,
@@ -2223,6 +2523,36 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertDatabaseCount('hs_events', 0);
         $this->assertDatabaseCount('control_room_alerts', 1);
         $this->assertSame($before, $alert->fresh()->only(array_keys($before)));
+    }
+
+    public function test_direct_health_safety_reads_fail_closed_on_client_or_site_mismatch(): void
+    {
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $otherClient = Client::factory()->create(['site_id' => $site->id]);
+
+        foreach ([
+            ['client_id' => $otherClient->id, 'site_id' => $site->id, 'field' => 'client_id'],
+            ['client_id' => $client->id, 'site_id' => $otherSite->id, 'field' => 'site_id'],
+        ] as $mismatch) {
+            $incident = $this->incidentWithoutEvents([
+                'client_id' => $client->id,
+                'site_id' => $site->id,
+            ]);
+            $event = HsEvent::factory()->forClientIncident($incident)->create([
+                'client_id' => $mismatch['client_id'],
+                'site_id' => $mismatch['site_id'],
+            ]);
+            $incident->updateQuietly(['hs_event_id' => $event->id]);
+
+            try {
+                app(IncidentJourneyService::class)->journeyForIncident($incident->fresh());
+                $this->fail("A mismatched direct H&S {$mismatch['field']} was accepted.");
+            } catch (\DomainException $exception) {
+                $this->assertStringContainsString($mismatch['field'], $exception->getMessage());
+            }
+        }
     }
 
     public function test_journey_lookup_uses_legacy_fallbacks_without_creating_or_repairing_records(): void

@@ -754,9 +754,9 @@ describe('QueclinkHub page chrome', () => {
         // not the former bespoke gradient banner.
         expect(screen.getByText('Back to APIs & Integrations')).toBeVisible();
         expect(screen.getByText('Paired devices')).toBeVisible();
-        expect(screen.getByTestId('queclink-tab-list'))
-            .toHaveClass('border-b', 'flex-wrap')
-            .not.toHaveClass('overflow-x-auto');
+        const tabList = screen.getByTestId('queclink-tab-list');
+        expect(tabList).toHaveClass('border-b', 'flex-wrap');
+        expect(tabList).not.toHaveClass('overflow-x-auto');
     });
 });
 

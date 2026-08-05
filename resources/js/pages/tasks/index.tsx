@@ -38,6 +38,8 @@ import {
     humanise,
     SEVERITY_VARIANT,
     taskNumericId,
+    taskRecordSource,
+    taskStateLabel,
     type TaskItem,
     type TaskSeverity,
 } from '@/pages/tasks/types';
@@ -276,6 +278,11 @@ export default function TasksIndex({
     const [search, setSearch] = useState(filters.q ?? '');
     const [selected, setSelected] = useState<TaskItem | null>(null);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const detailTriggerRef = useRef<HTMLElement | null>(null);
+    const taskReturnTo =
+        typeof window === 'undefined'
+            ? '/tasks'
+            : `${window.location.pathname}${window.location.search}`;
 
     // The debounce timer must always read the LATEST committed filters —
     // a closure over the render-time `filters` re-applies stale filters
@@ -424,7 +431,7 @@ export default function TasksIndex({
     /* ── Assignment (the queue's one write action) ── */
     const assign = (item: TaskItem, assigneeId: number | null) =>
         router.post(
-            `/tasks/${item.source}/${taskNumericId(item)}/assign`,
+            `/tasks/${taskRecordSource(item)}/${taskNumericId(item)}/assign`,
             { assignee_id: assigneeId },
             { preserveState: true, preserveScroll: true },
         );
@@ -499,7 +506,7 @@ export default function TasksIndex({
             x: e.clientX,
             y: e.clientY,
             tag: item.severity.toUpperCase(),
-            meta: `${item.ref ?? humanise(item.status)} · ${item.sourceLabel}`,
+            meta: `${item.ref ?? taskStateLabel(item)} · ${item.sourceLabel}`,
             items: menu,
         });
     };
@@ -829,19 +836,35 @@ export default function TasksIndex({
                                             const due = dueInfo(item);
                                             // Row click previews in the drawer; the deep link
                                             // lives on the drawer button + context menu now.
-                                            const open = () =>
+                                            const open = (
+                                                trigger: HTMLElement,
+                                            ) => {
+                                                detailTriggerRef.current =
+                                                    trigger;
                                                 setSelected(item);
+                                            };
                                             return (
                                                 <tr
                                                     key={item.id}
                                                     role="button"
                                                     tabIndex={0}
+                                                    aria-label={`Open ${item.ref ?? item.title}`}
                                                     data-test="tasks-row"
-                                                    onClick={open}
-                                                    onKeyDown={(e) =>
-                                                        e.key === 'Enter' &&
-                                                        open()
+                                                    onClick={(event) =>
+                                                        open(
+                                                            event.currentTarget,
+                                                        )
                                                     }
+                                                    onKeyDown={(event) => {
+                                                        if (
+                                                            event.key ===
+                                                            'Enter'
+                                                        ) {
+                                                            open(
+                                                                event.currentTarget,
+                                                            );
+                                                        }
+                                                    }}
                                                     onContextMenu={(e) =>
                                                         openRowCtx(e, item)
                                                     }
@@ -891,7 +914,7 @@ export default function TasksIndex({
                                                         </StatusBadge>
                                                     </td>
                                                     <td className="px-3 py-2.5 whitespace-nowrap">
-                                                        {humanise(item.status)}
+                                                        {taskStateLabel(item)}
                                                     </td>
                                                     <td className="px-3 py-2.5 whitespace-nowrap">
                                                         {item.assignee ? (
@@ -975,6 +998,8 @@ export default function TasksIndex({
                 item={selected}
                 currentUserId={currentUserId}
                 onClose={() => setSelected(null)}
+                returnTo={taskReturnTo}
+                triggerRef={detailTriggerRef}
             />
         </AppLayout>
     );

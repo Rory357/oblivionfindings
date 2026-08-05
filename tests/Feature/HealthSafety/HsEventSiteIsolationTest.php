@@ -153,9 +153,16 @@ class HsEventSiteIsolationTest extends TestCase
             ["/health-safety/events/{$hiddenEvent->id}/corrective-actions", [
                 'title' => 'Cross-site action',
                 'priority' => HsCorrectiveAction::PRIORITY_HIGH,
+                'assigned_to_user_id' => $user->id,
+                'due_date' => now()->addDays(14)->toDateString(),
             ]],
             ["/health-safety/events/{$hiddenEvent->id}/investigations/{$hiddenInvestigation->id}/seed-action", [
                 'recommendation_index' => 0,
+                'assigned_to_user_id' => $user->id,
+                'due_date' => now()->addDays(14)->toDateString(),
+                'priority' => HsCorrectiveAction::PRIORITY_HIGH,
+                'responsibility_choice' => 'new_responsibility',
+                'new_responsibility_reason' => 'This cross-site request must never reach the hidden recommendation.',
             ]],
             ["/health-safety/events/{$hiddenEvent->id}/corrective-actions/{$open->id}/start", []],
             ["/health-safety/events/{$hiddenEvent->id}/corrective-actions/{$inProgress->id}/complete", [
@@ -218,6 +225,7 @@ class HsEventSiteIsolationTest extends TestCase
                 'title' => 'Site-specific safety action',
                 'priority' => HsCorrectiveAction::PRIORITY_HIGH,
                 'assigned_to_user_id' => $otherSiteManager->id,
+                'due_date' => now()->addDays(14)->toDateString(),
             ])
             ->assertSessionHasErrors('assigned_to_user_id');
 

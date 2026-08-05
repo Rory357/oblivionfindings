@@ -63,7 +63,7 @@ import {
     Wifi,
     WifiOff,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import {
     PlanThumbnail,
     type PlanLayout,
@@ -122,13 +122,51 @@ type TypePlanSummary = {
     has_plan: boolean;
 };
 
-type Props = {
+export type SiteHardwareProps = {
     site: Site;
     devices: DeviceItem[];
     rooms: Room[];
     can: Permissions;
     typePlan?: TypePlanSummary | null;
 };
+
+function SiteHardwareFrame({
+    embedded,
+    site,
+    children,
+}: {
+    embedded: boolean;
+    site: Site;
+    children: ReactNode;
+}) {
+    if (embedded) return <Fragment>{children}</Fragment>;
+
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Sites', href: '/sites' },
+                { title: site.name, href: `/sites/${site.id}` },
+                { title: 'Hardware', href: `/sites/${site.id}/hardware` },
+            ]}
+        >
+            {children}
+        </AppLayout>
+    );
+}
+
+function SiteHardwareShell({
+    embedded,
+    children,
+}: {
+    embedded: boolean;
+    children: ReactNode;
+}) {
+    return embedded ? (
+        <Fragment>{children}</Fragment>
+    ) : (
+        <PageShell>{children}</PageShell>
+    );
+}
 
 // ---------------------------------------------------------------------------
 // Status helpers
@@ -218,13 +256,14 @@ function formatDateTime(value?: string | null): string {
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function SiteHardware({
+export function SiteHardwareSurface({
     site,
     devices,
     rooms,
     can,
     typePlan = null,
-}: Props) {
+    embedded = false,
+}: SiteHardwareProps & { embedded?: boolean }) {
     // ── filter / search state ──────────────────────────────────────
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -325,7 +364,7 @@ export default function SiteHardware({
     }, [devices, search, filterStatus, filterCategory, filterProvider]);
 
     const canManageHardware = !!can?.manage_hardware;
-    const planForPins = typePlan?.draft ?? typePlan?.published ?? null;
+    const planForPins = typePlan?.published ?? typePlan?.draft ?? null;
 
     // ── handlers ───────────────────────────────────────────────────
     function submitRoom(e: React.FormEvent) {
@@ -443,67 +482,95 @@ export default function SiteHardware({
 
     // ── render ─────────────────────────────────────────────────────
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Sites', href: '/sites' },
-                { title: site.name, href: `/sites/${site.id}` },
-                { title: 'Hardware', href: `/sites/${site.id}/hardware` },
-            ]}
-        >
-            <Head title={`${site.name} - Hardware`} />
+        <SiteHardwareFrame embedded={embedded} site={site}>
+            {!embedded ? <Head title={`${site.name} - Hardware`} /> : null}
 
-            <PageShell>
-                <PageHero
-                    icon={HardDrive}
-                    backHref={`/sites/${site.id}`}
-                    backLabel="Back to site"
-                    title="Hardware at this location"
-                    description="See devices at this Site and manage their room and floor-plan placement. Device lifecycle and monitoring live in Security & Devices."
-                    stats={[
-                        { label: 'Total', value: stats.total },
-                        { label: 'Online', value: stats.online },
-                        { label: 'Offline', value: stats.offline },
-                        { label: 'Unassigned', value: stats.unassigned },
-                    ]}
-                    actions={
-                        <div className="flex items-center gap-2">
-                            {planForPins && (
+            <SiteHardwareShell embedded={embedded}>
+                {!embedded ? (
+                    <PageHero
+                        icon={HardDrive}
+                        backHref={`/sites/${site.id}`}
+                        backLabel="Back to site"
+                        title="Hardware at this location"
+                        description="Read-only view of devices at this site, with room placement. Device management lives in Security & Devices."
+                        stats={[
+                            { label: 'Total', value: stats.total },
+                            { label: 'Online', value: stats.online },
+                            { label: 'Offline', value: stats.offline },
+                            { label: 'Unassigned', value: stats.unassigned },
+                        ]}
+                        actions={
+                            <div className="flex items-center gap-2">
+                                {planForPins && (
+                                    <Button
+                                        asChild
+                                        variant="outline"
+                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
+                                        <Link
+                                            href={`/sites/${site.id}?tab=type-plan`}
+                                        >
+                                            <MapPin className="mr-1 h-4 w-4" />
+                                            Open {typePlan?.tab_label ?? 'Plan'}
+                                        </Link>
+                                    </Button>
+                                )}
                                 <Button
                                     asChild
                                     variant="outline"
                                     className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                 >
-                                    <Link
-                                        href={`/sites/${site.id}?tab=type-plan`}
+                                    <a
+                                        href={`/security-devices/devices?site_id=${site.id}`}
                                     >
-                                        <MapPin className="mr-1 h-4 w-4" />
-                                        Open {typePlan?.tab_label ?? 'Plan'}
-                                    </Link>
+                                        Manage in Security &amp; Devices
+                                        <ArrowRight className="ml-1 h-4 w-4" />
+                                    </a>
                                 </Button>
-                            )}
-                            <Button
-                                asChild
-                                variant="outline"
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <a
-                                    href={`/security-devices/devices?site_id=${site.id}`}
-                                >
-                                    Manage in Security &amp; Devices
-                                    <ArrowRight className="ml-1 h-4 w-4" />
-                                </a>
-                            </Button>
-                            <Button asChild>
-                                <a
-                                    href={`/security-devices/devices/create?domain=&site_id=${site.id}`}
-                                >
-                                    <Plus className="mr-1 h-4 w-4" />
-                                    Register Device
-                                </a>
-                            </Button>
-                        </div>
-                    }
-                />
+                                <Button asChild>
+                                    <a
+                                        href={`/security-devices/devices/create?domain=&site_id=${site.id}`}
+                                    >
+                                        <Plus className="mr-1 h-4 w-4" />
+                                        Register Device
+                                    </a>
+                                </Button>
+                            </div>
+                        }
+                    />
+                ) : (
+                    <Card>
+                        <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <CardTitle>Hardware at this location</CardTitle>
+                                <CardDescription>
+                                    Canonical device register, live state, room
+                                    assignment and plan-pin controls.
+                                </CardDescription>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {planForPins ? (
+                                    <Button asChild variant="outline">
+                                        <Link
+                                            href={`/sites/${site.id}?tab=plan`}
+                                        >
+                                            <MapPin className="mr-1 h-4 w-4" />
+                                            Open {typePlan?.tab_label ?? 'Plan'}
+                                        </Link>
+                                    </Button>
+                                ) : null}
+                                <Button asChild variant="outline">
+                                    <a
+                                        href={`/security-devices/devices?site_id=${site.id}`}
+                                    >
+                                        Manage in Security &amp; Devices
+                                        <ArrowRight className="ml-1 h-4 w-4" />
+                                    </a>
+                                </Button>
+                            </div>
+                        </CardHeader>
+                    </Card>
+                )}
 
                 {/* ── Ownership banner ─────────────────────────────── */}
                 <Card className="border-dashed bg-muted/30">
@@ -1138,7 +1205,7 @@ export default function SiteHardware({
                         )}
                     </CardContent>
                 </Card>
-            </PageShell>
+            </SiteHardwareShell>
 
             <Dialog
                 open={pinningDevice !== null}
@@ -1184,11 +1251,6 @@ export default function SiteHardware({
                                 className="min-h-[420px]"
                             />
                             <div className="space-y-3 text-sm">
-                                <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
-                                    {typePlan?.draft
-                                        ? 'Placement changes update the current draft. Publish the plan when it is ready.'
-                                        : 'Saving creates a draft from the published plan, so the live plan stays unchanged until you publish.'}
-                                </div>
                                 <div className="rounded-md border p-3">
                                     <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                                         Coordinates
@@ -1240,6 +1302,10 @@ export default function SiteHardware({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </AppLayout>
+        </SiteHardwareFrame>
     );
+}
+
+export default function SiteHardware(props: SiteHardwareProps) {
+    return <SiteHardwareSurface {...props} />;
 }

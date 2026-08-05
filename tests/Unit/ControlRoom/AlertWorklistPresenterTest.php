@@ -101,6 +101,55 @@ class AlertWorklistPresenterTest extends TestCase
         $this->assertStringNotContainsString('CR-'.$alert->id, json_encode($row, JSON_THROW_ON_ERROR));
     }
 
+    public function test_presenter_exposes_only_state_and_permission_authorised_row_actions(): void
+    {
+        $site = Site::factory()->create(['tenant_id' => 1]);
+        $viewer = $this->siteBoundUser($site, ['controlRoom.alerts.view']);
+        $operator = $this->siteBoundUser($site, [
+            'controlRoom.alerts.view',
+            'controlRoom.alerts.manage',
+            'controlRoom.alerts.assign',
+            'controlRoom.alerts.escalate',
+            'incidents.create',
+        ]);
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $site->id,
+            'assigned_to_user_id' => null,
+            'severity' => 'high',
+        ]);
+        $presenter = app(AlertWorklistPresenter::class);
+
+        $viewRow = $presenter->present(
+            app(AlertWorklistQuery::class)->forUser($viewer)->whereKey($alert->id)->firstOrFail(),
+            $viewer,
+        );
+        $operatorRow = $presenter->present(
+            app(AlertWorklistQuery::class)->forUser($operator)->whereKey($alert->id)->firstOrFail(),
+            $operator,
+        );
+
+        $this->assertFalse($viewRow['actions']['can_claim']);
+        $this->assertFalse($viewRow['actions']['can_acknowledge']);
+        $this->assertFalse($viewRow['actions']['can_move_queue']);
+        $this->assertFalse($viewRow['actions']['can_escalate']);
+        $this->assertFalse($viewRow['actions']['can_create_incident']);
+        $this->assertTrue($viewRow['actions']['can_copy_reference']);
+
+        $this->assertTrue($operatorRow['actions']['can_claim']);
+        $this->assertTrue($operatorRow['actions']['can_acknowledge']);
+        $this->assertTrue($operatorRow['actions']['can_move_queue']);
+        $this->assertTrue($operatorRow['actions']['can_escalate']);
+        $this->assertTrue($operatorRow['actions']['can_create_incident']);
+
+        $alert->update(['status' => ControlRoomAlert::STATUS_RESOLVED]);
+        $resolvedRow = $presenter->present($alert->fresh(), $operator);
+        $this->assertFalse($resolvedRow['actions']['can_claim']);
+        $this->assertFalse($resolvedRow['actions']['can_acknowledge']);
+        $this->assertFalse($resolvedRow['actions']['can_move_queue']);
+        $this->assertFalse($resolvedRow['actions']['can_escalate']);
+        $this->assertFalse($resolvedRow['actions']['can_create_incident']);
+    }
+
     /** @param list<string> $permissionKeys */
     private function siteBoundUser(Site $site, array $permissionKeys): User
     {

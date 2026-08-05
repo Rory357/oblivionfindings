@@ -2350,12 +2350,12 @@ export default function ClientShow({
                         tabs={activeGroup?.tabs ?? []}
                         activeTab={tab}
                         onTab={(key) => handleTabChange(key as TabKey)}
-                        renderLink={(t, className, inner) => (
+                        renderLink={(t, className, inner, tabProps) => (
                             <Link
                                 key={t.key}
                                 href={t.href!}
                                 className={className}
-                                data-test={`client-tab-${t.key}`}
+                                {...tabProps}
                             >
                                 {inner}
                             </Link>

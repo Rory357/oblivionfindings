@@ -955,17 +955,20 @@ SQL;
     ): Builder {
         $query
             ->staff()
-            ->whereNotNull($query->qualifyColumn('approved_at'));
+            ->whereNotNull($query->qualifyColumn('approved_at'))
+            ->whereHas('hrEmployeeProfile', function (Builder $profileQuery) use ($event): void {
+                $this->applyCurrentEmployeeProfileScope($profileQuery);
 
-        if ($event->site_id !== null) {
-            $siteId = (int) $event->site_id;
-            $query->whereHas('hrEmployeeProfile', function (Builder $profileQuery) use ($siteId): void {
+                if ($event->site_id === null) {
+                    return;
+                }
+
+                $siteId = (int) $event->site_id;
                 $profileQuery->where(function (Builder $siteQuery) use ($siteId): void {
                     $siteQuery->where('primary_site_id', $siteId)
                         ->orWhereJsonContains('secondary_site_ids', $siteId);
                 });
             });
-        }
 
         return $this->applyStaffScope($query, $viewer, $bypassPermissions);
     }

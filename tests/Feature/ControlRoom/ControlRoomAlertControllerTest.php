@@ -10,6 +10,7 @@ use App\Models\ControlRoom\EvidencePack;
 use App\Models\ControlRoom\Playbook;
 use App\Models\ControlRoom\PlaybookRun;
 use App\Models\ControlRoom\PlaybookStep;
+use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
@@ -1241,6 +1242,14 @@ class ControlRoomAlertControllerTest extends TestCase
 
         $this->actingAs($this->admin)
             ->post("/control-room/alerts/{$alert->id}/confirm")
+            ->assertSessionHasErrors('immediate_action_taken');
+
+        $this->assertDatabaseCount('client_incidents', 0);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/confirm", [
+                'immediate_action_taken' => 'Resident checked and the area made safe.',
+            ])
             ->assertRedirect();
 
         $incident = ClientIncident::where('source', 'sensor')->latest('id')->first();
@@ -1248,6 +1257,10 @@ class ControlRoomAlertControllerTest extends TestCase
         $this->assertSame('fall', $incident->type);
         $this->assertSame($client->id, $incident->client_id);
         $this->assertSame($alert->id, $incident->control_room_alert_id);
+        $this->assertSame(
+            'Resident checked and the area made safe.',
+            $incident->immediate_action_taken,
+        );
         $this->assertFalse($incident->interactive);
         $this->assertSame('fall_detected', $incident->metadata['sensor_evidence']['signal_type'] ?? null);
 
@@ -1302,7 +1315,9 @@ class ControlRoomAlertControllerTest extends TestCase
         $alert = $this->alertFactory()->resolved()->create(['source' => 'sensor']);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/alerts/{$alert->id}/confirm")
+            ->post("/control-room/alerts/{$alert->id}/confirm", [
+                'immediate_action_taken' => 'Resident checked before the alert was resolved.',
+            ])
             ->assertSessionHasErrors('alert');
 
         $this->assertSame(0, ClientIncident::where('source', 'sensor')->count());
@@ -1331,7 +1346,9 @@ class ControlRoomAlertControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/alerts/{$confirmAlert->id}/confirm")
+            ->post("/control-room/alerts/{$confirmAlert->id}/confirm", [
+                'immediate_action_taken' => 'No immediate control was possible',
+            ])
             ->assertRedirect()
             ->assertSessionHasErrors('alert');
         $this->actingAs($this->admin)
@@ -1506,6 +1523,54 @@ class ControlRoomAlertControllerTest extends TestCase
                 ->has('alerts.data', 1)
                 ->where('alerts.data.0.id', $snoozed->id)
             );
+    }
+
+    public function test_review_gap_carry_forward_drilldown_contains_only_the_exact_unchanged_population_including_snoozed(): void
+    {
+        $shift = Shift::query()->create([
+            'name' => 'Outgoing shift',
+            'starts_at' => now()->subHours(8),
+            'status' => 'active',
+            'shift_lead_user_id' => $this->admin->id,
+            'team_members' => [$this->admin->id],
+        ]);
+        $unchanged = $this->alertFactory()->open()->create([
+            'site_id' => $this->site->id,
+            'severity' => 'medium',
+            'triggered_at' => now()->subHours(10),
+            'created_at' => now()->subHours(10),
+            'updated_at' => now()->subHours(10),
+        ]);
+        $unchangedSnoozed = $this->alertFactory()->open()->create([
+            'site_id' => $this->site->id,
+            'severity' => 'low',
+            'snoozed_until' => now()->addHour(),
+            'snoozed_by_user_id' => $this->admin->id,
+            'triggered_at' => now()->subHours(10),
+            'created_at' => now()->subHours(10),
+            'updated_at' => now()->subHours(10),
+        ]);
+        $required = $this->alertFactory()->open()->create([
+            'site_id' => $this->site->id,
+            'severity' => 'critical',
+            'created_at' => now()->subHour(),
+            'updated_at' => now()->subHour(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/control-room/alerts?lens=active&handover=carry-forward')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where(
+                    'alerts.data',
+                    fn ($rows): bool => collect($rows)->pluck('id')->sort()->values()->all()
+                        === collect([$unchanged->id, $unchangedSnoozed->id])->sort()->values()->all(),
+                )
+                ->where('filters.lens', 'active')
+            );
+
+        $this->assertNotSame($required->id, $unchanged->id);
+        $this->assertSame($shift->id, Shift::getCurrent()?->id);
     }
 
     public function test_expired_snooze_returns_to_the_default_worklist(): void

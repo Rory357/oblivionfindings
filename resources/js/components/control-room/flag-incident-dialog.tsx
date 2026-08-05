@@ -1,11 +1,27 @@
 import { PaneNav } from '@/components/control-room/alert-workspace-dialog';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Field, SelectInput, StepHead, TilePicker } from '@/components/wizard/primitives';
+import {
+    Field,
+    SelectInput,
+    StepHead,
+    TilePicker,
+} from '@/components/wizard/primitives';
 import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import { useForm, usePage } from '@inertiajs/react';
-import { Activity, AlertTriangle, CheckCircle2, RadioTower, ShieldAlert } from 'lucide-react';
+import {
+    Activity,
+    AlertTriangle,
+    CheckCircle2,
+    RadioTower,
+    ShieldAlert,
+} from 'lucide-react';
 import { useState, type ComponentType } from 'react';
 
 /**
@@ -27,7 +43,11 @@ const TYPE_OPTIONS = [
     { value: 'other', label: 'Other' },
 ];
 
-const SEVERITY_TILES: Array<{ key: string; label: string; icon: ComponentType<{ className?: string }> }> = [
+const SEVERITY_TILES: Array<{
+    key: string;
+    label: string;
+    icon: ComponentType<{ className?: string }>;
+}> = [
     { key: 'low', label: 'Low', icon: CheckCircle2 },
     { key: 'medium', label: 'Medium', icon: Activity },
     { key: 'high', label: 'High', icon: AlertTriangle },
@@ -47,8 +67,22 @@ export function FlagIncidentDialog({
 }) {
     const [step, setStep] = useState(0);
     const [done, setDone] = useState(false);
-    const flash = (usePage().props as { flash?: { flagged_incident_id?: number; flagged_alert_id?: number; error?: string } }).flash;
-    const form = useForm({ client_id: '', type: '', severity: 'high', note: '' });
+    const flash = (
+        usePage().props as {
+            flash?: {
+                flagged_incident_id?: number;
+                flagged_alert_id?: number;
+                error?: string;
+            };
+        }
+    ).flash;
+    const form = useForm({
+        client_id: '',
+        type: '',
+        severity: 'high',
+        note: '',
+        immediate_action_taken: '',
+    });
 
     const close = () => {
         form.reset();
@@ -59,47 +93,72 @@ export function FlagIncidentDialog({
     };
 
     const submit = () => {
-        form.transform((d) => ({ ...d, client_id: d.client_id ? Number(d.client_id) : null }));
+        form.transform((d) => ({
+            ...d,
+            client_id: d.client_id ? Number(d.client_id) : null,
+        }));
         form.post('/control-room/incidents/flag', {
             preserveScroll: true,
             onSuccess: (pg) => {
-                if (!(pg.props as { flash?: { error?: string } }).flash?.error) setDone(true);
+                if (!(pg.props as { flash?: { error?: string } }).flash?.error)
+                    setDone(true);
             },
         });
     };
 
-    const clientName = clients.find((c) => String(c.id) === form.data.client_id)?.name;
-    const typeLabel = TYPE_OPTIONS.find((t) => t.value === form.data.type)?.label;
+    const clientName = clients.find(
+        (c) => String(c.id) === form.data.client_id,
+    )?.name;
+    const typeLabel = TYPE_OPTIONS.find(
+        (t) => t.value === form.data.type,
+    )?.label;
     const incidentId = flash?.flagged_incident_id;
     const alertId = flash?.flagged_alert_id;
+    const serious = ['high', 'critical'].includes(form.data.severity);
 
     return (
         <Dialog open={open} onOpenChange={(o) => (!o ? close() : undefined)}>
             <DialogContent className="sm:max-w-lg">
                 <DialogTitle className="sr-only">Flag an incident</DialogTitle>
-                <DialogDescription className="sr-only">Raise a Control Room alert and create the incident record in one step.</DialogDescription>
+                <DialogDescription className="sr-only">
+                    Raise a Control Room alert and create the incident record in
+                    one step.
+                </DialogDescription>
                 {done ? (
                     <div className="flex flex-col items-center gap-3 py-4 text-center">
                         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-status-success-bg">
                             <CheckCircle2 className="h-6 w-6 text-status-success" />
                         </span>
-                        <p className="text-lg font-bold">Flagged and alert raised</p>
-                        <p className="text-sm text-muted-foreground">The alert is on the operator desk and the incident is the system of record.</p>
+                        <p className="text-lg font-bold">
+                            Flagged and alert raised
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                            The alert is on the operator desk and the incident
+                            is the system of record.
+                        </p>
                         <div className="flex flex-wrap justify-center gap-2 text-xs">
                             {alertId ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2.5 py-1 font-medium text-status-critical">
-                                    <RadioTower className="h-3.5 w-3.5" /> CR-{alertId}
+                                    <RadioTower className="h-3.5 w-3.5" /> CR-
+                                    {alertId}
                                 </span>
                             ) : null}
                             {incidentId ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary">
-                                    <ShieldAlert className="h-3.5 w-3.5" /> INC-{incidentId}
+                                    <ShieldAlert className="h-3.5 w-3.5" /> INC-
+                                    {incidentId}
                                 </span>
                             ) : null}
                         </div>
                         <div className="mt-2 flex gap-2">
                             {incidentId && onFlagged && alertId ? (
-                                <Button size="sm" onClick={() => { onFlagged(incidentId, alertId); close(); }}>
+                                <Button
+                                    size="sm"
+                                    onClick={() => {
+                                        onFlagged(incidentId, alertId);
+                                        close();
+                                    }}
+                                >
                                     Open incident
                                 </Button>
                             ) : null}
@@ -118,39 +177,165 @@ export function FlagIncidentDialog({
 
                         {step === 0 ? (
                             <>
-                                <Field label="Client" required error={form.errors.client_id}>
+                                <Field
+                                    label="Client"
+                                    required
+                                    error={form.errors.client_id}
+                                >
                                     <SelectInput
                                         value={form.data.client_id}
-                                        onChange={(v) => form.setData('client_id', v)}
+                                        onChange={(v) =>
+                                            form.setData('client_id', v)
+                                        }
                                         placeholder="Select client"
-                                        options={clients.map((c) => ({ value: String(c.id), label: c.name }))}
+                                        options={clients.map((c) => ({
+                                            value: String(c.id),
+                                            label: c.name,
+                                        }))}
                                     />
                                 </Field>
-                                <Field label="Type" required error={form.errors.type}>
-                                    <SelectInput value={form.data.type} onChange={(v) => form.setData('type', v)} placeholder="Select type" options={TYPE_OPTIONS} />
+                                <Field
+                                    label="Type"
+                                    required
+                                    error={form.errors.type}
+                                >
+                                    <SelectInput
+                                        value={form.data.type}
+                                        onChange={(v) =>
+                                            form.setData('type', v)
+                                        }
+                                        placeholder="Select type"
+                                        options={TYPE_OPTIONS}
+                                    />
                                 </Field>
-                                <PaneNav onCancel={close} onNext={() => setStep(1)} nextDisabled={!form.data.client_id || !form.data.type} step={0} stepCount={3} />
+                                <PaneNav
+                                    onCancel={close}
+                                    onNext={() => setStep(1)}
+                                    nextDisabled={
+                                        !form.data.client_id || !form.data.type
+                                    }
+                                    step={0}
+                                    stepCount={3}
+                                />
                             </>
                         ) : step === 1 ? (
                             <>
-                                <Field label="Severity" required error={form.errors.severity}>
-                                    <TilePicker value={form.data.severity} onChange={(v) => form.setData('severity', v)} options={SEVERITY_TILES} cols={2} />
+                                <Field
+                                    label="Severity"
+                                    required
+                                    error={form.errors.severity}
+                                >
+                                    <TilePicker
+                                        value={form.data.severity}
+                                        onChange={(v) =>
+                                            form.setData('severity', v)
+                                        }
+                                        options={SEVERITY_TILES}
+                                        cols={2}
+                                    />
                                 </Field>
-                                <Field label="Note" hint="What's happening right now?">
-                                    <Textarea rows={3} value={form.data.note} onChange={(e) => form.setData('note', e.target.value)} placeholder="Brief description for the operator and the record…" />
+                                <Field
+                                    label="Note"
+                                    hint="What's happening right now?"
+                                >
+                                    <Textarea
+                                        rows={3}
+                                        value={form.data.note}
+                                        onChange={(e) =>
+                                            form.setData('note', e.target.value)
+                                        }
+                                        placeholder="Brief description for the operator and the record…"
+                                    />
                                 </Field>
-                                <PaneNav onCancel={close} onBack={() => setStep(0)} onNext={() => setStep(2)} step={1} stepCount={3} />
+                                <Field
+                                    label="Immediate action taken"
+                                    required={serious}
+                                    error={form.errors.immediate_action_taken}
+                                    hint={
+                                        serious
+                                            ? 'Required for high and critical incidents'
+                                            : 'Optional'
+                                    }
+                                >
+                                    <Textarea
+                                        rows={3}
+                                        aria-label={
+                                            serious
+                                                ? 'Immediate action taken *'
+                                                : 'Immediate action taken'
+                                        }
+                                        value={form.data.immediate_action_taken}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'immediate_action_taken',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="What was done immediately to keep people safe?"
+                                    />
+                                </Field>
+                                {serious &&
+                                !form.data.immediate_action_taken.trim() ? (
+                                    <p className="text-xs text-status-warning">
+                                        Record the controls taken. If none could
+                                        be taken, enter “No immediate control
+                                        was possible”.
+                                    </p>
+                                ) : null}
+                                <PaneNav
+                                    onCancel={close}
+                                    onBack={() => setStep(0)}
+                                    onNext={() => setStep(2)}
+                                    nextDisabled={
+                                        serious &&
+                                        !form.data.immediate_action_taken.trim()
+                                    }
+                                    step={1}
+                                    stepCount={3}
+                                />
                             </>
                         ) : (
                             <>
-                                <ReviewCard icon={RadioTower} title="Review & flag" span>
-                                    <ReviewRow label="Client" value={clientName} />
+                                <ReviewCard
+                                    icon={RadioTower}
+                                    title="Review & flag"
+                                    span
+                                >
+                                    <ReviewRow
+                                        label="Client"
+                                        value={clientName}
+                                    />
                                     <ReviewRow label="Type" value={typeLabel} />
-                                    <ReviewRow label="Severity" value={form.data.severity ? form.data.severity.charAt(0).toUpperCase() + form.data.severity.slice(1) : undefined} />
-                                    <ReviewRow label="Note" value={form.data.note || undefined} />
+                                    <ReviewRow
+                                        label="Severity"
+                                        value={
+                                            form.data.severity
+                                                ? form.data.severity
+                                                      .charAt(0)
+                                                      .toUpperCase() +
+                                                  form.data.severity.slice(1)
+                                                : undefined
+                                        }
+                                    />
+                                    <ReviewRow
+                                        label="Note"
+                                        value={form.data.note || undefined}
+                                    />
+                                    <ReviewRow
+                                        label="Immediate action"
+                                        value={
+                                            form.data.immediate_action_taken ||
+                                            undefined
+                                        }
+                                    />
                                 </ReviewCard>
                                 <p className="text-xs text-muted-foreground">
-                                    Critical severity raises a <span className="font-medium">critical</span> alert; the incident records as high. Both records stay linked.
+                                    Critical severity raises a{' '}
+                                    <span className="font-medium">
+                                        critical
+                                    </span>{' '}
+                                    alert; the incident records as high. Both
+                                    records stay linked.
                                 </p>
                                 <PaneNav
                                     onCancel={close}

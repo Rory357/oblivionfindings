@@ -12,6 +12,7 @@ use App\Http\Controllers\AssetOwnershipController;
 use App\Http\Controllers\AssetAssignmentController;
 use App\Http\Controllers\AssetGeofenceController;
 use App\Http\Controllers\SiteController;
+use App\Http\Controllers\Sites\SiteProfileController;
 use App\Http\Controllers\SiteClientController;
 use App\Http\Controllers\SiteContactController;
 use App\Http\Controllers\SiteDocumentController;
@@ -31,7 +32,7 @@ Route::middleware(['auth'])->group(function () {
     // Sites
     Route::middleware('permission:sites.viewAny')->group(function () {
         Route::get('/sites', [SiteController::class, 'index'])->name('sites.index');
-        Route::get('/sites/{site}', [SiteController::class, 'show'])
+        Route::get('/sites/{site}', SiteProfileController::class)
             ->whereNumber('site')
             ->name('sites.show');
 
@@ -86,10 +87,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/sites/geocode/search', [\App\Http\Controllers\Sites\SiteGeocodingController::class, 'search'])
             ->name('sites.geocode.search');
 
-        // Site clients (link existing, quick-create, unlink)
-        Route::post('/sites/{site}/clients', [SiteClientController::class, 'store'])
-            ->whereNumber('site')
-            ->name('sites.clients.store');
+        // Site clients (place existing or unlink; creation stays in clients.store)
         Route::post('/sites/{site}/clients/link', [SiteClientController::class, 'link'])
             ->whereNumber('site')
             ->name('sites.clients.link');

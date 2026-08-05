@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
@@ -50,6 +51,29 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
 
         $this->withoutVite();
+    }
+
+    /**
+     * Build a valid Inertia partial-reload header set whether or not frontend
+     * assets have already been built in the current worktree.
+     *
+     * @return array<string, string>
+     */
+    protected function inertiaPartialHeaders(string $component, string $data): array
+    {
+        $headers = [
+            'X-Inertia' => 'true',
+            'X-Inertia-Partial-Component' => $component,
+            'X-Inertia-Partial-Data' => $data,
+        ];
+
+        $version = app(HandleInertiaRequests::class)->version(request());
+
+        if (is_string($version) && $version !== '') {
+            $headers['X-Inertia-Version'] = $version;
+        }
+
+        return $headers;
     }
 
     protected function clearTestingMaintenanceMode(): void

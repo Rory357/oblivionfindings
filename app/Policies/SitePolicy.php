@@ -33,7 +33,8 @@ class SitePolicy
 
     public function update(User $user, Site $site): bool
     {
-        return $user->canDo('sites.update')
+        return ! $site->archived
+            && $user->canDo('sites.update')
             && $this->canViewType($user, $site->type)
             && $this->canAccessAssignedSite($user, $site);
     }

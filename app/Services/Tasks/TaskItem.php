@@ -3,6 +3,7 @@
 namespace App\Services\Tasks;
 
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * Normalised company-wide work item — the single shape returned by the
@@ -40,7 +41,26 @@ class TaskItem
         public ?array $journey = null,     // shared incident journey key, source and official references
         public ?string $sourceContext = null,
         public string $actionLabel = 'Open record',
-    ) {}
+        public ?string $displayState = null,
+        /** @var string[] Server-side search material; never serialised to the browser. */
+        public array $searchTerms = [],
+        public ?string $actionHelp = null,
+    ) {
+        $journeySearchTerms = data_get($this->journey, 'search_terms', []);
+        if (is_array($this->journey)) {
+            unset($this->journey['search_terms']);
+        }
+
+        $this->searchTerms = collect([
+            ...$this->searchTerms,
+            ...(is_array($journeySearchTerms) ? $journeySearchTerms : []),
+        ])
+            ->filter(fn ($term) => is_scalar($term) && filled((string) $term))
+            ->map(fn ($term) => (string) $term)
+            ->unique()
+            ->values()
+            ->all();
+    }
 
     private ?bool $overdue = null;
 
@@ -50,6 +70,21 @@ class TaskItem
         return $this->overdue ??= $this->bucket !== self::BUCKET_DONE
             && $this->dueAt !== null
             && Carbon::parse($this->dueAt)->isPast();
+    }
+
+    /**
+     * Stable action/persistence identity. Usually this equals `source`; a
+     * composite provider can emit subtype-prefixed ids such as
+     * `fleet_work_order-42` beneath the `fleet_maintenance` list source.
+     */
+    public function identitySource(): string
+    {
+        return Str::beforeLast($this->id, '-');
+    }
+
+    public function numericId(): int
+    {
+        return (int) Str::afterLast($this->id, '-');
     }
 
     /**
@@ -89,6 +124,8 @@ class TaskItem
             'journey' => $this->journey,
             'sourceContext' => $this->sourceContext,
             'actionLabel' => $this->actionLabel,
+            'displayState' => $this->displayState,
+            'actionHelp' => $this->actionHelp,
             'overdue' => $this->isOverdue(),
         ];
     }

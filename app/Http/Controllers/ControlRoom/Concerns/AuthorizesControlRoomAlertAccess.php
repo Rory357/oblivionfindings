@@ -4,6 +4,7 @@ namespace App\Http\Controllers\ControlRoom\Concerns;
 
 use App\Models\ControlRoomAlert;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -24,11 +25,9 @@ trait AuthorizesControlRoomAlertAccess
 
     protected function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void
     {
-        $this->siteAccess()->assertCanAccessAlert(
-            $user,
+        app(ControlRoomAlertAccessService::class)->assertCanView(
             $alert,
-            $this->alertBypassPermissions(),
-            'You are not authorized to access alerts for this site.',
+            $user,
         );
     }
 

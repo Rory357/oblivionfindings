@@ -91,6 +91,58 @@ class HsDashboardWorklistTest extends TestCase
         $this->assertFalse($rows[1]['is_overdue']);
     }
 
+    public function test_attention_worklists_put_site_scoped_handover_acceptance_first_and_link_directly_to_the_action(): void
+    {
+        $maple = Site::factory()->create(['name' => 'Maple House']);
+        $rata = Site::factory()->create(['name' => 'Rata House']);
+        $owner = User::factory()->create(['name' => 'H&S Owner']);
+        $acceptor = User::factory()->create();
+
+        $awaiting = HsEvent::factory()
+            ->awaitingHandoverAcceptance($owner)
+            ->create([
+                'site_id' => $maple->id,
+                'reference_number' => 'HS-2026-0080',
+                'event_category' => HsEvent::CATEGORY_INCIDENT,
+                'severity' => HsEvent::SEVERITY_CRITICAL,
+                'reported_at' => now()->subMinute(),
+            ]);
+        HsEvent::factory()
+            ->awaitingHandoverAcceptance($owner)
+            ->create([
+                'site_id' => $maple->id,
+                'severity' => HsEvent::SEVERITY_MEDIUM,
+                'reported_at' => now(),
+            ]);
+        HsEvent::factory()
+            ->awaitingHandoverAcceptance($owner)
+            ->create(['site_id' => $rata->id]);
+        HsEvent::factory()
+            ->handoverAccepted($owner, $acceptor)
+            ->create(['site_id' => $maple->id]);
+        HsEvent::factory()
+            ->closed()
+            ->awaitingHandoverAcceptance($owner)
+            ->create(['site_id' => $maple->id]);
+
+        $worklists = $this->svc->attentionWorklists($maple->id, limit: 1);
+
+        $this->assertSame('awaiting_hs_acceptance', $worklists[0]['key']);
+        $this->assertSame('Awaiting H&S acceptance', $worklists[0]['label']);
+        $this->assertSame(
+            'A named H&S owner must accept governance responsibility.',
+            $worklists[0]['help'],
+        );
+        $this->assertSame(2, $worklists[0]['count']);
+        $this->assertCount(1, $worklists[0]['items']);
+        $this->assertSame($awaiting->id, $worklists[0]['items'][0]['id']);
+        $this->assertSame(
+            "/health-safety/events/{$awaiting->id}?action=accept-handover",
+            $worklists[0]['items'][0]['action_url'],
+        );
+        $this->assertSame('Maple House', $worklists[0]['items'][0]['site']);
+    }
+
     public function test_notifiable_events_list_pending_first_and_keep_closed_pending_obligations_visible(): void
     {
         HsEvent::factory()->worksafeNotifiable()->create([

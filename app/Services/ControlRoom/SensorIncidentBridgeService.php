@@ -34,7 +34,7 @@ class SensorIncidentBridgeService
      * Confirm a sensor alert into a ClientIncident. Idempotent: if the alert is
      * already linked to an incident, that incident is returned unchanged.
      *
-     * @param  array{type?: string, severity?: string, note?: string}  $overrides
+     * @param  array{type?: string, severity?: string, note?: string, immediate_action_taken?: string}  $overrides
      */
     public function confirm(ControlRoomAlert $alert, User $operator, array $overrides = []): ClientIncident
     {
@@ -63,6 +63,7 @@ class SensorIncidentBridgeService
                 'severity' => $overrides['severity'] ?? $this->mapSeverity($lockedAlert->severity),
                 'occurred_at' => $signal?->occurred_at ?? $lockedAlert->triggered_at ?? now(),
                 'description' => $overrides['note'] ?? $this->describe($signal),
+                'immediate_action_taken' => $overrides['immediate_action_taken'] ?? null,
                 'title' => ucfirst(str_replace('_', ' ', $type)).' incident',
                 'metadata' => ['sensor_evidence' => $evidence],
             ], $operator);

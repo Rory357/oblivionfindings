@@ -8,7 +8,7 @@ use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 
-class DataBreachProvider implements TaskProvider, HasModelClass
+class DataBreachProvider implements HasModelClass, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -33,6 +33,7 @@ class DataBreachProvider implements TaskProvider, HasModelClass
     public function tasks(User $user, array $filters = []): array
     {
         $query = DataBreachLog::query()
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('discovered_at')
             ->limit(300);
 

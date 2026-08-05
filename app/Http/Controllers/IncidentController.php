@@ -3,12 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
+use App\Http\Requests\HealthSafety\StoreHsCorrectiveActionRequest;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
+use App\Models\ControlRoom\EvidenceItem;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
-use App\Models\HsInvestigation;
 use App\Models\IncidentFollowup;
 use App\Models\MedicationError;
 use App\Models\SafeguardingConcern;
@@ -20,9 +21,11 @@ use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
 use App\Services\HealthSafety\HsCorrectiveActionService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
 use App\Services\Incidents\IncidentJourney;
+use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\NotificationService;
 use App\Services\UserSiteAccessService;
+use App\Support\Incidents\LinkedOperationalEvidencePresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +37,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class IncidentController extends Controller
 {
     use ServesPrivateAttachments;
+
+    public function __construct(
+        private readonly LinkedOperationalEvidencePresenter $linkedEvidence,
+        private readonly IncidentJourneyService $journeys,
+        private readonly IncidentJourneyPresenter $journeyPresenter,
+    ) {}
 
     /**
      * Unified Incidents register (redesign): hs-hero-kit hero with incident stat
@@ -389,22 +398,6 @@ class IncidentController extends Controller
         return $query->exists();
     }
 
-    private function canOpenControlRoomAlert(User $user, ControlRoomAlert $alert): bool
-    {
-        if (! $user->canDo('controlRoom.viewAny')) {
-            return false;
-        }
-
-        $query = ControlRoomAlert::query()->whereKey($alert->id);
-        app(UserSiteAccessService::class)->applyAlertScope(
-            $query,
-            $user,
-            ['reports.viewAny'],
-        );
-
-        return $query->exists();
-    }
-
     /**
      * The full, read-only detail payload behind the IncidentDetailDialog — shared
      * by the modal-over-list (index `?incident=`) and the `/incidents/{id}`
@@ -469,8 +462,54 @@ class IncidentController extends Controller
 
         $inv = $hsEvent?->latestInvestigation;
         $canOpenHsEvent = $hsEvent && $this->canOpenHsEvent($user, $hsEvent);
-        $canOpenControlRoomAlert = $incident->controlRoomAlert
-            && $this->canOpenControlRoomAlert($user, $incident->controlRoomAlert);
+        $canRaiseCorrectiveAction = $user->canDo('incidents.viewAny')
+            || $user->canDo('compliance.view')
+            || $user->canDo('hazards.view');
+        $correctiveActionOwners = [];
+        if ($hsEvent && $canRaiseCorrectiveAction) {
+            $ownerQuery = User::query();
+            app(UserSiteAccessService::class)->applyHsEventStaffScope(
+                $ownerQuery,
+                $hsEvent,
+                $user,
+                ['healthSafety.viewAllSites'],
+            );
+            $correctiveActionOwners = $ownerQuery
+                ->orderBy('name')
+                ->limit(200)
+                ->get(['id', 'name'])
+                ->filter(fn (User $candidate): bool => $candidate->canDo('hazards.manage'))
+                ->map(fn (User $candidate): array => [
+                    'id' => $candidate->id,
+                    'name' => $candidate->name,
+                ])
+                ->values()
+                ->all();
+        }
+        $linkedControlRoomAlert = $this->journeys
+            ->journeyForIncident($incident)
+            ->alert;
+        $linkedOperationalEvidence = $linkedControlRoomAlert
+            ? $this->linkedEvidence->present(
+                $linkedControlRoomAlert,
+                $user,
+                fn (EvidenceItem $item): string => "/incidents/{$incident->id}/control-room-evidence/{$item->id}/download",
+            )
+            : null;
+        $closeGate = $this->journeys->closeGateForDisplay($incident);
+        $closeGatePayload = $closeGate->toArray();
+        if (! $request->user()?->canDo('hazards.view')) {
+            $closeGatePayload['requirements'] = collect($closeGatePayload['requirements'])
+                ->map(function (array $requirement): array {
+                    if (str_starts_with($requirement['href'], '/health-safety/')) {
+                        $requirement['href'] = null;
+                    }
+
+                    return $requirement;
+                })
+                ->values()
+                ->all();
+        }
 
         // Medication error that raised / was linked to this incident, so the
         // incident side carries a back-link into the eMAR error report.
@@ -514,7 +553,7 @@ class IncidentController extends Controller
             'closed_notes' => $incident->closed_notes,
             'reopened_at' => $incident->reopened_at,
             'reopened_reason' => $incident->reopened_reason,
-            'control_room_alert_id' => $incident->control_room_alert_id,
+            'control_room_alert_id' => $linkedControlRoomAlert?->id,
             'client' => $incident->client ? [
                 'id' => $incident->client->id,
                 'first_name' => $incident->client->first_name,
@@ -554,17 +593,22 @@ class IncidentController extends Controller
                 'reported_at' => $medicationError->reported_at,
                 'url' => '/emar/errors',
             ] : null,
-            'control_room_alert' => $incident->controlRoomAlert ? [
-                'id' => $incident->controlRoomAlert->id,
-                'status' => $incident->controlRoomAlert->status,
-                'severity' => $incident->controlRoomAlert->severity,
-                'alert_type' => $incident->controlRoomAlert->alert_type,
-                'triggered_at' => $incident->controlRoomAlert->triggered_at,
-                'resolved_at' => $incident->controlRoomAlert->resolved_at,
-                'url' => $canOpenControlRoomAlert
-                    ? "/control-room/alerts/{$incident->controlRoomAlert->id}"
-                    : null,
+            'control_room_alert' => $linkedControlRoomAlert ? [
+                'id' => $linkedControlRoomAlert->id,
+                'status' => $linkedControlRoomAlert->status,
+                'severity' => $linkedControlRoomAlert->severity,
+                'alert_type' => $linkedControlRoomAlert->alert_type,
+                'triggered_at' => $linkedControlRoomAlert->triggered_at,
+                'resolved_at' => $linkedControlRoomAlert->resolved_at,
+                'url' => data_get($linkedOperationalEvidence, 'source.href'),
             ] : null,
+            'linked_operational_evidence' => $linkedOperationalEvidence,
+            'close_gate' => $closeGatePayload,
+            'journey_state' => $this->journeyPresenter->journeyState(
+                $incident,
+                $linkedControlRoomAlert,
+                $hsEvent,
+            ),
             'hs_event' => $hsEvent ? [
                 'id' => $hsEvent->id,
                 'reference_number' => $hsEvent->reference_number,
@@ -664,12 +708,14 @@ class IncidentController extends Controller
                 'followupsManage' => $user->canDo('incidents.followups.manage'),
                 'followupsComplete' => $user->canDo('incidents.followups.complete') || $user->canDo('incidents.followups.manage'),
                 'portalManage' => $user->canDo('incidents.portal.manage'),
-                'raiseCorrectiveAction' => $user->canDo('incidents.viewAny') || $user->canDo('compliance.view') || $user->canDo('hazards.view'),
+                'raiseCorrectiveAction' => $canRaiseCorrectiveAction,
             ],
-            // Assignee options for the add-follow-up + raise-corrective-action forms.
+            // Follow-up assignees remain broader than the site-scoped H&S owner
+            // list used by the corrective-action form.
             'assignable_staff' => ($user->canDo('incidents.followups.manage') || $user->canDo('incidents.viewAny') || $user->canDo('compliance.view') || $user->canDo('hazards.view'))
                 ? User::staff()->orderBy('name')->get(['id', 'name'])
                 : [],
+            'corrective_action_owners' => $correctiveActionOwners,
         ];
     }
 
@@ -1507,19 +1553,11 @@ class IncidentController extends Controller
             // operation wins is visible to the other before it can continue.
             abort_unless($lockedIncident->status === 'reviewed', 403);
 
-            if (in_array($lockedIncident->severity, ['high', 'critical'], true)
-                && $lockedIncident->investigation_status !== 'completed'
-                && ! $this->hasCompletedHsInvestigation($lockedIncident)) {
+            $gate = $this->journeys->closeGate($lockedIncident);
+            if (! $gate->allowed) {
                 return [
                     $lockedIncident,
-                    'High-severity incidents require a completed investigation before closure. Open the Investigation section to start one.',
-                ];
-            }
-
-            if ($lockedIncident->followups()->whereNull('completed_at')->exists()) {
-                return [
-                    $lockedIncident,
-                    'There are open follow-ups. Please complete them before closing the incident.',
+                    implode(' ', $gate->blockers()),
                 ];
             }
 
@@ -1563,7 +1601,7 @@ class IncidentController extends Controller
             ]
         );
 
-        return back()->with('success', 'Incident closed.');
+        return back()->with('success', 'Incident closed. Linked journey closure can now continue.');
     }
 
     public function reopen(Request $request, ClientIncident $incident)
@@ -1705,38 +1743,21 @@ class IncidentController extends Controller
     }
 
     /**
-     * Whether the incident's governance HsEvent carries a completed investigation.
-     * Used by the high-severity close guardrail alongside the mirrored
-     * `investigation_status` column.
-     */
-    private function hasCompletedHsInvestigation(ClientIncident $incident): bool
-    {
-        return HsEvent::query()
-            ->where('source_type', ClientIncident::class)
-            ->where('source_id', $incident->id)
-            ->whereHas('investigations', fn ($q) => $q->where('status', HsInvestigation::STATUS_COMPLETED))
-            ->exists();
-    }
-
-    /**
      * Raise a corrective action from the incident (Option B): creates an
      * HsCorrectiveAction in the H&S Corrective Actions register, linked to this
      * incident's HsEvent. No copy is stored on the incident — it is surfaced
      * read-only on the detail from the H&S register.
      */
-    public function raiseCorrectiveAction(Request $request, ClientIncident $incident, HsCorrectiveActionService $service)
-    {
+    public function raiseCorrectiveAction(
+        StoreHsCorrectiveActionRequest $request,
+        ClientIncident $incident,
+        HsCorrectiveActionService $service,
+    ) {
         $this->authorize('view', $incident);
         $user = $request->user();
         abort_unless($user && ($user->canDo('incidents.viewAny') || $user->canDo('compliance.view') || $user->canDo('hazards.view')), 403);
 
-        $data = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'priority' => ['nullable', 'in:low,medium,high,critical'],
-            'due_date' => ['nullable', 'date'],
-            'assigned_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
-        ]);
+        $data = $request->validated();
 
         $hsEvent = HsEvent::query()
             ->where('source_type', ClientIncident::class)
@@ -1750,16 +1771,14 @@ class IncidentController extends Controller
             return back()->with('error', 'The Health & Safety event is closed; corrective actions can no longer be added.');
         }
 
-        $service->createStandalone($hsEvent, [
-            'title' => $data['title'],
-            'description' => $data['description'] ?? null,
-            'action_type' => 'corrective',
-            'priority' => $data['priority'] ?? 'medium',
-            'assigned_to_user_id' => $data['assigned_to_user_id'] ?? null,
-            'assigned_by_user_id' => $user->id,
-            'due_date' => $data['due_date'] ?? null,
-            'created_by' => $user->id,
-        ]);
+        try {
+            $service->createStandalone($hsEvent, [
+                ...$data,
+                'action_type' => 'corrective',
+            ], $user);
+        } catch (\InvalidArgumentException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
 
         return back()->with('success', 'Corrective action raised in the Health & Safety register.');
     }
@@ -1829,6 +1848,28 @@ class IncidentController extends Controller
             $attachment->path,
             $attachment->original_name,
             $attachment->mime,
+        );
+    }
+
+    public function downloadControlRoomEvidence(
+        Request $request,
+        ClientIncident $incident,
+        EvidenceItem $item,
+    ): StreamedResponse {
+        $this->authorize('view', $incident);
+        $alert = $this->journeys->journeyForIncident($incident)->alert;
+        $belongsToJourney = $alert !== null
+            && $item->evidencePack()
+                ->where('alert_id', $alert->id)
+                ->exists();
+
+        abort_unless($belongsToJourney && filled($item->storage_path), 404);
+
+        return $this->streamPrivateAttachment(
+            'local',
+            $item->storage_path,
+            data_get($item->metadata, 'original_name') ?: basename($item->storage_path),
+            $item->mime_type,
         );
     }
 }

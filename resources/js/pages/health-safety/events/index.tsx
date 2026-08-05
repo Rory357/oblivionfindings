@@ -9,9 +9,11 @@
 import {
     EVENT_CATEGORY_LABELS,
     EventDetailDialog,
+    worksafeLabel,
     type EventActionKey,
     type EventDetail,
     type EventSectionKey,
+    type WorksafeState,
 } from '@/components/health-safety/event-detail-dialog';
 import {
     EntityFilter,
@@ -57,6 +59,7 @@ import {
     AlertTriangle,
     CheckCircle2,
     ClipboardCheck,
+    Clock,
     FileText,
     Flame,
     FlaskConical,
@@ -92,7 +95,7 @@ type EventRow = {
     site_name: string | null;
     client_name: string | null;
     staff_name: string | null;
-    worksafe_notifiable: boolean;
+    worksafe_notifiable: boolean | null;
     worksafe_status: string | null;
     handover: {
         status: string;
@@ -486,8 +489,31 @@ export default function HsEventsIndex({
                 onClick: () => openEvent(ev.id, { section: 'handover' }),
             });
         }
+        const worksafe = worksafeState(ev);
+        const canDecideWorksafe =
+            can.manage &&
+            ev.status !== 'closed' &&
+            ['accepted', 'not_required'].includes(ev.handover.status);
+        if (canDecideWorksafe) {
+            items.push({
+                icon:
+                    ev.worksafe_notifiable === null ? (
+                        <ShieldAlert className="h-3.5 w-3.5" />
+                    ) : (
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                    ),
+                label:
+                    ev.worksafe_notifiable === null
+                        ? 'Record WorkSafe decision'
+                        : 'Update WorkSafe decision',
+                sub: worksafeLabel(worksafe),
+                tone: ev.worksafe_notifiable === null ? 'critical' : undefined,
+                onClick: () =>
+                    openEvent(ev.id, { action: 'worksafe_decision' }),
+            });
+        }
         if (
-            ev.worksafe_notifiable &&
+            ev.worksafe_notifiable === true &&
             can.manage &&
             ev.worksafe_status !== 'acknowledged'
         ) {
@@ -507,11 +533,17 @@ export default function HsEventsIndex({
                         openEvent(ev.id, { action: 'worksafe_notify' }),
                 });
             }
-        } else if (ev.worksafe_notifiable) {
+        } else if (!canDecideWorksafe) {
             items.push({
-                icon: <ShieldAlert className="h-3.5 w-3.5" />,
-                label: 'WorkSafe',
-                sub: titleCase(ev.worksafe_status ?? 'pending'),
+                icon:
+                    ev.worksafe_notifiable === false ||
+                    ev.worksafe_status === 'acknowledged' ? (
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                    ) : (
+                        <ShieldAlert className="h-3.5 w-3.5" />
+                    ),
+                label: 'WorkSafe status',
+                sub: worksafeLabel(worksafe),
                 onClick: () => openEvent(ev.id, { section: 'overview' }),
             });
         }
@@ -989,6 +1021,23 @@ function eventContext(ev: EventRow): string {
     return 'Governance event';
 }
 
+function worksafeState(ev: EventRow): WorksafeState {
+    return {
+        notifiable: ev.worksafe_notifiable,
+        status: ev.worksafe_status,
+    };
+}
+
+function worksafeFlagTone(
+    worksafe: WorksafeState,
+): 'critical' | 'warning' | 'success' | 'info' | 'neutral' {
+    if (worksafe.notifiable === null) return 'warning';
+    if (worksafe.notifiable === false || worksafe.status === 'acknowledged')
+        return 'success';
+    if (!worksafe.status || worksafe.status === 'pending') return 'critical';
+    return 'warning';
+}
+
 function sourceRef(ev: EventRow): string {
     if (!ev.source) return 'No source';
     const prefix =
@@ -1075,6 +1124,14 @@ function EventTable({
                                   : ev.site_name
                                     ? 'Site record'
                                     : 'No linked person';
+                        const worksafe = worksafeState(ev);
+                        const WorksafeIcon =
+                            worksafe.notifiable === false ||
+                            worksafe.status === 'acknowledged'
+                                ? ShieldCheck
+                                : worksafe.notifiable === null
+                                  ? Clock
+                                  : ShieldAlert;
                         return (
                             <tr
                                 key={ev.id}
@@ -1206,31 +1263,13 @@ function EventTable({
                                                 H&S accepted
                                             </FlagBadge>
                                         ) : null}
-                                        {ev.worksafe_notifiable ? (
-                                            <FlagBadge
-                                                icon={ShieldAlert}
-                                                tone={
-                                                    ev.flags.worksafe_pending
-                                                        ? 'critical'
-                                                        : ev.worksafe_status ===
-                                                            'acknowledged'
-                                                          ? 'success'
-                                                          : 'warning'
-                                                }
-                                                title={
-                                                    ev.flags.worksafe_pending
-                                                        ? 'WorkSafe notification due'
-                                                        : `WorkSafe ${titleCase(ev.worksafe_status ?? 'notifiable')}`
-                                                }
-                                            >
-                                                {ev.flags.worksafe_pending
-                                                    ? 'Pending'
-                                                    : titleCase(
-                                                          ev.worksafe_status ??
-                                                              'Notifiable',
-                                                      )}
-                                            </FlagBadge>
-                                        ) : null}
+                                        <FlagBadge
+                                            icon={WorksafeIcon}
+                                            tone={worksafeFlagTone(worksafe)}
+                                            title={`WorkSafe: ${worksafeLabel(worksafe)}`}
+                                        >
+                                            {worksafeLabel(worksafe)}
+                                        </FlagBadge>
                                         {ev.flags.investigation_overdue ? (
                                             <FlagBadge
                                                 icon={Search}
@@ -1280,7 +1319,6 @@ function EventTable({
                                         {ev.handover.status !==
                                             'awaiting_acceptance' &&
                                         ev.handover.status !== 'accepted' &&
-                                        !ev.worksafe_notifiable &&
                                         !ev.flags.investigation_overdue &&
                                         !(
                                             ev.investigation_required &&

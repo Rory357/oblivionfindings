@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class AlertTask extends Model
 {
@@ -73,9 +74,29 @@ class AlertTask extends Model
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
-    public function transferredCorrectiveAction(): BelongsTo
+    public function transferredCorrectiveAction(): HasOne
+    {
+        return $this->hasOne(HsCorrectiveAction::class, 'source_control_room_task_id');
+    }
+
+    public function legacyTransferredCorrectiveAction(): BelongsTo
     {
         return $this->belongsTo(HsCorrectiveAction::class, 'transferred_to_hs_corrective_action_id');
+    }
+
+    public function getTransferredCorrectiveActionAttribute(): ?HsCorrectiveAction
+    {
+        $reciprocal = $this->relationLoaded('transferredCorrectiveAction')
+            ? $this->getRelation('transferredCorrectiveAction')
+            : $this->transferredCorrectiveAction()->first();
+
+        if ($reciprocal) {
+            return $reciprocal;
+        }
+
+        return $this->relationLoaded('legacyTransferredCorrectiveAction')
+            ? $this->getRelation('legacyTransferredCorrectiveAction')
+            : $this->legacyTransferredCorrectiveAction()->first();
     }
 
     public function transferredBy(): BelongsTo

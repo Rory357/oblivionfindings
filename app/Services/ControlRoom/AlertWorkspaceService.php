@@ -5,14 +5,17 @@ namespace App\Services\ControlRoom;
 use App\Domain\Monitoring\Presenters\MonitoringIncidentEvidencePresenter;
 use App\Models\AuditLog;
 use App\Models\ControlRoom\ConfigOption;
+use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\Playbook;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\HealthSafety\HsVisibilityService;
+use App\Services\Incidents\IncidentJourneyPresenter;
+use App\Services\Incidents\IncidentJourneyService;
 use App\Services\UserSiteAccessService;
+use App\Support\Incidents\LinkedOperationalEvidencePresenter;
 use Illuminate\Support\Collection;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Assembles the full workspace payload behind the Alert Workspace dialog —
@@ -23,10 +26,15 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 class AlertWorkspaceService
 {
     public function __construct(
+        private ControlRoomAlertAccessService $access,
         private UserSiteAccessService $siteAccess,
         private HsVisibilityService $hsVisibility,
         private ControlRoomAlertProvenanceService $provenance,
         private MonitoringIncidentEvidencePresenter $monitoringIncidentEvidence,
+        private LinkedOperationalEvidencePresenter $linkedEvidence,
+        private ControlRoomAlertLifecycleService $lifecycle,
+        private IncidentJourneyService $journeys,
+        private IncidentJourneyPresenter $journeyPresenter,
     ) {}
 
     /**
@@ -34,31 +42,16 @@ class AlertWorkspaceService
      */
     public function build(User $user, int $alertId): ?array
     {
-        if (! $user->canDo('controlRoom.viewAny')) {
-            return null;
-        }
-
-        $alert = ControlRoomAlert::query()->find($alertId);
+        $alert = $this->access->findVisible($user, $alertId);
         if (! $alert) {
-            return null;
-        }
-
-        try {
-            $this->siteAccess->assertCanAccessAlert(
-                $user,
-                $alert,
-                $this->bypassPermissions(),
-                'You are not authorized to access alerts for this site.',
-            );
-        } catch (HttpException) {
             return null;
         }
 
         $alert->load([
             'asset:id,name,asset_tag,site_id,home_site_id,client_id',
-            'asset.client:id,site_id,organization_id',
+            'asset.client:id,site_id',
             'fleetSignal.asset:id,site_id,home_site_id,client_id',
-            'fleetSignal.asset.client:id,site_id,organization_id',
+            'fleetSignal.asset.client:id,site_id',
             'assignedTo:id,name,email',
             'acknowledgedBy:id,name',
             'resolvedBy:id,name',
@@ -72,7 +65,7 @@ class AlertWorkspaceService
             'evidencePacks.evidenceItems',
             'communications',
             'sla.slaDefinition',
-            'client:id,first_name,last_name,site_id,organization_id',
+            'client:id,first_name,last_name,site_id',
             'clientIncident:id,reference_number,control_room_alert_id,hs_event_id,status,severity,client_id,site_id,title',
             'device:id,type,latitude,longitude,location_description,site_id,client_id,asset_id',
             'tasks' => fn ($q) => $q->whereNull('parent_task_id')->orderBy('sort_order')->with(['assignedTo:id,name', 'subtasks.assignedTo:id,name']),
@@ -115,9 +108,46 @@ class AlertWorkspaceService
         $unsafeDeviceReference = $alert->device_id !== null && $safeDevice === null;
         $safeContext = $this->provenance->sanitiseContextForRead($alert);
 
-        $linkedIncident = $alert->clientIncident;
+        $linkedIncident = $this->journeys->incidentForAlert($alert);
+        $linkedHsEvent = $linkedIncident
+            ? $this->journeys->journeyForIncident($linkedIncident)->hsEvent
+            : $alert->hsEvent()->first();
+        $immediateControls = OperatorNote::query()
+            ->where('alert_id', $alert->id)
+            ->where('purpose', OperatorNote::PURPOSE_IMMEDIATE_CONTROLS)
+            ->with('user:id,name')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->first();
         $canViewIncident = $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned');
         $monitoringContext = $this->monitoringIncidentEvidence->forAlert($alert, $user);
+        $canOpenIncident = $linkedIncident !== null
+            && $canViewIncident
+            && $user->can('view', $linkedIncident);
+        $canOpenHs = $linkedHsEvent !== null && $user->canDo('hazards.view');
+        $resolveGate = $this->lifecycle->resolveGate($alert)->toArray();
+        $closeGate = $this->lifecycle->closeGate($alert)->toArray();
+        $closeGate['requirements'] = collect($closeGate['requirements'])
+            ->map(function (array $requirement) use ($canOpenIncident, $canOpenHs): array {
+                $canOpen = match ($requirement['key']) {
+                    'incident_closed' => $canOpenIncident,
+                    'health_safety_closed' => $canOpenHs,
+                    default => true,
+                };
+                if (! $canOpen) {
+                    $requirement['href'] = null;
+                }
+
+                return $requirement;
+            })
+            ->values()
+            ->all();
+        $capabilities = $this->access->capabilitiesForScopedAlert($user);
+        $linkedOperationalEvidence = $this->linkedEvidence->present(
+            $alert,
+            $user,
+            fn ($item): string => "/control-room/evidence/items/{$item->id}/download",
+        );
 
         return [
             'alert' => [
@@ -279,12 +309,7 @@ class AlertWorkspaceService
             ] : null,
             'audit_logs' => $auditLogs,
             'can' => [
-                'manage' => $user->canDo('controlRoom.alerts.manage'),
-                'assign' => $user->canDo('controlRoom.alerts.assign'),
-                'escalate' => $user->canDo('controlRoom.alerts.escalate'),
-                'create' => $user->canDo('controlRoom.alerts.create'),
-                'create_incident' => $user->canDo('controlRoom.alerts.manage')
-                    && $user->canDo('incidents.create'),
+                ...$capabilities,
                 'view_incident' => $canViewIncident,
                 'view_health_safety' => $user->canDo('hazards.view'),
             ],
@@ -349,6 +374,14 @@ class AlertWorkspaceService
                 'categories' => ConfigOption::forGroup('category'),
                 'resolution_codes' => ConfigOption::forGroup('resolution_code'),
             ],
+            'incident_defaults' => [
+                'immediate_action_taken' => $immediateControls?->content ?? '',
+                'source_note' => $immediateControls ? [
+                    'id' => $immediateControls->id,
+                    'user_name' => $immediateControls->user?->name,
+                    'created_at' => optional($immediateControls->created_at)->toISOString(),
+                ] : null,
+            ],
             'linked_incident' => $linkedIncident ? [
                 'id' => $linkedIncident->id,
                 'reference_number' => $linkedIncident->reference_number,
@@ -362,15 +395,15 @@ class AlertWorkspaceService
             'linked_hs_event' => $this->hsVisibility->forControlRoomAlert($alert, $user),
             'linked_it_work' => $monitoringContext['linked_it_work'],
             'monitoring_incident_evidence' => $monitoringContext['incident_evidence'],
+            'linked_operational_evidence' => $linkedOperationalEvidence,
+            'resolve_gate' => $resolveGate,
+            'close_gate' => $closeGate,
+            'journey_state' => $this->journeyPresenter->journeyState(
+                $linkedIncident,
+                $alert,
+                $linkedHsEvent,
+            ),
         ];
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function bypassPermissions(): array
-    {
-        return ['reports.viewAny'];
     }
 
     private function assignableStaff(User $user): Collection
@@ -380,7 +413,11 @@ class AlertWorkspaceService
         }
 
         $staffQuery = User::staff()->orderBy('name');
-        $this->siteAccess->applyControlRoomAssigneeScope($staffQuery, $user, $this->bypassPermissions());
+        $this->siteAccess->applyControlRoomAssigneeScope(
+            $staffQuery,
+            $user,
+            ['reports.viewAny'],
+        );
 
         return $staffQuery->get(['id', 'name', 'email']);
     }

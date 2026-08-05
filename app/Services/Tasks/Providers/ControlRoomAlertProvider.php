@@ -5,11 +5,13 @@ namespace App\Services\Tasks\Providers;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\IncidentJourneyTaskContext;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskSearch;
 use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -43,14 +45,17 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
     public function canAssign(User $user): bool
     {
         // Mirrors routes/control-room.php: POST /alerts/{alert}/assign|unassign
-        // → permission:controlRoom.alerts.assign.
-        return $user->canDo('controlRoom.alerts.assign');
+        // → permission:controlRoom.alerts.assign, plus the canonical readable
+        // destination required by the controller's shared access concern.
+        return $user->canDo('controlRoom.alerts.assign')
+            && app(ControlRoomAlertAccessService::class)->canRead($user);
     }
 
     public function assign(User $actor, int $id, ?int $assigneeId): void
     {
         DB::transaction(function () use ($actor, $assigneeId, $id): void {
-            $access = app(UserSiteAccessService::class);
+            $alertAccess = app(ControlRoomAlertAccessService::class);
+            $siteAccess = app(UserSiteAccessService::class);
             $freshActor = User::query()->whereKey($actor->id)->first();
             if (! $freshActor || ! $this->canAssign($freshActor)) {
                 throw ValidationException::withMessages([
@@ -62,11 +67,7 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
             // queue item cannot bypass tenant access or terminal-state gates.
             $alert = ControlRoomAlert::query()
                 ->whereKey($id)
-                ->tap(fn ($query) => $access->applyAlertScope(
-                    $query,
-                    $freshActor,
-                    self::ALERT_BYPASS_PERMISSIONS,
-                ))
+                ->tap(fn ($query) => $alertAccess->applyReadableScope($query, $freshActor))
                 ->lockForUpdate()
                 ->first();
 
@@ -86,7 +87,7 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
             if ($assigneeId !== null) {
                 $assignee = User::staff()
                     ->whereKey($assigneeId)
-                    ->tap(fn ($query) => $access->applyControlRoomAssigneeScope(
+                    ->tap(fn ($query) => $siteAccess->applyControlRoomAssigneeScope(
                         $query,
                         $freshActor,
                         self::ALERT_BYPASS_PERMISSIONS,
@@ -143,34 +144,77 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
 
     public function canView(User $user): bool
     {
-        return $user->canDo('controlRoom.viewAny')
-            || $user->canDo('controlRoom.alerts.view');
+        return app(ControlRoomAlertAccessService::class)->canList($user);
     }
 
     public function tasks(User $user, array $filters = []): array
     {
+        $includeSearchContext = TaskSearch::hasQuery($filters);
+        $with = [
+            'client:id,first_name,last_name',
+            'site:id,name',
+            'assignedTo:id,name',
+            $includeSearchContext
+                ? 'clientIncident:id,client_id,site_id,hs_event_id,control_room_alert_id,investigation_assigned_to,reference_number,source,occurred_at,title,description,immediate_action_taken,immediate_action,witnesses,potential_consequence'
+                : 'clientIncident:id,client_id,site_id,hs_event_id,control_room_alert_id,reference_number,source,occurred_at',
+            'clientIncident.client:id,first_name,last_name',
+            'clientIncident.site:id,name',
+            $includeSearchContext
+                ? 'clientIncident.hsEvent:id,reference_number,owner_user_id'
+                : 'clientIncident.hsEvent:id,reference_number',
+        ];
+
+        if ($includeSearchContext) {
+            array_push(
+                $with,
+                'tasks:id,alert_id,title,description,assigned_to_user_id',
+                'tasks.assignedTo:id,name',
+                'clientIncident.investigator:id,name',
+                'clientIncident.followups:id,client_incident_id,assigned_to_user_id',
+                'clientIncident.followups.assignedTo:id,name',
+                'clientIncident.hsEvent.owner:id,name',
+                'clientIncident.hsEvent.investigations:id,hs_event_id,reference_number,lead_investigator_id',
+                'clientIncident.hsEvent.investigations.leadInvestigator:id,name',
+                'clientIncident.hsEvent.correctiveActions:id,hs_event_id,reference_number,assigned_to_user_id',
+                'clientIncident.hsEvent.correctiveActions.assignedTo:id,name',
+            );
+        }
+
+        $access = app(ControlRoomAlertAccessService::class);
         $query = ControlRoomAlert::query()
-            ->with([
-                'client:id,first_name,last_name',
-                'site:id,name',
-                'assignedTo:id,name',
-                'clientIncident:id,client_id,site_id,hs_event_id,control_room_alert_id,reference_number,source,occurred_at',
-                'clientIncident.client:id,first_name,last_name',
-                'clientIncident.site:id,name',
-                'clientIncident.hsEvent:id,reference_number',
-            ])
-            // Same site scoping as the Control Room index (applyAlertScope) —
-            // the queue must never show alerts the module itself would hide.
-            ->tap(fn ($q) => app(UserSiteAccessService::class)->applyAlertScope($q, $user, self::ALERT_BYPASS_PERMISSIONS))
+            ->with($with)
+            ->tap(fn ($q) => $access->applyVisibleScope($q, $user))
+            ->when(
+                $includeSearchContext,
+                fn ($q) => $q->whereHas(
+                    'clientIncident',
+                    fn ($incident) => TaskSearch::applyIncidentJourneyPredicate($incident, $filters),
+                ),
+            )
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('triggered_at')
-            ->limit(300);
+            ->when(! $includeSearchContext, fn ($q) => $q->limit(300));
 
         if (empty($filters['include_done'])) {
             $query->actionable();
         }
 
-        return $query->get()->map(function (ControlRoomAlert $alert) {
-            $journey = IncidentJourneyTaskContext::make($alert->clientIncident, $alert);
+        return $query->get()->map(function (ControlRoomAlert $alert) use (
+            $access,
+            $filters,
+            $includeSearchContext,
+            $user,
+        ) {
+            $journey = IncidentJourneyTaskContext::make(
+                $alert->clientIncident,
+                $alert,
+                includeSearchContext: $includeSearchContext,
+            );
+            $destination = $access->destinationForScopedAlert(
+                $alert,
+                $user,
+                $filters['return_to'] ?? null,
+            );
             $client = $journey['person'] ?? ($alert->client ? [
                 'id' => $alert->client->id,
                 'name' => trim($alert->client->first_name.' '.$alert->client->last_name),
@@ -206,12 +250,32 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
                 site: $site,
                 dueAt: optional($alert->due_at)->toIso8601String(),
                 createdAt: optional($alert->created_at)->toIso8601String(),
-                link: "/control-room/alerts/{$alert->id}",
+                link: $destination['href'],
                 type: 'Alert',
                 description: $alert->notes ? str($alert->notes)->limit(140)->toString() : null,
                 journey: $journey,
                 sourceContext: str_replace('_', ' ', (string) ($alert->source ?: $alert->alert_type)),
-                actionLabel: 'Continue Control Room response',
+                actionLabel: $destination['label'],
+                displayState: match ($alert->status) {
+                    ControlRoomAlert::STATUS_OPEN => 'Awaiting response',
+                    ControlRoomAlert::STATUS_ACK => 'Acknowledged',
+                    ControlRoomAlert::STATUS_TRIAGING => 'Triage in progress',
+                    ControlRoomAlert::STATUS_CONFIRMED => 'Response confirmed',
+                    ControlRoomAlert::STATUS_RESOLVED => 'Resolved',
+                    ControlRoomAlert::STATUS_CLOSED => 'Closed',
+                    ControlRoomAlert::STATUS_DISMISSED => 'Dismissed',
+                    default => ucfirst(str_replace('_', ' ', (string) $alert->status)),
+                },
+                searchTerms: $includeSearchContext
+                    ? array_values(array_filter([
+                        $alert->assignedTo?->name,
+                        ...$alert->tasks
+                            ->flatMap(fn ($task) => [$task->title, $task->description])
+                            ->filter()
+                            ->all(),
+                    ]))
+                    : [],
+                actionHelp: $destination['help'],
             );
         })->all();
     }

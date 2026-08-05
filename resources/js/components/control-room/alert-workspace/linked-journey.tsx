@@ -5,7 +5,7 @@ import {
 } from '@/components/control-room/alert-workspace/next-action';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Link, router } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import {
     ArrowRight,
     Check,
@@ -14,7 +14,6 @@ import {
     HeartPulse,
     RadioTower,
 } from 'lucide-react';
-import { useState } from 'react';
 
 type JourneyCan = {
     manage: boolean;
@@ -24,7 +23,6 @@ type JourneyCan = {
 };
 
 export function LinkedJourney({
-    alertId,
     alertReference,
     alertStatus,
     sensorConfirmationRequired,
@@ -32,9 +30,9 @@ export function LinkedJourney({
     healthSafety,
     can,
     onConfirmSensor,
+    onCreateIncident,
     showAction = true,
 }: {
-    alertId: number;
     alertReference: string;
     alertStatus: string;
     sensorConfirmationRequired: boolean;
@@ -42,10 +40,9 @@ export function LinkedJourney({
     healthSafety: LinkedHealthSafety | null;
     can: JourneyCan;
     onConfirmSensor?: () => void;
+    onCreateIncident?: () => void;
     showAction?: boolean;
 }) {
-    const [confirming, setConfirming] = useState(false);
-    const [busy, setBusy] = useState(false);
     const action = nextAlertAction({
         alertStatus,
         sensorConfirmationRequired,
@@ -53,25 +50,6 @@ export function LinkedJourney({
         healthSafety,
         can,
     });
-
-    const createIncident = () => {
-        if (!confirming) {
-            setConfirming(true);
-            return;
-        }
-        setBusy(true);
-        router.post(
-            `/control-room/alerts/${alertId}/create-incident`,
-            {},
-            {
-                preserveScroll: true,
-                onFinish: () => {
-                    setBusy(false);
-                    setConfirming(false);
-                },
-            },
-        );
-    };
 
     const actionControl = (() => {
         if (!showAction) return null;
@@ -85,30 +63,10 @@ export function LinkedJourney({
         }
         if (action.key === 'create_incident') {
             return (
-                <div className="flex items-center gap-2">
-                    {confirming ? (
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setConfirming(false)}
-                        >
-                            Cancel
-                        </Button>
-                    ) : null}
-                    <Button size="sm" onClick={createIncident} disabled={busy}>
-                        {confirming
-                            ? 'Confirm create and hand over'
-                            : action.label}
-                        {confirming ? (
-                            <Check className="ml-1.5 h-4 w-4" aria-hidden />
-                        ) : (
-                            <ArrowRight
-                                className="ml-1.5 h-4 w-4"
-                                aria-hidden
-                            />
-                        )}
-                    </Button>
-                </div>
+                <Button size="sm" onClick={onCreateIncident}>
+                    {action.label}
+                    <ArrowRight className="ml-1.5 h-4 w-4" aria-hidden />
+                </Button>
             );
         }
         if (action.href) {

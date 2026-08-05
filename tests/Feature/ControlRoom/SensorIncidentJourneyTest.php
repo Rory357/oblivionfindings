@@ -66,10 +66,13 @@ class SensorIncidentJourneyTest extends TestCase
             'status' => 'processed',
         ]);
 
-        $first = app(SensorIncidentBridgeService::class)->confirm($alert, $operator);
+        $overrides = [
+            'immediate_action_taken' => 'Resident checked and the bedroom made safe.',
+        ];
+        $first = app(SensorIncidentBridgeService::class)->confirm($alert, $operator, $overrides);
         $confirmedAt = data_get($alert->fresh()->context, 'confirmed_at');
         $acknowledgedAt = $alert->fresh()->acknowledged_at?->toISOString();
-        $second = app(SensorIncidentBridgeService::class)->confirm($alert->fresh(), $operator);
+        $second = app(SensorIncidentBridgeService::class)->confirm($alert->fresh(), $operator, $overrides);
         $first = $first->fresh();
         $event = HsEvent::query()->sole();
 
@@ -77,6 +80,10 @@ class SensorIncidentJourneyTest extends TestCase
         $this->assertSame('sensor', $first->source);
         $this->assertFalse($first->interactive);
         $this->assertSame('submitted', $first->status);
+        $this->assertSame(
+            'Resident checked and the bedroom made safe.',
+            $first->immediate_action_taken,
+        );
         $this->assertSame('fall_detected', data_get($first->metadata, 'sensor_evidence.signal_type'));
         $this->assertSame(0.97, data_get($first->metadata, 'sensor_evidence.payload.confidence'));
         $this->assertSame($alert->id, $first->control_room_alert_id);
@@ -131,10 +138,16 @@ class SensorIncidentJourneyTest extends TestCase
             'control_room_alert_id' => $alert->id,
         ]));
 
-        $result = app(SensorIncidentBridgeService::class)->confirm($alert, $operator);
+        $result = app(SensorIncidentBridgeService::class)->confirm($alert, $operator, [
+            'immediate_action_taken' => 'Resident checked during partial confirmation repair.',
+        ]);
         $alert->refresh();
 
         $this->assertTrue($result->is($incident));
+        $this->assertSame(
+            'Resident checked during partial confirmation repair.',
+            $incident->fresh()->immediate_action_taken,
+        );
         $this->assertSame(ControlRoomAlert::STATUS_CONFIRMED, $alert->status);
         $this->assertSame($incident->id, data_get($alert->context, 'incident_id'));
         $this->assertSame($operator->name, data_get($alert->context, 'confirmed_by'));
@@ -192,12 +205,18 @@ class SensorIncidentJourneyTest extends TestCase
             'hs_event_id' => null,
         ]));
 
-        $result = app(SensorIncidentBridgeService::class)->confirm($alert, $operator);
+        $result = app(SensorIncidentBridgeService::class)->confirm($alert, $operator, [
+            'immediate_action_taken' => 'Resident checked while the H&S link was repaired.',
+        ]);
         $alert->refresh();
         $incident->refresh();
         $event = HsEvent::query()->sole();
 
         $this->assertTrue($result->is($incident));
+        $this->assertSame(
+            'Resident checked while the H&S link was repaired.',
+            $incident->immediate_action_taken,
+        );
         $this->assertSame(ControlRoomAlert::STATUS_CONFIRMED, $alert->status);
         $this->assertSame($confirmedAt->toISOString(), data_get($alert->context, 'confirmed_at'));
         $this->assertSame($acknowledgedAt->toISOString(), $alert->acknowledged_at?->toISOString());
@@ -350,7 +369,9 @@ class SensorIncidentJourneyTest extends TestCase
             'status' => 'processed',
         ]);
 
-        $incident = app(SensorIncidentBridgeService::class)->confirm($alert, $operator);
+        $incident = app(SensorIncidentBridgeService::class)->confirm($alert, $operator, [
+            'immediate_action_taken' => 'Wearer contacted and immediate assistance arranged.',
+        ]);
 
         $this->assertSame($alert->id, $incident->control_room_alert_id);
         $this->assertSame(ControlRoomAlert::STATUS_CONFIRMED, $alert->fresh()->status);

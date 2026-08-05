@@ -8,6 +8,7 @@ use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\IncidentJourneyTaskContext;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskSearch;
 use App\Services\UserSiteAccessService;
 
 class HsInvestigationProvider implements HasModelClass, TaskProvider
@@ -36,31 +37,68 @@ class HsInvestigationProvider implements HasModelClass, TaskProvider
 
     public function tasks(User $user, array $filters = []): array
     {
+        $includeSearchContext = TaskSearch::hasQuery($filters);
+        $with = [
+            'leadInvestigator:id,name',
+            'hsEvent.client:id,first_name,last_name',
+            'hsEvent.site:id,name',
+            $includeSearchContext
+                ? 'hsEvent.controlRoomAlert:id,reference_number,assigned_to_user_id'
+                : 'hsEvent.controlRoomAlert:id,reference_number',
+            $includeSearchContext
+                ? 'hsEvent.clientIncident:id,client_id,site_id,hs_event_id,investigation_assigned_to,reference_number,source,occurred_at,title,description,immediate_action_taken,immediate_action,witnesses,potential_consequence'
+                : 'hsEvent.clientIncident:id,client_id,site_id,hs_event_id,reference_number,source,occurred_at',
+            'hsEvent.clientIncident.client:id,first_name,last_name',
+            'hsEvent.clientIncident.site:id,name',
+        ];
+
+        if ($includeSearchContext) {
+            array_push(
+                $with,
+                'hsEvent.owner:id,name',
+                'hsEvent.controlRoomAlert.assignedTo:id,name',
+                'hsEvent.controlRoomAlert.tasks:id,alert_id,title,description,assigned_to_user_id',
+                'hsEvent.controlRoomAlert.tasks.assignedTo:id,name',
+                'hsEvent.investigations:id,hs_event_id,reference_number,lead_investigator_id',
+                'hsEvent.investigations.leadInvestigator:id,name',
+                'hsEvent.correctiveActions:id,hs_event_id,reference_number,assigned_to_user_id',
+                'hsEvent.correctiveActions.assignedTo:id,name',
+                'hsEvent.clientIncident.investigator:id,name',
+                'hsEvent.clientIncident.followups:id,client_incident_id,assigned_to_user_id',
+                'hsEvent.clientIncident.followups.assignedTo:id,name',
+            );
+        }
+
         $query = HsInvestigation::query()
-            ->with([
-                'leadInvestigator:id,name',
-                'hsEvent.client:id,first_name,last_name',
-                'hsEvent.site:id,name',
-                'hsEvent.controlRoomAlert:id,reference_number',
-                'hsEvent.clientIncident:id,client_id,site_id,hs_event_id,control_room_alert_id,reference_number,source,occurred_at',
-                'hsEvent.clientIncident.client:id,first_name,last_name',
-                'hsEvent.clientIncident.site:id,name',
-            ])
+            ->with($with)
             ->whereHas('hsEvent', fn ($q) => app(UserSiteAccessService::class)->applyHsEventScope(
                 $q,
                 $user,
                 self::SITE_BYPASS_PERMISSIONS,
             ))
+            ->when(
+                $includeSearchContext,
+                fn ($q) => $q->whereHas(
+                    'hsEvent.clientIncident',
+                    fn ($incident) => TaskSearch::applyIncidentJourneyPredicate($incident, $filters),
+                ),
+            )
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('created_at')
-            ->limit(300);
+            ->when(! $includeSearchContext, fn ($q) => $q->limit(300));
 
         if (empty($filters['include_done'])) {
             $query->whereNotIn('status', [HsInvestigation::STATUS_COMPLETED]);
         }
 
-        return $query->get()->map(function (HsInvestigation $investigation) {
+        return $query->get()->map(function (HsInvestigation $investigation) use ($includeSearchContext) {
             $event = $investigation->hsEvent;
-            $journey = IncidentJourneyTaskContext::make($event?->clientIncident, $event?->controlRoomAlert, $event);
+            $journey = IncidentJourneyTaskContext::make(
+                $event?->clientIncident,
+                $event?->controlRoomAlert,
+                $event,
+                $includeSearchContext,
+            );
             $client = $journey['person'] ?? ($event?->client ? [
                 'id' => $event->client->id,
                 'name' => trim($event->client->first_name.' '.$event->client->last_name),

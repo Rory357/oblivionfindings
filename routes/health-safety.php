@@ -5,10 +5,12 @@ use App\Http\Controllers\HealthSafety\FirstAidController;
 use App\Http\Controllers\HealthSafety\HazardousSubstanceController;
 use App\Http\Controllers\HealthSafety\HealthSafetyDashboardController;
 use App\Http\Controllers\HealthSafety\HsCorrectiveActionController;
+use App\Http\Controllers\HealthSafety\HsCorrectiveActionEvidenceController;
 use App\Http\Controllers\HealthSafety\HsEventController;
 use App\Http\Controllers\HealthSafety\HsGovernanceReportController;
 use App\Http\Controllers\HealthSafety\HsInvestigationController;
 use App\Http\Controllers\HealthSafety\HsRiskAssessmentController;
+use App\Http\Controllers\HealthSafety\HsWorksafeDecisionController;
 use App\Http\Controllers\HealthSafety\LoneWorkerController;
 use App\Http\Controllers\HealthSafety\PpeController;
 use App\Http\Controllers\HealthSafety\RestraintController;
@@ -49,10 +51,21 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::get('/risk-assessments/{assessment}/attachments/{attachment}/download', [HsRiskAssessmentController::class, 'downloadAttachment'])->name('risk-assessments.attachments.download');
     });
 
+    // Corrective-action evidence is participant-authorized in the controller.
+    // The assigned owner can upload/download/remove evidence without receiving
+    // governance-wide hazards.manage permission.
+    Route::post('/events/{event}/corrective-actions/{action}/evidence', [HsCorrectiveActionEvidenceController::class, 'store'])
+        ->name('events.corrective-actions.evidence.store');
+    Route::get('/events/{event}/corrective-actions/{action}/evidence/{attachment}', [HsCorrectiveActionEvidenceController::class, 'download'])
+        ->name('events.corrective-actions.evidence.download');
+    Route::delete('/events/{event}/corrective-actions/{action}/evidence/{attachment}', [HsCorrectiveActionEvidenceController::class, 'destroy'])
+        ->name('events.corrective-actions.evidence.destroy');
+
     // ── Events governance write actions (gated) ──
     Route::middleware('permission:hazards.manage')->group(function () {
         Route::post('/events/{hsEvent}/accept-handover', [HsEventController::class, 'acceptHandover'])->name('events.handover.accept');
         Route::post('/events/{hsEvent}/close', [HsEventController::class, 'close'])->name('events.close');
+        Route::post('/events/{hsEvent}/worksafe/decision', HsWorksafeDecisionController::class)->name('events.worksafe.decision');
         Route::post('/events/{hsEvent}/worksafe/notify', [HsEventController::class, 'worksafeNotify'])->name('events.worksafe.notify');
         Route::post('/events/{hsEvent}/worksafe/acknowledge', [HsEventController::class, 'worksafeAcknowledge'])->name('events.worksafe.acknowledge');
 

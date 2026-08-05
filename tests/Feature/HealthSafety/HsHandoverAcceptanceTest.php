@@ -168,6 +168,7 @@ class HsHandoverAcceptanceTest extends TestCase
             'hazards.view',
             'incidents.viewAny',
             'controlRoom.viewAny',
+            'controlRoom.alerts.view',
         ]);
 
         $this->actingAs($viewer)
@@ -200,7 +201,10 @@ class HsHandoverAcceptanceTest extends TestCase
         $this->assertNotNull(data_get($workspace, 'linked_hs_event.handover.accepted_at'));
         $this->assertSame("/health-safety/events/{$event->id}", data_get($workspace, 'linked_hs_event.href'));
 
-        $controlRoomOnly = $this->siteBoundUser($site, ['controlRoom.viewAny']);
+        $controlRoomOnly = $this->siteBoundUser($site, [
+            'controlRoom.viewAny',
+            'controlRoom.alerts.view',
+        ]);
         $controlRoomWorkspace = app(AlertWorkspaceService::class)->build($controlRoomOnly, $alert->id);
         $this->assertSame(HsEvent::HANDOVER_ACCEPTED, data_get($controlRoomWorkspace, 'linked_hs_event.handover.status'));
         $this->assertSame($actor->id, data_get($controlRoomWorkspace, 'linked_hs_event.handover.owner.id'));
@@ -234,6 +238,7 @@ class HsHandoverAcceptanceTest extends TestCase
             'hazards.view',
             'incidents.viewAny',
             'controlRoom.viewAny',
+            'controlRoom.alerts.view',
         ]);
         [$incident, $alert, $event] = $this->incidentJourney($site, $manager, [
             'worksafe_notifiable' => true,
@@ -280,6 +285,7 @@ class HsHandoverAcceptanceTest extends TestCase
             'incidents.viewAny',
             'hazards.view',
             'controlRoom.viewAny',
+            'controlRoom.alerts.view',
         ]);
 
         $this->actingAs($incidentOnlyViewer)

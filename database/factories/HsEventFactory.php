@@ -26,7 +26,12 @@ class HsEventFactory extends Factory
             'status' => HsEvent::STATUS_OPEN,
             'occurred_at' => fake()->dateTimeBetween('-1 month', 'now'),
             'reported_at' => now(),
-            'worksafe_notifiable' => false,
+            'worksafe_notifiable' => null,
+            'worksafe_decided_at' => null,
+            'worksafe_decided_by_user_id' => null,
+            'worksafe_decision_reason' => null,
+            'worksafe_decision_source' => null,
+            'worksafe_status' => null,
             'investigation_required' => false,
             'idempotency_key' => HsEvent::buildIdempotencyKey($sourceType, $sourceId, $eventCategory),
             'created_by' => User::factory(),
@@ -59,10 +64,38 @@ class HsEventFactory extends Factory
         ]);
     }
 
-    public function worksafeNotifiable(): static
+    public function worksafeUndecided(): static
+    {
+        return $this->state(fn () => [
+            'worksafe_notifiable' => null,
+            'worksafe_decided_at' => null,
+            'worksafe_decided_by_user_id' => null,
+            'worksafe_decision_reason' => null,
+            'worksafe_decision_source' => null,
+            'worksafe_status' => null,
+        ]);
+    }
+
+    public function worksafeNotNotifiable(User $actor): static
+    {
+        return $this->state(fn () => [
+            'worksafe_notifiable' => false,
+            'worksafe_decided_at' => now(),
+            'worksafe_decided_by_user_id' => $actor->id,
+            'worksafe_decision_reason' => 'Assessed as not meeting the WorkSafe notification threshold.',
+            'worksafe_decision_source' => 'manual',
+            'worksafe_status' => null,
+        ]);
+    }
+
+    public function worksafeNotifiable(?User $actor = null): static
     {
         return $this->state(fn () => [
             'worksafe_notifiable' => true,
+            'worksafe_decided_at' => now(),
+            'worksafe_decided_by_user_id' => $actor?->id ?? User::factory(),
+            'worksafe_decision_reason' => 'Assessed as meeting the WorkSafe notification threshold.',
+            'worksafe_decision_source' => 'manual',
             'worksafe_status' => HsEvent::WORKSAFE_PENDING,
             'investigation_required' => true,
         ]);

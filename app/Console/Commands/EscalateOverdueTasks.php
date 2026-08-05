@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\TaskWatcher;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\Tasks\TaskAggregator;
@@ -10,7 +9,6 @@ use App\Services\Tasks\TaskItem;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Hourly escalation sweep over the company-wide work-item feed (TaskAggregator).
@@ -92,12 +90,11 @@ class EscalateOverdueTasks extends Command
                         // this is idempotent regardless of which user's pass
                         // surfaced the item.
                         $assigneeId = (int) ($item->assignee['id'] ?? 0);
-                        $watcherIds = TaskWatcher::query()
-                            ->where('source', $item->source)
-                            ->where('item_id', (int) Str::afterLast($item->id, '-'))
-                            ->when($assigneeId > 0, fn ($q) => $q->where('user_id', '!=', $assigneeId))
-                            ->pluck('user_id')
-                            ->all();
+                        $watcherIds = $aggregator->authorizedWatcherIdsFor(
+                            $item->identitySource(),
+                            $item->numericId(),
+                            $assigneeId > 0 ? [$assigneeId] : [],
+                        );
 
                         foreach ($watcherIds as $watcherId) {
                             $watchersPinged += $this->escalate($notifications, $seen, $item, 3, [
@@ -147,11 +144,14 @@ class EscalateOverdueTasks extends Command
         array $extra,
         ?int $dedupeKey = null,
     ): bool {
-        $itemId = (int) Str::afterLast($item->id, '-');
+        $itemId = $item->numericId();
+        $source = $item->identitySource();
         $assigneeKey = $dedupeKey ?? ($level === 1 ? (int) ($item->assignee['id'] ?? 0) : 0);
-        $key = $item->source.'|'.$itemId.'|'.$level.'|'.$assigneeKey;
+        $key = $source.'|'.$itemId.'|'.$level.'|'.$assigneeKey;
+        $legacyKey = $item->source.'|'.$itemId.'|'.$level.'|'.$assigneeKey;
 
-        if (isset($seen[$key])) {
+        if (isset($seen[$key])
+            || ($source !== $item->source && isset($seen[$legacyKey]))) {
             return false;
         }
 
@@ -174,7 +174,7 @@ class EscalateOverdueTasks extends Command
             // Insert only after a successful notify; insertOrIgnore guards the
             // unique key against a concurrent run.
             DB::table('task_escalations')->insertOrIgnore([
-                'source' => $item->source,
+                'source' => $source,
                 'item_id' => $itemId,
                 'level' => $level,
                 'assignee_id' => $assigneeKey,

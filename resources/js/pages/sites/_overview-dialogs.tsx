@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -81,7 +82,11 @@ function SiteLineBody({
     return (
         <>
             <DialogHeader>
-                <DialogTitle>Edit phone &amp; email</DialogTitle>
+                <DialogTitle>Edit site line</DialogTitle>
+                <DialogDescription>
+                    Update the phone number and email staff use to contact this
+                    Site.
+                </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">

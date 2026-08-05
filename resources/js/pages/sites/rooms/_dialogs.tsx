@@ -1,6 +1,8 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -9,7 +11,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,7 +30,6 @@ import {
     UserX,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 // ── Shared types ──────────────────────────────────────────────────────────
 
@@ -97,7 +97,10 @@ export function getOccupantDisplayName(c: {
     return full;
 }
 
-function initials(c: { first_name?: string | null; last_name?: string | null }) {
+function initials(c: {
+    first_name?: string | null;
+    last_name?: string | null;
+}) {
     return (
         ((c.first_name?.[0] ?? '') + (c.last_name?.[0] ?? '')).toUpperCase() ||
         '?'
@@ -189,9 +192,7 @@ function AddRoomBody({
                         id="rm-notes"
                         rows={3}
                         value={form.data.notes}
-                        onChange={(e) =>
-                            form.setData('notes', e.target.value)
-                        }
+                        onChange={(e) => form.setData('notes', e.target.value)}
                         placeholder="Bed type, accessibility features, sensory considerations…"
                     />
                     <FieldError message={form.errors.notes} />
@@ -227,7 +228,10 @@ function AssignableToggle({
     onChange: (v: boolean) => void;
 }) {
     return (
-        <GuardrailCard unstyled className="flex items-start gap-3 rounded-lg border bg-background/40 p-3">
+        <GuardrailCard
+            unstyled
+            className="flex items-start gap-3 rounded-lg border bg-background/40 p-3"
+        >
             <Checkbox
                 id={id}
                 checked={value}
@@ -237,7 +241,7 @@ function AssignableToggle({
             <div className="min-w-0 flex-1">
                 <Label
                     htmlFor={id}
-                    className="text-sm font-medium leading-tight"
+                    className="text-sm leading-tight font-medium"
                 >
                     Assignable to client
                 </Label>
@@ -287,13 +291,10 @@ function EditRoomBody({
     room: RoomRecord;
     onClose: () => void;
 }) {
-    const form = useForm<RoomFormValues & { assigned_client_id: number | null }>({
+    const form = useForm<RoomFormValues>({
         name: room.name ?? '',
         notes: room.notes ?? '',
         is_assignable: room.is_assignable ?? true,
-        // Preserve the current occupant — the assignment endpoint owns that
-        // field, but the legacy update route also accepts it.
-        assigned_client_id: room.assigned_client?.id ?? null,
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -334,9 +335,7 @@ function EditRoomBody({
                         id="erm-notes"
                         rows={3}
                         value={form.data.notes}
-                        onChange={(e) =>
-                            form.setData('notes', e.target.value)
-                        }
+                        onChange={(e) => form.setData('notes', e.target.value)}
                     />
                     <FieldError message={form.errors.notes} />
                 </div>
@@ -405,8 +404,8 @@ export function DeleteRoomDialog({
                         {room && (
                             <>
                                 <span className="font-medium">{room.name}</span>{' '}
-                                will be hidden from the active list. History
-                                and any current assignment are kept intact.
+                                will be hidden from the active list. History and
+                                any current assignment are kept intact.
                             </>
                         )}
                     </DialogDescription>
@@ -491,13 +490,18 @@ export function ShowRoomDialog({
                                             Available
                                         </Badge>
                                     )}
-                                    {(room.assigned_from || room.assigned_until) && (
+                                    {(room.assigned_from ||
+                                        room.assigned_until) && (
                                         <span className="text-xs text-primary-foreground/70">
                                             {room.assigned_from && (
                                                 <>Since {room.assigned_from}</>
                                             )}
                                             {room.assigned_until && (
-                                                <> · until {room.assigned_until}</>
+                                                <>
+                                                    {' '}
+                                                    · until{' '}
+                                                    {room.assigned_until}
+                                                </>
                                             )}
                                         </span>
                                     )}
@@ -507,97 +511,104 @@ export function ShowRoomDialog({
                     </DialogHeader>
                 </div>
 
-                <div className="space-y-3 px-6 pb-2 pt-4">
-                {occupant ? (
-                    <GuardrailCard unstyled className="rounded-xl border bg-card/40 p-3">
-                        <div className="flex items-center gap-3">
-                            <Avatar className="size-11 shrink-0">
-                                {occupant.profile_photo_url && (
-                                    <AvatarImage
-                                        src={occupant.profile_photo_url}
-                                        alt={getOccupantDisplayName(occupant)}
-                                    />
-                                )}
-                                <AvatarFallback>
-                                    {initials(occupant)}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium">
-                                    {getOccupantDisplayName(occupant)}
-                                </p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                    Current occupant
-                                    {occupant.status
-                                        ? ` · ${occupant.status}`
-                                        : ''}
-                                </p>
-                            </div>
-                        </div>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            asChild
-                            className="mt-3 w-full"
+                <div className="space-y-3 px-6 pt-4 pb-2">
+                    {occupant ? (
+                        <GuardrailCard
+                            unstyled
+                            className="rounded-xl border bg-card/40 p-3"
                         >
-                            <a href={`/clients/${occupant.id}`}>
-                                Open {occupant.first_name}'s profile
-                            </a>
-                        </Button>
-                    </GuardrailCard>
-                ) : (
-                    <div className="rounded-xl border border-dashed p-3 text-center text-sm text-muted-foreground">
-                        No client assigned yet.
-                    </div>
-                )}
-
-                {room.notes && (
-                    <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-                        <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
-                            Notes
-                        </p>
-                        <p className="whitespace-pre-wrap">{room.notes}</p>
-                    </div>
-                )}
-
-                {room.history && room.history.length > 0 && (
-                    <GuardrailCard unstyled className="rounded-xl border bg-card/40">
-                        <p className="flex items-center gap-1.5 border-b px-3 py-2 text-xs uppercase tracking-wide text-muted-foreground">
-                            <History className="h-3 w-3" />
-                            Assignment history
-                            <span className="ml-auto normal-case tracking-normal text-[10px] opacity-70">
-                                Most recent first
-                            </span>
-                        </p>
-                        <ul className="max-h-48 divide-y overflow-y-auto">
-                            {room.history.slice(0, 8).map((h) => {
-                                const range = `${h.assigned_from ?? '—'} → ${
-                                    h.assigned_until ?? 'present'
-                                }`;
-                                return (
-                                    <li
-                                        key={h.id}
-                                        className="px-3 py-2 text-xs"
-                                    >
-                                        <p className="truncate font-medium">
-                                            {h.client
-                                                ? `${h.client.first_name} ${h.client.last_name}`.trim()
-                                                : 'Unknown client'}
-                                        </p>
-                                        <p className="truncate text-[11px] text-muted-foreground">
-                                            {range}
-                                            {h.assigned_by && (
-                                                <> · by {h.assigned_by}</>
+                            <div className="flex items-center gap-3">
+                                <Avatar className="size-11 shrink-0">
+                                    {occupant.profile_photo_url && (
+                                        <AvatarImage
+                                            src={occupant.profile_photo_url}
+                                            alt={getOccupantDisplayName(
+                                                occupant,
                                             )}
-                                        </p>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </GuardrailCard>
-                )}
+                                        />
+                                    )}
+                                    <AvatarFallback>
+                                        {initials(occupant)}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium">
+                                        {getOccupantDisplayName(occupant)}
+                                    </p>
+                                    <p className="truncate text-xs text-muted-foreground">
+                                        Current occupant
+                                        {occupant.status
+                                            ? ` · ${occupant.status}`
+                                            : ''}
+                                    </p>
+                                </div>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                asChild
+                                className="mt-3 w-full"
+                            >
+                                <a href={`/clients/${occupant.id}`}>
+                                    Open {occupant.first_name}'s profile
+                                </a>
+                            </Button>
+                        </GuardrailCard>
+                    ) : (
+                        <div className="rounded-xl border border-dashed p-3 text-center text-sm text-muted-foreground">
+                            No client assigned yet.
+                        </div>
+                    )}
 
+                    {room.notes && (
+                        <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+                            <p className="mb-1 text-xs tracking-wide text-muted-foreground uppercase">
+                                Notes
+                            </p>
+                            <p className="whitespace-pre-wrap">{room.notes}</p>
+                        </div>
+                    )}
+
+                    {room.history && room.history.length > 0 && (
+                        <GuardrailCard
+                            unstyled
+                            className="rounded-xl border bg-card/40"
+                        >
+                            <p className="flex items-center gap-1.5 border-b px-3 py-2 text-xs tracking-wide text-muted-foreground uppercase">
+                                <History className="h-3 w-3" />
+                                Assignment history
+                                <span className="ml-auto text-[10px] tracking-normal normal-case opacity-70">
+                                    Most recent first
+                                </span>
+                            </p>
+                            <ul className="max-h-48 divide-y overflow-y-auto">
+                                {room.history.slice(0, 8).map((h) => {
+                                    const range = `${h.assigned_from ?? '—'} → ${
+                                        h.assigned_until ?? 'present'
+                                    }`;
+                                    return (
+                                        <li
+                                            key={h.id}
+                                            className="px-3 py-2 text-xs"
+                                        >
+                                            <p className="truncate font-medium">
+                                                {h.client
+                                                    ? `${h.client.first_name} ${h.client.last_name}`.trim()
+                                                    : 'Unknown client'}
+                                            </p>
+                                            <p className="truncate text-[11px] text-muted-foreground">
+                                                {range}
+                                                {h.assigned_by && (
+                                                    <> · by {h.assigned_by}</>
+                                                )}
+                                            </p>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </GuardrailCard>
+                    )}
                 </div>
 
                 <DialogFooter className="flex flex-row flex-wrap items-center gap-2 border-t bg-muted/20 px-6 py-3 sm:justify-between">
@@ -627,18 +638,20 @@ export function ShowRoomDialog({
                                 <Pencil className="h-4 w-4" />
                             </Button>
                         )}
-                        {canManage && occupant && room.is_assignable !== false && (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={onUnassign}
-                                aria-label="Unassign occupant"
-                                title="Unassign occupant"
-                            >
-                                <Link2Off className="h-4 w-4" />
-                            </Button>
-                        )}
+                        {canManage &&
+                            occupant &&
+                            room.is_assignable !== false && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={onUnassign}
+                                    aria-label="Unassign occupant"
+                                    title="Unassign occupant"
+                                >
+                                    <Link2Off className="h-4 w-4" />
+                                </Button>
+                            )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         <Button
@@ -650,11 +663,7 @@ export function ShowRoomDialog({
                             Close
                         </Button>
                         {canManage && room.is_assignable !== false && (
-                            <Button
-                                type="button"
-                                size="sm"
-                                onClick={onAssign}
-                            >
+                            <Button type="button" size="sm" onClick={onAssign}>
                                 <UserPlus className="mr-1.5 h-3.5 w-3.5" />
                                 {occupant ? 'Change occupant' : 'Assign client'}
                             </Button>
@@ -711,11 +720,11 @@ function AssignClientBody({
     onClose: () => void;
 }) {
     const currentClientId = room.assigned_client?.id ?? null;
-    const [selectedId, setSelectedId] = useState<number | null>(currentClientId);
-    const [query, setQuery] = useState('');
-    const [assignedFrom, setAssignedFrom] = useState(
-        room.assigned_from ?? '',
+    const [selectedId, setSelectedId] = useState<number | null>(
+        currentClientId,
     );
+    const [query, setQuery] = useState('');
+    const [assignedFrom, setAssignedFrom] = useState(room.assigned_from ?? '');
     const [assignedUntil, setAssignedUntil] = useState(
         room.assigned_until ?? '',
     );
@@ -769,7 +778,9 @@ function AssignClientBody({
 
             <div className="mt-3 space-y-3">
                 <div>
-                    <Label htmlFor="ac-search">Search clients at this site</Label>
+                    <Label htmlFor="ac-search">
+                        Search clients at this site
+                    </Label>
                     <Input
                         id="ac-search"
                         placeholder="Search by name…"
@@ -778,7 +789,10 @@ function AssignClientBody({
                     />
                 </div>
 
-                <GuardrailCard unstyled className="max-h-60 overflow-y-auto rounded-xl border bg-card/40">
+                <GuardrailCard
+                    unstyled
+                    className="max-h-60 overflow-y-auto rounded-xl border bg-card/40"
+                >
                     {filtered.length === 0 ? (
                         <p className="px-4 py-6 text-center text-xs text-muted-foreground">
                             {clients.length === 0
@@ -793,7 +807,8 @@ function AssignClientBody({
                                     c.room && c.room.id !== room.id;
                                 return (
                                     <li key={c.id}>
-                                        <Button unstyled
+                                        <Button
+                                            unstyled
                                             type="button"
                                             onClick={() => setSelectedId(c.id)}
                                             className={cn(
@@ -860,7 +875,10 @@ function AssignClientBody({
                     </div>
                     <div>
                         <Label htmlFor="ac-until">
-                            Until <span className="text-xs text-muted-foreground">(optional)</span>
+                            Until{' '}
+                            <span className="text-xs text-muted-foreground">
+                                (optional)
+                            </span>
                         </Label>
                         <Input
                             id="ac-until"
@@ -898,239 +916,6 @@ function AssignClientBody({
                     {currentClientId && selectedId !== currentClientId
                         ? 'Reassign'
                         : 'Assign'}
-                </Button>
-            </DialogFooter>
-        </>
-    );
-}
-
-// ── Assign-room-to-client dialog (used FROM the Clients tab) ──────────────
-//
-// Fixed: client. User picks a room from the site's available rooms (+ their
-// current room).
-
-export function AssignRoomToClientDialog({
-    siteId,
-    client,
-    rooms,
-    isOpen,
-    onClose,
-}: {
-    siteId: number;
-    client: {
-        id: number;
-        first_name: string;
-        last_name: string;
-        preferred_name?: string | null;
-        room?: { id: number; name: string } | null;
-    } | null;
-    rooms: RoomRecord[];
-    isOpen: boolean;
-    onClose: () => void;
-}) {
-    return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-xl">
-                {isOpen && client && (
-                    <AssignRoomBody
-                        siteId={siteId}
-                        client={client}
-                        rooms={rooms}
-                        onClose={onClose}
-                    />
-                )}
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function AssignRoomBody({
-    siteId,
-    client,
-    rooms,
-    onClose,
-}: {
-    siteId: number;
-    client: {
-        id: number;
-        first_name: string;
-        last_name: string;
-        preferred_name?: string | null;
-        room?: { id: number; name: string } | null;
-    };
-    rooms: RoomRecord[];
-    onClose: () => void;
-}) {
-    const currentRoomId = client.room?.id ?? null;
-    const pickable = useMemo(
-        () =>
-            rooms.filter((r) => {
-                // Communal spaces are never pickable.
-                if (r.is_assignable === false) return false;
-                // Otherwise pick rooms that are free, the client's own, or
-                // their current room (so they can confirm/clear it).
-                return (
-                    !r.assigned_client ||
-                    r.assigned_client.id === client.id ||
-                    r.id === currentRoomId
-                );
-            }),
-        [rooms, client.id, currentRoomId],
-    );
-    const [selectedId, setSelectedId] = useState<number | null>(currentRoomId);
-    const [assignedFrom, setAssignedFrom] = useState('');
-    const [assignedUntil, setAssignedUntil] = useState('');
-    const [notes, setNotes] = useState('');
-    const [submitting, setSubmitting] = useState(false);
-
-    const handleAssign = () => {
-        if (!selectedId) return;
-        setSubmitting(true);
-        router.post(
-            `/sites/${siteId}/rooms/${selectedId}/assign`,
-            {
-                client_id: client.id,
-                assigned_from: assignedFrom || null,
-                assigned_until: assignedUntil || null,
-                notes: notes || null,
-            },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onFinish: () => setSubmitting(false),
-                onSuccess: () => onClose(),
-            },
-        );
-    };
-
-    return (
-        <>
-            <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                    <BedDouble className="h-4 w-4 text-primary" />
-                    {currentRoomId
-                        ? `Change room for ${getOccupantDisplayName(client)}`
-                        : `Assign a room to ${getOccupantDisplayName(client)}`}
-                </DialogTitle>
-                <DialogDescription>
-                    Pick an available bedroom. Dates are optional but useful for
-                    respite stays.
-                </DialogDescription>
-            </DialogHeader>
-
-            <div className="mt-3 space-y-3">
-                <GuardrailCard unstyled className="max-h-72 overflow-y-auto rounded-xl border bg-card/40">
-                    {pickable.length === 0 ? (
-                        <p className="px-4 py-6 text-center text-xs text-muted-foreground">
-                            No bedrooms available — every active room already
-                            has an occupant.
-                        </p>
-                    ) : (
-                        <ul className="divide-y">
-                            {pickable.map((r) => {
-                                const active = selectedId === r.id;
-                                const isCurrent = r.id === currentRoomId;
-                                return (
-                                    <li key={r.id}>
-                                        <Button unstyled
-                                            type="button"
-                                            onClick={() => setSelectedId(r.id)}
-                                            className={cn(
-                                                'flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors',
-                                                active
-                                                    ? 'bg-primary/10'
-                                                    : 'hover:bg-muted/50',
-                                            )}
-                                        >
-                                            <div className="flex min-w-0 items-center gap-3">
-                                                <span className="shrink-0 rounded-lg border bg-background/60 p-1.5">
-                                                    <BedDouble className="h-4 w-4 text-primary" />
-                                                </span>
-                                                <div className="min-w-0">
-                                                    <p className="truncate font-medium">
-                                                        {r.name}
-                                                    </p>
-                                                    <p className="truncate text-xs text-muted-foreground">
-                                                        {isCurrent
-                                                            ? 'Current room'
-                                                            : 'Available'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Badge
-                                                variant="outline"
-                                                className={cn(
-                                                    'text-[10px]',
-                                                    isCurrent
-                                                        ? 'border-primary/30 text-primary'
-                                                        : 'border-status-success/30 text-status-success',
-                                                )}
-                                            >
-                                                {isCurrent
-                                                    ? 'Current'
-                                                    : 'Available'}
-                                            </Badge>
-                                        </Button>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    )}
-                </GuardrailCard>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                        <Label htmlFor="ar-from">Assigned from</Label>
-                        <Input
-                            id="ar-from"
-                            type="date"
-                            value={assignedFrom}
-                            onChange={(e) => setAssignedFrom(e.target.value)}
-                        />
-                    </div>
-                    <div>
-                        <Label htmlFor="ar-until">
-                            Until{' '}
-                            <span className="text-xs text-muted-foreground">
-                                (optional)
-                            </span>
-                        </Label>
-                        <Input
-                            id="ar-until"
-                            type="date"
-                            value={assignedUntil}
-                            onChange={(e) => setAssignedUntil(e.target.value)}
-                        />
-                    </div>
-                </div>
-
-                <div>
-                    <Label htmlFor="ar-notes">Notes</Label>
-                    <Textarea
-                        id="ar-notes"
-                        rows={2}
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Respite stay, transition arrangement…"
-                    />
-                </div>
-            </div>
-
-            <DialogFooter className="mt-4">
-                <Button type="button" variant="outline" onClick={onClose}>
-                    Cancel
-                </Button>
-                <Button
-                    type="button"
-                    onClick={handleAssign}
-                    disabled={!selectedId || submitting}
-                >
-                    {submitting && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    {currentRoomId && selectedId !== currentRoomId
-                        ? 'Move client'
-                        : 'Assign room'}
                 </Button>
             </DialogFooter>
         </>

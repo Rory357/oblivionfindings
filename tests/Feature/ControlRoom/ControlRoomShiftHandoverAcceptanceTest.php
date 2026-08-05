@@ -5,11 +5,13 @@ namespace Tests\Feature\ControlRoom;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ControlRoom\AlertTask;
+use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomHandoverScopeService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -38,16 +40,21 @@ class ControlRoomShiftHandoverAcceptanceTest extends TestCase
         $this->otherCoordinator = $this->coordinatorAt($this->site);
     }
 
-    public function test_prepare_requires_explicit_review_of_every_visible_critical_and_high_alert(): void
+    public function test_prepare_requires_explicit_review_of_every_changed_or_decision_relevant_alert(): void
     {
         $shift = $this->activeShift();
         $critical = $this->urgentAlert('critical', 'CR-2026-1201');
-        $this->urgentAlert('high', 'CR-2026-1202');
+        $this->urgentAlert('high', 'CR-2026-1202', [
+            'triggered_at' => now()->subHours(10),
+            'created_at' => now()->subHours(10),
+            'updated_at' => now()->subHours(10),
+        ]);
         $this->urgentAlert('medium', 'CR-2026-1203');
 
         $this->saveDraft($shift, [
             'incoming_lead_user_id' => $this->incomingLead->id,
             'reviewed_alert_ids' => [$critical->id],
+            'carry_forward_acknowledged' => true,
         ]);
 
         $shift->refresh();
@@ -68,6 +75,11 @@ class ControlRoomShiftHandoverAcceptanceTest extends TestCase
     {
         $shift = $this->activeShift();
         $client = Client::factory()->create(['site_id' => $this->site->id]);
+        $this->urgentAlert('medium', 'CR-2026-1209', [
+            'triggered_at' => now()->subHours(10),
+            'created_at' => now()->subHours(10),
+            'updated_at' => now()->subHours(10),
+        ]);
         $critical = $this->urgentAlert('critical', 'CR-2026-1210', [
             'client_id' => $client->id,
             'assigned_to_user_id' => $this->outgoingLead->id,
@@ -91,6 +103,24 @@ class ControlRoomShiftHandoverAcceptanceTest extends TestCase
             'incoming_team_members' => [$this->incomingLead->id],
             'reviewed_alert_ids' => [$critical->id, $high->id],
             'priority_alert_ids' => [$critical->id],
+            'carry_forward_acknowledged' => true,
+        ]);
+        OperatorNote::query()->create([
+            'shift_id' => $shift->id,
+            'type' => OperatorNote::TYPE_HANDOVER,
+            'purpose' => OperatorNote::PURPOSE_ESCALATION_HANDOVER,
+            'content' => 'Pinned outgoing context.',
+            'is_pinned' => true,
+            'user_id' => $this->outgoingLead->id,
+        ]);
+        OperatorNote::query()->create([
+            'shift_id' => $shift->id,
+            'type' => OperatorNote::TYPE_ACTION,
+            'purpose' => OperatorNote::PURPOSE_GENERAL,
+            'content' => 'Follow up with the incoming team.',
+            'requires_followup' => true,
+            'followup_at' => now()->addHour(),
+            'user_id' => $this->outgoingLead->id,
         ]);
 
         $shift->refresh();
@@ -118,6 +148,15 @@ class ControlRoomShiftHandoverAcceptanceTest extends TestCase
         $this->assertSame($this->incomingLead->name, data_get($snapshot, 'incoming_shift.lead.name'));
         $this->assertSame([$critical->id], data_get($snapshot, 'priority_alert_ids'));
         $this->assertEqualsCanonicalizing([$critical->id, $high->id], data_get($snapshot, 'reviewed_alert_ids'));
+        $this->assertEqualsCanonicalizing([$critical->id, $high->id], data_get($snapshot, 'required_alert_ids'));
+        $this->assertNotNull(data_get($snapshot, 'criteria_at'));
+        $this->assertCount(7, data_get($snapshot, 'criteria'));
+        $this->assertNull(data_get($snapshot, 'override'));
+        $this->assertSame(1, data_get($snapshot, 'carry_forward.total'));
+        $this->assertTrue(data_get($snapshot, 'carry_forward_acknowledged'));
+        $this->assertSame($this->outgoingLead->id, data_get($snapshot, 'carry_forward_acknowledged_by.id'));
+        $this->assertSame('Pinned outgoing context.', data_get($snapshot, 'pinned_notes.0.content'));
+        $this->assertSame('Follow up with the incoming team.', data_get($snapshot, 'followup_notes.0.content'));
 
         $criticalSnapshot = collect(data_get($snapshot, 'alerts'))->firstWhere('id', $critical->id);
         $this->assertSame('CR-2026-1210', data_get($criticalSnapshot, 'reference_number'));
@@ -129,6 +168,230 @@ class ControlRoomShiftHandoverAcceptanceTest extends TestCase
         $this->assertArrayHasKey('journey', $criticalSnapshot);
         $this->assertSame('/control-room/alerts/'.$critical->id, data_get($criticalSnapshot, 'next_action.href'));
         $this->assertSame('Confirm the person is safe', data_get($criticalSnapshot, 'tasks.0.title'));
+    }
+
+    public function test_prepare_requires_an_explicit_acknowledgement_of_the_current_carry_forward_summary(): void
+    {
+        $shift = $this->activeShift();
+        $this->urgentAlert('medium', 'CR-2026-1215', [
+            'triggered_at' => now()->subHours(10),
+            'created_at' => now()->subHours(10),
+            'updated_at' => now()->subHours(10),
+        ]);
+
+        $this->saveDraft($shift, [
+            'incoming_lead_user_id' => $this->incomingLead->id,
+        ]);
+        $shift->refresh();
+
+        $this->actingAs($this->outgoingLead)
+            ->post("/control-room/shifts/{$shift->id}/handover", [
+                'incoming_lead_user_id' => $this->incomingLead->id,
+                'reviewed_alert_ids' => [],
+                'expected_version' => $shift->handover_version,
+            ])
+            ->assertSessionHasErrors('carry_forward_acknowledged');
+
+        $this->saveDraft($shift, [
+            'incoming_lead_user_id' => $this->incomingLead->id,
+            'carry_forward_acknowledged' => true,
+            'carry_forward_signature' => str_repeat('0', 64),
+        ]);
+        $shift->refresh();
+
+        $this->actingAs($this->outgoingLead)
+            ->post("/control-room/shifts/{$shift->id}/handover", [
+                'incoming_lead_user_id' => $this->incomingLead->id,
+                'reviewed_alert_ids' => [],
+                'expected_version' => $shift->handover_version,
+            ])
+            ->assertSessionHasErrors('carry_forward_acknowledged');
+    }
+
+    public function test_review_gap_prepare_rejects_an_incoming_lead_who_cannot_access_every_required_alert(): void
+    {
+        $secondSite = Site::factory()->create([
+            'tenant_id' => $this->site->tenant_id,
+            'type' => 'house',
+        ]);
+        $this->outgoingLead->hrEmployeeProfile()->update([
+            'secondary_site_ids' => [$secondSite->id],
+        ]);
+        $shift = $this->activeShift();
+        $hiddenFromIncoming = $this->urgentAlert('high', 'CR-2026-1216', [
+            'site_id' => $secondSite->id,
+        ]);
+
+        $this->saveDraft($shift, [
+            'incoming_lead_user_id' => $this->incomingLead->id,
+            'reviewed_alert_ids' => [$hiddenFromIncoming->id],
+        ]);
+        $shift->refresh();
+
+        $this->actingAs($this->outgoingLead)
+            ->post("/control-room/shifts/{$shift->id}/handover", [
+                'incoming_lead_user_id' => $this->incomingLead->id,
+                'reviewed_alert_ids' => [$hiddenFromIncoming->id],
+                'expected_version' => $shift->handover_version,
+            ])
+            ->assertSessionHasErrors('incoming_lead_user_id');
+
+        $this->assertSame(Shift::HANDOVER_NONE, $shift->fresh()->handover_status);
+    }
+
+    public function test_review_gap_a_current_snoozed_required_alert_can_be_saved_reviewed_and_prepared(): void
+    {
+        $shift = $this->activeShift();
+        $snoozed = $this->urgentAlert('high', 'CR-2026-1217', [
+            'snoozed_until' => now()->addHour(),
+            'snoozed_by_user_id' => $this->outgoingLead->id,
+        ]);
+
+        $this->saveDraft($shift, [
+            'incoming_lead_user_id' => $this->incomingLead->id,
+            'reviewed_alert_ids' => [$snoozed->id],
+            'priority_alert_ids' => [$snoozed->id],
+        ]);
+        $shift->refresh();
+
+        $this->actingAs($this->outgoingLead)
+            ->post("/control-room/shifts/{$shift->id}/handover", [
+                'incoming_lead_user_id' => $this->incomingLead->id,
+                'reviewed_alert_ids' => [$snoozed->id],
+                'expected_version' => $shift->handover_version,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(Shift::HANDOVER_PREPARED, $shift->fresh()->handover_status);
+        $this->assertSame([$snoozed->id], data_get($shift->fresh()->handover_snapshot, 'required_alert_ids'));
+    }
+
+    public function test_review_gap_carry_only_handover_does_not_invent_required_alerts_for_the_incoming_lead(): void
+    {
+        $shift = $this->activeShift();
+        $this->urgentAlert('medium', 'CR-2026-1218', [
+            'triggered_at' => now()->subHours(10),
+            'created_at' => now()->subHours(10),
+            'updated_at' => now()->subHours(10),
+        ]);
+
+        $this->saveDraft($shift, [
+            'incoming_lead_user_id' => $this->incomingLead->id,
+            'carry_forward_acknowledged' => true,
+        ]);
+        $shift->refresh();
+
+        $this->actingAs($this->outgoingLead)
+            ->post("/control-room/shifts/{$shift->id}/handover", [
+                'incoming_lead_user_id' => $this->incomingLead->id,
+                'reviewed_alert_ids' => [],
+                'expected_version' => $shift->handover_version,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(Shift::HANDOVER_PREPARED, $shift->fresh()->handover_status);
+        $this->assertSame([], data_get($shift->fresh()->handover_snapshot, 'required_alert_ids'));
+        $this->assertSame(1, data_get($shift->fresh()->handover_snapshot, 'carry_forward.total'));
+    }
+
+    public function test_review_gap_accept_rejects_a_malformed_prepared_snapshot_without_switching_shifts(): void
+    {
+        $shift = $this->activeShift();
+        $shift->forceFill([
+            'handover_status' => Shift::HANDOVER_PREPARED,
+            'handed_over_to_user_id' => $this->incomingLead->id,
+            'handover_prepared_at' => now(),
+            'handover_snapshot' => [],
+        ])->save();
+        $shift->refresh();
+
+        $this->actingAs($this->incomingLead)
+            ->post("/control-room/shifts/{$shift->id}/accept-handover", [
+                'expected_version' => $shift->handover_version,
+            ])
+            ->assertSessionHasErrors('handover');
+
+        $this->assertSame('active', $shift->fresh()->status);
+        $this->assertSame(Shift::HANDOVER_PREPARED, $shift->fresh()->handover_status);
+        $this->assertDatabaseCount('control_room_shifts', 1);
+    }
+
+    public function test_review_gap_accept_rejects_a_fabricated_handover_criteria_taxonomy(): void
+    {
+        $shift = $this->activeShift();
+        $required = $this->urgentAlert('high', 'CR-2026-1221');
+        $this->saveDraft($shift, [
+            'incoming_lead_user_id' => $this->incomingLead->id,
+            'reviewed_alert_ids' => [$required->id],
+        ]);
+        $shift->refresh();
+        $this->actingAs($this->outgoingLead)
+            ->post("/control-room/shifts/{$shift->id}/handover", [
+                'incoming_lead_user_id' => $this->incomingLead->id,
+                'reviewed_alert_ids' => [$required->id],
+                'expected_version' => $shift->handover_version,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $prepared = $shift->fresh();
+        $snapshot = $prepared->handover_snapshot;
+        data_set($snapshot, 'criteria.0', [
+            'key' => 'fabricated_criterion',
+            'label' => 'Fabricated handover criterion',
+        ]);
+        data_set($snapshot, 'alerts.0.handover_reasons.0', [
+            'key' => 'fabricated_criterion',
+            'label' => 'Fabricated handover criterion',
+        ]);
+        $prepared->updateQuietly(['handover_snapshot' => $snapshot]);
+
+        $this->actingAs($this->incomingLead)
+            ->post("/control-room/shifts/{$shift->id}/accept-handover", [
+                'expected_version' => $prepared->handover_version,
+            ])
+            ->assertSessionHasErrors('handover');
+
+        $this->assertSame('active', $shift->fresh()->status);
+        $this->assertSame(Shift::HANDOVER_PREPARED, $shift->fresh()->handover_status);
+        $this->assertDatabaseCount('control_room_shifts', 1);
+    }
+
+    public function test_review_gap_accept_rechecks_the_incoming_leads_current_required_alert_access(): void
+    {
+        $shift = $this->activeShift();
+        $required = $this->urgentAlert('high', 'CR-2026-1219');
+        $this->saveDraft($shift, [
+            'incoming_lead_user_id' => $this->incomingLead->id,
+            'reviewed_alert_ids' => [$required->id],
+        ]);
+        $shift->refresh();
+        $this->actingAs($this->outgoingLead)
+            ->post("/control-room/shifts/{$shift->id}/handover", [
+                'incoming_lead_user_id' => $this->incomingLead->id,
+                'reviewed_alert_ids' => [$required->id],
+                'expected_version' => $shift->handover_version,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $otherSite = Site::factory()->create([
+            'tenant_id' => $this->site->tenant_id,
+            'type' => 'house',
+        ]);
+        $this->incomingLead->hrEmployeeProfile()->update([
+            'primary_site_id' => $otherSite->id,
+            'secondary_site_ids' => [],
+        ]);
+        $prepared = $shift->fresh();
+
+        $this->actingAs($this->incomingLead)
+            ->post("/control-room/shifts/{$shift->id}/accept-handover", [
+                'expected_version' => $prepared->handover_version,
+            ])
+            ->assertSessionHasErrors('handover');
+
+        $this->assertSame('active', $shift->fresh()->status);
+        $this->assertSame(Shift::HANDOVER_PREPARED, $shift->fresh()->handover_status);
+        $this->assertDatabaseCount('control_room_shifts', 1);
     }
 
     public function test_only_selected_incoming_lead_can_accept_and_acceptance_switches_shifts_once(): void
@@ -288,6 +551,11 @@ class ControlRoomShiftHandoverAcceptanceTest extends TestCase
     /** @param array<string, mixed> $overrides */
     private function saveDraft(Shift $shift, array $overrides = []): void
     {
+        $scope = app(ControlRoomHandoverScopeService::class)->build(
+            $shift->fresh(),
+            $this->outgoingLead,
+        );
+        $acknowledged = (bool) ($overrides['carry_forward_acknowledged'] ?? false);
         $payload = array_replace([
             'handover_notes' => '',
             'incoming_shift_name' => '',
@@ -295,6 +563,10 @@ class ControlRoomShiftHandoverAcceptanceTest extends TestCase
             'incoming_team_members' => [],
             'reviewed_alert_ids' => [],
             'priority_alert_ids' => [],
+            'carry_forward_acknowledged' => false,
+            'carry_forward_signature' => $acknowledged
+                ? data_get($scope, 'carry_forward.signature')
+                : null,
             'expected_version' => $shift->fresh()->handover_version,
         ], $overrides);
 

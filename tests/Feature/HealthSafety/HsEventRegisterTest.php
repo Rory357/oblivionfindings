@@ -12,6 +12,7 @@ use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRiskAssessment;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteInspectionRecord;
@@ -198,6 +199,154 @@ class HsEventRegisterTest extends TestCase
                 ->has('detail.investigations', 1)
                 ->has('detail.corrective_actions', 1)
                 ->has('detail.risk_assessments', 1)
+            );
+    }
+
+    public function test_register_and_detail_preserve_nullable_worksafe_decision_truth(): void
+    {
+        $site = $this->activeSite('Rimu House');
+        $actor = $this->hsOfficer($site);
+        $undecided = HsEvent::factory()->worksafeUndecided()->create([
+            'site_id' => $site->id,
+            'created_by' => $actor->id,
+            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+        ]);
+
+        $this->actingAs($actor)
+            ->get('/health-safety/events?event='.$undecided->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('events.data.0.worksafe_notifiable', null)
+                ->where('detail.worksafe.notifiable', null)
+                ->where('detail.worksafe.status', null)
+                ->where('detail.worksafe.decision_reason', null)
+                ->where('detail.worksafe.decided_at', null)
+                ->where('detail.worksafe.decided_by', null)
+                ->where('detail.worksafe.can_decide', true)
+                ->where('detail.worksafe.can_notify', false)
+                ->where('detail.worksafe.can_acknowledge', false)
+                ->where('detail.close_gate.allowed', false)
+                ->where('detail.close_gate.requirements.1.key', 'worksafe_decision')
+                ->where('detail.close_gate.requirements.1.complete', false)
+                ->where(
+                    'detail.close_gate.requirements.1.href',
+                    "/health-safety/events/{$undecided->id}?action=worksafe-decision",
+                )
+                ->where('detail.journey_state', 'H&S governance active')
+            );
+
+        $notNotifiable = HsEvent::factory()->worksafeNotNotifiable($actor)->create([
+            'site_id' => $site->id,
+            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+        ]);
+
+        $this->actingAs($actor)
+            ->get('/health-safety/events?event='.$notNotifiable->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.worksafe.notifiable', false)
+                ->where('detail.worksafe.decision_reason', $notNotifiable->worksafe_decision_reason)
+                ->where('detail.worksafe.decision_source', 'manual')
+                ->where('detail.worksafe.decided_by.id', $actor->id)
+                ->where('detail.worksafe.decided_by.name', $actor->name)
+                ->where('detail.worksafe.can_decide', true)
+                ->where('detail.worksafe.can_notify', false)
+                ->where('detail.worksafe.can_acknowledge', false)
+            );
+
+        $pending = HsEvent::factory()->worksafeNotifiable($actor)->create([
+            'site_id' => $site->id,
+            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+        ]);
+
+        $this->actingAs($actor)
+            ->get('/health-safety/events?event='.$pending->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.worksafe.notifiable', true)
+                ->where('detail.worksafe.status', HsEvent::WORKSAFE_PENDING)
+                ->where('detail.worksafe.can_decide', true)
+                ->where('detail.worksafe.can_notify', true)
+                ->where('detail.worksafe.can_acknowledge', false)
+            );
+    }
+
+    public function test_detail_worksafe_capabilities_follow_event_lifecycle(): void
+    {
+        $site = $this->activeSite('Totara House');
+        $actor = $this->hsOfficer($site);
+        $awaiting = HsEvent::factory()->worksafeNotifiable($actor)->create([
+            'site_id' => $site->id,
+            'handover_status' => HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
+        ]);
+
+        $this->actingAs($actor)
+            ->get('/health-safety/events?event='.$awaiting->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.worksafe.can_decide', false)
+                ->where('detail.worksafe.can_notify', true)
+                ->where('detail.worksafe.can_acknowledge', false)
+            );
+
+        $notified = HsEvent::factory()->worksafeNotifiable($actor)->create([
+            'site_id' => $site->id,
+            'handover_status' => HsEvent::HANDOVER_ACCEPTED,
+            'worksafe_status' => HsEvent::WORKSAFE_NOTIFIED,
+            'worksafe_notified_at' => now(),
+            'worksafe_method' => 'online',
+        ]);
+
+        $this->actingAs($actor)
+            ->get('/health-safety/events?event='.$notified->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.worksafe.can_decide', true)
+                ->where('detail.worksafe.can_notify', false)
+                ->where('detail.worksafe.can_acknowledge', true)
+            );
+
+        $notified->update([
+            'status' => HsEvent::STATUS_CLOSED,
+            'closed_at' => now(),
+            'closed_by' => $actor->id,
+            'closure_summary' => 'Closed under an authorised historic exception.',
+        ]);
+
+        $this->actingAs($actor)
+            ->get('/health-safety/events?event='.$notified->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.worksafe.can_decide', false)
+                ->where('detail.worksafe.can_notify', false)
+                ->where('detail.worksafe.can_acknowledge', true)
+            );
+    }
+
+    public function test_view_only_detail_exposes_worksafe_truth_without_mutation_controls(): void
+    {
+        $site = $this->activeSite('Nikau House');
+        $actor = $this->hsOfficer($site);
+        $event = HsEvent::factory()->worksafeNotNotifiable($actor)->create([
+            'site_id' => $site->id,
+            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+        ]);
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        $permission = Permission::query()->where('key', 'hazards.view')->firstOrFail();
+        $viewer->permissionOverrides()->sync([
+            $permission->id => ['allowed' => true],
+        ]);
+        $this->attachCurrentHrProfile($viewer, $site, 'viewer');
+
+        $this->actingAs($viewer)
+            ->get('/health-safety/events?event='.$event->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.worksafe.notifiable', false)
+                ->where('detail.worksafe.decision_reason', $event->worksafe_decision_reason)
+                ->where('detail.worksafe.can_decide', false)
+                ->where('detail.worksafe.can_notify', false)
+                ->where('detail.worksafe.can_acknowledge', false)
             );
     }
 

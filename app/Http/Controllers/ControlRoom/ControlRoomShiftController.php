@@ -58,10 +58,21 @@ class ControlRoomShiftController extends Controller
                 'handover_status' => $activeShift->handover_status,
                 'handover_version' => $activeShift->handover_version,
                 'handover_prepared_at' => $activeShift->handover_prepared_at?->toISOString(),
+                'is_stale' => $activeShift->isHandoverStale(),
+                'stale_after_hours' => $activeShift->handoverStaleAfterHours(),
+                'can_override' => $activeShift->handover_status === Shift::HANDOVER_NONE
+                    && $activeShift->isHandoverStale()
+                    && (int) $activeShift->shift_lead_user_id !== $user->id
+                    && $user->canDo('controlRoom.handovers.override'),
                 'incoming_lead' => $activeShift->handedOverTo ? [
                     'id' => $activeShift->handedOverTo->id,
                     'name' => $activeShift->handedOverTo->name,
                 ] : null,
+                'actions' => [
+                    'can_open_handover' => $user->canDo('controlRoom.alerts.manage'),
+                    'can_add_note' => $user->canDo('controlRoom.alerts.manage'),
+                    'can_copy_summary' => true,
+                ],
             ];
 
             $notes = OperatorNote::where('shift_id', $activeShift->id)
@@ -88,7 +99,7 @@ class ControlRoomShiftController extends Controller
         }
 
         // Recent completed shifts
-        $recentShifts = Shift::whereIn('status', ['completed', 'handover'])
+        $recentShifts = Shift::where('status', 'completed')
             ->with('shiftLead:id,name')
             ->orderByDesc('starts_at')
             ->limit(10)
@@ -107,6 +118,9 @@ class ControlRoomShiftController extends Controller
                 'alerts_resolved' => $shift->alerts_resolved ?? 0,
                 'alerts_escalated' => $shift->alerts_escalated ?? 0,
                 'duration_minutes' => $shift->getDuration(),
+                'actions' => [
+                    'can_copy_summary' => true,
+                ],
             ])
             ->all();
 
@@ -199,6 +213,7 @@ class ControlRoomShiftController extends Controller
     ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanPrepareHandover($shift, $user);
 
         $validated = $request->validate([
             'handover_notes' => ['nullable', 'string', 'max:5000'],
@@ -210,6 +225,9 @@ class ControlRoomShiftController extends Controller
             'reviewed_alert_ids.*' => ['integer', 'exists:control_room_alerts,id'],
             'priority_alert_ids' => ['nullable', 'array'],
             'priority_alert_ids.*' => ['integer', 'exists:control_room_alerts,id'],
+            'carry_forward_acknowledged' => ['nullable', 'boolean'],
+            'carry_forward_signature' => ['nullable', 'string', 'size:64', 'regex:/^[a-f0-9]+$/'],
+            'override_reason' => ['nullable', 'string', 'min:10', 'max:2000'],
             'expected_version' => ['required', 'integer', 'min:1'],
         ]);
 
@@ -224,9 +242,16 @@ class ControlRoomShiftController extends Controller
         }
 
         $expectedVersion = (int) $validated['expected_version'];
-        unset($validated['expected_version']);
+        $overrideReason = $validated['override_reason'] ?? null;
+        unset($validated['expected_version'], $validated['override_reason']);
 
-        $handovers->saveDraft($shift, $validated, $user, $expectedVersion);
+        $handovers->saveDraft(
+            $shift,
+            $validated,
+            $user,
+            $expectedVersion,
+            $overrideReason,
+        );
 
         return redirect()->route('control-room.shifts.handover-page', $shift)
             ->with('success', 'Handover draft saved.');
@@ -242,11 +267,13 @@ class ControlRoomShiftController extends Controller
     ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanPrepareHandover($shift, $user);
 
         $validated = $request->validate([
             'incoming_lead_user_id' => ['required', 'integer', 'exists:users,id'],
             'reviewed_alert_ids' => ['present', 'array'],
             'reviewed_alert_ids.*' => ['integer', 'exists:control_room_alerts,id'],
+            'override_reason' => ['nullable', 'string', 'min:10', 'max:2000'],
             'expected_version' => ['required', 'integer', 'min:1'],
         ]);
 
@@ -260,6 +287,7 @@ class ControlRoomShiftController extends Controller
             $validated['reviewed_alert_ids'],
             $user,
             (int) $validated['expected_version'],
+            $validated['override_reason'] ?? null,
         );
 
         return redirect()->route('control-room.shifts.handover-page', $shift)
@@ -329,6 +357,13 @@ class ControlRoomShiftController extends Controller
             'shift_id' => $shift->id,
             'user_id' => $user->id,
             'type' => $validated['type'],
+            'purpose' => in_array(
+                $validated['type'],
+                [OperatorNote::TYPE_ESCALATION, OperatorNote::TYPE_HANDOVER],
+                true,
+            )
+                ? OperatorNote::PURPOSE_ESCALATION_HANDOVER
+                : OperatorNote::PURPOSE_GENERAL,
             'content' => $validated['content'],
             'alert_id' => $validated['alert_id'] ?? null,
             'is_pinned' => $validated['is_pinned'] ?? false,
@@ -381,6 +416,19 @@ class ControlRoomShiftController extends Controller
             $lead && $lead->canDo('controlRoom.alerts.manage'),
             403,
             'The selected shift lead is not eligible to manage a Control Room handover.',
+        );
+    }
+
+    protected function assertCanPrepareHandover(Shift $shift, User $user): void
+    {
+        abort_unless(
+            (int) $shift->shift_lead_user_id === $user->id
+                || (
+                    $shift->isHandoverStale()
+                    && $user->canDo('controlRoom.handovers.override')
+                ),
+            403,
+            'Only the outgoing lead or an authorised stale-shift manager can prepare this handover.',
         );
     }
 

@@ -8,6 +8,7 @@ use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\IncidentJourneyTaskContext;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskSearch;
 use App\Services\UserSiteAccessService;
 
 class HsEventProvider implements HasModelClass, TaskProvider
@@ -36,31 +37,66 @@ class HsEventProvider implements HasModelClass, TaskProvider
 
     public function tasks(User $user, array $filters = []): array
     {
+        $includeSearchContext = TaskSearch::hasQuery($filters);
+        $with = [
+            'client:id,first_name,last_name',
+            'site:id,name',
+            'owner:id,name',
+            $includeSearchContext
+                ? 'controlRoomAlert:id,reference_number,assigned_to_user_id'
+                : 'controlRoomAlert:id,reference_number',
+            $includeSearchContext
+                ? 'clientIncident:id,client_id,site_id,hs_event_id,investigation_assigned_to,reference_number,source,occurred_at,title,description,immediate_action_taken,immediate_action,witnesses,potential_consequence'
+                : 'clientIncident:id,client_id,site_id,hs_event_id,reference_number,source,occurred_at',
+            'clientIncident.client:id,first_name,last_name',
+            'clientIncident.site:id,name',
+        ];
+
+        if ($includeSearchContext) {
+            array_push(
+                $with,
+                'controlRoomAlert.assignedTo:id,name',
+                'controlRoomAlert.tasks:id,alert_id,title,description,assigned_to_user_id',
+                'controlRoomAlert.tasks.assignedTo:id,name',
+                'investigations:id,hs_event_id,reference_number,lead_investigator_id',
+                'investigations.leadInvestigator:id,name',
+                'correctiveActions:id,hs_event_id,reference_number,assigned_to_user_id',
+                'correctiveActions.assignedTo:id,name',
+                'clientIncident.investigator:id,name',
+                'clientIncident.followups:id,client_incident_id,assigned_to_user_id',
+                'clientIncident.followups.assignedTo:id,name',
+            );
+        }
+
         $query = HsEvent::query()
-            ->with([
-                'client:id,first_name,last_name',
-                'site:id,name',
-                'owner:id,name',
-                'controlRoomAlert:id,reference_number',
-                'clientIncident:id,client_id,site_id,hs_event_id,control_room_alert_id,reference_number,source,occurred_at',
-                'clientIncident.client:id,first_name,last_name',
-                'clientIncident.site:id,name',
-                'clientIncident.controlRoomAlert:id,reference_number',
-            ])
+            ->with($with)
             ->tap(fn ($q) => app(UserSiteAccessService::class)->applyHsEventScope(
                 $q,
                 $user,
                 self::SITE_BYPASS_PERMISSIONS,
             ))
+            ->when(
+                $includeSearchContext,
+                fn ($q) => $q->whereHas(
+                    'clientIncident',
+                    fn ($incident) => TaskSearch::applyIncidentJourneyPredicate($incident, $filters),
+                ),
+            )
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('occurred_at')
-            ->limit(300);
+            ->when(! $includeSearchContext, fn ($q) => $q->limit(300));
 
         if (empty($filters['include_done'])) {
             $query->where('status', '!=', HsEvent::STATUS_CLOSED);
         }
 
-        return $query->get()->map(function (HsEvent $event) {
-            $journey = IncidentJourneyTaskContext::make($event->clientIncident, $event->controlRoomAlert, $event);
+        return $query->get()->map(function (HsEvent $event) use ($includeSearchContext) {
+            $journey = IncidentJourneyTaskContext::make(
+                $event->clientIncident,
+                $event->controlRoomAlert,
+                $event,
+                $includeSearchContext,
+            );
             $client = $journey['person'] ?? ($event->client ? [
                 'id' => $event->client->id,
                 'name' => trim($event->client->first_name.' '.$event->client->last_name),

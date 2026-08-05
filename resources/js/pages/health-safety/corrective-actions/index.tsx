@@ -7,20 +7,13 @@
  * `hs-hero-kit` hero chrome + rostering TabStrip/ShiftContextMenu with /incidents,
  * /safeguarding and /fleet-assets/incidents so the whole safety workflow reads as
  * one product. Row helpers come from the neutral register-row-kit. NZ-only, web-only. */
-import AppLayout from '@/layouts/app-layout';
-import { Button } from '@/components/ui/button';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
-    HeroShell,
-    HeroStatusPill,
-    HeroMedallion,
-    HeroCluster,
-    HeroClusterTile,
-    HeroSegmented,
-    fmt,
-    type Tone,
-} from '@/pages/health-safety/components/hs-hero-kit';
-import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
+    EVENT_CATEGORY_LABELS,
+    EventDetailDialog,
+    type EventActionKey,
+    type EventDetail,
+    type EventSectionKey,
+} from '@/components/health-safety/event-detail-dialog';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -29,23 +22,31 @@ import {
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
+import { Button } from '@/components/ui/button';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly } from '@/lib/datetime';
+import { cn } from '@/lib/utils';
 import {
-    EventDetailDialog,
-    EVENT_CATEGORY_LABELS,
-    type EventActionKey,
-    type EventDetail,
-    type EventSectionKey,
-} from '@/components/health-safety/event-detail-dialog';
+    fmt,
+    HeroCluster,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroSegmented,
+    HeroShell,
+    HeroStatusPill,
+    type Tone,
+} from '@/pages/health-safety/components/hs-hero-kit';
 import {
+    entityTone,
     FlagBadge,
+    initials,
     RegisterTableHeader,
     titleCase,
-    initials,
-    entityTone,
     TONE_BG,
     TONE_DOT,
 } from '@/pages/health-safety/components/register-row-kit';
-import { cn } from '@/lib/utils';
+import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
 import { Head, router } from '@inertiajs/react';
 import {
     Activity,
@@ -101,6 +102,21 @@ type ActionRow = {
     completed_by_user_id: number | null;
     completed_by_name: string | null;
     can_verify: boolean;
+    evidence: {
+        load_state: 'loaded' | 'unavailable';
+        attachments: Array<{ id: number }>;
+    };
+    rework: { latest_reason: string | null };
+    recommendation: string | null;
+    source:
+        | {
+              type: 'control_room_task';
+              id: number;
+              reference: string;
+              title: string;
+          }
+        | { type: 'new_responsibility'; reason: string | null }
+        | { type: 'standalone' };
     event: {
         id: number;
         reference_number: string;
@@ -139,8 +155,18 @@ type Props = {
     tab: string;
     tabCounts: Record<string, number>;
     hero: {
-        live: { open: number; in_progress: number; awaiting_verification: number; verified: number };
-        attention: { overdue: number; critical_open: number; unassigned: number; monitoring_events: number };
+        live: {
+            open: number;
+            in_progress: number;
+            awaiting_verification: number;
+            verified: number;
+        };
+        attention: {
+            overdue: number;
+            critical_open: number;
+            unassigned: number;
+            monitoring_events: number;
+        };
     };
     filters: Filters;
     sites: Array<{ id: number; name: string }>;
@@ -159,12 +185,35 @@ const PRI: Record<string, { tone: Tone; label: string }> = {
     critical: { tone: 'critical', label: 'Critical' },
 };
 
-const ACTION_STAGE: Record<string, { label: string; cls: string; icon: LucideIcon }> = {
-    open: { label: 'Open', cls: 'bg-status-info-bg text-status-info', icon: ListChecks },
-    in_progress: { label: 'In progress', cls: 'bg-primary/10 text-primary', icon: Activity },
-    completed: { label: 'Awaiting verification', cls: 'bg-status-warning-bg text-status-warning', icon: ShieldCheck },
-    verified: { label: 'Verified', cls: 'bg-status-success-bg text-status-success', icon: CheckCircle2 },
-    closed: { label: 'Closed', cls: 'bg-muted text-muted-foreground', icon: CheckCircle2 },
+const ACTION_STAGE: Record<
+    string,
+    { label: string; cls: string; icon: LucideIcon }
+> = {
+    open: {
+        label: 'Open',
+        cls: 'bg-status-info-bg text-status-info',
+        icon: ListChecks,
+    },
+    in_progress: {
+        label: 'In progress',
+        cls: 'bg-primary/10 text-primary',
+        icon: Activity,
+    },
+    completed: {
+        label: 'Awaiting verification',
+        cls: 'bg-status-warning-bg text-status-warning',
+        icon: ShieldCheck,
+    },
+    verified: {
+        label: 'Verified',
+        cls: 'bg-status-success-bg text-status-success',
+        icon: CheckCircle2,
+    },
+    closed: {
+        label: 'Closed',
+        cls: 'bg-muted text-muted-foreground',
+        icon: CheckCircle2,
+    },
 };
 
 const EVENT_STAGE: Record<string, { label: string; icon: LucideIcon }> = {
@@ -215,22 +264,22 @@ const TABLE_TITLE: Record<string, string> = {
     closed: 'Closed actions',
 };
 
-const TRACEABILITY_REPORT = '/health-safety/reports/corrective-action-traceability';
-
-function fmtDate(iso: string | null): string {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
-}
+const TRACEABILITY_REPORT =
+    '/health-safety/reports/corrective-action-traceability';
 
 /* date helpers (browser-local) */
 const todayStr = () => {
     const d = new Date();
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 10);
 };
 const daysAgoStr = (n: number) => {
     const d = new Date();
     d.setDate(d.getDate() - n);
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 10);
 };
 
 const RANGE_ITEMS = [
@@ -252,52 +301,144 @@ const PRIORITY_ITEMS = [
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function CorrectiveActionsIndex({ actions, tab, tabCounts, hero, filters, sites, detail, can }: Props) {
+export default function CorrectiveActionsIndex({
+    actions,
+    tab,
+    tabCounts,
+    hero,
+    filters,
+    sites,
+    detail,
+    can,
+}: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
-    const [pendingSection, setPendingSection] = useState<EventSectionKey>('actions');
-    const [pendingAction, setPendingAction] = useState<EventActionKey | null>(null);
-    const [pendingActionTarget, setPendingActionTarget] = useState<{ actionId: number; pane: ActionPane } | null>(null);
+    const [pendingSection, setPendingSection] =
+        useState<EventSectionKey>('actions');
+    const [pendingAction, setPendingAction] = useState<EventActionKey | null>(
+        null,
+    );
+    const [pendingActionTarget, setPendingActionTarget] = useState<{
+        actionId: number;
+        pane: ActionPane;
+    } | null>(null);
 
     const go = (next: Partial<Filters>) =>
-        router.get('/health-safety/corrective-actions', { ...filters, ...next }, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(
+            '/health-safety/corrective-actions',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true, replace: true },
+        );
 
-    const setTab = (id: string) => router.get('/health-safety/corrective-actions', { ...filters, tab: id }, { preserveScroll: true });
+    const setTab = (id: string) =>
+        router.get(
+            '/health-safety/corrective-actions',
+            { ...filters, tab: id },
+            { preserveScroll: true },
+        );
 
     // Detail-over-list: fetch only the `detail` prop and open the dialog without
     // navigating away; closing drops the param so `detail` comes back null.
     const openEvent = (
         id: number,
-        opts?: { section?: EventSectionKey; action?: EventActionKey; actionTarget?: { actionId: number; pane: ActionPane } },
+        opts?: {
+            section?: EventSectionKey;
+            action?: EventActionKey;
+            actionTarget?: { actionId: number; pane: ActionPane };
+        },
     ) => {
         setPendingSection(opts?.section ?? 'actions');
         setPendingAction(opts?.action ?? null);
         setPendingActionTarget(opts?.actionTarget ?? null);
-        router.get('/health-safety/corrective-actions', { ...filters, event: id }, { preserveState: true, preserveScroll: true, only: ['detail'] });
+        router.get(
+            '/health-safety/corrective-actions',
+            { ...filters, event: id },
+            { preserveState: true, preserveScroll: true, only: ['detail'] },
+        );
     };
     // Deep-link a row straight onto a lifecycle pane (Complete / Verify / Return)
     // of its parent event's Corrective actions section.
     const openActionPane = (action: ActionRow, pane: ActionPane) => {
         if (!action.event) return;
-        openEvent(action.event.id, { section: 'actions', actionTarget: { actionId: action.id, pane } });
+        openEvent(action.event.id, {
+            section: 'actions',
+            actionTarget: { actionId: action.id, pane },
+        });
     };
     const closeDetail = () => {
         setPendingActionTarget(null);
-        router.get('/health-safety/corrective-actions', { ...filters }, { preserveState: true, preserveScroll: true, only: ['detail'] });
+        router.get(
+            '/health-safety/corrective-actions',
+            { ...filters },
+            { preserveState: true, preserveScroll: true, only: ['detail'] },
+        );
     };
 
     const clearFilters = () =>
-        router.get('/health-safety/corrective-actions', { tab }, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(
+            '/health-safety/corrective-actions',
+            { tab },
+            { preserveState: true, preserveScroll: true, replace: true },
+        );
 
-    const hasFilters = !!(filters.q || filters.priority || filters.unassigned || filters.site_id || filters.from || filters.to);
+    const hasFilters = !!(
+        filters.q ||
+        filters.priority ||
+        filters.unassigned ||
+        filters.site_id ||
+        filters.from ||
+        filters.to
+    );
 
     const TABS: RosterTabItem[] = [
-        { id: 'all', label: 'All', icon: LayoutList, tone: 'primary', badge: tabCounts.all || undefined },
-        { id: 'open', label: 'Open', icon: ListChecks, tone: 'info', badge: tabCounts.open || undefined },
-        { id: 'in_progress', label: 'In progress', icon: Activity, tone: 'primary', badge: tabCounts.in_progress || undefined },
-        { id: 'awaiting_verification', label: 'Awaiting verification', icon: ShieldCheck, tone: 'warning', badge: tabCounts.awaiting_verification || undefined },
-        { id: 'overdue', label: 'Overdue', icon: Clock, tone: 'critical', badge: tabCounts.overdue || undefined },
-        { id: 'verified', label: 'Verified', icon: CheckCircle2, tone: 'success', badge: tabCounts.verified || undefined },
-        { id: 'closed', label: 'Closed', icon: CheckCircle2, tone: 'success', badge: tabCounts.closed || undefined },
+        {
+            id: 'all',
+            label: 'All',
+            icon: LayoutList,
+            tone: 'primary',
+            badge: tabCounts.all || undefined,
+        },
+        {
+            id: 'open',
+            label: 'Open',
+            icon: ListChecks,
+            tone: 'info',
+            badge: tabCounts.open || undefined,
+        },
+        {
+            id: 'in_progress',
+            label: 'In progress',
+            icon: Activity,
+            tone: 'primary',
+            badge: tabCounts.in_progress || undefined,
+        },
+        {
+            id: 'awaiting_verification',
+            label: 'Awaiting verification',
+            icon: ShieldCheck,
+            tone: 'warning',
+            badge: tabCounts.awaiting_verification || undefined,
+        },
+        {
+            id: 'overdue',
+            label: 'Overdue',
+            icon: Clock,
+            tone: 'critical',
+            badge: tabCounts.overdue || undefined,
+        },
+        {
+            id: 'verified',
+            label: 'Verified',
+            icon: CheckCircle2,
+            tone: 'success',
+            badge: tabCounts.verified || undefined,
+        },
+        {
+            id: 'closed',
+            label: 'Closed',
+            icon: CheckCircle2,
+            tone: 'success',
+            badge: tabCounts.closed || undefined,
+        },
     ];
 
     /* ---- due-date range (footer pills) ---- */
@@ -328,25 +469,88 @@ export default function CorrectiveActionsIndex({ actions, tab, tabCounts, hero, 
         const lifecycle: ShiftCtxItem[] = [];
         if (canWrite) {
             if (action.status === 'open') {
-                lifecycle.push({ icon: <Play className="h-3.5 w-3.5" />, label: 'Start action', tone: 'primary', onClick: () => router.post(`${base}/start`, {}, { preserveScroll: true }) });
+                lifecycle.push({
+                    icon: <Play className="h-3.5 w-3.5" />,
+                    label: 'Start action',
+                    tone: 'primary',
+                    onClick: () =>
+                        router.post(
+                            `${base}/start`,
+                            {},
+                            { preserveScroll: true },
+                        ),
+                });
             } else if (action.status === 'in_progress') {
-                lifecycle.push({ icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: 'Mark complete…', tone: 'primary', onClick: () => openActionPane(action, 'complete') });
+                lifecycle.push({
+                    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+                    label: 'Mark complete…',
+                    tone: 'primary',
+                    onClick: () => openActionPane(action, 'complete'),
+                });
             } else if (action.status === 'completed') {
                 // Verify is hidden for the person who completed it (server also gates).
                 if (action.can_verify) {
-                    lifecycle.push({ icon: <ShieldCheck className="h-3.5 w-3.5" />, label: 'Verify…', tone: 'primary', onClick: () => openActionPane(action, 'verify') });
+                    lifecycle.push({
+                        icon: <ShieldCheck className="h-3.5 w-3.5" />,
+                        label: 'Verify…',
+                        tone: 'primary',
+                        onClick: () => openActionPane(action, 'verify'),
+                    });
                 }
-                lifecycle.push({ icon: <RotateCcw className="h-3.5 w-3.5" />, label: 'Return for rework…', tone: 'critical', onClick: () => openActionPane(action, 'return') });
+                lifecycle.push({
+                    icon: <RotateCcw className="h-3.5 w-3.5" />,
+                    label: 'Return for rework…',
+                    tone: 'critical',
+                    onClick: () => openActionPane(action, 'return'),
+                });
             } else if (action.status === 'verified') {
-                lifecycle.push({ icon: <Lock className="h-3.5 w-3.5" />, label: 'Close action', onClick: () => router.post(`${base}/close`, {}, { preserveScroll: true }) });
+                lifecycle.push({
+                    icon: <Lock className="h-3.5 w-3.5" />,
+                    label: 'Close action',
+                    onClick: () =>
+                        router.post(
+                            `${base}/close`,
+                            {},
+                            { preserveScroll: true },
+                        ),
+                });
             }
         }
 
         const tail: ShiftCtxItem[] = [
-            { icon: <ListChecks className="h-3.5 w-3.5" />, label: 'Open corrective actions', sub: action.reference_number, tone: 'primary', onClick: () => openEvent(action.event!.id, { section: 'actions' }) },
-            { icon: <Eye className="h-3.5 w-3.5" />, label: 'View parent event', sub: action.event.reference_number, onClick: () => openEvent(action.event!.id, { section: 'overview' }) },
-            ...(canWrite ? [{ icon: <Plus className="h-3.5 w-3.5" />, label: 'Add corrective action', onClick: () => openEvent(action.event!.id, { action: 'add_action' }) } satisfies ShiftCtxItem] : []),
-            { icon: <Link2 className="h-3.5 w-3.5" />, label: 'Open event full page', onClick: () => router.visit(`/health-safety/events/${action.event!.id}`) },
+            {
+                icon: <ListChecks className="h-3.5 w-3.5" />,
+                label: 'Open corrective actions',
+                sub: action.reference_number,
+                tone: 'primary',
+                onClick: () =>
+                    openEvent(action.event!.id, { section: 'actions' }),
+            },
+            {
+                icon: <Eye className="h-3.5 w-3.5" />,
+                label: 'View parent event',
+                sub: action.event.reference_number,
+                onClick: () =>
+                    openEvent(action.event!.id, { section: 'overview' }),
+            },
+            ...(canWrite
+                ? [
+                      {
+                          icon: <Plus className="h-3.5 w-3.5" />,
+                          label: 'Add corrective action',
+                          onClick: () =>
+                              openEvent(action.event!.id, {
+                                  action: 'add_action',
+                              }),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
+            {
+                icon: <Link2 className="h-3.5 w-3.5" />,
+                label: 'Open event full page',
+                onClick: () =>
+                    router.visit(`/health-safety/events/${action.event!.id}`),
+            },
         ];
 
         return lifecycle.length ? [...lifecycle, { sep: true }, ...tail] : tail;
@@ -354,7 +558,13 @@ export default function CorrectiveActionsIndex({ actions, tab, tabCounts, hero, 
 
     const openMenu = (action: ActionRow, x: number, y: number) => {
         const priority = PRI[action.priority] ?? PRI.medium;
-        setCtx({ x, y, tag: priority.label.toUpperCase(), meta: `${action.reference_number} · ${action.title}`, items: menuItems(action) });
+        setCtx({
+            x,
+            y,
+            tag: priority.label.toUpperCase(),
+            meta: `${action.reference_number} · ${action.title}`,
+            items: menuItems(action),
+        });
     };
 
     const live = hero.live;
@@ -362,7 +572,15 @@ export default function CorrectiveActionsIndex({ actions, tab, tabCounts, hero, 
     const tableTitle = TABLE_TITLE[tab] ?? 'Corrective actions';
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Health & Safety', href: '/health-safety' }, { title: 'Corrective actions', href: '/health-safety/corrective-actions' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Health & Safety', href: '/health-safety' },
+                {
+                    title: 'Corrective actions',
+                    href: '/health-safety/corrective-actions',
+                },
+            ]}
+        >
             <Head title="Corrective actions" />
 
             <div className="flex flex-col gap-6 p-6">
@@ -370,9 +588,23 @@ export default function CorrectiveActionsIndex({ actions, tab, tabCounts, hero, 
                 <HeroShell
                     footer={
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                            <HeroSegmented label="Due" variant="pill" ariaLabel="Due date range" items={RANGE_ITEMS} value={activeRange} onChange={onRange} />
+                            <HeroSegmented
+                                label="Due"
+                                variant="pill"
+                                ariaLabel="Due date range"
+                                items={RANGE_ITEMS}
+                                value={activeRange}
+                                onChange={onRange}
+                            />
                             {sites?.length ? (
-                                <EntityFilter label="Site" allLabel="All sites" items={sites} value={filters.site_id} onChange={(id) => go({ site_id: id })} onDark />
+                                <EntityFilter
+                                    label="Site"
+                                    allLabel="All sites"
+                                    items={sites}
+                                    value={filters.site_id}
+                                    onChange={(id) => go({ site_id: id })}
+                                    onDark
+                                />
                             ) : null}
                             <HeroSegmented
                                 label="Priority"
@@ -380,7 +612,9 @@ export default function CorrectiveActionsIndex({ actions, tab, tabCounts, hero, 
                                 ariaLabel="Priority"
                                 items={PRIORITY_ITEMS}
                                 value={filters.priority ?? 'all'}
-                                onChange={(key) => go({ priority: key === 'all' ? null : key })}
+                                onChange={(key) =>
+                                    go({ priority: key === 'all' ? null : key })
+                                }
                             />
                             <div className="relative ml-auto">
                                 <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
@@ -389,7 +623,13 @@ export default function CorrectiveActionsIndex({ actions, tab, tabCounts, hero, 
                                     placeholder="Search action or event…"
                                     defaultValue={filters.q ?? ''}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter') go({ q: (e.target as HTMLInputElement).value || null });
+                                        if (e.key === 'Enter')
+                                            go({
+                                                q:
+                                                    (
+                                                        e.target as HTMLInputElement
+                                                    ).value || null,
+                                            });
                                     }}
                                     className="w-52 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pr-2.5 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
                                 />
@@ -414,16 +654,24 @@ export default function CorrectiveActionsIndex({ actions, tab, tabCounts, hero, 
                             <HeroMedallion icon={Wrench} />
                             <div className="flex flex-col gap-1.5">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <HeroStatusPill>Safety actions · verification register</HeroStatusPill>
+                                    <HeroStatusPill>
+                                        Safety actions · verification register
+                                    </HeroStatusPill>
                                     <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-2.5 py-1 text-[11px] font-semibold tracking-[0.04em] text-primary-foreground/85 uppercase">
-                                        <ShieldCheck className="h-3.5 w-3.5" /> Verifier ≠ completer
+                                        <ShieldCheck className="h-3.5 w-3.5" />{' '}
+                                        Verifier ≠ completer
                                     </span>
                                 </div>
-                                <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">Corrective actions</h1>
+                                <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">
+                                    Corrective actions
+                                </h1>
                                 <p className="max-w-xl text-sm text-primary-foreground/70">
-                                    Every corrective and preventive action raised from a safety event — driven from open through completion to
-                                    independent verification, then closed to advance the parent event. Open a row to complete, verify and close
-                                    inside the governance workspace.
+                                    Every corrective and preventive action
+                                    raised from a safety event — driven from
+                                    open through completion to independent
+                                    verification, then closed to advance the
+                                    parent event. Open a row to complete, verify
+                                    and close inside the governance workspace.
                                 </p>
                             </div>
                         </div>
@@ -432,48 +680,140 @@ export default function CorrectiveActionsIndex({ actions, tab, tabCounts, hero, 
                             <Button
                                 size="sm"
                                 className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                onClick={() => router.visit(TRACEABILITY_REPORT)}
+                                onClick={() =>
+                                    router.visit(TRACEABILITY_REPORT)
+                                }
                             >
-                                <FileText className="mr-1.5 h-4 w-4" /> Traceability report
+                                <FileText className="mr-1.5 h-4 w-4" />{' '}
+                                Traceability report
                             </Button>
                         ) : null}
                     </div>
 
                     {/* stat clusters */}
                     <div className="grid gap-3 lg:grid-cols-2">
-                        <HeroCluster title="Live · action lifecycle" icon={ListChecks}>
-                            <HeroClusterTile href="/health-safety/corrective-actions?tab=open" label="Open" value={fmt(live.open)} caption="ready to start" tone="neutral" />
-                            <HeroClusterTile href="/health-safety/corrective-actions?tab=in_progress" label="In progress" value={fmt(live.in_progress)} caption="being resolved" tone="neutral" />
-                            <HeroClusterTile href="/health-safety/corrective-actions?tab=awaiting_verification" label="Await verify" value={fmt(live.awaiting_verification)} caption="needs verifier" tone="warning" />
-                            <HeroClusterTile href="/health-safety/corrective-actions?tab=verified" label="Verified" value={fmt(live.verified)} caption="effectiveness ✓" tone="success" />
+                        <HeroCluster
+                            title="Live · action lifecycle"
+                            icon={ListChecks}
+                        >
+                            <HeroClusterTile
+                                href="/health-safety/corrective-actions?tab=open"
+                                label="Open"
+                                value={fmt(live.open)}
+                                caption="ready to start"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/health-safety/corrective-actions?tab=in_progress"
+                                label="In progress"
+                                value={fmt(live.in_progress)}
+                                caption="being resolved"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/health-safety/corrective-actions?tab=awaiting_verification"
+                                label="Await verify"
+                                value={fmt(live.awaiting_verification)}
+                                caption="needs verifier"
+                                tone="warning"
+                            />
+                            <HeroClusterTile
+                                href="/health-safety/corrective-actions?tab=verified"
+                                label="Verified"
+                                value={fmt(live.verified)}
+                                caption="effectiveness ✓"
+                                tone="success"
+                            />
                         </HeroCluster>
                         <HeroCluster title="Needs attention" icon={Bell}>
-                            <HeroClusterTile href="/health-safety/corrective-actions?tab=overdue" label="Overdue" value={fmt(attention.overdue)} caption={attention.overdue > 0 ? 'past due' : 'all on track'} tone={attention.overdue > 0 ? 'critical' : 'success'} />
-                            <HeroClusterTile href="/health-safety/corrective-actions?priority=high,critical" label="High / critical" value={fmt(attention.critical_open)} caption="priority open" tone={attention.critical_open > 0 ? 'critical' : 'success'} />
-                            <HeroClusterTile href="/health-safety/corrective-actions?unassigned=true" label="Unassigned" value={fmt(attention.unassigned)} caption="needs an owner" tone={attention.unassigned > 0 ? 'warning' : 'success'} />
-                            <HeroClusterTile href="/health-safety/events?tab=monitoring" label="Events monitoring" value={fmt(attention.monitoring_events)} caption="auto-advanced" tone="success" />
+                            <HeroClusterTile
+                                href="/health-safety/corrective-actions?tab=overdue"
+                                label="Overdue"
+                                value={fmt(attention.overdue)}
+                                caption={
+                                    attention.overdue > 0
+                                        ? 'past due'
+                                        : 'all on track'
+                                }
+                                tone={
+                                    attention.overdue > 0
+                                        ? 'critical'
+                                        : 'success'
+                                }
+                            />
+                            <HeroClusterTile
+                                href="/health-safety/corrective-actions?priority=high,critical"
+                                label="High / critical"
+                                value={fmt(attention.critical_open)}
+                                caption="priority open"
+                                tone={
+                                    attention.critical_open > 0
+                                        ? 'critical'
+                                        : 'success'
+                                }
+                            />
+                            <HeroClusterTile
+                                href="/health-safety/corrective-actions?unassigned=true"
+                                label="Unassigned"
+                                value={fmt(attention.unassigned)}
+                                caption="needs an owner"
+                                tone={
+                                    attention.unassigned > 0
+                                        ? 'warning'
+                                        : 'success'
+                                }
+                            />
+                            <HeroClusterTile
+                                href="/health-safety/events?tab=monitoring"
+                                label="Events monitoring"
+                                value={fmt(attention.monitoring_events)}
+                                caption="auto-advanced"
+                                tone="success"
+                            />
                         </HeroCluster>
                     </div>
                 </HeroShell>
 
                 {/* ---- Tabs ---- */}
-                <TabStrip value={tab} items={TABS} onChange={setTab} ariaLabel="Corrective action views" />
+                <TabStrip
+                    value={tab}
+                    items={TABS}
+                    onChange={setTab}
+                    ariaLabel="Corrective action views"
+                />
 
                 {/* ---- Table ---- */}
                 <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                    <RegisterTableHeader icon={Wrench} title={tableTitle} subtitle="the verification view" hint="Right-click or ⋮ for the full lifecycle" hintIcon={MousePointer2} />
-                    <ActionTable rows={actions.data} canViewReports={!!can.viewReports} onOpen={openEvent} onMenu={openMenu} />
+                    <RegisterTableHeader
+                        icon={Wrench}
+                        title={tableTitle}
+                        subtitle="the verification view"
+                        hint="Right-click or ⋮ for the full lifecycle"
+                        hintIcon={MousePointer2}
+                    />
+                    <ActionTable
+                        rows={actions.data}
+                        canViewReports={!!can.viewReports}
+                        onOpen={openEvent}
+                        onMenu={openMenu}
+                    />
                 </section>
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-sm text-muted-foreground">
-                        {actions.total > 0 ? `Showing ${actions.from}–${actions.to} of ${actions.total}` : 'No corrective actions found'}
+                        {actions.total > 0
+                            ? `Showing ${actions.from}–${actions.to} of ${actions.total}`
+                            : 'No corrective actions found'}
                     </p>
-                    {actions.last_page > 1 ? <LaravelPagination links={actions.links} /> : null}
+                    {actions.last_page > 1 ? (
+                        <LaravelPagination links={actions.links} />
+                    ) : null}
                 </div>
             </div>
 
-            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+            {ctx ? (
+                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+            ) : null}
 
             {detail ? (
                 <EventDetailDialog
@@ -502,25 +842,41 @@ function ActionTable({
 }: {
     rows: ActionRow[];
     canViewReports: boolean;
-    onOpen: (id: number, opts?: { section?: EventSectionKey; action?: EventActionKey }) => void;
+    onOpen: (
+        id: number,
+        opts?: { section?: EventSectionKey; action?: EventActionKey },
+    ) => void;
     onMenu: (action: ActionRow, x: number, y: number) => void;
 }) {
     if (!rows.length) {
         return (
             <div className="px-4 py-16 text-center">
                 <Wrench className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-                <p className="font-semibold text-foreground">No corrective actions yet</p>
+                <p className="font-semibold text-foreground">
+                    No corrective actions yet
+                </p>
                 <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-                    Corrective and preventive actions are raised from a safety event — open an event in the register and add an action, or
-                    promote an investigation recommendation. They'll appear here to drive, verify and close.
+                    Corrective and preventive actions are raised from a safety
+                    event — open an event in the register and add an action, or
+                    promote an investigation recommendation. They'll appear here
+                    to drive, verify and close.
                 </p>
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                    <Button size="sm" onClick={() => router.visit('/health-safety/events')}>
-                        <ListChecks className="mr-1.5 h-4 w-4" /> Go to Events register
+                    <Button
+                        size="sm"
+                        onClick={() => router.visit('/health-safety/events')}
+                    >
+                        <ListChecks className="mr-1.5 h-4 w-4" /> Go to Events
+                        register
                     </Button>
                     {canViewReports ? (
-                        <Button size="sm" variant="outline" onClick={() => router.visit(TRACEABILITY_REPORT)}>
-                            <FileText className="mr-1.5 h-4 w-4" /> Traceability report
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => router.visit(TRACEABILITY_REPORT)}
+                        >
+                            <FileText className="mr-1.5 h-4 w-4" /> Traceability
+                            report
                         </Button>
                     ) : null}
                 </div>
@@ -540,22 +896,37 @@ function ActionTable({
                         <th className="px-4 py-3">Parent event</th>
                         <th className="px-4 py-3">Stage</th>
                         <th className="px-4 py-3">Flags</th>
-                        <th className="px-4 py-3"><span className="sr-only">Actions</span></th>
+                        <th className="px-4 py-3">
+                            <span className="sr-only">Actions</span>
+                        </th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                     {rows.map((action) => {
                         const priority = PRI[action.priority] ?? PRI.medium;
-                        const stage = ACTION_STAGE[action.status] ?? ACTION_STAGE.open;
+                        const stage =
+                            ACTION_STAGE[action.status] ?? ACTION_STAGE.open;
                         const StageIcon = stage.icon;
-                        const eventStage = action.event ? (EVENT_STAGE[action.event.status] ?? EVENT_STAGE.open) : null;
-                        const CatIcon = action.event ? (CATEGORY_ICON[action.event.event_category] ?? Shield) : Link2;
+                        const eventStage = action.event
+                            ? (EVENT_STAGE[action.event.status] ??
+                              EVENT_STAGE.open)
+                            : null;
+                        const CatIcon = action.event
+                            ? (CATEGORY_ICON[action.event.event_category] ??
+                              Shield)
+                            : Link2;
                         const awaiting = action.status === 'completed';
-                        const unassigned = !action.assigned_to_name && action.status !== 'verified' && action.status !== 'closed';
-                        const resolved = action.status === 'verified' || action.status === 'closed';
+                        const unassigned =
+                            !action.assigned_to_name &&
+                            action.status !== 'verified' &&
+                            action.status !== 'closed';
+                        const resolved =
+                            action.status === 'verified' ||
+                            action.status === 'closed';
 
                         const open = () => {
-                            if (action.event) onOpen(action.event.id, { section: 'actions' });
+                            if (action.event)
+                                onOpen(action.event.id, { section: 'actions' });
                         };
 
                         return (
@@ -567,36 +938,95 @@ function ActionTable({
                                     onMenu(action, e.clientX, e.clientY);
                                 }}
                                 tabIndex={action.event ? 0 : -1}
-                                aria-label={action.event ? `Open parent event for action ${action.reference_number}` : undefined}
+                                aria-label={
+                                    action.event
+                                        ? `Open parent event for action ${action.reference_number}`
+                                        : undefined
+                                }
                                 onKeyDown={(e) => {
-                                    if (action.event && (e.key === 'Enter' || e.key === ' ')) {
+                                    if (
+                                        action.event &&
+                                        (e.key === 'Enter' || e.key === ' ')
+                                    ) {
                                         e.preventDefault();
                                         open();
                                     }
                                 }}
                                 className={cn(
-                                    action.event ? 'cursor-pointer transition-colors hover:bg-muted/45 focus-visible:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring' : '',
-                                    action.is_overdue ? 'bg-status-critical-bg/40' : '',
+                                    action.event
+                                        ? 'cursor-pointer transition-colors hover:bg-muted/45 focus-visible:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring'
+                                        : '',
+                                    action.is_overdue
+                                        ? 'bg-status-critical-bg/40'
+                                        : '',
                                 )}
                             >
                                 {/* Due */}
                                 <td className="px-4 py-3 align-top whitespace-nowrap">
-                                    <div className={cn('flex items-center gap-1 text-xs font-bold', action.is_overdue ? 'text-status-critical' : 'text-foreground')}>
+                                    <div
+                                        className={cn(
+                                            'flex items-center gap-1 text-xs font-bold',
+                                            action.is_overdue
+                                                ? 'text-status-critical'
+                                                : 'text-foreground',
+                                        )}
+                                    >
                                         <Clock className="h-3.5 w-3.5" />
-                                        {fmtDate(action.due_date)}
+                                        {formatDateOnly(action.due_date)}
                                     </div>
                                     <div className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
-                                        {action.is_overdue ? 'Overdue' : action.reference_number}
+                                        {action.is_overdue
+                                            ? 'Overdue'
+                                            : action.reference_number}
                                     </div>
                                 </td>
 
                                 {/* Action */}
                                 <td className="max-w-[300px] px-4 py-3 align-top">
                                     <div className="flex items-start gap-2">
-                                        <span className={cn('mt-1 h-2 w-2 shrink-0 rounded-full', TONE_DOT[priority.tone])} />
+                                        <span
+                                            className={cn(
+                                                'mt-1 h-2 w-2 shrink-0 rounded-full',
+                                                TONE_DOT[priority.tone],
+                                            )}
+                                        />
                                         <span className="min-w-0">
-                                            <span className="block text-xs font-bold text-foreground">{action.reference_number}</span>
-                                            <span className="block max-w-[24rem] truncate text-[11px] text-muted-foreground">{action.title}</span>
+                                            <span className="block text-xs font-bold text-foreground">
+                                                {action.reference_number}
+                                            </span>
+                                            <span className="block max-w-[24rem] truncate text-[11px] text-muted-foreground">
+                                                {action.title}
+                                            </span>
+                                            {action.recommendation ? (
+                                                <span className="mt-1 block max-w-[24rem] text-[11px] text-muted-foreground">
+                                                    Recommendation:{' '}
+                                                    {action.recommendation}
+                                                </span>
+                                            ) : null}
+                                            {action.source.type ===
+                                            'control_room_task' ? (
+                                                <span className="mt-1 block max-w-[24rem] text-[11px] text-muted-foreground">
+                                                    Transferred from Control
+                                                    Room task:{' '}
+                                                    {action.source.title}
+                                                </span>
+                                            ) : action.source.type ===
+                                              'new_responsibility' ? (
+                                                <span className="mt-1 block max-w-[24rem] text-[11px] text-muted-foreground">
+                                                    New responsibility:{' '}
+                                                    {action.source.reason ??
+                                                        'Reason not recorded'}
+                                                </span>
+                                            ) : null}
+                                            {action.rework.latest_reason ? (
+                                                <span className="mt-1 block max-w-[24rem] text-[11px] text-status-warning">
+                                                    Returned for rework:{' '}
+                                                    {
+                                                        action.rework
+                                                            .latest_reason
+                                                    }
+                                                </span>
+                                            ) : null}
                                             <span className="mt-1 inline-flex rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                                                 {titleCase(action.action_type)}
                                             </span>
@@ -606,24 +1036,43 @@ function ActionTable({
 
                                 {/* Priority */}
                                 <td className="px-4 py-3 align-top">
-                                    <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', TONE_BG[priority.tone])}>{priority.label}</span>
+                                    <span
+                                        className={cn(
+                                            'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
+                                            TONE_BG[priority.tone],
+                                        )}
+                                    >
+                                        {priority.label}
+                                    </span>
                                 </td>
 
                                 {/* Owner */}
                                 <td className="px-4 py-3 align-top">
                                     {action.assigned_to_name ? (
                                         <span className="flex items-center gap-2">
-                                            <span className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-md text-[10px] font-bold', entityTone(action.id))}>
-                                                {initials(action.assigned_to_name)}
+                                            <span
+                                                className={cn(
+                                                    'grid h-7 w-7 shrink-0 place-items-center rounded-md text-[10px] font-bold',
+                                                    entityTone(action.id),
+                                                )}
+                                            >
+                                                {initials(
+                                                    action.assigned_to_name,
+                                                )}
                                             </span>
                                             <span className="min-w-0">
-                                                <span className="block truncate text-xs font-bold text-foreground">{action.assigned_to_name}</span>
-                                                <span className="block text-[11px] text-muted-foreground">Owner</span>
+                                                <span className="block truncate text-xs font-bold text-foreground">
+                                                    {action.assigned_to_name}
+                                                </span>
+                                                <span className="block text-[11px] text-muted-foreground">
+                                                    Owner
+                                                </span>
                                             </span>
                                         </span>
                                     ) : (
                                         <span className="inline-flex items-center gap-1.5 rounded-md bg-status-warning-bg px-2 py-1 text-[11px] font-bold text-status-warning">
-                                            <UserRound className="h-3 w-3" /> Unassigned
+                                            <UserRound className="h-3 w-3" />{' '}
+                                            Unassigned
                                         </span>
                                     )}
                                 </td>
@@ -632,27 +1081,56 @@ function ActionTable({
                                 <td className="px-4 py-3 align-top">
                                     {action.event ? (
                                         <div className="flex items-center gap-2">
-                                            <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-md', CATEGORY_CHIP[action.event.event_category] ?? 'bg-muted text-muted-foreground')}>
+                                            <span
+                                                className={cn(
+                                                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
+                                                    CATEGORY_CHIP[
+                                                        action.event
+                                                            .event_category
+                                                    ] ??
+                                                        'bg-muted text-muted-foreground',
+                                                )}
+                                            >
                                                 <CatIcon className="h-3.5 w-3.5" />
                                             </span>
                                             <span className="min-w-0">
-                                                <span className="block text-xs font-bold text-foreground">{action.event.reference_number}</span>
+                                                <span className="block text-xs font-bold text-foreground">
+                                                    {
+                                                        action.event
+                                                            .reference_number
+                                                    }
+                                                </span>
                                                 <span className="block truncate text-[11px] font-medium text-muted-foreground">
-                                                    {EVENT_CATEGORY_LABELS[action.event.event_category] ?? titleCase(action.event.event_category)}
-                                                    {action.event.site_name ? ` · ${action.event.site_name}` : ''}
+                                                    {EVENT_CATEGORY_LABELS[
+                                                        action.event
+                                                            .event_category
+                                                    ] ??
+                                                        titleCase(
+                                                            action.event
+                                                                .event_category,
+                                                        )}
+                                                    {action.event.site_name
+                                                        ? ` · ${action.event.site_name}`
+                                                        : ''}
                                                 </span>
                                             </span>
                                         </div>
                                     ) : (
                                         <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-[11px] font-medium text-muted-foreground">
-                                            <Link2 className="h-3 w-3" /> No parent event
+                                            <Link2 className="h-3 w-3" /> No
+                                            parent event
                                         </span>
                                     )}
                                 </td>
 
                                 {/* Action stage */}
                                 <td className="px-4 py-3 align-top">
-                                    <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium', stage.cls)}>
+                                    <span
+                                        className={cn(
+                                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
+                                            stage.cls,
+                                        )}
+                                    >
                                         <StageIcon className="h-3 w-3" />
                                         {stage.label}
                                     </span>
@@ -662,33 +1140,68 @@ function ActionTable({
                                 <td className="px-4 py-3 align-top">
                                     <div className="flex flex-wrap items-center gap-1.5">
                                         {action.is_overdue ? (
-                                            <FlagBadge icon={Clock} tone="critical" title="Past its due date">
+                                            <FlagBadge
+                                                icon={Clock}
+                                                tone="critical"
+                                                title="Past its due date"
+                                            >
                                                 Overdue
                                             </FlagBadge>
                                         ) : null}
-                                        {awaiting ? (
-                                            <FlagBadge icon={ShieldCheck} tone="info" title="Completed — needs a different person to verify">
+                                        {awaiting &&
+                                        action.evidence.load_state ===
+                                            'loaded' ? (
+                                            <FlagBadge
+                                                icon={ShieldCheck}
+                                                tone="info"
+                                                title="Completed — needs a different person to verify"
+                                            >
                                                 Verify
+                                            </FlagBadge>
+                                        ) : awaiting ? (
+                                            <FlagBadge
+                                                icon={ShieldAlert}
+                                                tone="warning"
+                                                title="Completion evidence could not be loaded; verification is unavailable"
+                                            >
+                                                Evidence unavailable
                                             </FlagBadge>
                                         ) : null}
                                         {unassigned ? (
-                                            <FlagBadge icon={UserRound} tone="warning" title="No owner assigned">
+                                            <FlagBadge
+                                                icon={UserRound}
+                                                tone="warning"
+                                                title="No owner assigned"
+                                            >
                                                 No owner
                                             </FlagBadge>
                                         ) : null}
                                         {eventStage ? (
-                                            <FlagBadge icon={eventStage.icon} tone={action.event?.monitoring ? 'success' : 'neutral'} title={`Parent event: ${eventStage.label}`}>
+                                            <FlagBadge
+                                                icon={eventStage.icon}
+                                                tone={
+                                                    action.event?.monitoring
+                                                        ? 'success'
+                                                        : 'neutral'
+                                                }
+                                                title={`Parent event: ${eventStage.label}`}
+                                            >
                                                 {eventStage.label}
                                             </FlagBadge>
                                         ) : null}
-                                        {!action.is_overdue && !awaiting && !unassigned && !eventStage ? (
-                                            <span className="text-xs text-muted-foreground">{resolved ? 'Resolved' : '—'}</span>
+                                        {!action.is_overdue &&
+                                        !awaiting &&
+                                        !unassigned &&
+                                        !eventStage ? (
+                                            <span className="text-xs text-muted-foreground">
+                                                {resolved ? 'Resolved' : '—'}
+                                            </span>
                                         ) : null}
                                     </div>
                                 </td>
 
                                 {/* Kebab — same payload as right-click (a11y / discoverability) */}
-                                <td className="px-2 py-3 align-top text-right">
+                                <td className="px-2 py-3 text-right align-top">
                                     {action.event ? (
                                         // eslint-disable-next-line no-restricted-syntax -- icon-only row affordance; opens the shared ShiftContextMenu
                                         <button
@@ -696,8 +1209,13 @@ function ActionTable({
                                             aria-label={`Lifecycle actions for ${action.reference_number}`}
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                const r = e.currentTarget.getBoundingClientRect();
-                                                onMenu(action, r.left, r.bottom);
+                                                const r =
+                                                    e.currentTarget.getBoundingClientRect();
+                                                onMenu(
+                                                    action,
+                                                    r.left,
+                                                    r.bottom,
+                                                );
                                             }}
                                             className="inline-grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                                         >

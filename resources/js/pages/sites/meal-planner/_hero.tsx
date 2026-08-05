@@ -741,7 +741,7 @@ export function MealPlannerToolbar(props: MealPlannerToolbarProps) {
     const [weekPickerOpen, setWeekPickerOpen] = useState(false);
 
     const actions = (
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
             {props.canPlan && (
                 <GuardrailButton unstyled type="button" onClick={props.onPlan} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-sites px-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <Plus className="h-4 w-4" strokeWidth={2.5} /> {isHouse ? 'Plan a meal' : 'Add a meal'}
@@ -810,7 +810,7 @@ export function MealPlannerToolbar(props: MealPlannerToolbarProps) {
             <GuardrailCard unstyled className="rounded-xl border border-border bg-card p-3 shadow-sm">
                 {/* md+: week-nav · KPIs · actions on one row. Narrow: week-nav+actions row, KPIs scroll below. */}
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="flex items-center justify-between gap-2 md:contents">
+                    <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between md:contents">
                         {weekNav}
                         <div className="md:hidden">{actions}</div>
                     </div>

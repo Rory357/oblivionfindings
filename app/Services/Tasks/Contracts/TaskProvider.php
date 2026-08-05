@@ -3,6 +3,7 @@
 namespace App\Services\Tasks\Contracts;
 
 use App\Models\User;
+use App\Services\Tasks\TaskAggregator;
 use App\Services\Tasks\TaskItem;
 
 /**
@@ -11,7 +12,7 @@ use App\Services\Tasks\TaskItem;
  * Providers return OPEN (non-terminal) work items by default; when
  * `$filters['include_done']` is true they may also include recently
  * closed items. Cross-cutting filtering (severity, assignee, search,
- * source toggles) happens centrally in {@see \App\Services\Tasks\TaskAggregator} —
+ * source toggles) happens centrally in {@see TaskAggregator} —
  * a provider only applies module-specific visibility rules (e.g. HR case
  * confidentiality) that the aggregator cannot know about.
  */
@@ -27,7 +28,13 @@ interface TaskProvider
     public function canView(User $user): bool;
 
     /**
-     * @param  array{include_done?: bool}  $filters
+     * @param  array{
+     *   id?: int,
+     *   include_done?: bool,
+     *   q?: string|null,
+     *   sources?: string[]|null,
+     *   return_to?: string
+     * }  $filters
      * @return TaskItem[]
      */
     public function tasks(User $user, array $filters = []): array;

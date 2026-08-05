@@ -69,8 +69,8 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('queues.0.alert_count', 1)
-                ->has('queues.0.alerts', 1)
-                ->where('queues.0.alerts.0.id', $visible->id)
+                ->has('worklist.data', 1)
+                ->where('worklist.data.0.id', $visible->id)
             );
 
         $this->actingAs($operator)

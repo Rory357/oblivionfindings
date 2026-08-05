@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AuditLog;
 use App\Models\ClientIncident;
 use App\Models\HsCorrectiveAction;
@@ -11,7 +12,9 @@ use App\Models\HsRecommendationDisposition;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\HealthSafety\HsEventService;
 use App\Services\HealthSafety\HsInvestigationService;
+use App\Support\Journeys\JourneyGate;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -37,15 +40,21 @@ class HsEventClosureTest extends TestCase
         if ($role = Role::where('name', 'health_safety_officer')->first()) {
             $user->roles()->attach($role);
         }
+        HrEmployeeProfile::factory()->create([
+            'tenant_id' => $user->organization_id,
+            'user_id' => $user->id,
+            'secondary_site_ids' => [],
+        ]);
 
         return $user;
     }
 
     public function test_clean_event_closes_with_summary(): void
     {
-        $event = HsEvent::factory()->create(); // low severity → no investigation required, no actions
+        $actor = $this->hsOfficer();
+        $event = HsEvent::factory()->worksafeNotNotifiable($actor)->create();
 
-        $this->actingAs($this->hsOfficer())
+        $this->actingAs($actor)
             ->from('/health-safety/events')
             ->post("/health-safety/events/{$event->id}/close", [
                 'closure_summary' => 'Resolved — controls verified, no further action.',
@@ -58,6 +67,116 @@ class HsEventClosureTest extends TestCase
         $this->assertNotNull($event->closed_at);
         $this->assertNotNull($event->closed_by);
         $this->assertNotEmpty($event->closure_summary);
+    }
+
+    public function test_worksafe_closure_truth_matrix_and_direct_action_requirement(): void
+    {
+        $actor = $this->hsOfficer();
+        $service = app(HsEventService::class);
+        $events = [
+            'unknown blocks' => [
+                HsEvent::factory()->worksafeUndecided()->create(),
+                false,
+                'Record the WorkSafe notifiability decision before closing this event.',
+                'worksafe-decision',
+            ],
+            'explicit false closes regulatory gate' => [
+                HsEvent::factory()->worksafeNotNotifiable($actor)->create(),
+                true,
+                null,
+                'worksafe-decision',
+            ],
+            'true pending blocks' => [
+                HsEvent::factory()->worksafeNotifiable($actor)->create(),
+                false,
+                'Record the WorkSafe notification before closing this event.',
+                'worksafe-notify',
+            ],
+            'true notified closes regulatory gate' => [
+                HsEvent::factory()->worksafeNotifiable($actor)->create([
+                    'worksafe_status' => HsEvent::WORKSAFE_NOTIFIED,
+                    'worksafe_notified_at' => now(),
+                    'worksafe_method' => 'online',
+                ]),
+                true,
+                null,
+                'worksafe-decision',
+            ],
+            'true acknowledged closes regulatory gate' => [
+                HsEvent::factory()->worksafeNotifiable($actor)->create([
+                    'worksafe_status' => HsEvent::WORKSAFE_ACKNOWLEDGED,
+                    'worksafe_notified_at' => now()->subHour(),
+                    'worksafe_method' => 'online',
+                    'worksafe_acknowledged_at' => now(),
+                ]),
+                true,
+                null,
+                'worksafe-decision',
+            ],
+        ];
+
+        foreach ($events as $label => [$event, $expected, $blocker, $action]) {
+            $gate = $service->closureGate($event)->toArray();
+            $requirement = collect($gate['requirements'])->firstWhere('key', 'worksafe_decision');
+
+            $this->assertNotNull($requirement, $label);
+            $this->assertSame($expected, $requirement['complete'], $label);
+            $this->assertSame(
+                "/health-safety/events/{$event->id}?action={$action}",
+                $requirement['href'],
+                $label,
+            );
+
+            if ($blocker !== null) {
+                $this->assertContains(
+                    $blocker,
+                    collect($gate['requirements'])
+                        ->where('complete', false)
+                        ->pluck('label')
+                        ->all(),
+                    $label,
+                );
+            }
+        }
+    }
+
+    public function test_hs_closure_gate_uses_the_shared_typed_requirement_contract(): void
+    {
+        $event = HsEvent::factory()->high()->worksafeUndecided()->create([
+            'source_type' => ClientIncident::class,
+            'source_id' => 991_014,
+            'idempotency_key' => HsEvent::buildIdempotencyKey(
+                ClientIncident::class,
+                991_014,
+                HsEvent::CATEGORY_INCIDENT,
+            ),
+            'handover_status' => HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
+        ]);
+        HsCorrectiveAction::factory()->create([
+            'hs_event_id' => $event->id,
+            'status' => HsCorrectiveAction::STATUS_COMPLETED,
+        ]);
+
+        $gate = app(HsEventService::class)->closureGate($event);
+
+        $this->assertInstanceOf(JourneyGate::class, $gate);
+        $this->assertFalse($gate->allowed);
+        $this->assertSame([
+            'hs_acceptance',
+            'worksafe_decision',
+            'hs_investigation',
+            'recommendation_dispositions',
+            'corrective_actions',
+        ], array_column($gate->requirements, 'key'));
+        foreach ($gate->requirements as $requirement) {
+            $this->assertSame(['key', 'complete', 'label', 'href'], array_keys($requirement));
+            $this->assertNotSame('', trim($requirement['label']));
+            $this->assertNotSame('', trim($requirement['href']));
+        }
+        $this->assertSame(
+            $gate->allowed,
+            $gate->toArray()['allowed'],
+        );
     }
 
     public function test_close_blocked_when_required_investigation_incomplete(): void
@@ -116,6 +235,13 @@ class HsEventClosureTest extends TestCase
             'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
         ]);
         HsInvestigation::factory()->completed()->create(['hs_event_id' => $event->id]);
+        $requirement = collect(app(HsEventService::class)->closureGate($event)->requirements)
+            ->firstWhere('key', 'recommendation_dispositions');
+
+        $this->assertSame(
+            "/health-safety/events/{$event->id}?section=investigation",
+            $requirement['href'],
+        );
 
         $this->assertFalse($event->fresh()->allCorrectiveActionsResolved());
 
@@ -146,13 +272,13 @@ class HsEventClosureTest extends TestCase
 
     public function test_event_closes_after_every_recommendation_is_decided_and_linked_action_is_verified(): void
     {
-        $event = HsEvent::factory()->high()->create([
+        $actor = $this->hsOfficer();
+        $event = HsEvent::factory()->high()->worksafeNotNotifiable($actor)->create([
             'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
         ]);
         $investigation = HsInvestigation::factory()->completed()->create([
             'hs_event_id' => $event->id,
         ]);
-        $actor = $this->hsOfficer();
         $service = app(HsInvestigationService::class);
 
         $correctiveOutcome = $service->dispositionRecommendation(
@@ -160,6 +286,13 @@ class HsEventClosureTest extends TestCase
             0,
             HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION,
             $actor,
+            actionData: [
+                'assigned_to_user_id' => $actor->id,
+                'due_date' => now()->addDays(14)->toDateString(),
+                'priority' => HsCorrectiveAction::PRIORITY_HIGH,
+                'responsibility_choice' => 'new_responsibility',
+                'new_responsibility_reason' => 'This verified recommendation requires a new H&S responsibility.',
+            ],
         );
         $service->dispositionRecommendation(
             $investigation->fresh(),
@@ -209,6 +342,13 @@ class HsEventClosureTest extends TestCase
         }
 
         HsInvestigation::factory()->create(['hs_event_id' => $event->id]);
+        $requirement = collect(app(HsEventService::class)->closureGate($event)->requirements)
+            ->firstWhere('key', 'hs_investigation');
+
+        $this->assertSame(
+            "/health-safety/events/{$event->id}?section=investigation",
+            $requirement['href'],
+        );
 
         $this->actingAs($actor)
             ->post("/health-safety/events/{$event->id}/close", [

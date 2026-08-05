@@ -4,8 +4,10 @@ namespace App\Http\Requests;
 
 use App\Models\AssetGeofence;
 use App\Models\Client;
+use App\Models\ServiceContext;
 use App\Models\SiteHouseRoom;
 use App\Services\Clients\ClientWorkerEligibility;
+use App\Services\UserSiteAccessService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -182,13 +184,16 @@ class StoreClientRequest extends FormRequest
                 return;
             }
 
-            $belongsToSite = SiteHouseRoom::query()
+            $roomIsAvailable = SiteHouseRoom::query()
                 ->whereKey($roomId)
                 ->where('site_id', $siteId)
+                ->where('is_active', true)
+                ->where('is_assignable', true)
+                ->whereNull('assigned_client_id')
                 ->exists();
 
-            if (! $belongsToSite) {
-                $validator->errors()->add('room_id', 'Selected room does not belong to the chosen site.');
+            if (! $roomIsAvailable) {
+                $validator->errors()->add('room_id', 'Choose an available room at the selected Site.');
             }
         });
 
@@ -227,6 +232,36 @@ class StoreClientRequest extends FormRequest
                 $validator->errors()->add(
                     'key_worker_id',
                     'Choose a current key worker assigned to the selected Site.',
+                );
+            }
+        });
+
+        $validator->after(function (Validator $validator) {
+            $siteId = filled($this->input('site_id')) && is_numeric($this->input('site_id'))
+                ? (int) $this->input('site_id')
+                : null;
+            $accessibleSiteIds = app(UserSiteAccessService::class)->accessibleSiteIds(
+                $this->user(),
+                ['clients.create'],
+            );
+
+            if ($siteId !== null
+                && ! $validator->errors()->has('site_id')
+                && ! in_array($siteId, $accessibleSiteIds, true)
+            ) {
+                $validator->errors()->add('site_id', 'Choose a Site you can access.');
+            }
+
+            if (filled($this->input('service_context_id'))
+                && ! $validator->errors()->has('service_context_id')
+                && ! ServiceContext::query()
+                    ->availableToSites($siteId === null ? [] : [$siteId])
+                    ->whereKey((int) $this->input('service_context_id'))
+                    ->exists()
+            ) {
+                $validator->errors()->add(
+                    'service_context_id',
+                    'Choose a service context available to the selected Site.',
                 );
             }
         });

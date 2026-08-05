@@ -10,7 +10,7 @@ use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 use Illuminate\Validation\ValidationException;
 
-class DataSubjectRequestProvider implements TaskProvider, HasModelClass, AssignableTaskProvider
+class DataSubjectRequestProvider implements AssignableTaskProvider, HasModelClass, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -69,6 +69,7 @@ class DataSubjectRequestProvider implements TaskProvider, HasModelClass, Assigna
     {
         $query = DataSubjectRequest::query()
             ->with(['client:id,first_name,last_name', 'assignedTo:id,name'])
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('received_at')
             ->limit(300);
 

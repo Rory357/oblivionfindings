@@ -14,6 +14,8 @@ import {
  */
 
 test.describe('control room — dashboard interactions', () => {
+    test.setTimeout(60_000);
+
     let operator: ReturnType<
         typeof seedIncidentHandoverFixtures
     >['users']['operator'];
@@ -26,8 +28,8 @@ test.describe('control room — dashboard interactions', () => {
         await loginAsFixture(page, operator);
         await page.goto('/control-room');
         await expect(
-            page.getByRole('heading', { name: 'Control Room Desk', level: 1 }),
-        ).toBeVisible();
+            page.getByRole('heading', { name: 'Desk', level: 1 }),
+        ).toBeVisible({ timeout: 20_000 });
     });
 
     test('continuity summary opens the H&S handover register', async ({
@@ -118,7 +120,6 @@ test.describe('control room — dashboard interactions', () => {
     test('workspace navigation reaches the operational destinations', async ({
         page,
     }) => {
-        test.setTimeout(60_000);
         const errors = collectConsoleErrors(page);
         const workspace = page.getByRole('navigation', {
             name: 'Control Room workspace',

@@ -54,6 +54,7 @@ function makeWatcherIncident(Site $site, array $attributes = []): ClientIncident
     return ClientIncident::factory()->create([
         'client_id' => $client->id,
         'site_id' => $site->id,
+        'status' => 'submitted',
         ...$attributes,
     ]);
 }
@@ -65,7 +66,7 @@ function makeWatcherIncident(Site $site, array $attributes = []): ClientIncident
 it('adds a task_watchers row and surfaces the item under the following filter only after watching', function () {
     $site = Site::factory()->create();
     $user = makeWatcherUser(['incidents.viewAny'], $site);
-    $incident = makeWatcherIncident($site, ['status' => 'submitted']);
+    $incident = makeWatcherIncident($site);
 
     $inList = fn ($items) => collect($items)->contains(fn ($i) => $i['id'] === 'incident-'.$incident->id);
 
@@ -115,9 +116,9 @@ it('adds a task_watchers row and surfaces the item under the following filter on
 it('reflects the watched count in stats.watching', function () {
     $site = Site::factory()->create();
     $user = makeWatcherUser(['incidents.viewAny'], $site);
-    $a = makeWatcherIncident($site, ['status' => 'submitted']);
-    $b = makeWatcherIncident($site, ['status' => 'submitted']);
-    makeWatcherIncident($site, ['status' => 'submitted']); // unwatched
+    $a = makeWatcherIncident($site);
+    $b = makeWatcherIncident($site);
+    makeWatcherIncident($site); // unwatched
 
     $this->actingAs($user)->get('/tasks')
         ->assertInertia(fn ($page) => $page->where('stats.watching', 0));
@@ -134,8 +135,8 @@ it('scopes the following filter to the acting user — a second user\'s watch do
     $me = makeWatcherUser(['incidents.viewAny'], $site);
     $other = makeWatcherUser(['incidents.viewAny'], $site);
 
-    $mine = makeWatcherIncident($site, ['status' => 'submitted']);
-    $theirs = makeWatcherIncident($site, ['status' => 'submitted']);
+    $mine = makeWatcherIncident($site);
+    $theirs = makeWatcherIncident($site);
 
     TaskWatcher::query()->create(['source' => 'incident', 'item_id' => $mine->id, 'user_id' => $me->id]);
     TaskWatcher::query()->create(['source' => 'incident', 'item_id' => $theirs->id, 'user_id' => $other->id]);
@@ -144,6 +145,93 @@ it('scopes the following filter to the acting user — a second user\'s watch do
         ->get('/tasks?following=1')
         ->assertInertia(fn ($page) => $page
             ->where('items', fn ($items) => collect($items)->pluck('id')->all() === ['incident-'.$mine->id]));
+});
+
+it('rejects watching an incident outside the viewer site scope', function () {
+    $localSite = Site::factory()->create();
+    $foreignSite = Site::factory()->create();
+    $user = makeWatcherUser(['incidents.viewAny'], $localSite);
+    $incident = makeWatcherIncident($foreignSite);
+
+    $this->actingAs($user)
+        ->post("/tasks/incident/{$incident->id}/watch", ['watching' => true])
+        ->assertNotFound();
+
+    expect(TaskWatcher::query()
+        ->where('source', 'incident')
+        ->where('item_id', $incident->id)
+        ->where('user_id', $user->id)
+        ->exists())->toBeFalse();
+});
+
+it('allows a user to stop following after module read permission is revoked', function () {
+    $site = Site::factory()->create();
+    $user = makeWatcherUser(['incidents.viewAny'], $site);
+    $incident = makeWatcherIncident($site);
+    TaskWatcher::query()->create([
+        'source' => 'incident',
+        'item_id' => $incident->id,
+        'user_id' => $user->id,
+    ]);
+    $permission = Permission::query()
+        ->where('key', 'incidents.viewAny')
+        ->firstOrFail();
+    $user->permissionOverrides()->syncWithoutDetaching([
+        $permission->id => ['allowed' => false],
+    ]);
+    $user->unsetRelation('permissionOverrides');
+    $user->unsetRelation('roles');
+
+    $this->actingAs($user)
+        ->post("/tasks/incident/{$incident->id}/watch", ['watching' => false])
+        ->assertRedirect()
+        ->assertSessionHas('success', 'Stopped following.');
+
+    expect(TaskWatcher::query()
+        ->where('source', 'incident')
+        ->where('item_id', $incident->id)
+        ->where('user_id', $user->id)
+        ->exists())->toBeFalse();
+});
+
+it('keeps a restricted safeguarding viewers own follow state available for unfollow', function () {
+    $user = makeWatcherUser(['safeguarding.viewAny']);
+    $concern = SafeguardingConcern::factory()->create([
+        'status' => 'reported',
+        'is_sensitive' => true,
+        'reported_by_user_id' => User::factory()->create()->id,
+        'assigned_to_user_id' => null,
+    ]);
+    TaskWatcher::query()->create([
+        'source' => 'safeguarding',
+        'item_id' => $concern->id,
+        'user_id' => $user->id,
+    ]);
+
+    $this->actingAs($user)
+        ->getJson('/tasks/detail?'.http_build_query([
+            'source' => 'safeguarding',
+            'id' => $concern->id,
+        ]))
+        ->assertOk()
+        ->assertJsonPath('item.restricted', true)
+        ->assertJsonPath('canWatch', true)
+        ->assertJsonPath('watchersHidden', true)
+        ->assertJsonPath('watchers', [])
+        ->assertJsonPath('isWatching', true);
+
+    $this->actingAs($user)
+        ->post("/tasks/safeguarding/{$concern->id}/watch", [
+            'watching' => false,
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success', 'Stopped following.');
+
+    $this->assertDatabaseMissing('task_watchers', [
+        'source' => 'safeguarding',
+        'item_id' => $concern->id,
+        'user_id' => $user->id,
+    ]);
 });
 
 // ---------------------------------------------------------------------------
@@ -192,7 +280,7 @@ it('splits an incident into a follow-up assigned to the chosen user', function (
     $site = Site::factory()->create();
     $user = makeWatcherUser(['incidents.viewAny', 'incidents.followups.manage'], $site);
     $assignee = makeWatcherUser(['incidents.viewAny'], $site);
-    $incident = makeWatcherIncident($site, ['status' => 'submitted']);
+    $incident = makeWatcherIncident($site);
 
     $this->actingAs($user)
         ->post("/tasks/incident/{$incident->id}/split", [

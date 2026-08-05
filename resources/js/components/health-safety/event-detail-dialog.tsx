@@ -15,9 +15,23 @@
  * Write actions (close / WorkSafe / investigation / corrective actions) are added
  * to the Options bar as their backend lands — an action appears only when it can
  * actually run (no stubs). */
+import {
+    CorrectiveActionHandoverPane,
+    type CorrectiveActionHandover,
+} from '@/components/health-safety/corrective-action-handover-pane';
 import { EventTimeline } from '@/components/health-safety/event-timeline';
 import { RiskMatrix } from '@/components/health-safety/risk-matrix';
+import {
+    JourneyGateList,
+    type JourneyGateData,
+} from '@/components/incidents/journey-gate-list';
+import {
+    LinkedOperationalEvidence,
+    type LinkedOperationalEvidenceData,
+} from '@/components/incidents/linked-operational-evidence';
+import { JourneyTermHelp } from '@/components/journey-term-help';
 import { Button } from '@/components/ui/button';
+import { formatFileSize } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -32,7 +46,7 @@ import {
     WizardShell,
     type WizardStep,
 } from '@/components/wizard/shell';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
@@ -128,6 +142,7 @@ export type EventCorrectiveAction = {
     priority: string;
     status: string;
     assigned_to_name: string | null;
+    owner: { id: number; name: string } | null;
     due_date: string | null;
     is_overdue: boolean;
     completed_at: string | null;
@@ -140,6 +155,47 @@ export type EventCorrectiveAction = {
     effectiveness_confirmed: boolean | null;
     hs_investigation_id: number | null;
     recommendation_index: number | null;
+    recommendation: string | null;
+    source:
+        | {
+              type: 'control_room_task';
+              id: number;
+              reference: string;
+              title: string;
+          }
+        | { type: 'new_responsibility'; reason: string | null }
+        | { type: 'standalone' };
+    source_task: {
+        id: number;
+        reference: string;
+        title: string;
+    } | null;
+    evidence: {
+        can_upload: boolean;
+        completion_notes: string | null;
+        legacy_paths: string[];
+        completed_by: { id: number; name: string } | null;
+        completed_at: string | null;
+        load_state: 'loaded' | 'unavailable';
+        attachments: Array<{
+            id: number;
+            original_name: string;
+            mime_type: string | null;
+            size_bytes: number | null;
+            description: string | null;
+            uploaded_by: string | null;
+            created_at: string | null;
+            download_url: string;
+            can_remove: boolean;
+        }>;
+    };
+    rework: { latest_reason: string | null };
+    history: Array<{
+        label: string;
+        actor: string | null;
+        occurred_at: string | null;
+        detail?: string | null;
+    }>;
 };
 
 export type EventRiskAssessment = {
@@ -242,6 +298,26 @@ export type EventSource = {
     unwired: boolean;
 };
 
+export type WorksafeState = {
+    notifiable: boolean | null;
+    status: string | null;
+};
+
+export type EventWorksafe = WorksafeState & {
+    decision_reason: string | null;
+    decision_source: string | null;
+    decided_at: string | null;
+    decided_by: { id: number; name: string } | null;
+    reference: string | null;
+    notified_at: string | null;
+    acknowledged_at: string | null;
+    method: string | null;
+    site_preserved: boolean;
+    can_decide: boolean;
+    can_notify: boolean;
+    can_acknowledge: boolean;
+};
+
 export type EventDetail = {
     id: number;
     reference_number: string;
@@ -255,14 +331,7 @@ export type EventDetail = {
     client: { id: number; name: string } | null;
     staff: { id: number; name: string } | null;
     asset: { id: number; name: string } | null;
-    worksafe_notifiable: boolean;
-    worksafe_status: string | null;
-    worksafe_reference: string | null;
-    worksafe_notified_at: string | null;
-    worksafe_acknowledged_at: string | null;
-    worksafe_method: string | null;
-    worksafe_site_preserved: boolean;
-    worksafe_reason: string | null;
+    worksafe: EventWorksafe;
     investigation_required: boolean;
     control_room_alert: {
         id: number;
@@ -282,16 +351,24 @@ export type EventDetail = {
     handover: EventHandover;
     lifecycle: EventLifecycle;
     handover_summary: EventHandoverSummary;
-    close_gate: {
-        acceptance_ok: boolean;
-        worksafe_ok: boolean;
-        investigation_ok: boolean;
-        recommendations_ok: boolean;
-        actions_ok: boolean;
-        blockers: string[];
-    };
+    linked_operational_evidence: LinkedOperationalEvidenceData | null;
+    incident_followups: Array<{
+        id: number;
+        notes: string | null;
+        assigned_to: string | null;
+        due_at: string | null;
+        completed_at: string | null;
+    }>;
+    close_gate: JourneyGateData;
+    journey_state: string;
     assignable_staff: Array<{ id: number; name: string }>;
-    can: { manage: boolean; override_closure: boolean };
+    action_handover: CorrectiveActionHandover;
+    can: {
+        manage: boolean;
+        override_closure: boolean;
+        manage_corrective_action_lifecycle: boolean;
+        verify_corrective_actions: boolean;
+    };
 };
 
 export type EventSectionKey =
@@ -306,6 +383,8 @@ export type EventSectionKey =
  *  opened from inside the Investigation / Corrective-actions sections. */
 export type EventActionKey =
     | 'close'
+    | 'accept_handover'
+    | 'worksafe_decision'
     | 'worksafe_notify'
     | 'worksafe_acknowledge'
     | 'investigation'
@@ -440,6 +519,27 @@ const PRIORITY: Record<string, string> = {
 function titleCase(s: string): string {
     return s.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+export function worksafeLabel(worksafe: WorksafeState): string {
+    if (worksafe.notifiable === null) return 'Decision not recorded';
+    if (worksafe.notifiable === false)
+        return 'Not notifiable — decision recorded';
+    if (!worksafe.status || worksafe.status === 'pending')
+        return 'Notification pending';
+    if (worksafe.status === 'notified')
+        return 'Notified — acknowledgement pending';
+    if (worksafe.status === 'acknowledged') return 'Acknowledged';
+    return 'WorkSafe status needs review';
+}
+
+function worksafeChipClass(worksafe: WorksafeState): string {
+    if (worksafe.notifiable === null) return 'bg-muted text-muted-foreground';
+    if (worksafe.notifiable === false || worksafe.status === 'acknowledged')
+        return 'bg-status-success-bg text-status-success';
+    if (!worksafe.status || worksafe.status === 'pending')
+        return 'bg-status-critical-bg text-status-critical';
+    return 'bg-status-warning-bg text-status-warning';
+}
 function handoverStatusLabel(status: string): string {
     if (status === 'accepted') return 'Accepted into H&S';
     if (status === 'awaiting_acceptance' || status === 'awaiting_hs_acceptance')
@@ -468,6 +568,7 @@ function fmtSize(bytes: number | null): string {
 type ActivePane =
     | { kind: 'close' }
     | { kind: 'accept_handover' }
+    | { kind: 'worksafe_decision' }
     | { kind: 'worksafe_notify' }
     | { kind: 'worksafe_acknowledge' }
     | { kind: 'inv_start' }
@@ -484,14 +585,29 @@ type ActivePane =
     | { kind: 'ca_verify'; actionId: number }
     | { kind: 'ca_return'; actionId: number };
 
-function paneFromAction(action: EventActionKey | null): ActivePane | null {
+function paneFromAction(
+    action: EventActionKey | null,
+    detail: EventDetail,
+): ActivePane | null {
     switch (action) {
         case 'close':
             return { kind: 'close' };
+        case 'accept_handover':
+            return detail.handover.can_accept
+                ? { kind: 'accept_handover' }
+                : null;
+        case 'worksafe_decision':
+            return detail.worksafe.can_decide
+                ? { kind: 'worksafe_decision' }
+                : null;
         case 'worksafe_notify':
-            return { kind: 'worksafe_notify' };
+            return detail.worksafe.can_notify
+                ? { kind: 'worksafe_notify' }
+                : null;
         case 'worksafe_acknowledge':
-            return { kind: 'worksafe_acknowledge' };
+            return detail.worksafe.can_acknowledge
+                ? { kind: 'worksafe_acknowledge' }
+                : null;
         case 'investigation':
             return { kind: 'inv_start' };
         case 'add_action':
@@ -541,7 +657,7 @@ export function EventDetailDialog({
                   kind: CA_TARGET_PANE[initialActionTarget.pane],
                   actionId: initialActionTarget.actionId,
               }
-            : paneFromAction(initialAction),
+            : paneFromAction(initialAction, detail),
     );
     /** Briefly ring the deep-linked action card once its section is on screen. */
     const [highlightActionId, setHighlightActionId] = useState<number | null>(
@@ -578,7 +694,7 @@ export function EventDetailDialog({
             setHighlightActionId(initialActionTarget.actionId);
         } else {
             setSection(initialSection);
-            setPane(paneFromAction(initialAction));
+            setPane(paneFromAction(initialAction, detail));
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only on incoming prop-value changes; the local setters are stable and intentionally excluded
     }, [
@@ -586,6 +702,10 @@ export function EventDetailDialog({
         initialActionTarget?.pane,
         initialSection,
         initialAction,
+        detail.worksafe.can_decide,
+        detail.worksafe.can_notify,
+        detail.worksafe.can_acknowledge,
+        detail.handover.can_accept,
     ]);
 
     const cat =
@@ -673,24 +793,22 @@ export function EventDetailDialog({
             <span
                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${stage.chip}`}
             >
-                <stage.icon className="h-3 w-3" /> {stage.label}
+                <stage.icon className="h-3 w-3" /> {d.journey_state}
             </span>
-            {d.worksafe_notifiable ? (
-                <span
-                    className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2 py-0.5 font-medium text-status-critical"
-                    title="WorkSafe NZ notifiable event"
-                >
-                    <ShieldAlert className="h-3 w-3" /> WorkSafe{' '}
-                    {d.worksafe_status
-                        ? titleCase(d.worksafe_status)
-                        : 'pending'}
-                </span>
-            ) : null}
+            <span
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${worksafeChipClass(d.worksafe)}`}
+                title={`WorkSafe: ${worksafeLabel(d.worksafe)}`}
+            >
+                <ShieldAlert className="h-3 w-3" /> WorkSafe ·{' '}
+                {worksafeLabel(d.worksafe)}
+            </span>
         </div>
     );
 
     const canAct = d.can.manage && d.status !== 'closed';
-    const blockers = d.close_gate?.blockers ?? [];
+    const blockers = d.close_gate.requirements.filter(
+        (requirement) => !requirement.complete,
+    );
 
     // Options bar — suppressed while a pane owns the body + its own buttons. Write
     // actions appear only when they can run (no stubs). Investigation / corrective-
@@ -711,31 +829,37 @@ export function EventDetailDialog({
                     <ShieldCheck className="mr-1.5 h-4 w-4" /> Accept handover
                 </Button>
             ) : null}
-            {d.can.manage &&
-            d.worksafe_notifiable &&
-            d.worksafe_status !== 'acknowledged' ? (
-                d.worksafe_status === 'notified' ? (
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                            setPane({ kind: 'worksafe_acknowledge' })
-                        }
-                    >
-                        <ShieldCheck className="mr-1.5 h-4 w-4" /> Record
-                        acknowledgement
-                    </Button>
-                ) : (
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setPane({ kind: 'worksafe_notify' })}
-                        className="border-status-critical/40 text-status-critical hover:text-status-critical"
-                    >
-                        <ShieldAlert className="mr-1.5 h-4 w-4" /> Record
-                        WorkSafe notification
-                    </Button>
-                )
+            {d.worksafe.can_decide ? (
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPane({ kind: 'worksafe_decision' })}
+                >
+                    <ShieldCheck className="mr-1.5 h-4 w-4" />{' '}
+                    {d.worksafe.notifiable === null
+                        ? 'Record WorkSafe decision'
+                        : 'Update WorkSafe decision'}
+                </Button>
+            ) : null}
+            {d.worksafe.can_notify ? (
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPane({ kind: 'worksafe_notify' })}
+                    className="border-status-critical/40 text-status-critical hover:text-status-critical"
+                >
+                    <ShieldAlert className="mr-1.5 h-4 w-4" /> Record WorkSafe
+                    notification
+                </Button>
+            ) : d.worksafe.can_acknowledge ? (
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPane({ kind: 'worksafe_acknowledge' })}
+                >
+                    <ShieldCheck className="mr-1.5 h-4 w-4" /> Record
+                    acknowledgement
+                </Button>
             ) : null}
             {canAct ? (
                 <Button
@@ -744,7 +868,7 @@ export function EventDetailDialog({
                     onClick={() => setPane({ kind: 'close' })}
                     title={
                         blockers.length
-                            ? `Closure blocked: ${blockers.join(' ')}`
+                            ? `Closure blocked: ${blockers.map((requirement) => requirement.label).join(' ')}`
                             : undefined
                     }
                     className={
@@ -827,7 +951,7 @@ export function EventDetailDialog({
 
 function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
     const gate = d.close_gate;
-    const blocked = (gate?.blockers.length ?? 0) > 0;
+    const blocked = !gate.allowed;
     const form = useForm<{ closure_summary: string; override_reason: string }>({
         closure_summary: '',
         override_reason: '',
@@ -877,38 +1001,11 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
                 </InfoCard>
             ) : null}
 
-            {/* eslint-disable-next-line no-restricted-syntax -- closure gate checklist surface */}
-            <div className="flex flex-col gap-2 rounded-xl border border-border bg-card/70 p-3">
-                <GateRow
-                    ok={gate?.acceptance_ok ?? true}
-                    label="H&S handover accepted where required"
-                />
-                <GateRow
-                    ok={gate?.worksafe_ok ?? true}
-                    label="WorkSafe notification recorded where required"
-                />
-                <GateRow
-                    ok={gate?.investigation_ok ?? true}
-                    label="Required investigation complete"
-                />
-                <GateRow
-                    ok={gate?.recommendations_ok ?? true}
-                    label="Every recommendation has a recorded outcome"
-                />
-                <GateRow
-                    ok={gate?.actions_ok ?? true}
-                    label="All corrective actions verified or closed"
-                />
-            </div>
+            <JourneyGateList gate={gate} />
 
             {blocked ? (
                 <InfoCard icon={AlertTriangle} tone="crit">
                     <p className="font-semibold">Closure is blocked</p>
-                    <ul className="mt-1 list-disc space-y-1 pl-4">
-                        {gate.blockers.map((blocker) => (
-                            <li key={blocker}>{blocker}</li>
-                        ))}
-                    </ul>
                     <p className="mt-2">
                         {d.can.override_closure
                             ? 'You have the separate override permission. Record the formal reason below; the actor, reason and blockers will be audited.'
@@ -959,24 +1056,6 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
                 </Button>
             </div>
         </form>
-    );
-}
-
-function GateRow({ ok, label }: { ok: boolean; label: string }) {
-    return (
-        <div className="flex items-center gap-2 text-sm">
-            {ok ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" />
-            ) : (
-                <AlertTriangle className="h-4 w-4 shrink-0 text-status-critical" />
-            )}
-            <span className={ok ? 'text-foreground' : 'text-status-critical'}>
-                <span className="font-semibold">
-                    {ok ? 'Complete' : 'Blocked'}:
-                </span>{' '}
-                {label}
-            </span>
-        </div>
     );
 }
 
@@ -1048,6 +1127,172 @@ function AcceptHandoverPane({
     );
 }
 
+function WorksafeDecisionPane({
+    d,
+    onDone,
+}: {
+    d: EventDetail;
+    onDone: () => void;
+}) {
+    const revising = d.worksafe.notifiable !== null;
+    const completedNotification =
+        d.worksafe.status === 'notified' ||
+        d.worksafe.status === 'acknowledged';
+    const [hasSelected, setHasSelected] = useState(revising);
+    const form = useForm<{
+        notifiable: boolean;
+        reason: string;
+        source: string;
+    }>({
+        notifiable: d.worksafe.notifiable ?? false,
+        reason: d.worksafe.decision_reason ?? '',
+        source: 'manual',
+    });
+    const canSubmit =
+        hasSelected && form.data.reason.trim().length >= 10 && !form.processing;
+
+    const choose = (notifiable: boolean) => {
+        setHasSelected(true);
+        form.setData('notifiable', notifiable);
+    };
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!canSubmit) return;
+        form.post(`/health-safety/events/${d.id}/worksafe/decision`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (
+                    !(page.props as { flash?: { error?: string } }).flash?.error
+                )
+                    onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead
+                icon={ShieldCheck}
+                title={
+                    revising
+                        ? 'Update WorkSafe decision'
+                        : 'Record WorkSafe decision'
+                }
+                blurb="Record whether this event meets the WorkSafe NZ notifiable-event threshold and why."
+            />
+
+            {revising && d.worksafe.decided_by ? (
+                <InfoCard icon={History} tone="info">
+                    Current decision recorded by{' '}
+                    <span className="font-semibold">
+                        {d.worksafe.decided_by.name}
+                    </span>
+                    {d.worksafe.decided_at
+                        ? ` · ${formatDateTime(d.worksafe.decided_at)}`
+                        : ''}
+                    .
+                </InfoCard>
+            ) : null}
+
+            <fieldset className="min-w-0">
+                <legend className="mb-1.5 text-sm font-medium text-foreground">
+                    WorkSafe decision{' '}
+                    <span className="text-status-critical">*</span>
+                </legend>
+                <div className="grid gap-2 sm:grid-cols-2">
+                    <label
+                        className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${
+                            hasSelected && form.data.notifiable
+                                ? 'border-status-critical bg-status-critical-bg'
+                                : 'border-border bg-background hover:bg-muted/50'
+                        }`}
+                    >
+                        <input
+                            type="radio"
+                            name="worksafe-decision"
+                            aria-label="Notifiable"
+                            checked={hasSelected && form.data.notifiable}
+                            onChange={() => choose(true)}
+                            className="h-4 w-4 border-border text-primary focus-visible:ring-2 focus-visible:ring-ring"
+                        />
+                        <span>
+                            <span className="block text-sm font-semibold text-foreground">
+                                Notifiable
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                                Starts the WorkSafe notification duty.
+                            </span>
+                        </span>
+                    </label>
+                    <label
+                        className={`flex min-h-11 items-center gap-3 rounded-lg border p-3 transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${
+                            completedNotification
+                                ? 'cursor-not-allowed opacity-60'
+                                : 'cursor-pointer'
+                        } ${
+                            hasSelected && !form.data.notifiable
+                                ? 'border-status-success bg-status-success-bg'
+                                : 'border-border bg-background hover:bg-muted/50'
+                        }`}
+                    >
+                        <input
+                            type="radio"
+                            name="worksafe-decision"
+                            aria-label="Not notifiable"
+                            checked={hasSelected && !form.data.notifiable}
+                            onChange={() => choose(false)}
+                            disabled={completedNotification}
+                            className="h-4 w-4 border-border text-primary focus-visible:ring-2 focus-visible:ring-ring"
+                        />
+                        <span>
+                            <span className="block text-sm font-semibold text-foreground">
+                                Not notifiable
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                                Records that the statutory threshold is not met.
+                            </span>
+                        </span>
+                    </label>
+                </div>
+            </fieldset>
+
+            {completedNotification ? (
+                <InfoCard icon={ShieldAlert} tone="warn">
+                    A completed WorkSafe notification cannot be changed to not
+                    notifiable. The existing notification record is preserved.
+                </InfoCard>
+            ) : null}
+
+            <Field
+                label="Decision rationale"
+                required
+                hint="At least 10 characters"
+                error={form.errors.reason}
+            >
+                <Textarea
+                    required
+                    aria-label="Decision rationale"
+                    rows={5}
+                    value={form.data.reason}
+                    onChange={(e) => form.setData('reason', e.target.value)}
+                    placeholder="What facts and threshold assessment support this decision?"
+                />
+            </Field>
+
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={!canSubmit}>
+                    {revising
+                        ? 'Update WorkSafe decision'
+                        : 'Record WorkSafe decision'}
+                </Button>
+            </div>
+        </form>
+    );
+}
+
 const WORKSAFE_METHODS = [
     { value: 'phone', label: 'Phone — 0800 030 040' },
     { value: 'online', label: 'Online notification form' },
@@ -1078,8 +1323,8 @@ function WorksafeNotifyPane({
     }>({
         notified_at: todayInput(),
         method: '',
-        reference: d.worksafe_reference ?? '',
-        site_preserved: d.worksafe_site_preserved,
+        reference: d.worksafe.reference ?? '',
+        site_preserved: d.worksafe.site_preserved,
     });
 
     const submit = (e: FormEvent) => {
@@ -1248,10 +1493,18 @@ function PaneRenderer({
             return <CloseEventPane d={d} onDone={onDone} />;
         case 'accept_handover':
             return <AcceptHandoverPane d={d} onDone={onDone} />;
+        case 'worksafe_decision':
+            return d.worksafe.can_decide ? (
+                <WorksafeDecisionPane d={d} onDone={onDone} />
+            ) : null;
         case 'worksafe_notify':
-            return <WorksafeNotifyPane d={d} onDone={onDone} />;
+            return d.worksafe.can_notify ? (
+                <WorksafeNotifyPane d={d} onDone={onDone} />
+            ) : null;
         case 'worksafe_acknowledge':
-            return <WorksafeAcknowledgePane d={d} onDone={onDone} />;
+            return d.worksafe.can_acknowledge ? (
+                <WorksafeAcknowledgePane d={d} onDone={onDone} />
+            ) : null;
         case 'inv_start':
             return <StartInvestigationPane d={d} onDone={onDone} />;
         case 'inv_findings':
@@ -1943,7 +2196,7 @@ function RecommendationDispositionPane({
     };
 
     return (
-        <form onSubmit={submit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
             <StepHead
                 icon={ListChecks}
                 title={`Recommendation ${recommendationIndex + 1} outcome`}
@@ -1972,45 +2225,74 @@ function RecommendationDispositionPane({
                     options={RECOMMENDATION_OUTCOMES}
                 />
             </Field>
-            {raisesAction ? (
+            {raisesAction && current?.corrective_action ? (
                 <InfoCard icon={ListChecks} tone="info">
-                    Recording this outcome creates or reuses one linked
-                    corrective action. The action must then be completed and
-                    independently verified before closure.
+                    <p className="font-semibold">
+                        This recommendation is already handed over.
+                    </p>
+                    <p className="mt-1">
+                        {current.corrective_action.reference_number} is{' '}
+                        {titleCase(current.corrective_action.status)}. Open the
+                        corrective-actions section to continue the work.
+                    </p>
                 </InfoCard>
-            ) : form.data.disposition ? (
-                <Field
-                    label="Reason"
-                    required
-                    error={form.errors.reason}
-                    hint="Recorded in the audit trail"
-                >
-                    <Textarea
-                        rows={4}
-                        value={form.data.reason}
-                        onChange={(event) =>
-                            form.setData('reason', event.target.value)
-                        }
-                        placeholder="Explain why this recommendation does not need a new corrective action."
-                    />
-                </Field>
+            ) : raisesAction ? (
+                <CorrectiveActionHandoverPane
+                    eventId={d.id}
+                    investigationId={inv.id}
+                    recommendationIndex={recommendationIndex}
+                    recommendation={recommendation}
+                    handover={d.action_handover}
+                    onDone={onDone}
+                />
+            ) : (
+                <form onSubmit={submit} className="flex flex-col gap-4">
+                    {form.data.disposition ? (
+                        <Field
+                            label="Reason"
+                            required
+                            error={form.errors.reason}
+                            hint="Recorded in the audit trail"
+                        >
+                            <Textarea
+                                rows={4}
+                                value={form.data.reason}
+                                onChange={(event) =>
+                                    form.setData('reason', event.target.value)
+                                }
+                                placeholder="Explain why this recommendation does not need a new corrective action."
+                            />
+                        </Field>
+                    ) : null}
+                    <div className="flex justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onDone}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={
+                                form.processing ||
+                                !form.data.disposition ||
+                                (needsReason && !form.data.reason.trim())
+                            }
+                        >
+                            Record outcome
+                        </Button>
+                    </div>
+                </form>
+            )}
+            {raisesAction && current?.corrective_action ? (
+                <div className="flex justify-end">
+                    <Button type="button" variant="outline" onClick={onDone}>
+                        Done
+                    </Button>
+                </div>
             ) : null}
-            <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
-                    Cancel
-                </Button>
-                <Button
-                    type="submit"
-                    disabled={
-                        form.processing ||
-                        !form.data.disposition ||
-                        (needsReason && !form.data.reason.trim())
-                    }
-                >
-                    Record outcome
-                </Button>
-            </div>
-        </form>
+        </div>
     );
 }
 
@@ -2047,6 +2329,21 @@ function AddCorrectiveActionPane({
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        if (!form.data.title.trim()) {
+            form.setError('title', 'Give the corrective action a title.');
+            return;
+        }
+        if (!form.data.assigned_to_user_id) {
+            form.setError(
+                'assigned_to_user_id',
+                'Choose the person responsible.',
+            );
+            return;
+        }
+        if (!form.data.due_date) {
+            form.setError('due_date', 'Set the date this action is due.');
+            return;
+        }
         form.post(`/health-safety/events/${d.id}/corrective-actions`, {
             preserveScroll: true,
             preserveState: true,
@@ -2106,7 +2403,7 @@ function AddCorrectiveActionPane({
                         options={ACTION_TYPES}
                     />
                 </Field>
-                <Field label="Due" error={form.errors.due_date}>
+                <Field label="Due" required error={form.errors.due_date}>
                     <Input
                         type="date"
                         value={form.data.due_date}
@@ -2118,21 +2415,29 @@ function AddCorrectiveActionPane({
             </div>
             <Field
                 label="Owner"
-                hint="Optional"
+                required
                 error={form.errors.assigned_to_user_id}
             >
                 <StaffSelect
                     value={form.data.assigned_to_user_id}
                     onChange={(v) => form.setData('assigned_to_user_id', v)}
                     staff={d.assignable_staff}
-                    placeholder="Unassigned"
+                    placeholder="Choose owner"
                 />
             </Field>
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={onDone}>
                     Cancel
                 </Button>
-                <Button type="submit" disabled={form.processing}>
+                <Button
+                    type="submit"
+                    disabled={
+                        form.processing ||
+                        !form.data.title.trim() ||
+                        !form.data.assigned_to_user_id ||
+                        !form.data.due_date
+                    }
+                >
                     {form.processing ? (
                         <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                     ) : null}
@@ -2183,7 +2488,7 @@ function CompleteActionPane({
             />
             <Field
                 label="What was done"
-                required
+                hint="Required when no completion file is retained"
                 error={form.errors.completion_notes}
             >
                 <Textarea
@@ -2195,6 +2500,7 @@ function CompleteActionPane({
                     placeholder="Describe the evidence that this action is complete."
                 />
             </Field>
+            <ActionEvidencePanel d={d} ca={ca} allowUpload />
             <InfoCard icon={ShieldCheck} tone="info">
                 A different person must verify this action — separation of
                 duties.
@@ -2203,7 +2509,15 @@ function CompleteActionPane({
                 <Button type="button" variant="outline" onClick={onDone}>
                     Cancel
                 </Button>
-                <Button type="submit" disabled={form.processing}>
+                <Button
+                    type="submit"
+                    disabled={
+                        form.processing ||
+                        (!form.data.completion_notes.trim() &&
+                            ca.evidence.attachments.length === 0 &&
+                            ca.evidence.legacy_paths.length === 0)
+                    }
+                >
                     {form.processing ? (
                         <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                     ) : null}
@@ -2211,6 +2525,238 @@ function CompleteActionPane({
                 </Button>
             </div>
         </form>
+    );
+}
+
+type EvidenceUploadState = {
+    key: string;
+    name: string;
+    status: 'queued' | 'uploading' | 'uploaded' | 'failed';
+};
+
+function ActionEvidencePanel({
+    d,
+    ca,
+    allowUpload = false,
+    allowRemove = true,
+}: {
+    d: EventDetail;
+    ca: EventCorrectiveAction;
+    allowUpload?: boolean;
+    allowRemove?: boolean;
+}) {
+    const [description, setDescription] = useState('');
+    const [uploads, setUploads] = useState<EvidenceUploadState[]>([]);
+    const evidence = ca.evidence;
+    const base = `/health-safety/events/${d.id}/corrective-actions/${ca.id}/evidence`;
+
+    const updateUpload = (
+        key: string,
+        status: EvidenceUploadState['status'],
+    ) => {
+        setUploads((current) =>
+            current.map((upload) =>
+                upload.key === key ? { ...upload, status } : upload,
+            ),
+        );
+    };
+
+    const uploadFiles = (files: File[]) => {
+        const selectionId = `${Date.now()}-${Math.random()}`;
+        const queue = files.map((file, index) => ({
+            file,
+            key: `${file.name}-${file.lastModified}-${selectionId}-${index}`,
+        }));
+        setUploads((current) => [
+            ...current,
+            ...queue.map(({ file, key }, index) => ({
+                key,
+                name: file.name,
+                status:
+                    index === 0 ? ('uploading' as const) : ('queued' as const),
+            })),
+        ]);
+
+        const uploadNext = (index: number) => {
+            const item = queue[index];
+            if (!item) return;
+            updateUpload(item.key, 'uploading');
+
+            router.post(
+                base,
+                {
+                    file: item.file,
+                    description: description.trim() || null,
+                },
+                {
+                    forceFormData: true,
+                    preserveScroll: true,
+                    preserveState: true,
+                    onSuccess: (page) => {
+                        const failed = Boolean(
+                            (page.props as { flash?: { error?: string } }).flash
+                                ?.error,
+                        );
+                        updateUpload(item.key, failed ? 'failed' : 'uploaded');
+                    },
+                    onError: () => updateUpload(item.key, 'failed'),
+                    onFinish: () => uploadNext(index + 1),
+                },
+            );
+        };
+
+        uploadNext(0);
+    };
+
+    if (evidence.load_state === 'unavailable') {
+        return ca.status === 'completed' ? (
+            <InfoCard icon={ShieldAlert} tone="warn">
+                Completion evidence could not be loaded. Verification is
+                unavailable.
+            </InfoCard>
+        ) : null;
+    }
+
+    if (
+        evidence.attachments.length === 0 &&
+        (!allowUpload || !evidence.can_upload)
+    ) {
+        return null;
+    }
+
+    return (
+        <div className="rounded-xl border border-border bg-muted/20 p-3">
+            <div className="flex items-center justify-between gap-2">
+                <p className="flex items-center gap-1.5 text-sm font-bold">
+                    <Paperclip className="h-4 w-4 text-primary" />
+                    Completion evidence
+                </p>
+                {evidence.attachments.length ? (
+                    <span className="text-xs text-muted-foreground">
+                        {evidence.attachments.length}{' '}
+                        {evidence.attachments.length === 1 ? 'file' : 'files'}
+                    </span>
+                ) : null}
+            </div>
+
+            {evidence.attachments.length ? (
+                <ul className="mt-2 space-y-2">
+                    {evidence.attachments.map((attachment) => (
+                        <li
+                            key={attachment.id}
+                            className="flex items-start justify-between gap-3 rounded-lg border border-border bg-background/70 p-2.5"
+                        >
+                            <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold">
+                                    {attachment.original_name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    {formatFileSize(attachment.size_bytes ?? 0)}
+                                    {attachment.uploaded_by
+                                        ? ` · ${attachment.uploaded_by}`
+                                        : ''}
+                                </p>
+                                {attachment.description ? (
+                                    <p className="mt-1 text-xs text-foreground">
+                                        {attachment.description}
+                                    </p>
+                                ) : null}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                                <a
+                                    href={attachment.download_url}
+                                    aria-label={`Download ${attachment.original_name}`}
+                                    className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2 text-xs font-semibold text-primary hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                                >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                    Download
+                                </a>
+                                {allowRemove && attachment.can_remove ? (
+                                    <ArmedButton
+                                        label="Remove evidence"
+                                        icon={Trash2}
+                                        ariaLabel={`Remove evidence ${attachment.original_name}`}
+                                        onConfirm={() =>
+                                            router.delete(
+                                                attachment.download_url,
+                                                {
+                                                    preserveScroll: true,
+                                                    preserveState: true,
+                                                },
+                                            )
+                                        }
+                                    />
+                                ) : null}
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="mt-2 text-xs text-muted-foreground">
+                    No completion evidence uploaded yet.
+                </p>
+            )}
+
+            {allowUpload && evidence.can_upload ? (
+                <div className="mt-3 grid gap-2 border-t border-border pt-3">
+                    <Field
+                        label="Evidence description"
+                        hint="Optional — applied to selected files"
+                    >
+                        <Input
+                            value={description}
+                            onChange={(event) =>
+                                setDescription(event.target.value)
+                            }
+                            placeholder="e.g. After photo and contractor sign-off"
+                        />
+                    </Field>
+                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-primary/50 bg-primary/5 px-3 py-3 text-sm font-semibold text-primary focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-ring hover:bg-primary/10">
+                        <Paperclip className="h-4 w-4" />
+                        Add completion evidence
+                        <input
+                            aria-label="Add completion evidence"
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                            multiple
+                            className="sr-only"
+                            onChange={(event) =>
+                                uploadFiles(
+                                    Array.from(event.target.files ?? []),
+                                )
+                            }
+                        />
+                    </label>
+                    {uploads.length ? (
+                        <ul
+                            className="space-y-1 text-xs"
+                            aria-label="Evidence upload status"
+                        >
+                            {uploads.map((upload) => (
+                                <li
+                                    key={upload.key}
+                                    className={
+                                        upload.status === 'failed'
+                                            ? 'text-status-critical'
+                                            : upload.status === 'uploaded'
+                                              ? 'text-status-success'
+                                              : 'text-muted-foreground'
+                                    }
+                                >
+                                    {upload.status === 'queued'
+                                        ? `Queued ${upload.name}`
+                                        : upload.status === 'uploading'
+                                          ? `Uploading ${upload.name}`
+                                          : upload.status === 'uploaded'
+                                            ? `Uploaded ${upload.name}`
+                                            : `Upload failed for ${upload.name}`}
+                                </li>
+                            ))}
+                        </ul>
+                    ) : null}
+                </div>
+            ) : null}
+        </div>
     );
 }
 
@@ -2224,9 +2770,20 @@ function VerifyActionPane({
     onDone: () => void;
 }) {
     const form = useForm<{
-        effectiveness_confirmed: boolean;
+        evidence_reviewed: boolean;
+        effective: boolean | null;
         verification_notes: string;
-    }>({ effectiveness_confirmed: true, verification_notes: '' });
+    }>({
+        evidence_reviewed: false,
+        effective: null,
+        verification_notes: '',
+    });
+    const canVerify =
+        ca.evidence.load_state === 'loaded' &&
+        form.data.evidence_reviewed &&
+        form.data.effective !== null &&
+        d.can.verify_corrective_actions &&
+        ca.can_verify;
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -2255,48 +2812,190 @@ function VerifyActionPane({
             />
             <InfoCard icon={ShieldCheck} tone="warn">
                 Separation of duties — the verifier must be a different person
-                than whoever completed this action
+                than the action owner and whoever completed it
                 {ca.completed_by_name ? ` (${ca.completed_by_name})` : ''}.
             </InfoCard>
-            <label className="flex items-center gap-2 text-sm text-foreground">
-                <input
-                    type="checkbox"
-                    checked={form.data.effectiveness_confirmed}
-                    onChange={(e) =>
-                        form.setData(
-                            'effectiveness_confirmed',
-                            e.target.checked,
-                        )
-                    }
-                    className="h-4 w-4 rounded border-border"
-                />
-                The action is effective
-            </label>
-            <Field
-                label="Verification notes"
-                hint="Optional"
-                error={form.errors.verification_notes}
-            >
-                <Textarea
-                    rows={3}
-                    value={form.data.verification_notes}
-                    onChange={(e) =>
-                        form.setData('verification_notes', e.target.value)
-                    }
-                />
-            </Field>
+            <VerificationSection title="What was required">
+                <p className="text-sm font-semibold text-foreground">
+                    {ca.recommendation ?? ca.title}
+                </p>
+                <dl className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                    <div>
+                        <dt className="font-semibold text-foreground">Owner</dt>
+                        <dd>
+                            {ca.owner?.name ??
+                                ca.assigned_to_name ??
+                                'Unassigned'}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt className="font-semibold text-foreground">
+                            Due date
+                        </dt>
+                        <dd>
+                            {ca.due_date
+                                ? formatDateOnly(ca.due_date)
+                                : 'Not recorded'}
+                        </dd>
+                    </div>
+                </dl>
+                {ca.source_task ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        Source: {ca.source_task.reference} ·{' '}
+                        {ca.source_task.title}
+                    </p>
+                ) : null}
+            </VerificationSection>
+            <VerificationSection title="What the owner submitted">
+                {ca.evidence.load_state === 'loaded' ? (
+                    <>
+                        <p className="text-sm text-foreground">
+                            {ca.evidence.completion_notes ??
+                                'No completion notes were entered.'}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            {ca.evidence.completed_by?.name
+                                ? `Submitted by ${ca.evidence.completed_by.name}`
+                                : 'Submitter not recorded'}
+                            {ca.evidence.completed_at
+                                ? ` · ${formatDateTime(ca.evidence.completed_at)}`
+                                : ''}
+                        </p>
+                        <ActionEvidencePanel
+                            d={d}
+                            ca={ca}
+                            allowRemove={false}
+                        />
+                        {ca.evidence.legacy_paths.length ? (
+                            <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                                {ca.evidence.legacy_paths.map((path) => (
+                                    <li key={path}>Legacy evidence: {path}</li>
+                                ))}
+                            </ul>
+                        ) : null}
+                    </>
+                ) : (
+                    <InfoCard icon={ShieldAlert} tone="warn">
+                        Completion evidence could not be loaded. Verification is
+                        unavailable.
+                    </InfoCard>
+                )}
+            </VerificationSection>
+            <VerificationSection title="Prior rework and resubmission">
+                {ca.rework.latest_reason ? (
+                    <p className="text-sm text-foreground">
+                        {ca.rework.latest_reason}
+                    </p>
+                ) : (
+                    <p className="text-sm text-muted-foreground">
+                        No prior rework was recorded.
+                    </p>
+                )}
+                {ca.history.length ? (
+                    <ol className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        {ca.history.map((entry, index) => (
+                            <li
+                                key={`${entry.label}-${entry.occurred_at}-${index}`}
+                            >
+                                <span className="font-semibold text-foreground">
+                                    {entry.label}
+                                </span>
+                                {entry.actor ? ` · ${entry.actor}` : ''}
+                                {entry.occurred_at
+                                    ? ` · ${formatDateTime(entry.occurred_at)}`
+                                    : ''}
+                            </li>
+                        ))}
+                    </ol>
+                ) : null}
+            </VerificationSection>
+            <VerificationSection title="Verifier decision">
+                <label className="flex items-start gap-2 text-sm text-foreground">
+                    <input
+                        type="checkbox"
+                        checked={form.data.evidence_reviewed}
+                        onChange={(e) =>
+                            form.setData('evidence_reviewed', e.target.checked)
+                        }
+                        className="mt-0.5 h-4 w-4 rounded border-border"
+                    />
+                    I reviewed the owner submission and retained evidence
+                </label>
+                <fieldset className="mt-3">
+                    <legend className="text-sm font-semibold text-foreground">
+                        Is the action effective?
+                    </legend>
+                    <div className="mt-2 flex flex-wrap gap-3">
+                        <label className="flex items-center gap-2 text-sm text-foreground">
+                            <input
+                                type="radio"
+                                name={`corrective-action-${ca.id}-effective`}
+                                checked={form.data.effective === true}
+                                onChange={() => form.setData('effective', true)}
+                                className="h-4 w-4 border-border"
+                            />
+                            Effective
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-foreground">
+                            <input
+                                type="radio"
+                                name={`corrective-action-${ca.id}-effective`}
+                                checked={form.data.effective === false}
+                                onChange={() =>
+                                    form.setData('effective', false)
+                                }
+                                className="h-4 w-4 border-border"
+                            />
+                            Not effective
+                        </label>
+                    </div>
+                </fieldset>
+                <div className="mt-3">
+                    <Field
+                        label="Verification notes"
+                        hint="Optional"
+                        error={form.errors.verification_notes}
+                    >
+                        <Textarea
+                            rows={3}
+                            value={form.data.verification_notes}
+                            onChange={(e) =>
+                                form.setData(
+                                    'verification_notes',
+                                    e.target.value,
+                                )
+                            }
+                        />
+                    </Field>
+                </div>
+            </VerificationSection>
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={onDone}>
                     Cancel
                 </Button>
-                <Button type="submit" disabled={form.processing}>
+                <Button type="submit" disabled={form.processing || !canVerify}>
                     {form.processing ? (
                         <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                     ) : null}
-                    Verify
+                    Verify action
                 </Button>
             </div>
         </form>
+    );
+}
+
+function VerificationSection({
+    title,
+    children,
+}: {
+    title: string;
+    children: ReactNode;
+}) {
+    return (
+        <section className="rounded-xl border border-border bg-muted/20 p-3">
+            <h3 className="text-sm font-bold text-foreground">{title}</h3>
+            <div className="mt-2">{children}</div>
+        </section>
     );
 }
 
@@ -2364,15 +3063,23 @@ function ArmedButton({
     label,
     icon: Icon,
     onConfirm,
+    ariaLabel,
 }: {
     label: string;
     icon: ComponentType<{ className?: string }>;
     onConfirm: () => void;
+    ariaLabel?: string;
 }) {
     const [arming, setArming] = useState(false);
     if (!arming) {
         return (
-            <Button size="sm" variant="outline" onClick={() => setArming(true)}>
+            <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                aria-label={ariaLabel}
+                onClick={() => setArming(true)}
+            >
                 <Icon className="mr-1.5 h-3.5 w-3.5" /> {label}
             </Button>
         );
@@ -2380,7 +3087,9 @@ function ArmedButton({
     return (
         <span className="inline-flex items-center gap-1">
             <Button
+                type="button"
                 size="sm"
+                aria-label={ariaLabel ? `Confirm ${ariaLabel}` : undefined}
                 onClick={() => {
                     onConfirm();
                     setArming(false);
@@ -2389,6 +3098,7 @@ function ArmedButton({
                 <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> {label}?
             </Button>
             <Button
+                type="button"
                 size="sm"
                 variant="ghost"
                 onClick={() => setArming(false)}
@@ -2411,10 +3121,12 @@ function CorrectiveActionControls({
     onPane: (p: ActivePane) => void;
 }) {
     const base = `/health-safety/events/${d.id}/corrective-actions/${ca.id}`;
+    const canManageStrictLifecycle = d.can.manage_corrective_action_lifecycle;
     // Write controls require manage AND a live event — no lifecycle moves once closed.
     if (!d.can.manage || d.status === 'closed') return null;
     if (!['open', 'in_progress', 'completed', 'verified'].includes(ca.status))
         return null;
+    if (ca.status !== 'open' && !canManageStrictLifecycle) return null;
 
     return (
         <div className="mt-2 flex flex-col gap-2 border-t border-border pt-2">
@@ -2432,7 +3144,7 @@ function CorrectiveActionControls({
                         }
                     />
                 ) : null}
-                {ca.status === 'in_progress' ? (
+                {ca.status === 'in_progress' && canManageStrictLifecycle ? (
                     <Button
                         size="sm"
                         onClick={() =>
@@ -2443,18 +3155,23 @@ function CorrectiveActionControls({
                         complete
                     </Button>
                 ) : null}
-                {ca.status === 'completed' ? (
+                {ca.status === 'completed' && canManageStrictLifecycle ? (
                     <>
                         <Button
                             size="sm"
-                            disabled={!ca.can_verify}
+                            disabled={
+                                !ca.can_verify ||
+                                ca.evidence.load_state !== 'loaded'
+                            }
                             onClick={() =>
                                 onPane({ kind: 'ca_verify', actionId: ca.id })
                             }
                             title={
-                                ca.can_verify
-                                    ? undefined
-                                    : 'A different person must verify this action.'
+                                ca.evidence.load_state !== 'loaded'
+                                    ? 'Completion evidence could not be loaded.'
+                                    : ca.can_verify
+                                      ? undefined
+                                      : 'A different person must verify this action.'
                             }
                         >
                             <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />{' '}
@@ -2472,7 +3189,7 @@ function CorrectiveActionControls({
                         </Button>
                     </>
                 ) : null}
-                {ca.status === 'verified' ? (
+                {ca.status === 'verified' && canManageStrictLifecycle ? (
                     <ArmedButton
                         label="Close"
                         icon={CheckCircle2}
@@ -2486,11 +3203,11 @@ function CorrectiveActionControls({
                     />
                 ) : null}
             </div>
-            {ca.status === 'completed' ? (
+            {ca.status === 'completed' && canManageStrictLifecycle ? (
                 <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
                     <ShieldCheck className="mt-0.5 h-3 w-3 shrink-0" />A
-                    different person must verify this action than whoever
-                    completed it
+                    different person must verify this action than its owner or
+                    whoever completed it
                     {ca.completed_by_name ? ` (${ca.completed_by_name})` : ''}.
                 </p>
             ) : null}
@@ -2681,9 +3398,15 @@ function OverviewSection({
         <div className="flex flex-col gap-4">
             {/* eslint-disable-next-line no-restricted-syntax -- custom governance layout surface */}
             <div className="rounded-xl border border-border bg-card/70 p-4">
-                <p className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                    Governance stage
-                </p>
+                <div className="mb-2 flex items-center gap-1">
+                    <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                        Governance stage
+                    </p>
+                    <JourneyTermHelp
+                        terms={['governance_stage', 'status']}
+                        label="Explain governance stage"
+                    />
+                </div>
                 <StageTracker status={d.status} />
             </div>
 
@@ -2691,7 +3414,7 @@ function OverviewSection({
                 <HandoverOverview d={d} />
             </div>
 
-            {d.worksafe_notifiable ? <WorkSafeBanner d={d} /> : null}
+            <WorkSafeGovernanceCard d={d} />
 
             <div className="grid gap-4 sm:grid-cols-2">
                 <ReviewCard icon={FileText} title="Event">
@@ -2848,7 +3571,11 @@ function HandoverSection({ d }: { d: EventDetail }) {
                 </InfoCard>
             ) : null}
 
-            <ReviewCard icon={Paperclip} title="Handover attachments" span>
+            <ReviewCard
+                icon={Paperclip}
+                title="Official incident attachments"
+                span
+            >
                 {summary.attachments.length ? (
                     <div className="flex flex-col gap-2">
                         {summary.attachments.map((attachment) => (
@@ -2865,57 +3592,38 @@ function HandoverSection({ d }: { d: EventDetail }) {
                 )}
             </ReviewCard>
 
-            <ReviewCard icon={RadioTower} title="Control Room evidence" span>
-                {summary.control_room_evidence.length ? (
-                    <div className="flex flex-col gap-3">
-                        {summary.control_room_evidence.map((evidence) => (
-                            <div
-                                key={evidence.id}
-                                className="rounded-lg border border-border p-3"
-                            >
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <p className="text-sm font-semibold text-foreground">
-                                        {evidence.title}
-                                    </p>
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                                        <CheckCircle2 className="h-3 w-3" />{' '}
-                                        {titleCase(evidence.status)}
-                                    </span>
-                                </div>
-                                {evidence.items.map((item) => (
-                                    <div
-                                        key={item.id}
-                                        className="mt-2 rounded-md bg-muted/40 p-2.5"
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                                <p className="text-sm font-medium text-foreground">
-                                                    {item.title}
-                                                </p>
-                                                {item.description ? (
-                                                    <p className="mt-0.5 text-xs text-muted-foreground">
-                                                        {item.description}
-                                                    </p>
-                                                ) : null}
-                                            </div>
-                                            {item.download_url ? (
-                                                <a
-                                                    href={item.download_url}
-                                                    className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                                >
-                                                    <ExternalLink className="h-3.5 w-3.5" />{' '}
-                                                    Open
-                                                </a>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                ))}
+            <LinkedOperationalEvidence
+                evidence={d.linked_operational_evidence}
+            />
+
+            <ReviewCard icon={ListChecks} title="Incident follow-ups" span>
+                {d.incident_followups.length ? (
+                    d.incident_followups.map((followup) => (
+                        <div
+                            key={followup.id}
+                            className="flex flex-wrap items-start justify-between gap-3 border-b border-border py-2 last:border-0"
+                        >
+                            <div>
+                                <p className="text-sm font-medium text-foreground">
+                                    {followup.notes || 'Incident follow-up'}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    {followup.assigned_to ?? 'Unassigned'}
+                                    {followup.due_at
+                                        ? ` · due ${formatDateTime(followup.due_at)}`
+                                        : ''}
+                                </p>
                             </div>
-                        ))}
-                    </div>
+                            <span className="text-xs font-semibold text-muted-foreground">
+                                {followup.completed_at
+                                    ? `Completed ${formatDateTime(followup.completed_at)}`
+                                    : 'Open'}
+                            </span>
+                        </div>
+                    ))
                 ) : (
                     <p className="text-sm text-muted-foreground">
-                        No Control Room evidence was attached.
+                        No incident follow-ups were recorded.
                     </p>
                 )}
             </ReviewCard>
@@ -2947,70 +3655,7 @@ function HandoverSection({ d }: { d: EventDetail }) {
                         </p>
                     )}
                 </ReviewCard>
-                <ReviewCard icon={Send} title="Communications">
-                    {summary.communications.length ? (
-                        summary.communications.map((communication) => (
-                            <div
-                                key={communication.id}
-                                className="border-b border-border py-2 last:border-0"
-                            >
-                                <p className="text-sm font-medium text-foreground">
-                                    {communication.purpose ??
-                                        'Operational update'}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    {titleCase(communication.channel)} ·{' '}
-                                    {titleCase(communication.status)}
-                                    {communication.sent_at
-                                        ? ` · ${formatDateTime(communication.sent_at)}`
-                                        : ''}
-                                </p>
-                                {communication.content ? (
-                                    <p className="mt-1 text-xs text-foreground">
-                                        {communication.content}
-                                    </p>
-                                ) : null}
-                            </div>
-                        ))
-                    ) : (
-                        <p className="text-sm text-muted-foreground">
-                            No communications were recorded.
-                        </p>
-                    )}
-                </ReviewCard>
             </div>
-
-            <ReviewCard icon={ListChecks} title="Operational tasks" span>
-                {summary.operational_tasks.length ? (
-                    summary.operational_tasks.map((task) => (
-                        <div
-                            key={task.id}
-                            className="flex flex-wrap items-start justify-between gap-3 border-b border-border py-2 last:border-0"
-                        >
-                            <div>
-                                <p className="text-sm font-medium text-foreground">
-                                    {task.title}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    {task.assignee ?? 'Unassigned'}
-                                    {task.due_at
-                                        ? ` · due ${formatDateTime(task.due_at)}`
-                                        : ''}
-                                </p>
-                            </div>
-                            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                                <ListChecks className="h-3 w-3" />{' '}
-                                {titleCase(task.status)} ·{' '}
-                                {titleCase(task.priority)}
-                            </span>
-                        </div>
-                    ))
-                ) : (
-                    <p className="text-sm text-muted-foreground">
-                        No operational tasks were handed over.
-                    </p>
-                )}
-            </ReviewCard>
         </div>
     );
 }
@@ -3121,14 +3766,101 @@ const WORKSAFE_METHOD_LABELS: Record<string, string> = {
     in_person: 'in person',
 };
 
+function decisionSourceLabel(source: string | null): string | null {
+    if (!source) return null;
+    return (
+        {
+            manual: 'Manual decision',
+            incident_report: 'Incident report',
+            classifier: 'Source classifier',
+        }[source] ?? titleCase(source)
+    );
+}
+
+function WorkSafeGovernanceCard({ d }: { d: EventDetail }) {
+    const worksafe = d.worksafe;
+    const label = worksafeLabel(worksafe);
+    const source = decisionSourceLabel(worksafe.decision_source);
+
+    return (
+        // eslint-disable-next-line no-restricted-syntax -- compact governance status surface with custom icon, provenance and statutory-duty content.
+        <div className="rounded-xl border border-border bg-card/70 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                    <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${worksafeChipClass(worksafe)}`}
+                    >
+                        {worksafe.notifiable === null ? (
+                            <Clock className="h-4 w-4" />
+                        ) : worksafe.notifiable === false ||
+                          worksafe.status === 'acknowledged' ? (
+                            <ShieldCheck className="h-4 w-4" />
+                        ) : (
+                            <ShieldAlert className="h-4 w-4" />
+                        )}
+                    </span>
+                    <div>
+                        <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                            WorkSafe decision
+                        </p>
+                        <p className="mt-0.5 text-sm font-semibold text-foreground">
+                            {label}
+                        </p>
+                    </div>
+                </div>
+                {source ? (
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        {source}
+                    </span>
+                ) : null}
+            </div>
+
+            {worksafe.notifiable === null ? (
+                <p className="mt-3 text-sm text-muted-foreground">
+                    Record whether this event meets the WorkSafe NZ
+                    notifiable-event threshold before closure.
+                </p>
+            ) : (
+                <>
+                    {worksafe.decision_reason ? (
+                        <p className="mt-3 text-sm whitespace-pre-wrap text-foreground">
+                            {worksafe.decision_reason}
+                        </p>
+                    ) : null}
+                    {worksafe.decided_by || worksafe.decided_at ? (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                            Recorded
+                            {worksafe.decided_by
+                                ? ` by ${worksafe.decided_by.name}`
+                                : ''}
+                            {worksafe.decided_at
+                                ? ` · ${formatDateTime(worksafe.decided_at)}`
+                                : ''}
+                        </p>
+                    ) : null}
+                </>
+            )}
+
+            {worksafe.notifiable === true ? (
+                <div className="mt-3">
+                    <WorkSafeBanner d={d} />
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
 function WorkSafeBanner({ d }: { d: EventDetail }) {
     const notified =
-        d.worksafe_status === 'notified' ||
-        d.worksafe_status === 'acknowledged';
-    const acknowledged = d.worksafe_status === 'acknowledged';
-    const methodLabel = d.worksafe_method
-        ? (WORKSAFE_METHOD_LABELS[d.worksafe_method] ??
-          d.worksafe_method.replace(/_/g, ' '))
+        d.worksafe.status === 'notified' ||
+        d.worksafe.status === 'acknowledged';
+    const acknowledged = d.worksafe.status === 'acknowledged';
+    const statusKnown =
+        !d.worksafe.status ||
+        ['pending', 'notified', 'acknowledged'].includes(d.worksafe.status);
+    const methodLabel = d.worksafe.method
+        ? (WORKSAFE_METHOD_LABELS[d.worksafe.method] ??
+          d.worksafe.method.replace(/_/g, ' '))
         : null;
     return (
         <InfoCard icon={ShieldAlert} tone="crit">
@@ -3136,19 +3868,21 @@ function WorkSafeBanner({ d }: { d: EventDetail }) {
                 WorkSafe NZ notifiable event (HSWA 2015).
             </span>{' '}
             {acknowledged
-                ? `Acknowledged by WorkSafe${d.worksafe_acknowledged_at ? ` ${formatDateTime(d.worksafe_acknowledged_at)}` : ''}${d.worksafe_reference ? ` · ref ${d.worksafe_reference}` : ''}.`
+                ? `Acknowledged by WorkSafe${d.worksafe.acknowledged_at ? ` ${formatDateTime(d.worksafe.acknowledged_at)}` : ''}${d.worksafe.reference ? ` · ref ${d.worksafe.reference}` : ''}.`
                 : notified
-                  ? `Notified${d.worksafe_notified_at ? ` ${formatDateTime(d.worksafe_notified_at)}` : ''}${methodLabel ? ` by ${methodLabel}` : ''}${d.worksafe_reference ? ` · ref ${d.worksafe_reference}` : ''} — awaiting acknowledgement.`
-                  : 'Notification to WorkSafe NZ is still pending.'}
+                  ? `Notified${d.worksafe.notified_at ? ` ${formatDateTime(d.worksafe.notified_at)}` : ''}${methodLabel ? ` by ${methodLabel}` : ''}${d.worksafe.reference ? ` · ref ${d.worksafe.reference}` : ''} — awaiting acknowledgement.`
+                  : statusKnown
+                    ? 'Notification to WorkSafe NZ is still pending.'
+                    : 'The stored WorkSafe status is not recognised and needs review before this record can be trusted.'}
             <span className="mt-2 flex flex-wrap gap-1.5">
                 <DutyChip label="Notify ASAP" done={notified} />
                 <DutyChip
                     label={
-                        d.worksafe_site_preserved
+                        d.worksafe.site_preserved
                             ? 'Site preserved'
                             : 'Preserve the site until released'
                     }
-                    done={d.worksafe_site_preserved}
+                    done={d.worksafe.site_preserved}
                 />
                 <DutyChip label="Keep records ≥ 5 years" />
             </span>
@@ -3281,7 +4015,7 @@ function InvestigationSection({
                             {inv.target_completion_date ? (
                                 <span>
                                     Due{' '}
-                                    {formatDateTime(inv.target_completion_date)}
+                                    {formatDateOnly(inv.target_completion_date)}
                                 </span>
                             ) : null}
                         </div>
@@ -3572,7 +4306,7 @@ function ActionsSection({
                                     <p className="mt-0.5 text-xs text-muted-foreground">
                                         {a.assigned_to_name ?? 'Unassigned'}
                                         {a.due_date
-                                            ? ` · due ${formatDateTime(a.due_date)}`
+                                            ? ` · due ${formatDateOnly(a.due_date)}`
                                             : ''}
                                         {a.is_overdue &&
                                         a.status !== 'verified' &&
@@ -3580,6 +4314,31 @@ function ActionsSection({
                                             ? ' · overdue'
                                             : ''}
                                     </p>
+                                    {a.recommendation ? (
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Recommendation: {a.recommendation}
+                                        </p>
+                                    ) : null}
+                                    {a.source.type === 'control_room_task' ? (
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Transferred from Control Room task:{' '}
+                                            {a.source.reference} ·{' '}
+                                            {a.source.title}
+                                        </p>
+                                    ) : a.source.type ===
+                                      'new_responsibility' ? (
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            New responsibility:{' '}
+                                            {a.source.reason ??
+                                                'Reason not recorded'}
+                                        </p>
+                                    ) : null}
+                                    {a.rework.latest_reason ? (
+                                        <p className="mt-1 text-xs text-status-warning">
+                                            Returned for rework:{' '}
+                                            {a.rework.latest_reason}
+                                        </p>
+                                    ) : null}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span
@@ -3608,6 +4367,12 @@ function ActionsSection({
                                 </p>
                             ) : null}
 
+                            <ActionEvidencePanel
+                                d={d}
+                                ca={a}
+                                allowUpload={a.evidence.can_upload}
+                            />
+
                             {canAct ? (
                                 <CorrectiveActionControls
                                     d={d}
@@ -3623,7 +4388,7 @@ function ActionsSection({
             <p className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
                 <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 Separation of duties: a corrective action must be verified by
-                someone other than the person who completed it.
+                someone other than its owner or the person who completed it.
             </p>
         </div>
     );

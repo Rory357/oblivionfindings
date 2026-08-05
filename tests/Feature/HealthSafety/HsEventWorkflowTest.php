@@ -167,6 +167,8 @@ class HsEventWorkflowTest extends TestCase
             ->post("/health-safety/events/{$event->id}/corrective-actions", [
                 'title' => 'Install a grab rail',
                 'priority' => 'high',
+                'assigned_to_user_id' => $officer->id,
+                'due_date' => now()->addDays(14)->toDateString(),
             ])->assertSessionHas('success');
         $action = HsCorrectiveAction::where('hs_event_id', $event->id)->firstOrFail();
         $this->assertSame(1, HsCorrectiveAction::where('hs_event_id', $event->id)->count());
@@ -196,14 +198,16 @@ class HsEventWorkflowTest extends TestCase
         // Same person cannot verify their own completion.
         $this->actingAs($officer)->from('/health-safety/events')
             ->post("/health-safety/events/{$event->id}/corrective-actions/{$action->id}/verify", [
-                'effectiveness_confirmed' => true,
+                'evidence_reviewed' => true,
+                'effective' => true,
             ])->assertSessionHas('error');
         $this->assertEquals(HsCorrectiveAction::STATUS_COMPLETED, $action->fresh()->status);
 
         // A different manager can.
         $this->actingAs($verifier)->from('/health-safety/events')
             ->post("/health-safety/events/{$event->id}/corrective-actions/{$action->id}/verify", [
-                'effectiveness_confirmed' => true,
+                'evidence_reviewed' => true,
+                'effective' => true,
             ])->assertSessionHas('success');
         $this->assertEquals(HsCorrectiveAction::STATUS_VERIFIED, $action->fresh()->status);
 
@@ -239,18 +243,26 @@ class HsEventWorkflowTest extends TestCase
         $this->actingAs($officer)->from('/health-safety/events')->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/complete");
 
         // Seed an action from recommendation 0.
+        $payload = [
+            'recommendation_index' => 0,
+            'assigned_to_user_id' => $officer->id,
+            'due_date' => now()->addDays(14)->toDateString(),
+            'priority' => HsCorrectiveAction::PRIORITY_HIGH,
+            'responsibility_choice' => 'new_responsibility',
+            'new_responsibility_reason' => 'This recommendation creates a new H&S responsibility for the rail installation.',
+        ];
         $this->actingAs($officer)->from('/health-safety/events')
-            ->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/seed-action", ['recommendation_index' => 0])
+            ->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/seed-action", $payload)
             ->assertSessionHas('success');
 
         $action = HsCorrectiveAction::where('hs_investigation_id', $inv->id)->where('recommendation_index', 0)->first();
         $this->assertNotNull($action);
         $this->assertEquals('Install a grab rail', $action->title);
 
-        // Re-seeding the same recommendation is blocked.
+        // An exact retry is idempotent and returns the same handover.
         $this->actingAs($officer)->from('/health-safety/events')
-            ->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/seed-action", ['recommendation_index' => 0])
-            ->assertSessionHas('error');
+            ->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/seed-action", $payload)
+            ->assertSessionHas('success');
         $this->assertEquals(1, HsCorrectiveAction::where('hs_investigation_id', $inv->id)->count());
     }
 
@@ -267,6 +279,8 @@ class HsEventWorkflowTest extends TestCase
             ->post("/health-safety/events/{$event->id}/corrective-actions", [
                 'title' => 'No permission',
                 'priority' => 'low',
+                'assigned_to_user_id' => $user->id,
+                'due_date' => now()->addDays(14)->toDateString(),
             ])->assertForbidden();
     }
 }

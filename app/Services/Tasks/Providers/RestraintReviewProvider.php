@@ -12,7 +12,7 @@ use App\Services\Tasks\TaskItem;
  * Restraint events awaiting their post-incident review (reviewed_at IS NULL)
  * — the genuinely actionable slice of the restraint register.
  */
-class RestraintReviewProvider implements TaskProvider, HasModelClass
+class RestraintReviewProvider implements HasModelClass, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -40,6 +40,7 @@ class RestraintReviewProvider implements TaskProvider, HasModelClass
     {
         $query = RestraintEvent::query()
             ->with(['client:id,first_name,last_name', 'site:id,name'])
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('started_at')
             ->limit(300);
 

@@ -2,11 +2,17 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
+use App\Models\Permission;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\HealthSafety\HsInvestigationService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class HsInvestigationTest extends TestCase
@@ -61,6 +67,30 @@ class HsInvestigationTest extends TestCase
         $this->service->create($event);
     }
 
+    public function test_create_locks_and_rechecks_the_parent_before_querying_or_inserting_work(): void
+    {
+        $event = HsEvent::factory()->high()->create();
+        DB::connection()->enableQueryLog();
+
+        $this->service->create($event);
+
+        $queries = collect(DB::getQueryLog())
+            ->pluck('query')
+            ->map(fn (string $query): string => strtolower(str_replace(['`', '"'], '', $query)))
+            ->values();
+        DB::connection()->disableQueryLog();
+        $eventLock = $queries->search(fn (string $query): bool => str_contains($query, 'from hs_events')
+            && str_contains($query, 'for update'));
+        $activeCheck = $queries->search(fn (string $query): bool => str_contains($query, 'from hs_investigations'));
+        $insert = $queries->search(fn (string $query): bool => str_starts_with($query, 'insert into hs_investigations'));
+
+        $this->assertNotFalse($eventLock);
+        $this->assertNotFalse($activeCheck);
+        $this->assertNotFalse($insert);
+        $this->assertLessThan($activeCheck, $eventLock);
+        $this->assertLessThan($insert, $eventLock);
+    }
+
     public function test_worksafe_event_gets_worksafe_directed_type(): void
     {
         $event = HsEvent::factory()->worksafeNotifiable()->create();
@@ -108,6 +138,48 @@ class HsInvestigationTest extends TestCase
             now()->addDays(14)->toDateString(),
             $highInv->target_completion_date->toDateString()
         );
+    }
+
+    public function test_target_completion_date_is_stored_and_presented_as_the_exact_calendar_date(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $site = Site::factory()->create(['tenant_id' => 1]);
+        $viewer = User::factory()->create([
+            'organization_id' => 1,
+            'approved_at' => now(),
+        ]);
+        $hazardsView = Permission::query()->where('key', 'hazards.view')->firstOrFail();
+        $viewer->permissionOverrides()->sync([
+            $hazardsView->id => ['allowed' => true],
+        ]);
+        HrEmployeeProfile::factory()->create([
+            'tenant_id' => 1,
+            'user_id' => $viewer->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+        ]);
+        $event = HsEvent::factory()->high()->create([
+            'organization_id' => 1,
+            'site_id' => $site->id,
+        ]);
+        $investigation = HsInvestigation::factory()->create([
+            'hs_event_id' => $event->id,
+            'target_completion_date' => '2026-07-21',
+        ]);
+
+        $this->assertDatabaseHas('hs_investigations', [
+            'id' => $investigation->id,
+            'target_completion_date' => '2026-07-21',
+        ]);
+        $this->actingAs($viewer)
+            ->get("/health-safety/events/{$event->id}")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where(
+                    'detail.investigations.0.target_completion_date',
+                    '2026-07-21',
+                )
+            );
     }
 
     // ──────────────────────────────────────────────────────
@@ -394,6 +466,6 @@ class HsInvestigationTest extends TestCase
         $ref2 = HsInvestigation::generateReferenceNumber();
 
         $this->assertNotEquals($ref1, $ref2);
-        $this->assertStringStartsWith('INV-' . now()->year . '-', $ref2);
+        $this->assertStringStartsWith('INV-'.now()->year.'-', $ref2);
     }
 }

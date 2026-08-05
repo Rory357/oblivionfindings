@@ -13,16 +13,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { router, useForm } from '@inertiajs/react';
-import { Loader2, Mail, Pencil, Phone, Star, Trash2 } from 'lucide-react';
-import { useState, type ComponentType } from 'react';
+import { useForm } from '@inertiajs/react';
+import { Loader2, Star } from 'lucide-react';
 import {
     CONTACT_TYPES,
     getContactType,
     type ContactTypeDef,
     type ContactTypeKey,
 } from './_helpers';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 // Re-export so existing call sites that imported these from `_dialogs` keep
 // working without changes. The single source of truth lives in `_helpers.ts`.
@@ -72,7 +70,8 @@ function ContactTypePicker({
                 const Icon = t.icon;
                 const active = value === t.key;
                 return (
-                    <Button unstyled
+                    <Button
+                        unstyled
                         key={t.key}
                         type="button"
                         onClick={() => onChange(t.key)}
@@ -123,8 +122,7 @@ function ContactFields({
         <div className="space-y-4">
             <div>
                 <Label className="mb-2 block">
-                    Contact type{' '}
-                    <span className="text-status-critical">*</span>
+                    Contact type <span className="text-status-critical">*</span>
                 </Label>
                 {lockType ? (
                     <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/10 p-3">
@@ -138,7 +136,10 @@ function ContactFields({
                                 <span className="text-sm font-medium">
                                     {selectedType.label}
                                 </span>
-                                <Badge variant="outline" className="text-[10px]">
+                                <Badge
+                                    variant="outline"
+                                    className="text-[10px]"
+                                >
                                     From Overview
                                 </Badge>
                             </div>
@@ -213,10 +214,7 @@ function ContactFields({
                             form.setData('is_primary', !!checked)
                         }
                     />
-                    <Label
-                        htmlFor="c-primary"
-                        className="text-sm font-normal"
-                    >
+                    <Label htmlFor="c-primary" className="text-sm font-normal">
                         Mark as primary contact for this site
                     </Label>
                 </div>
@@ -245,12 +243,14 @@ export function AddContactDialog({
     onClose,
     type,
     lockType = false,
+    onSaved,
 }: {
     siteId: number;
     isOpen: boolean;
     onClose: () => void;
     type?: ContactTypeKey | string | null;
     lockType?: boolean;
+    onSaved?: () => void;
 }) {
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -261,6 +261,7 @@ export function AddContactDialog({
                         onClose={onClose}
                         type={type}
                         lockType={lockType}
+                        onSaved={onSaved}
                     />
                 )}
             </DialogContent>
@@ -273,11 +274,13 @@ function AddContactBody({
     onClose,
     type,
     lockType,
+    onSaved,
 }: {
     siteId: number;
     onClose: () => void;
     type?: ContactTypeKey | string | null;
     lockType: boolean;
+    onSaved?: () => void;
 }) {
     const form = useForm<ContactFormValues>({
         type: type ?? 'site_contact',
@@ -294,7 +297,10 @@ function AddContactBody({
         form.post(`/sites/${siteId}/contacts`, {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: () => onClose(),
+            onSuccess: () => {
+                onSaved?.();
+                onClose();
+            },
         });
     };
 
@@ -336,11 +342,13 @@ export function EditContactDialog({
     contact,
     isOpen,
     onClose,
+    onSaved,
 }: {
     siteId: number;
     contact: ContactRecord | null;
     isOpen: boolean;
     onClose: () => void;
+    onSaved?: () => void;
 }) {
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -350,6 +358,7 @@ export function EditContactDialog({
                         siteId={siteId}
                         contact={contact}
                         onClose={onClose}
+                        onSaved={onSaved}
                     />
                 )}
             </DialogContent>
@@ -361,13 +370,16 @@ function EditContactBody({
     siteId,
     contact,
     onClose,
+    onSaved,
 }: {
     siteId: number;
     contact: ContactRecord;
     onClose: () => void;
+    onSaved?: () => void;
 }) {
     const form = useForm<ContactFormValues>({
-        type: (getContactType(contact.type).key ?? 'site_contact') as ContactTypeKey,
+        type: (getContactType(contact.type).key ??
+            'site_contact') as ContactTypeKey,
         name: contact.name ?? '',
         role: contact.role ?? '',
         phone: contact.phone ?? '',
@@ -381,7 +393,10 @@ function EditContactBody({
         form.put(`/sites/${siteId}/contacts/${contact.id}`, {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: () => onClose(),
+            onSuccess: () => {
+                onSaved?.();
+                onClose();
+            },
         });
     };
 
@@ -410,211 +425,5 @@ function EditContactBody({
                 </Button>
             </DialogFooter>
         </form>
-    );
-}
-
-// ── Show / Read-only ──────────────────────────────────────────────────────
-
-export function ShowContactDialog({
-    contact,
-    isOpen,
-    canManage,
-    onClose,
-    onEdit,
-    onDelete,
-}: {
-    contact: ContactRecord | null;
-    isOpen: boolean;
-    canManage: boolean;
-    onClose: () => void;
-    onEdit?: () => void;
-    onDelete?: () => void;
-}) {
-    if (!contact) {
-        return (
-            <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-                <DialogContent className="max-w-md" />
-            </Dialog>
-        );
-    }
-    const type = getContactType(contact.type);
-    const Icon = type.icon;
-    return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <div className="flex items-center gap-3">
-                        <span className="rounded-xl border bg-background/60 p-2">
-                            <Icon className={cn('h-5 w-5', type.accent)} />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                            <DialogTitle className="truncate">
-                                {contact.name}
-                            </DialogTitle>
-                            <DialogDescription className="flex flex-wrap items-center gap-2">
-                                <span>{type.label}</span>
-                                {contact.role && (
-                                    <span className="text-muted-foreground">
-                                        · {contact.role}
-                                    </span>
-                                )}
-                                {contact.is_primary && (
-                                    <Badge
-                                        variant="outline"
-                                        className="border-status-success/30 text-status-success"
-                                    >
-                                        Primary
-                                    </Badge>
-                                )}
-                            </DialogDescription>
-                        </div>
-                    </div>
-                </DialogHeader>
-
-                <div className="space-y-2 text-sm">
-                    <ContactDetailRow
-                        icon={Phone}
-                        label="Phone"
-                        value={contact.phone}
-                        href={contact.phone ? `tel:${contact.phone}` : undefined}
-                    />
-                    <ContactDetailRow
-                        icon={Mail}
-                        label="Email"
-                        value={contact.email}
-                        href={contact.email ? `mailto:${contact.email}` : undefined}
-                    />
-                    {contact.notes && (
-                        <div className="rounded-lg border bg-muted/30 p-3">
-                            <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
-                                Notes
-                            </p>
-                            <p className="whitespace-pre-wrap">{contact.notes}</p>
-                        </div>
-                    )}
-                </div>
-
-                <DialogFooter className="mt-2">
-                    {canManage && onDelete && (
-                        <Button
-                            type="button"
-                            variant="outline"
-                            className="text-status-critical"
-                            onClick={onDelete}
-                        >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                        </Button>
-                    )}
-                    <Button type="button" variant="outline" onClick={onClose}>
-                        Close
-                    </Button>
-                    {canManage && onEdit && (
-                        <Button type="button" onClick={onEdit}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit
-                        </Button>
-                    )}
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function ContactDetailRow({
-    icon: Icon,
-    label,
-    value,
-    href,
-}: {
-    icon: ComponentType<{ className?: string }>;
-    label: string;
-    value?: string | null;
-    href?: string;
-}) {
-    return (
-        <GuardrailCard unstyled className="flex items-center gap-3 rounded-lg border bg-background/40 px-3 py-2">
-            <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <div className="min-w-0 flex-1">
-                <p className="text-xs text-muted-foreground">{label}</p>
-                {value ? (
-                    href ? (
-                        <a
-                            href={href}
-                            className="truncate text-sm hover:underline"
-                        >
-                            {value}
-                        </a>
-                    ) : (
-                        <p className="truncate text-sm">{value}</p>
-                    )
-                ) : (
-                    <p className="text-sm text-muted-foreground">—</p>
-                )}
-            </div>
-        </GuardrailCard>
-    );
-}
-
-// ── Confirm delete ────────────────────────────────────────────────────────
-
-export function DeleteContactDialog({
-    siteId,
-    contact,
-    isOpen,
-    onClose,
-}: {
-    siteId: number;
-    contact: ContactRecord | null;
-    isOpen: boolean;
-    onClose: () => void;
-}) {
-    const [submitting, setSubmitting] = useState(false);
-
-    const handleDelete = () => {
-        if (!contact) return;
-        setSubmitting(true);
-        router.delete(`/sites/${siteId}/contacts/${contact.id}`, {
-            preserveScroll: true,
-            preserveState: true,
-            onFinish: () => setSubmitting(false),
-            onSuccess: () => onClose(),
-        });
-    };
-
-    return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Delete contact?</DialogTitle>
-                    <DialogDescription>
-                        {contact && (
-                            <>
-                                <span className="font-medium">
-                                    {contact.name}
-                                </span>{' '}
-                                will be removed from this site. This cannot be
-                                undone.
-                            </>
-                        )}
-                    </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>
-                        Cancel
-                    </Button>
-                    <Button
-                        variant="destructive"
-                        onClick={handleDelete}
-                        disabled={submitting}
-                    >
-                        {submitting && (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        )}
-                        Delete contact
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
     );
 }

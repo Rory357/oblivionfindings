@@ -280,6 +280,9 @@ export function PlanEntryDialog({
             <DialogContent className="max-w-xl">
                 <DialogHeader>
                     <DialogTitle>{isNew ? 'Add meal' : 'Edit meal'}</DialogTitle>
+                    <DialogDescription>
+                        Choose the meal time, source and residents, then record any planning notes.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-3">
                     {!isNew && entry?.allergen_override_at && existingOverrideReason && (

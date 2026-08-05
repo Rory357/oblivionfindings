@@ -1,3 +1,4 @@
+import { JourneyTermHelp } from '@/components/journey-term-help';
 import { Button } from '@/components/ui/button';
 import { AttachmentUploader } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
@@ -38,6 +39,11 @@ import {
     X,
 } from 'lucide-react';
 import { useState, type ComponentType, type FormEvent } from 'react';
+import { JourneyGateList, type JourneyGateData } from './journey-gate-list';
+import {
+    LinkedOperationalEvidence,
+    type LinkedOperationalEvidenceData,
+} from './linked-operational-evidence';
 
 /* ------------------------------------------------------------------ */
 /*  Types — mirrors IncidentController::buildIncidentDetail()           */
@@ -115,6 +121,9 @@ export type IncidentDetail = {
         resolved_at: string | null;
         url: string | null;
     } | null;
+    linked_operational_evidence: LinkedOperationalEvidenceData | null;
+    close_gate: JourneyGateData;
+    journey_state: string;
     hs_event: {
         id: number;
         reference_number: string;
@@ -166,6 +175,7 @@ export type IncidentDetail = {
         raiseCorrectiveAction: boolean;
     };
     assignable_staff: Array<{ id: number; name: string }>;
+    corrective_action_owners: Array<{ id: number; name: string }>;
     safeguarding_concerns?: Array<{
         id: number;
         reference_number: string | null;
@@ -304,13 +314,13 @@ export function IncidentDetailDialog({
         },
         {
             key: 'photos',
-            label: 'Photos & documents',
+            label: 'Official incident attachments',
             blurb: `${d.attachments.length} file${d.attachments.length === 1 ? '' : 's'}`,
             icon: Paperclip,
         },
         {
             key: 'followups',
-            label: 'Follow-ups',
+            label: 'Incident follow-ups',
             blurb: openFollowups > 0 ? `${openFollowups} open` : 'all complete',
             icon: ListTodo,
         },
@@ -395,9 +405,7 @@ export function IncidentDetailDialog({
                 />
                 {SEV_LABEL[d.severity] ?? d.severity}
             </span>
-            <span className="text-muted-foreground">
-                {STATUS_LABEL[d.status] ?? d.status}
-            </span>
+            <span className="text-muted-foreground">{d.journey_state}</span>
         </div>
     );
 
@@ -480,7 +488,7 @@ const ACTION_META: Record<
     },
     close: {
         title: 'Close incident',
-        blurb: 'Record the outcome to close. High-severity incidents need a completed investigation and no open follow-ups.',
+        blurb: 'Close is available only after review, follow-ups, required investigation, and linked H&S governance are complete.',
         icon: CheckCircle2,
         cta: 'Close incident',
     },
@@ -606,6 +614,7 @@ function ActionPane({
 
             {action === 'close' ? (
                 <>
+                    <JourneyGateList gate={d.close_gate} />
                     <Field
                         label="Outcome"
                         required
@@ -652,7 +661,15 @@ function ActionPane({
                 <Button type="button" variant="outline" onClick={onDone}>
                     Cancel
                 </Button>
-                <Button type="submit" disabled={form.processing}>
+                <Button
+                    type="submit"
+                    disabled={
+                        form.processing ||
+                        (action === 'close' &&
+                            (!d.close_gate.allowed ||
+                                !form.data.closed_outcome.trim()))
+                    }
+                >
                     {meta.cta}
                 </Button>
             </div>
@@ -872,6 +889,12 @@ function OverviewSection({
         worksafe.status === 'notified' || worksafe.status === 'acknowledged';
     return (
         <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex justify-end sm:col-span-2">
+                <JourneyTermHelp
+                    terms={['status', 'severity', 'priority']}
+                    label="Explain incident status terms"
+                />
+            </div>
             {escalation ? (
                 <div className="sm:col-span-2">
                     <InfoCard icon={ShieldAlert} tone="warn">
@@ -1567,6 +1590,17 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
             form.setError('title', 'Give the corrective action a title.');
             return;
         }
+        if (!form.data.assigned_to_user_id) {
+            form.setError(
+                'assigned_to_user_id',
+                'Choose the person responsible.',
+            );
+            return;
+        }
+        if (!form.data.due_date) {
+            form.setError('due_date', 'Set the date this action is due.');
+            return;
+        }
         form.post(`/incidents/${d.id}/corrective-actions`, {
             preserveScroll: true,
             onSuccess: (page) => {
@@ -1621,18 +1655,22 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
                         ]}
                     />
                 </Field>
-                <Field label="Owner">
+                <Field
+                    label="Owner"
+                    required
+                    error={form.errors.assigned_to_user_id}
+                >
                     <SelectInput
                         value={form.data.assigned_to_user_id}
                         onChange={(v) => form.setData('assigned_to_user_id', v)}
-                        placeholder="Unassigned"
-                        options={d.assignable_staff.map((s) => ({
+                        placeholder="Choose owner"
+                        options={d.corrective_action_owners.map((s) => ({
                             value: String(s.id),
                             label: s.name,
                         }))}
                     />
                 </Field>
-                <Field label="Due">
+                <Field label="Due" required error={form.errors.due_date}>
                     <Input
                         type="date"
                         value={form.data.due_date}
@@ -1655,7 +1693,16 @@ function RaiseCorrectiveActionForm({ d }: { d: IncidentDetail }) {
                 >
                     Cancel
                 </Button>
-                <Button type="submit" size="sm" disabled={form.processing}>
+                <Button
+                    type="submit"
+                    size="sm"
+                    disabled={
+                        form.processing ||
+                        !form.data.title.trim() ||
+                        !form.data.assigned_to_user_id ||
+                        !form.data.due_date
+                    }
+                >
                     Raise in H&amp;S register
                 </Button>
             </div>
@@ -1671,99 +1718,103 @@ export function LinkedSection({
     clientName: string;
 }) {
     return (
-        <div className="flex flex-col gap-2">
-            {d.control_room_alert ? (
-                <LinkedRow
-                    icon={RadioTower}
-                    title="Control Room alert"
-                    sub={`${titleCase(d.control_room_alert.alert_type)} · ${titleCase(d.control_room_alert.status)}${d.control_room_alert.triggered_at ? ` · ${formatDateTime(d.control_room_alert.triggered_at)}` : ''}`}
-                    href={d.control_room_alert.url}
-                />
-            ) : null}
-            {d.hs_event ? (
-                <LinkedRow
-                    icon={ShieldAlert}
-                    title="Health & Safety event"
-                    sub={`${d.hs_event.reference_number} · ${titleCase(d.hs_event.status)}`}
-                    href={d.hs_event.url}
-                />
-            ) : null}
-            {(d.safeguarding_concerns ?? []).map((c) =>
-                c.can_view ? (
-                    <LinkedRow
-                        key={c.id}
-                        icon={ShieldAlert}
-                        title="Safeguarding concern"
-                        sub={`${c.reference_number}${c.status ? ` · ${titleCase(c.status)}` : ''}`}
-                        href={`/safeguarding/${c.id}`}
-                    />
-                ) : (
-                    <div
-                        key={c.id}
-                        className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3 text-muted-foreground"
-                    >
-                        <ShieldAlert className="h-4 w-4 shrink-0" />
-                        <span className="text-sm">
-                            Safeguarding concern raised · restricted
-                            (need-to-know)
-                        </span>
-                    </div>
-                ),
-            )}
-            {d.fleet_incident ? (
-                <LinkedRow
-                    icon={Truck}
-                    title="Fleet incident"
-                    sub={`${d.fleet_incident.reference} · ${titleCase(d.fleet_incident.type)}`}
-                    href={`/fleet-assets/incidents?incident=${d.fleet_incident.id}`}
-                />
-            ) : null}
-            {d.medication_error ? (
-                <LinkedRow
-                    icon={Pill}
-                    title="Medication error report"
-                    sub={`${titleCase(d.medication_error.error_type)} · ${titleCase(d.medication_error.severity)} · ${titleCase(d.medication_error.status)}${d.medication_error.medication ? ` · ${d.medication_error.medication}` : ''}`}
-                    href={d.medication_error.url}
-                />
-            ) : null}
-            {(d.restraint_events ?? []).map((r) => (
-                <LinkedRow
-                    key={`re-${r.id}`}
-                    icon={Hand}
-                    title="Restraint event"
-                    sub={`${r.reference} · ${titleCase(r.restraint_type)} · ${titleCase(r.severity)}${r.within_support_plan ? '' : ' · out of plan'}${r.injury_occurred ? ' · injury' : ''}`}
-                    href={`/health-safety/restraints?event=${r.id}`}
-                />
-            ))}
-            {(d.first_aid_records ?? []).map((r) => (
-                <LinkedRow
-                    key={`fa-${r.id}`}
-                    icon={HeartPulse}
-                    title="First-aid treatment"
-                    sub={`${r.reference} · ${r.person} · ${titleCase(r.injury)}${r.ambulance_called ? ' · ambulance' : ''}`}
-                    href={`/health-safety/first-aid?record=${r.id}`}
-                />
-            ))}
-            {d.client ? (
-                <LinkedRow
-                    icon={User}
-                    title="Client record"
-                    sub={clientName}
-                    href={`/operations/clients/${d.client.id}/care`}
-                />
-            ) : null}
-            {!d.control_room_alert &&
-            !d.hs_event &&
-            !d.client &&
-            !d.fleet_incident &&
-            !d.medication_error &&
-            !(d.safeguarding_concerns ?? []).length &&
-            !(d.restraint_events ?? []).length &&
-            !(d.first_aid_records ?? []).length ? (
-                <p className="text-sm text-muted-foreground">
-                    No linked records.
-                </p>
-            ) : null}
+        <div className="flex flex-col gap-4">
+            <LinkedOperationalEvidence
+                evidence={d.linked_operational_evidence}
+            />
+            <section aria-labelledby="other-linked-records-heading">
+                <h2
+                    id="other-linked-records-heading"
+                    className="mb-2 text-sm font-bold text-foreground"
+                >
+                    Other linked records
+                </h2>
+                <div className="flex flex-col gap-2">
+                    {d.hs_event ? (
+                        <LinkedRow
+                            icon={ShieldAlert}
+                            title="Health & Safety event"
+                            sub={`${d.hs_event.reference_number} · ${titleCase(d.hs_event.status)}`}
+                            href={d.hs_event.url}
+                        />
+                    ) : null}
+                    {(d.safeguarding_concerns ?? []).map((c) =>
+                        c.can_view ? (
+                            <LinkedRow
+                                key={c.id}
+                                icon={ShieldAlert}
+                                title="Safeguarding concern"
+                                sub={`${c.reference_number}${c.status ? ` · ${titleCase(c.status)}` : ''}`}
+                                href={`/safeguarding/${c.id}`}
+                            />
+                        ) : (
+                            <div
+                                key={c.id}
+                                className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3 text-muted-foreground"
+                            >
+                                <ShieldAlert className="h-4 w-4 shrink-0" />
+                                <span className="text-sm">
+                                    Safeguarding concern raised · restricted
+                                    (need-to-know)
+                                </span>
+                            </div>
+                        ),
+                    )}
+                    {d.fleet_incident ? (
+                        <LinkedRow
+                            icon={Truck}
+                            title="Fleet incident"
+                            sub={`${d.fleet_incident.reference} · ${titleCase(d.fleet_incident.type)}`}
+                            href={`/fleet-assets/incidents?incident=${d.fleet_incident.id}`}
+                        />
+                    ) : null}
+                    {d.medication_error ? (
+                        <LinkedRow
+                            icon={Pill}
+                            title="Medication error report"
+                            sub={`${titleCase(d.medication_error.error_type)} · ${titleCase(d.medication_error.severity)} · ${titleCase(d.medication_error.status)}${d.medication_error.medication ? ` · ${d.medication_error.medication}` : ''}`}
+                            href={d.medication_error.url}
+                        />
+                    ) : null}
+                    {(d.restraint_events ?? []).map((r) => (
+                        <LinkedRow
+                            key={`re-${r.id}`}
+                            icon={Hand}
+                            title="Restraint event"
+                            sub={`${r.reference} · ${titleCase(r.restraint_type)} · ${titleCase(r.severity)}${r.within_support_plan ? '' : ' · out of plan'}${r.injury_occurred ? ' · injury' : ''}`}
+                            href={`/health-safety/restraints?event=${r.id}`}
+                        />
+                    ))}
+                    {(d.first_aid_records ?? []).map((r) => (
+                        <LinkedRow
+                            key={`fa-${r.id}`}
+                            icon={HeartPulse}
+                            title="First-aid treatment"
+                            sub={`${r.reference} · ${r.person} · ${titleCase(r.injury)}${r.ambulance_called ? ' · ambulance' : ''}`}
+                            href={`/health-safety/first-aid?record=${r.id}`}
+                        />
+                    ))}
+                    {d.client ? (
+                        <LinkedRow
+                            icon={User}
+                            title="Client record"
+                            sub={clientName}
+                            href={`/operations/clients/${d.client.id}/care`}
+                        />
+                    ) : null}
+                    {!d.hs_event &&
+                    !d.client &&
+                    !d.fleet_incident &&
+                    !d.medication_error &&
+                    !(d.safeguarding_concerns ?? []).length &&
+                    !(d.restraint_events ?? []).length &&
+                    !(d.first_aid_records ?? []).length ? (
+                        <p className="text-sm text-muted-foreground">
+                            No other linked records.
+                        </p>
+                    ) : null}
+                </div>
+            </section>
         </div>
     );
 }

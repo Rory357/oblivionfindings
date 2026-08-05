@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { JourneyReferenceStrip } from './journey-reference-strip';
+import { taskStateLabel, type TaskItem } from './types';
 
 describe('universal tasks incident journey', () => {
     it('shows only truthful official references with their owning modules', () => {
@@ -31,5 +32,17 @@ describe('universal tasks incident journey', () => {
     it('does not invent a journey when no official references exist', () => {
         const { container } = render(<JourneyReferenceStrip journey={null} />);
         expect(container).toBeEmptyDOMElement();
+    });
+
+    it('uses the truthful display state before the raw module status', () => {
+        const item = {
+            status: 'completed',
+            displayState: 'Awaiting independent verification',
+        } as TaskItem;
+
+        expect(taskStateLabel(item)).toBe('Awaiting independent verification');
+        expect(taskStateLabel({ ...item, displayState: null })).toBe(
+            'Completed',
+        );
     });
 });

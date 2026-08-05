@@ -28,15 +28,26 @@ class ControlRoomShellConsistencyTest extends TestCase
         );
         $this->assertStringContainsString('WorkspaceStrip', $compatibilityStrip);
 
+        $deskHero = file_get_contents(
+            resource_path('js/components/control-room/dashboard/control-room-hero.tsx'),
+        );
+        $this->assertStringContainsString('ControlRoomWorkspaceHero', $deskHero);
+        $this->assertStringContainsString('title="Desk"', $deskHero);
+
         foreach ([
+            'alerts/index.tsx' => 'Active alerts',
             'escalations.tsx' => 'Escalations',
+            'incidents.tsx' => 'Safety handovers',
             'my-tasks.tsx' => 'My queue',
-            'shifts.tsx' => 'Control Room shifts',
+            'shifts.tsx' => 'Shifts',
         ] as $file => $title) {
             $source = file_get_contents(resource_path('js/pages/control-room/'.$file));
             $this->assertStringContainsString('CommandCentrePage', $source, $file);
             $this->assertStringContainsString('title="'.$title.'"', $source, $file);
             $this->assertStringNotContainsString('title="Command Centre"', $source, $file);
+            if ($file !== 'alerts/index.tsx') {
+                $this->assertStringNotContainsString('<PageHero', $source, $file);
+            }
         }
     }
 
@@ -72,5 +83,36 @@ class ControlRoomShellConsistencyTest extends TestCase
             $this->assertStringContainsString('CommandCentrePage', $source, $file);
             $this->assertStringContainsString('variant="compact"', $source, $file);
         }
+    }
+
+    public function test_primary_worklists_share_record_actions_and_escalations_use_one_bounded_list(): void
+    {
+        foreach ([
+            'alerts/index.tsx',
+            'escalations.tsx',
+            'index.tsx',
+            'my-tasks.tsx',
+        ] as $file) {
+            $source = file_get_contents(resource_path('js/pages/control-room/'.$file));
+            $this->assertStringContainsString('buildControlRoomAlertRowActions', $source, $file);
+        }
+
+        foreach (['incidents.tsx', 'shifts.tsx'] as $file) {
+            $source = file_get_contents(resource_path('js/pages/control-room/'.$file));
+            $this->assertStringContainsString('ControlRoomRowActions', $source, $file);
+        }
+
+        $escalations = file_get_contents(resource_path('js/pages/control-room/escalations.tsx'));
+        $this->assertStringContainsString('<AlertWorklist', $escalations);
+        $this->assertStringContainsString('<EscalationQueueFilters', $escalations);
+        $this->assertStringContainsString('worklist.links', $escalations);
+        $this->assertStringNotContainsString('QueueColumn', $escalations);
+        $this->assertStringNotContainsString('grid-cols-3', $escalations);
+
+        $queueFilters = file_get_contents(
+            resource_path('js/components/control-room/escalation-queue-filters.tsx'),
+        );
+        $this->assertStringContainsString('capacity_explanation', $queueFilters);
+        $this->assertStringContainsString('overflow-x-auto', $queueFilters);
     }
 }

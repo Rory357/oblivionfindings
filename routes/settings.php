@@ -25,12 +25,16 @@ use App\Http\Controllers\Settings\SsoConfigController;
 use App\Http\Controllers\Settings\SsoGroupController;
 use App\Http\Controllers\Settings\TerminologyController;
 use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
+use App\Http\Controllers\Settings\UiPreferenceController;
 use App\Http\Controllers\Settings\UserManagementRedirectController;
 use App\Http\Controllers\System\UsersController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
     Route::redirect('settings', '/settings/profile');
+
+    Route::put('settings/ui-preferences/{key}', [UiPreferenceController::class, 'update'])
+        ->name('settings.ui-preferences.update');
 
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');

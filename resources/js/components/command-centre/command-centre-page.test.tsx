@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { Activity } from 'lucide-react';
+import { Activity, Clock3 } from 'lucide-react';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -34,6 +34,26 @@ describe('CommandCentrePage', () => {
                 actions={<button type="button">Export report</button>}
                 workflow={<div>Detect → record → govern</div>}
                 footer={<div>Site filter</div>}
+                metricGroups={[
+                    {
+                        title: 'Workload',
+                        icon: Clock3,
+                        metrics: [
+                            {
+                                label: 'Open',
+                                value: '18',
+                                caption: 'Actionable now',
+                                tone: 'warning',
+                            },
+                            {
+                                label: 'Breached',
+                                value: '3',
+                                caption: 'Past SLA',
+                                tone: 'critical',
+                            },
+                        ],
+                    },
+                ]}
             >
                 <div>Report content</div>
             </CommandCentrePage>,
@@ -54,9 +74,18 @@ describe('CommandCentrePage', () => {
             screen.getByText('Detect → record → govern'),
         ).toBeInTheDocument();
         expect(screen.getByText('Site filter')).toBeInTheDocument();
+        expect(screen.getByText('Workload')).toBeInTheDocument();
+        expect(screen.getByText('18')).toBeInTheDocument();
+        expect(screen.getByText('Past SLA')).toBeInTheDocument();
         expect(screen.getByText('Report content')).toBeInTheDocument();
+        expect(screen.getByText('Report content').parentElement).toHaveClass(
+            'min-w-0',
+        );
         expect(
             screen.getByRole('navigation', { name: 'Control Room workspace' }),
         ).toBeInTheDocument();
+        expect(screen.getByTestId('control-room-hero')).toHaveClass(
+            'min-h-[10rem]',
+        );
     });
 });

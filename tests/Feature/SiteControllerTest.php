@@ -321,13 +321,16 @@ class SiteControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('sites/show')
                 ->has('site')
-                ->has('clients')
-                ->has('contacts')
-                ->has('documents')
-                ->has('assets')
-                ->has('checklist')
-                ->has('can_edit')
-                ->has('can')
+                ->has('hero')
+                ->has('permissions')
+                ->has('attention')
+                ->has('overview')
+                ->has('readiness')
+                ->has('uiPreferences')
+                ->missing('peopleData')
+                ->missing('safetyData')
+                ->missing('operationsData')
+                ->missing('adminData')
             );
     }
 
@@ -351,15 +354,15 @@ class SiteControllerTest extends TestCase
             ->get("/sites/{$site->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('checklist', 12)
+                ->has('readiness.critical', 7)
+                ->has('readiness.recommended', 5)
             );
     }
 
-    public function test_site_show_exposes_functional_checklists_workspace_payload(): void
+    public function test_site_show_exposes_site_scoped_checklist_workspace_and_plan_link(): void
     {
         $site = Site::factory()->create(['type' => 'house']);
         $template = SiteChecklistTemplate::create([
-            'tenant_id' => $site->tenant_id,
             'key' => 'profile_summary_'.uniqid(),
             'name' => 'Profile Summary Checklist',
             'applicable_to_type' => 'house',
@@ -367,7 +370,6 @@ class SiteControllerTest extends TestCase
             'is_active' => true,
         ]);
         $assignment = SiteChecklistAssignment::create([
-            'tenant_id' => $site->tenant_id,
             'site_id' => $site->id,
             'template_id' => $template->id,
             'frequency' => 'daily',
@@ -375,7 +377,6 @@ class SiteControllerTest extends TestCase
             'is_active' => true,
         ]);
         SiteChecklistRun::create([
-            'tenant_id' => $site->tenant_id,
             'assignment_id' => $assignment->id,
             'site_id' => $site->id,
             'template_id' => $template->id,
@@ -384,16 +385,18 @@ class SiteControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get("/sites/{$site->id}")
+            ->get("/sites/{$site->id}", $this->inertiaPartialHeaders('sites/show', 'checklistsData,planData'))
             ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('checklistsData.stats')
-                ->has('checklistsData.activeRuns', 1)
-                ->where('checklistsData.activeRuns.0.template.name', 'Profile Summary Checklist')
-                ->has('runDetail')
-                ->has('templateDetail')
-                ->missing('checklistsSummary')
-            );
+            ->assertHeader('X-Inertia', 'true')
+            ->assertJsonPath('props.checklistsData.locked', false)
+            ->assertJsonPath('props.checklistsData.stats.scheduled', 1)
+            ->assertJsonPath('props.checklistsData.stats.overdue', 0)
+            ->assertJsonCount(1, 'props.checklistsData.activeRuns')
+            ->assertJsonPath('props.checklistsData.activeRuns.0.template.name', 'Profile Summary Checklist')
+            ->assertJsonPath('props.checklistsData.site.id', $site->id)
+            ->assertJsonPath('props.checklistsData.backHref', route('sites.show', $site))
+            ->assertJsonPath('props.planData.href', route('sites.plan.show', $site))
+            ->assertJsonMissingPath('props.operationsData');
     }
 
     public function test_site_show_exposes_inspections_summary_for_profile_tab(): void
@@ -401,7 +404,6 @@ class SiteControllerTest extends TestCase
         $site = Site::factory()->create(['type' => 'house']);
         $overdueSchedule = SiteInspectionSchedule::create([
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'inspection_type' => 'house_safety',
             'title' => 'House safety inspection',
             'frequency' => 'monthly',
@@ -411,7 +413,6 @@ class SiteControllerTest extends TestCase
         ]);
         $dueSoonSchedule = SiteInspectionSchedule::create([
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'inspection_type' => 'fire_safety',
             'title' => 'Fire safety inspection',
             'frequency' => 'monthly',
@@ -423,7 +424,6 @@ class SiteControllerTest extends TestCase
         SiteInspectionRecord::create([
             'schedule_id' => $overdueSchedule->id,
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'due_date' => now()->subDay()->toDateString(),
             'completed_at' => now(),
             'completed_by_user_id' => $this->admin->id,
@@ -433,7 +433,6 @@ class SiteControllerTest extends TestCase
         SiteInspectionRecord::create([
             'schedule_id' => $dueSoonSchedule->id,
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'due_date' => now()->toDateString(),
             'completed_at' => now()->subHour(),
             'completed_by_user_id' => $this->admin->id,
@@ -441,38 +440,34 @@ class SiteControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get("/sites/{$site->id}")
+            ->get("/sites/{$site->id}", $this->inertiaPartialHeaders('sites/show', 'inspectionsData'))
             ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('inspectionsSummary.active_schedules', 2)
-                ->where('inspectionsSummary.overdue_schedules', 1)
-                ->where('inspectionsSummary.due_soon_schedules', 1)
-                ->where('inspectionsSummary.failed_records', 1)
-                ->has('inspectionsSummary.schedules', 2)
-                ->has('inspectionsSummary.records', 2)
-                ->where('inspectionsSummary.records.0.result', 'fail')
-                ->where('inspectionsSummary.records.0.findings', 'Exit lighting failed.')
-            );
+            ->assertHeader('X-Inertia', 'true')
+            ->assertJsonPath('props.inspectionsData.locked', false)
+            ->assertJsonCount(2, 'props.inspectionsData.schedules')
+            ->assertJsonPath('props.inspectionsData.schedules.0.overdue', true)
+            ->assertJsonCount(2, 'props.inspectionsData.records')
+            ->assertJsonPath('props.inspectionsData.href', route('sites.inspections.index', $site));
     }
 
     public function test_site_show_includes_linked_assets(): void
     {
         $site = Site::factory()->create();
-        Asset::factory()->count(3)->forSite($site)->create();
+        Asset::factory()->count(15)->forSite($site)->create();
 
         $this->actingAs($this->admin)
-            ->get("/sites/{$site->id}")
+            ->get("/sites/{$site->id}", $this->inertiaPartialHeaders('sites/show', 'assetsData'))
             ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('assets', 3)
-            );
+            ->assertHeader('X-Inertia', 'true')
+            ->assertJsonPath('props.assetsData.locked', false)
+            ->assertJsonCount(15, 'props.assetsData.items')
+            ->assertJsonPath('props.assetsData.href', route('fleet-assets.assets.index', ['site_id' => $site->id]));
     }
 
     public function test_site_show_returns_document_folders(): void
     {
         $site = Site::factory()->create();
         SiteDocument::create([
-            'tenant_id' => $site->tenant_id,
             'site_id' => $site->id,
             'uploaded_by_user_id' => $this->admin->id,
             'title' => 'Fire Safety Certificate',
@@ -486,19 +481,18 @@ class SiteControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->get("/sites/{$site->id}")
+            ->get("/sites/{$site->id}", $this->inertiaPartialHeaders('sites/show', 'documentsData'))
             ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('documents.0.folder', 'Compliance')
-                ->where('documents.0.category', 'safety')
-            );
+            ->assertHeader('X-Inertia', 'true')
+            ->assertJsonPath('props.documentsData.folders.0.name', 'Compliance')
+            ->assertJsonPath('props.documentsData.documents.0.folder', 'Compliance')
+            ->assertJsonPath('props.documentsData.documents.0.category', 'safety');
     }
 
     public function test_site_documents_manager_lists_foldered_documents(): void
     {
         $site = Site::factory()->create();
         SiteDocument::create([
-            'tenant_id' => $site->tenant_id,
             'site_id' => $site->id,
             'uploaded_by_user_id' => $this->admin->id,
             'title' => 'Evacuation Plan',
@@ -852,7 +846,6 @@ class SiteControllerTest extends TestCase
         HrEmployeeProfile::query()->updateOrCreate(
             ['user_id' => $user->id],
             [
-                'tenant_id' => 1,
                 'employee_number' => 'EMP-SITE-'.$user->id,
                 'work_email' => $user->email,
                 'position_title' => 'Coordinator',
