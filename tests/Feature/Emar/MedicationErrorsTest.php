@@ -566,6 +566,7 @@ class MedicationErrorsTest extends TestCase
         ['user' => $user, 'client' => $client] = $this->seedErrors();
         $error = MedicationError::query()->create([
             'client_id' => $client->id, 'error_type' => 'wrong_dose', 'severity' => 'critical', 'description' => 'Wrong strength dispensed.',
+            'immediate_action' => 'Clinical review completed.',
             'status' => 'reported', 'reported_by' => $user->id, 'reported_at' => now(),
         ]);
         $this->assertNull($error->client_incident_id);
@@ -581,9 +582,11 @@ class MedicationErrorsTest extends TestCase
 
         $incident = ClientIncident::query()->findOrFail($error->client_incident_id);
         $this->assertSame($client->id, $incident->client_id);
+        $this->assertSame($client->site_id, $incident->site_id);
         $this->assertSame('medication_error', $incident->type);
         $this->assertSame($user->id, (int) $incident->reported_by);
         $this->assertSame('critical', $incident->severity);
+        $this->assertSame('Clinical review completed.', $incident->immediate_action_taken);
     }
 
     public function test_link_incident_is_idempotent_when_already_linked(): void

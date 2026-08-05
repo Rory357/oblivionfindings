@@ -180,13 +180,16 @@ class MedicationErrorController extends Controller
         $validated['status'] = 'reported';
 
         DB::transaction(function () use ($request, $validated): void {
+            $client = Client::query()->findOrFail($validated['client_id']);
             $incident = null;
             if ($request->boolean('create_incident')) {
                 $incident = ClientIncident::withoutEvents(
                     fn () => ClientIncident::create([
                         'client_id' => $validated['client_id'],
+                        'site_id' => $client->site_id,
                         'title' => 'Medication Error: '.str_replace('_', ' ', $validated['error_type']),
                         'description' => $validated['description'],
+                        'immediate_action_taken' => $validated['immediate_action'] ?? null,
                         'occurred_at' => now(),
                         'reported_by' => $request->user()->id,
                         'severity' => match ($validated['severity']) {
@@ -336,10 +339,14 @@ class MedicationErrorController extends Controller
                 return (int) $lockedError->client_incident_id;
             }
 
+            $client = Client::query()->findOrFail($lockedError->client_id);
+
             $incident = ClientIncident::withoutEvents(fn () => ClientIncident::query()->create([
                 'client_id' => $lockedError->client_id,
+                'site_id' => $client->site_id,
                 'title' => 'Medication Error: '.str_replace('_', ' ', (string) $lockedError->error_type),
                 'description' => $lockedError->description ?: 'Linked from medication error '.$lockedError->id.'.',
+                'immediate_action_taken' => $lockedError->immediate_action,
                 'occurred_at' => $lockedError->reported_at ?? now(),
                 'reported_by' => $request->user()->id,
                 'severity' => match ($lockedError->severity) {
