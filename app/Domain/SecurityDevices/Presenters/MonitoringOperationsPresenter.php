@@ -10,6 +10,7 @@ use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorDependency;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitoringDeadLetter;
+use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Models\MonitoringRetentionPolicy;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CapacityProjectionService;
@@ -17,6 +18,7 @@ use App\Domain\Monitoring\Services\CentralSiteMonitoringReadinessService;
 use App\Domain\Monitoring\Services\MonitoringCollectorAvailabilityService;
 use App\Domain\Monitoring\Services\MonitoringReplayService;
 use App\Domain\Monitoring\Services\MonitoringRuntimeHealthService;
+use App\Domain\Monitoring\Services\NativeMonitoringDefinitionService;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -59,6 +61,7 @@ class MonitoringOperationsPresenter
             $device->id => $this->siteForDevice($device, $siteContext),
         ]);
         $accessibleSiteIds = $this->access->accessibleSiteIds($viewer);
+        $canManageNativeMonitors = $viewer->canDo('securityDevices.monitoring.manage');
         $accessibleSites = $accessibleSiteIds === []
             ? collect()
             : Site::query()
@@ -89,6 +92,7 @@ class MonitoringOperationsPresenter
             $sitesByDevice->get($monitor->device_id),
             $observations->get($monitor->id, collect()),
             $correlations->get($monitor->id),
+            $canManageNativeMonitors,
         ));
         $collectionPaths = $this->collectionPaths($allMonitors, $sitesByDevice);
         $monitorFindings = $mapped
@@ -155,6 +159,42 @@ class MonitoringOperationsPresenter
                 'note' => 'A failed collector is one collection-path finding. Its downstream monitor states remain visible as reported evidence but are not counted as independent failures until collection recovers.',
             ],
             'monitors' => $shown,
+            'monitor_management' => [
+                'can_manage' => $canManageNativeMonitors,
+                'create_url' => $canManageNativeMonitors
+                    ? '/security-devices/monitoring/native-monitors'
+                    : null,
+                'kinds' => $canManageNativeMonitors
+                    ? NativeMonitoringDefinitionService::directKindOptions()
+                    : [],
+                'profiles' => $canManageNativeMonitors
+                    ? MonitoringProfile::query()
+                        ->where('is_active', true)
+                        ->orderBy('name')
+                        ->get(['id', 'name'])
+                        ->map(fn (MonitoringProfile $profile): array => [
+                            'id' => (int) $profile->id,
+                            'name' => $profile->name,
+                        ])
+                        ->values()
+                        ->all()
+                    : [],
+                'devices' => $canManageNativeMonitors
+                    ? $visibleDevices
+                        ->filter(fn (Device $device): bool => $sitesByDevice->get($device->id) instanceof Site)
+                        ->map(function (Device $device) use ($sitesByDevice): array {
+                            $site = $sitesByDevice->get($device->id);
+
+                            return [
+                                'id' => (int) $device->id,
+                                'name' => $device->name,
+                                'site' => ['id' => (int) $site->id, 'name' => $site->name],
+                            ];
+                        })
+                        ->values()
+                        ->all()
+                    : [],
+            ],
             'inventory' => [
                 'total' => $filtered->count(),
                 'shown' => $shown->count(),
@@ -329,8 +369,19 @@ class MonitoringOperationsPresenter
     }
 
     /** @param Collection<int, MonitorObservation> $observations @return array<string, mixed> */
-    private function mapMonitor(Monitor $monitor, ?Site $site, Collection $observations, ?array $correlation): array
-    {
+    private function mapMonitor(
+        Monitor $monitor,
+        ?Site $site,
+        Collection $observations,
+        ?array $correlation,
+        bool $canManage,
+    ): array {
+        $nativeDirect = $monitor->collector_id === null
+            && in_array(
+                $monitor->kind?->value ?? (string) $monitor->kind,
+                NativeMonitoringDefinitionService::directKindValues(),
+                true,
+            );
         $reported = $monitor->current_state?->value ?? 'unknown';
         $collectorAvailable = $monitor->collector_id === null || $this->collectorState($monitor->collector) === 'available';
         $policyEffective = $monitor->effective_state?->value ?? $reported;
@@ -360,6 +411,10 @@ class MonitoringOperationsPresenter
             'affects_availability' => (bool) $monitor->affects_availability,
             'enabled' => (bool) $monitor->is_enabled,
             'operational' => (bool) $monitor->is_enabled && ($monitor->profile?->is_active ?? true),
+            'profile' => $monitor->profile ? [
+                'id' => (int) $monitor->profile->id,
+                'name' => $monitor->profile->name,
+            ] : null,
             'suppressed_until' => $monitor->suppressed_until?->toIso8601String(),
             'suppression_reason' => $monitor->suppression_reason,
             'root_cause' => $monitor->rootCauseMonitor ? [
@@ -394,6 +449,15 @@ class MonitoringOperationsPresenter
                 'mode' => 'direct',
                 'label' => 'Main application over site connectivity',
                 'state' => 'available',
+            ],
+            'actions' => [
+                'can_manage' => $canManage && $nativeDirect,
+                'update_url' => $canManage && $nativeDirect
+                    ? "/security-devices/monitoring/native-monitors/{$monitor->id}"
+                    : null,
+                'deactivate_url' => $canManage && $nativeDirect && $monitor->is_enabled
+                    ? "/security-devices/monitoring/native-monitors/{$monitor->id}/deactivate"
+                    : null,
             ],
             'latest_observation' => $latest ? [
                 'state' => $latest->state?->value ?? (string) $latest->state,

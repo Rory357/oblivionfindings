@@ -24,6 +24,7 @@ export interface SecurityDevicesPermissions {
     maintenanceManage?: boolean;
     integrationsView?: boolean;
     integrationsManage?: boolean;
+    monitoringManage?: boolean;
     reportsView?: boolean;
     commandsAdmin?: boolean;
 }
@@ -166,7 +167,8 @@ const navigationGroups: SecurityDevicesNavigationGroup[] = [
                     Boolean(
                         can.groupsManage ||
                         can.reportsView ||
-                        can.commandsAdmin,
+                        can.commandsAdmin ||
+                        can.monitoringManage,
                     ),
             },
         ],

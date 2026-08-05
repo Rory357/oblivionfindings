@@ -17,6 +17,7 @@ class SettingsAuditController extends Controller
             $user->canDo('securityDevices.groups.manage')
             || $user->canDo('securityDevices.reports.view')
             || $user->canDo('securityDevices.commands.admin')
+            || $user->canDo('securityDevices.monitoring.manage')
         ), 403);
 
         return Inertia::render('security-devices/settings', $presenter->present($user));

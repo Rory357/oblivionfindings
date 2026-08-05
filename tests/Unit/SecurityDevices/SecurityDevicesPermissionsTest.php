@@ -35,6 +35,7 @@ class SecurityDevicesPermissionsTest extends TestCase
         'securityDevices.maintenance.manage',
         'securityDevices.integrations.view',
         'securityDevices.integrations.manage',
+        'securityDevices.monitoring.manage',
         'securityDevices.reports.view',
         'securityDevices.commands.observe',
         'securityDevices.commands.operate',
@@ -65,11 +66,11 @@ class SecurityDevicesPermissionsTest extends TestCase
         }
     }
 
-    public function test_exactly_24_security_devices_permissions(): void
+    public function test_exactly_25_security_devices_permissions(): void
     {
         $count = Permission::where('key', 'like', 'securityDevices.%')->count();
 
-        $this->assertEquals(24, $count);
+        $this->assertEquals(25, $count);
     }
 
     public function test_permissions_have_correct_group_and_module(): void
@@ -137,6 +138,7 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.maintenance.manage',
             'securityDevices.integrations.view',
             'securityDevices.integrations.manage',
+            'securityDevices.monitoring.manage',
             'securityDevices.commands.manage',
             'securityDevices.commands.control',
             'securityDevices.commands.approve',
@@ -174,6 +176,7 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.maintenance.manage',
             'securityDevices.integrations.view',
             'securityDevices.integrations.manage',
+            'securityDevices.monitoring.manage',
             'securityDevices.reports.view',
             'securityDevices.commands.observe',
             'securityDevices.commands.operate',
@@ -212,6 +215,7 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.devices.delete',
             'securityDevices.groups.manage',
             'securityDevices.integrations.manage',
+            'securityDevices.monitoring.manage',
             'securityDevices.commands.operate',
             'securityDevices.commands.manage',
             'securityDevices.commands.control',
@@ -256,6 +260,7 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.devices.delete',
             'securityDevices.groups.manage',
             'securityDevices.integrations.manage',
+            'securityDevices.monitoring.manage',
             'securityDevices.commands.control',
             'securityDevices.commands.approve',
             'securityDevices.commands.admin',
@@ -291,6 +296,7 @@ class SecurityDevicesPermissionsTest extends TestCase
             'securityDevices.devices.assign',
             'securityDevices.maintenance.manage',
             'securityDevices.integrations.manage',
+            'securityDevices.monitoring.manage',
             'securityDevices.commands.operate',
             'securityDevices.commands.manage',
             'securityDevices.commands.control',

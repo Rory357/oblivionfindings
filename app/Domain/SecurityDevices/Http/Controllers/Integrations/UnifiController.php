@@ -17,10 +17,10 @@ use App\Services\Integration\Contracts\ConnectionHealthCapability;
 use App\Services\Integration\Contracts\DeviceSyncCapability;
 use App\Services\Integration\Contracts\InventoryDiscoveryCapability;
 use App\Services\Integration\IntegrationAdapterRegistry;
+use App\Services\Integration\IntegrationSecretManager;
 use App\Services\Integration\UnifiOperationalBridgeService;
 use App\Support\SafeOperationalData;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -42,6 +42,7 @@ class UnifiController extends Controller
     public function __construct(
         private readonly IntegrationSiteCredentialsPresenter $siteCredentials,
         private readonly SecurityDevicesAccessService $access,
+        private readonly IntegrationSecretManager $secrets,
     ) {}
 
     /**
@@ -225,36 +226,61 @@ class UnifiController extends Controller
             'api_key' => ['required', 'string', 'max:4096'],
         ]);
 
-        $isRecovery = DB::transaction(function () use ($request, $user): bool {
+        $apiKey = $request->string('api_key')->toString();
+        $connectionState = DB::transaction(function () use ($user): array {
             $connection = IntegrationProviderConnection::query()
                 ->forProvider(self::PROVIDER)
                 ->lockForUpdate()
                 ->first();
             $isRecovery = $connection?->status === IntegrationProviderConnection::STATUS_DISABLED
                 || (bool) $connection?->requires_credential_replacement;
-            $values = [
-                'secret_encrypted' => Crypt::encryptString($request->string('api_key')->toString()),
-                'secret_last4' => substr($request->string('api_key')->toString(), -4),
+            if ($connection === null) {
+                $connection = IntegrationProviderConnection::create([
+                    'provider' => self::PROVIDER,
+                    'status' => IntegrationProviderConnection::STATUS_DISCONNECTED,
+                    'created_by' => $user->id,
+                ]);
+            }
+
+            return [
+                'id' => (int) $connection->id,
+                'is_recovery' => $isRecovery,
+                'created' => $connection->wasRecentlyCreated,
+            ];
+        });
+        $connectionId = $connectionState['id'];
+        $isRecovery = $connectionState['is_recovery'];
+        $connectionWasCreated = $connectionState['created'];
+        $connection = IntegrationProviderConnection::query()->findOrFail($connectionId);
+
+        try {
+            $this->secrets->storeApplication(
+                $connection,
+                IntegrationSecretManager::PURPOSE_PRIMARY,
+                ['api_key' => $apiKey],
+            );
+        } catch (\Throwable) {
+            if ($connectionWasCreated && $connection->secretReferences()->doesntExist()) {
+                $connection->delete();
+            }
+
+            return redirect()->back()->with('error', 'The governed secret manager is unavailable. No UniFi API key was stored.');
+        }
+
+        DB::transaction(function () use ($connectionId, $apiKey, $isRecovery, $user, $request): void {
+            $connection = IntegrationProviderConnection::query()->lockForUpdate()->findOrFail($connectionId);
+            $connection->update([
+                'secret_last4' => substr($apiKey, -4),
                 'status' => IntegrationProviderConnection::STATUS_DISCONNECTED,
                 'last_error' => null,
                 'requires_credential_replacement' => false,
                 'recovery_credentials_replaced_at' => $isRecovery ? now() : null,
                 'recovery_credentials_replaced_by' => $isRecovery ? $user->id : null,
                 'created_by' => $user->id,
-            ];
-            if ($connection) {
-                $connection->update($values);
-            } else {
-                $connection = IntegrationProviderConnection::create([
-                    'provider' => self::PROVIDER,
-                    ...$values,
-                ]);
-            }
+            ]);
 
             Integration::updateOrCreate(
-                [
-                    'provider' => self::PROVIDER,
-                ],
+                ['provider' => self::PROVIDER],
                 [
                     'display_name' => 'UniFi',
                     'status' => Integration::STATUS_INACTIVE,
@@ -274,8 +300,6 @@ class UnifiController extends Controller
                     $request,
                 );
             }
-
-            return $isRecovery;
         });
 
         return redirect()->back()->with(
@@ -366,17 +390,30 @@ class UnifiController extends Controller
             'api_key' => ['required', 'string', 'max:4096'],
         ]);
 
-        $isRecovery = DB::transaction(function () use ($request, $user): bool {
+        $apiKey = $request->string('api_key')->toString();
+        $connection = IntegrationProviderConnection::query()
+            ->forProvider(self::PROVIDER)
+            ->firstOrFail();
+        $isRecovery = $connection->status === IntegrationProviderConnection::STATUS_DISABLED
+            || (bool) $connection->requires_credential_replacement;
+
+        try {
+            $this->secrets->storeApplication(
+                $connection,
+                IntegrationSecretManager::PURPOSE_PRIMARY,
+                ['api_key' => $apiKey],
+            );
+        } catch (\Throwable) {
+            return redirect()->back()->with('error', 'The governed secret manager is unavailable. The existing UniFi credential remains unchanged.');
+        }
+
+        DB::transaction(function () use ($connection, $apiKey, $isRecovery, $user, $request): void {
             $connection = IntegrationProviderConnection::query()
-                ->forProvider(self::PROVIDER)
                 ->lockForUpdate()
-                ->firstOrFail();
-            $isRecovery = $connection->status === IntegrationProviderConnection::STATUS_DISABLED
-                || (bool) $connection->requires_credential_replacement;
+                ->findOrFail($connection->id);
 
             $connection->update([
-                'secret_encrypted' => Crypt::encryptString($request->string('api_key')->toString()),
-                'secret_last4' => substr($request->string('api_key')->toString(), -4),
+                'secret_last4' => substr($apiKey, -4),
                 'rotated_at' => now(),
                 'status' => IntegrationProviderConnection::STATUS_DISCONNECTED,
                 'last_error' => null,
@@ -406,8 +443,6 @@ class UnifiController extends Controller
                     $request,
                 );
             }
-
-            return $isRecovery;
         });
 
         return redirect()->back()->with(
@@ -471,6 +506,9 @@ class UnifiController extends Controller
 
             return true;
         });
+
+        $connection = IntegrationProviderConnection::query()->forProvider(self::PROVIDER)->firstOrFail();
+        $this->secrets->revokeApplication($connection, IntegrationSecretManager::PURPOSE_PRIMARY);
 
         return redirect()->back()->with(
             $changed ? 'success' : 'info',

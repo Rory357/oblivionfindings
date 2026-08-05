@@ -4,6 +4,10 @@ import {
     CredentialReferenceManagement,
     type CredentialReferenceWorkspace,
 } from '@/components/security-devices/credential-reference-management';
+import {
+    MonitoringPolicySettings,
+    type MonitoringPolicyWorkspace,
+} from '@/components/security-devices/monitoring-policy-settings';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
@@ -124,6 +128,7 @@ export default function SettingsAudit(props: {
         };
         rule: string;
     };
+    monitoringPolicyWorkspace: MonitoringPolicyWorkspace;
     monitoringRuntime: {
         state: string;
         workers: {
@@ -157,8 +162,7 @@ export default function SettingsAudit(props: {
         classificationDefaults,
         providerOperationalDefaults,
         credentialReferences,
-        monitoringProfiles,
-        monitoringRetention,
+        monitoringPolicyWorkspace,
         monitoringRuntime,
         dataQuality,
         featureSupport,
@@ -180,7 +184,7 @@ export default function SettingsAudit(props: {
                     variant="compact"
                     icon={Settings2}
                     title="Settings & audit"
-                    description="Current defaults, monitoring profiles, data-quality exceptions, feature support, and safe read-only audit evidence."
+                    description="Govern monitoring behaviour, integration defaults, data quality, and safe audit evidence from one workspace."
                     stats={[
                         {
                             label: 'Device groups',
@@ -311,96 +315,9 @@ export default function SettingsAudit(props: {
                 <CredentialReferenceManagement
                     workspace={credentialReferences}
                 />
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Monitoring retention</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <p className="text-sm text-muted-foreground">
-                            {monitoringRetention.rule}
-                        </p>
-                        {monitoringRetention.policies.length ? (
-                            monitoringRetention.policies.map((policy) => (
-                                <article
-                                    key={policy.id}
-                                    className="rounded-lg border p-4 text-sm"
-                                >
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <strong>{policy.name}</strong>
-                                        <div className="flex gap-2">
-                                            <Badge variant="outline">
-                                                {policy.scope.replaceAll(
-                                                    '_',
-                                                    ' ',
-                                                )}
-                                            </Badge>
-                                            {policy.legal_hold ? (
-                                                <Badge variant="secondary">
-                                                    Legal hold
-                                                </Badge>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                    <p className="mt-2 text-muted-foreground">
-                                        Raw {policy.raw_days} days · hourly{' '}
-                                        {policy.hourly_days} days · daily{' '}
-                                        {policy.daily_days} days
-                                    </p>
-                                    {policy.data_class ||
-                                    policy.privacy_class ? (
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            {policy.data_class ?? 'All data'} ·{' '}
-                                            {policy.privacy_class ??
-                                                'All privacy classes'}
-                                        </p>
-                                    ) : null}
-                                </article>
-                            ))
-                        ) : (
-                            <p className="text-sm text-muted-foreground">
-                                No active retention policies are visible.
-                            </p>
-                        )}
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Monitoring profiles</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-3 md:grid-cols-2">
-                        {monitoringProfiles.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                No monitoring profiles are configured.
-                            </p>
-                        ) : (
-                            monitoringProfiles.map((profile) => (
-                                <article
-                                    key={profile.id}
-                                    className="rounded-lg border p-4 text-sm"
-                                >
-                                    <div className="flex justify-between gap-3">
-                                        <strong>{profile.name}</strong>
-                                        <Badge variant="outline">
-                                            {profile.state}
-                                        </Badge>
-                                    </div>
-                                    <p className="mt-1 text-muted-foreground">
-                                        {profile.description ??
-                                            'No description.'}
-                                    </p>
-                                    <p className="mt-2">
-                                        Every {profile.interval_seconds}s ·
-                                        stale after{' '}
-                                        {profile.stale_after_seconds}s ·
-                                        fail/recover{' '}
-                                        {profile.failure_confirmations}/
-                                        {profile.recovery_confirmations}
-                                    </p>
-                                </article>
-                            ))
-                        )}
-                    </CardContent>
-                </Card>
+                <MonitoringPolicySettings
+                    workspace={monitoringPolicyWorkspace}
+                />
                 <Card>
                     <CardHeader>
                         <CardTitle>

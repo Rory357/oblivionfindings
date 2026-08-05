@@ -6,6 +6,12 @@ import {
     type CollectorLifecycleTarget,
     type CollectorManagementSite,
 } from '@/components/security-devices/collector-lifecycle-dialogs';
+import {
+    DiscoveryScopeActionDialog,
+    DiscoveryScopeDialog,
+    type DiscoveryScopeManagement,
+    type GovernedDiscoveryScope,
+} from '@/components/security-devices/discovery-scope-dialogs';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -23,6 +29,9 @@ import {
     Cable,
     CircleHelp,
     Network,
+    Pencil,
+    Play,
+    Plus,
     Radar,
     RadioTower,
     RotateCcw,
@@ -73,6 +82,12 @@ export type DiscoveryScopeRow = {
     max_targets_per_run: number;
     packets_per_second: number;
     schedule: string | null;
+    actions?: {
+        can_manage: boolean;
+        update_url: string | null;
+        apply_url: string | null;
+        deactivate_url: string | null;
+    };
 };
 
 export type DiscoveryRunRow = {
@@ -143,6 +158,7 @@ export type DiscoveryWorkspace = {
         issue_url: string | null;
         sites: CollectorManagementSite[];
     };
+    scope_management?: DiscoveryScopeManagement;
     scopes: DiscoveryScopeRow[];
     runs: DiscoveryRunRow[];
     candidates: DiscoveryCandidateRow[];
@@ -373,6 +389,20 @@ export default function DiscoveryCollectors({
         useState<CollectorLifecycleTarget | null>(null);
     const [revocationCollector, setRevocationCollector] =
         useState<CollectorLifecycleTarget | null>(null);
+    const [scopeDialogOpen, setScopeDialogOpen] = useState(false);
+    const [editingScope, setEditingScope] =
+        useState<GovernedDiscoveryScope | null>(null);
+    const [scopeAction, setScopeAction] = useState<{
+        scope: GovernedDiscoveryScope;
+        action: 'apply' | 'deactivate';
+    } | null>(null);
+    const scopeManagement: DiscoveryScopeManagement =
+        workspace.scope_management ?? {
+            can_manage: false,
+            create_url: null,
+            protocols: [],
+            sites: [],
+        };
     const changeTab = (tab: string) => {
         setActiveTab(tab);
         router.get(
@@ -394,6 +424,24 @@ export default function DiscoveryCollectors({
     });
     const refreshCollectors = () =>
         router.reload({ only: ['workspace'], preserveScroll: true });
+    const governedScope = (
+        scope: DiscoveryScopeRow,
+    ): GovernedDiscoveryScope => ({
+        id: scope.id,
+        name: scope.name,
+        status: scope.status,
+        site: scope.site ? { id: scope.site.id, name: scope.site.name } : null,
+        collection_mode: scope.collection_mode,
+        protocols: scope.protocols,
+        max_targets_per_run: scope.max_targets_per_run,
+        packets_per_second: scope.packets_per_second,
+        actions: scope.actions ?? {
+            can_manage: false,
+            update_url: null,
+            apply_url: null,
+            deactivate_url: null,
+        },
+    });
 
     return (
         <AppLayout
@@ -609,13 +657,29 @@ export default function DiscoveryCollectors({
 
                 {activeTab === 'scopes' ? (
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Governed discovery scopes</CardTitle>
-                            <CardDescription>
-                                Site, collection path, protocol coverage,
-                                bounds, exclusions, and schedule without
-                                exposing target addresses or credentials.
-                            </CardDescription>
+                        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <CardTitle>Governed discovery scopes</CardTitle>
+                                <CardDescription>
+                                    Site, collection path, protocol coverage,
+                                    bounds, exclusions, and schedule without
+                                    exposing target addresses or credentials.
+                                </CardDescription>
+                            </div>
+                            {scopeManagement.can_manage &&
+                            scopeManagement.create_url &&
+                            scopeManagement.sites.length ? (
+                                <Button
+                                    type="button"
+                                    onClick={() => {
+                                        setEditingScope(null);
+                                        setScopeDialogOpen(true);
+                                    }}
+                                >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Create direct scope
+                                </Button>
+                            ) : null}
                         </CardHeader>
                         <CardContent className="space-y-3">
                             {workspace.scopes.length ? (
@@ -664,6 +728,66 @@ export default function DiscoveryCollectors({
                                             {scope.max_targets_per_run} targets
                                             at {scope.packets_per_second}/s
                                         </p>
+                                        {scope.actions?.can_manage ? (
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                {scope.actions.update_url ? (
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => {
+                                                            setEditingScope(
+                                                                governedScope(
+                                                                    scope,
+                                                                ),
+                                                            );
+                                                            setScopeDialogOpen(
+                                                                true,
+                                                            );
+                                                        }}
+                                                    >
+                                                        <Pencil className="mr-2 h-4 w-4" />
+                                                        Update
+                                                    </Button>
+                                                ) : null}
+                                                {scope.actions.apply_url ? (
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            setScopeAction({
+                                                                scope: governedScope(
+                                                                    scope,
+                                                                ),
+                                                                action: 'apply',
+                                                            })
+                                                        }
+                                                    >
+                                                        <Play className="mr-2 h-4 w-4" />
+                                                        Run now
+                                                    </Button>
+                                                ) : null}
+                                                {scope.actions
+                                                    .deactivate_url ? (
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="destructive"
+                                                        onClick={() =>
+                                                            setScopeAction({
+                                                                scope: governedScope(
+                                                                    scope,
+                                                                ),
+                                                                action: 'deactivate',
+                                                            })
+                                                        }
+                                                    >
+                                                        <ShieldX className="mr-2 h-4 w-4" />
+                                                        Deactivate
+                                                    </Button>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
                                     </article>
                                 ))
                             ) : (
@@ -921,6 +1045,22 @@ export default function DiscoveryCollectors({
                 }}
                 collector={revocationCollector}
                 onRevoked={refreshCollectors}
+            />
+            <DiscoveryScopeDialog
+                open={scopeDialogOpen}
+                onOpenChange={setScopeDialogOpen}
+                management={scopeManagement}
+                scope={editingScope}
+                onSaved={refreshCollectors}
+            />
+            <DiscoveryScopeActionDialog
+                open={scopeAction !== null}
+                onOpenChange={(open) => {
+                    if (!open) setScopeAction(null);
+                }}
+                scope={scopeAction?.scope ?? null}
+                action={scopeAction?.action ?? 'apply'}
+                onApplied={refreshCollectors}
             />
         </AppLayout>
     );

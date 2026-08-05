@@ -4,6 +4,7 @@ namespace App\Domain\Monitoring\Models;
 
 use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\DataRetentionPolicy;
+use App\Models\User;
 use Database\Factories\MonitoringProfileFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -37,6 +38,12 @@ class MonitoringProfile extends Model
         'rollup_policy',
         'retention_policy_id',
         'is_active',
+        'version',
+        'created_by_user_id',
+        'updated_by_user_id',
+        'deactivated_at',
+        'deactivated_by_user_id',
+        'deactivation_reason',
     ];
 
     protected $casts = [
@@ -52,6 +59,8 @@ class MonitoringProfile extends Model
         'baseline_minimum_samples' => 'integer',
         'baseline_deviation_multiplier' => 'decimal:3',
         'is_active' => 'boolean',
+        'version' => 'integer',
+        'deactivated_at' => 'immutable_datetime',
     ];
 
     public function monitors(): HasMany
@@ -61,6 +70,26 @@ class MonitoringProfile extends Model
 
     public function retentionPolicy(): BelongsTo
     {
-        return $this->belongsTo(DataRetentionPolicy::class, 'retention_policy_id');
+        return $this->belongsTo(MonitoringRetentionPolicy::class, 'retention_policy_id');
+    }
+
+    public function legacyDataRetentionPolicy(): BelongsTo
+    {
+        return $this->belongsTo(DataRetentionPolicy::class, 'legacy_data_retention_policy_id');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by_user_id');
+    }
+
+    public function deactivatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'deactivated_by_user_id');
     }
 }

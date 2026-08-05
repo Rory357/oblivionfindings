@@ -14,7 +14,6 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Models\LegalHold;
 use App\Models\Site;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -23,6 +22,7 @@ final class RetentionEnforcer
     public function __construct(
         private readonly TimeSeriesStore $timeSeries,
         private readonly SnapshotStore $snapshots,
+        private readonly MonitoringRetentionPolicyMatcher $policyMatcher,
     ) {}
 
     /** @return array{metric_payloads_deleted: int, snapshot_payloads_deleted: int, held_series: int, held_snapshots: int} */
@@ -57,7 +57,7 @@ final class RetentionEnforcer
                 &$result,
             ): void {
                 foreach ($seriesBatch as $series) {
-                    $matches = $this->matchingPolicies($series, $policies);
+                    $matches = $this->policyMatcher->matchingSeries($series, $policies);
                     if ($matches->isEmpty()) {
                         continue;
                     }
@@ -141,7 +141,9 @@ final class RetentionEnforcer
             ->orderBy('id')
             ->chunkById(100, function ($batch) use ($policies, $now, $actorId, $jobReference, &$result): void {
                 foreach ($batch as $snapshot) {
-                    $matches = $policies->filter(fn (MonitoringRetentionPolicy $policy): bool => $this->policyMatchesSnapshot($policy, $snapshot));
+                    $matches = $policies->filter(
+                        fn (MonitoringRetentionPolicy $policy): bool => $this->policyMatcher->matchesSnapshot($policy, $snapshot),
+                    );
                     $policy = $snapshot->retention_policy_id === null
                         ? $matches->sortBy('daily_days')->first()
                         : $policies->firstWhere('id', $snapshot->retention_policy_id);
@@ -221,34 +223,6 @@ final class RetentionEnforcer
         });
 
         return $missing;
-    }
-
-    /** @param Collection<int, MonitoringRetentionPolicy> $policies
-     * @return Collection<int, MonitoringRetentionPolicy>
-     */
-    private function matchingPolicies(MetricSeries $series, Collection $policies): Collection
-    {
-        return $policies->filter(fn (MonitoringRetentionPolicy $policy): bool => match ($policy->scope_kind) {
-            'application' => true,
-            'site' => (int) $policy->site_id === (int) $series->site_id,
-            'device' => (int) $policy->device_id === (int) $series->device_id,
-            'data_class' => $policy->data_class === $series->data_class,
-            'privacy' => $policy->privacy_class === $series->privacy_class,
-            default => false,
-        })->values();
-    }
-
-    private function policyMatchesSnapshot(
-        MonitoringRetentionPolicy $policy,
-        ConfigurationSnapshot $snapshot,
-    ): bool {
-        return match ($policy->scope_kind) {
-            'application' => true,
-            'site' => (int) $policy->site_id === (int) $snapshot->site_id,
-            'device' => (int) $policy->device_id === (int) $snapshot->device_id,
-            'data_class' => $policy->data_class === 'configuration',
-            default => false,
-        };
     }
 
     private function hasExternalHold(MetricSeries $series): bool

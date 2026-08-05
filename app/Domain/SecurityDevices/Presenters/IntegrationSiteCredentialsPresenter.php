@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Presenters;
 
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Models\Integration\IntegrationSecretReference;
 use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\User;
 
@@ -27,7 +28,10 @@ class IntegrationSiteCredentialsPresenter
             ->where('provider', $provider)
             ->whereIn('site_id', $siteIds)
             ->whereHas('site')
-            ->with('site:id,name')
+            ->with([
+                'site:id,name',
+                'secretReferences:id,site_secret_id,status',
+            ])
             ->orderBy('site_id')
             ->orderBy('capability')
             ->get()
@@ -40,6 +44,10 @@ class IntegrationSiteCredentialsPresenter
     public function project(IntegrationSiteSecret $credential): array
     {
         $state = self::state($credential);
+        $configured = filled($credential->secret_encrypted)
+            || $credential->secretReferences->contains(
+                fn ($reference): bool => $reference->status === IntegrationSecretReference::STATUS_ACTIVE,
+            );
 
         return [
             'id' => $credential->id,
@@ -47,7 +55,7 @@ class IntegrationSiteCredentialsPresenter
             'site_name' => $credential->site?->name ?? 'Unknown site',
             'provider' => $credential->provider,
             'capability' => $credential->capability,
-            'configured' => true,
+            'configured' => $configured,
             'enabled' => (bool) $credential->is_enabled,
             'tested' => $credential->last_tested_at !== null,
             'state' => $state,

@@ -3,6 +3,8 @@
 namespace Tests\Feature\SecurityDevices;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerLeaseIssuer;
+use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerSecretStore;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -18,11 +20,14 @@ use App\Models\Queclink\QueclinkRawFrame;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Integration\IntegrationSecretManager;
+use App\Services\Integration\IntegrationSecretMaterialService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
+use Tests\Support\FakeIntegrationSecretBackend;
 use Tests\TestCase;
 
 class ProviderConnectionsSingleApplicationTest extends TestCase
@@ -35,6 +40,9 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
 
         $this->seed(RbacSeeder::class);
         $this->seed(SecurityDevicesPermissionsSeeder::class);
+        $backend = new FakeIntegrationSecretBackend;
+        $this->app->instance(SecretManagerSecretStore::class, $backend);
+        $this->app->instance(SecretManagerLeaseIssuer::class, $backend);
     }
 
     public function test_provider_connection_is_application_wide_and_uses_the_new_read_model_contract(): void
@@ -153,14 +161,19 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
         $saved = IntegrationProviderConnection::query()->where('provider', 'milesight')->sole();
         $this->assertSame($connection->id, $saved->id);
         $this->assertSame('9876', $saved->secret_last4);
-        $this->assertSame('replacement-secret-9876', Crypt::decryptString($saved->secret_encrypted));
+        $this->assertSame('old-secret', Crypt::decryptString($saved->secret_encrypted));
+        $this->assertSame('replacement-secret-9876', app(IntegrationSecretMaterialService::class)->application(
+            $saved,
+            IntegrationSecretManager::PURPOSE_PRIMARY,
+            'client_secret',
+        ));
         $this->assertSame('client-123', $saved->config['client_id']);
         $this->assertSame('https://milesight.example.test', $saved->config['base_url']);
         $this->assertSame(IntegrationProviderConnection::STATUS_DISCONNECTED, $saved->status);
         $this->assertSame(1, Integration::query()->where('provider', 'milesight')->count());
     }
 
-    public function test_milesight_webhook_secret_is_encrypted_configurable_and_never_projected(): void
+    public function test_milesight_webhook_secret_is_externally_stored_configurable_and_never_projected(): void
     {
         $manager = $this->manager();
         IntegrationProviderConnection::query()->create([
@@ -186,22 +199,25 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
             ->assertRedirect();
 
         $connection = IntegrationProviderConnection::query()->where('provider', 'milesight')->sole();
-        $this->assertSame($webhookSecret, Crypt::decryptString($connection->config['webhook_secret_encrypted']));
+        $this->assertArrayNotHasKey('webhook_secret_encrypted', $connection->config);
+        $this->assertSame($webhookSecret, app(IntegrationSecretMaterialService::class)->application(
+            $connection,
+            IntegrationSecretManager::PURPOSE_WEBHOOK,
+            'webhook_secret',
+        ));
         $this->assertSame('9876', $connection->config['webhook_secret_last4']);
         $this->assertNotNull($connection->config['webhook_configured_at']);
-        $encryptedWebhookSecret = $connection->config['webhook_secret_encrypted'];
 
         $this->actingAs($manager)
             ->get('/security-devices/integrations/milesight')
             ->assertOk()
-            ->assertInertia(function ($page) use ($encryptedWebhookSecret, $webhookSecret): void {
+            ->assertInertia(function ($page) use ($webhookSecret): void {
                 $props = $page->toArray()['props'];
                 $this->assertTrue($props['providerConnection']['webhook_configured']);
                 $this->assertSame('9876', $props['providerConnection']['webhook_secret_last4']);
                 $this->assertStringEndsWith('/webhooks/milesight', $props['providerConnection']['webhook_url']);
                 $this->assertNull($props['providerConnection']['last_webhook_received_at']);
                 $this->assertStringNotContainsString($webhookSecret, json_encode($props, JSON_THROW_ON_ERROR));
-                $this->assertStringNotContainsString($encryptedWebhookSecret, json_encode($props, JSON_THROW_ON_ERROR));
             });
 
         $this->actingAs($manager)

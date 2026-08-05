@@ -4,6 +4,12 @@ import {
 } from '@/components/monitoring/delivery-recovery-card';
 import { PageHero, PageTabs } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import {
+    NativeMonitorDeactivateDialog,
+    NativeMonitorDialog,
+    type NativeMonitorManagement,
+    type NativeMonitorTarget,
+} from '@/components/security-devices/native-monitor-dialogs';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -23,11 +29,14 @@ import {
     Cable,
     Gauge,
     Network,
+    Pencil,
+    Plus,
     Radar,
     Search,
     ShieldCheck,
+    ShieldX,
 } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { useState, type FormEvent } from 'react';
 
 type NamedLink = { id: number; name: string; href: string };
 
@@ -40,6 +49,7 @@ export type MonitorRow = {
     affects_availability: boolean;
     enabled: boolean;
     operational: boolean;
+    profile?: { id: number; name: string } | null;
     suppressed_until: string | null;
     suppression_reason?: string | null;
     root_cause?: {
@@ -77,6 +87,11 @@ export type MonitorRow = {
               last_seen_at: string | null;
           }
         | { mode: 'direct'; label: string; state: string };
+    actions?: {
+        can_manage: boolean;
+        update_url: string | null;
+        deactivate_url: string | null;
+    };
     latest_observation: {
         state: string;
         value: string | null;
@@ -172,6 +187,7 @@ export type MonitoringWorkspace = {
         note: string;
     };
     monitors: MonitorRow[];
+    monitor_management?: NativeMonitorManagement;
     inventory: { total: number; shown: number; truncated: boolean };
     coverage: {
         total_devices: number;
@@ -580,7 +596,15 @@ export function CentralSiteReadinessCard({
     );
 }
 
-export function MonitorCard({ monitor }: { monitor: MonitorRow }) {
+export function MonitorCard({
+    monitor,
+    onEdit,
+    onDeactivate,
+}: {
+    monitor: MonitorRow;
+    onEdit?: (monitor: MonitorRow) => void;
+    onDeactivate?: (monitor: MonitorRow) => void;
+}) {
     const collectionLabel =
         monitor.collection.mode === 'direct'
             ? 'Direct from main application'
@@ -680,6 +704,32 @@ export function MonitorCard({ monitor }: { monitor: MonitorRow }) {
                                 ? ' · monitoring recovered, technician closure pending'
                                 : ''}
                         </Link>
+                    ) : null}
+                </div>
+            ) : null}
+            {monitor.actions?.can_manage ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                    {monitor.actions.update_url && onEdit ? (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onEdit(monitor)}
+                        >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Update monitor
+                        </Button>
+                    ) : null}
+                    {monitor.actions.deactivate_url && onDeactivate ? (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => onDeactivate(monitor)}
+                        >
+                            <ShieldX className="mr-2 h-4 w-4" />
+                            Deactivate
+                        </Button>
                     ) : null}
                 </div>
             ) : null}
@@ -841,8 +891,12 @@ function Filters({ workspace }: { workspace: MonitoringWorkspace }) {
 
 export function MonitoringContent({
     workspace,
+    onEditMonitor,
+    onDeactivateMonitor,
 }: {
     workspace: MonitoringWorkspace;
+    onEditMonitor?: (monitor: MonitorRow) => void;
+    onDeactivateMonitor?: (monitor: MonitorRow) => void;
 }) {
     if (workspace.active_tab === 'findings') {
         return (
@@ -1212,7 +1266,12 @@ export function MonitoringContent({
                 <CardContent className="space-y-3">
                     {workspace.monitors.length ? (
                         workspace.monitors.map((monitor) => (
-                            <MonitorCard key={monitor.id} monitor={monitor} />
+                            <MonitorCard
+                                key={monitor.id}
+                                monitor={monitor}
+                                onEdit={onEditMonitor}
+                                onDeactivate={onDeactivateMonitor}
+                            />
                         ))
                     ) : (
                         <EmptyState
@@ -1333,6 +1392,35 @@ export default function Monitoring({
 }: {
     workspace: MonitoringWorkspace;
 }) {
+    const monitorManagement: NativeMonitorManagement =
+        workspace.monitor_management ?? {
+            can_manage: false,
+            create_url: null,
+            kinds: [],
+            profiles: [],
+            devices: [],
+        };
+    const [monitorDialogOpen, setMonitorDialogOpen] = useState(false);
+    const [editingMonitor, setEditingMonitor] =
+        useState<NativeMonitorTarget | null>(null);
+    const [deactivatingMonitor, setDeactivatingMonitor] =
+        useState<NativeMonitorTarget | null>(null);
+    const lifecycleTarget = (monitor: MonitorRow): NativeMonitorTarget => ({
+        id: monitor.id,
+        name: monitor.name,
+        kind: monitor.kind,
+        enabled: monitor.enabled,
+        affects_availability: monitor.affects_availability,
+        profile: monitor.profile ?? null,
+        device: { id: monitor.device.id, name: monitor.device.name },
+        actions: monitor.actions ?? {
+            can_manage: false,
+            update_url: null,
+            deactivate_url: null,
+        },
+    });
+    const refreshWorkspace = () =>
+        router.reload({ only: ['workspace'], preserveScroll: true });
     const changeTab = (tab: string) =>
         router.get(
             '/security-devices/monitoring',
@@ -1367,12 +1455,29 @@ export default function Monitoring({
                         { label: 'Paused', value: workspace.summary.paused },
                     ]}
                     actions={
-                        <Button asChild variant="outline">
-                            <Link href="/control-room">
-                                <AlertTriangle className="mr-2 h-4 w-4" />
-                                Open Control Room
-                            </Link>
-                        </Button>
+                        <div className="flex flex-wrap gap-2">
+                            {monitorManagement.can_manage &&
+                            monitorManagement.create_url &&
+                            monitorManagement.devices.length &&
+                            monitorManagement.profiles.length ? (
+                                <Button
+                                    type="button"
+                                    onClick={() => {
+                                        setEditingMonitor(null);
+                                        setMonitorDialogOpen(true);
+                                    }}
+                                >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Create direct monitor
+                                </Button>
+                            ) : null}
+                            <Button asChild variant="outline">
+                                <Link href="/control-room">
+                                    <AlertTriangle className="mr-2 h-4 w-4" />
+                                    Open Control Room
+                                </Link>
+                            </Button>
+                        </div>
                     }
                 />
                 <Boundary data={workspace.boundary} />
@@ -1384,8 +1489,32 @@ export default function Monitoring({
                         label: tab.label,
                     }))}
                 />
-                <MonitoringContent workspace={workspace} />
+                <MonitoringContent
+                    workspace={workspace}
+                    onEditMonitor={(monitor) => {
+                        setEditingMonitor(lifecycleTarget(monitor));
+                        setMonitorDialogOpen(true);
+                    }}
+                    onDeactivateMonitor={(monitor) =>
+                        setDeactivatingMonitor(lifecycleTarget(monitor))
+                    }
+                />
             </PageShell>
+            <NativeMonitorDialog
+                open={monitorDialogOpen}
+                onOpenChange={setMonitorDialogOpen}
+                management={monitorManagement}
+                monitor={editingMonitor}
+                onSaved={refreshWorkspace}
+            />
+            <NativeMonitorDeactivateDialog
+                open={deactivatingMonitor !== null}
+                onOpenChange={(open) => {
+                    if (!open) setDeactivatingMonitor(null);
+                }}
+                monitor={deactivatingMonitor}
+                onDeactivated={refreshWorkspace}
+            />
         </AppLayout>
     );
 }

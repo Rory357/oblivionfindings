@@ -493,6 +493,7 @@ class HandleInertiaRequests extends Middleware
                 'maintenanceManage' => $user->canDo('securityDevices.maintenance.manage'),
                 'integrationsView' => $user->canDo('securityDevices.integrations.view'),
                 'integrationsManage' => $user->canDo('securityDevices.integrations.manage'),
+                'monitoringManage' => $user->canDo('securityDevices.monitoring.manage'),
                 'reportsView' => $user->canDo('securityDevices.reports.view'),
                 'commandsAdmin' => $user->canDo('securityDevices.commands.admin'),
             ],

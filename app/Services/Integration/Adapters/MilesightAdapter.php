@@ -21,12 +21,13 @@ use App\Services\Integration\Data\VerifiedProviderEventBatch;
 use App\Services\Integration\Exceptions\ProviderRateLimited;
 use App\Services\Integration\Exceptions\WebhookRejected;
 use App\Services\Integration\IntegrationAdapterInterface;
+use App\Services\Integration\IntegrationSecretManager;
+use App\Services\Integration\IntegrationSecretMaterialService;
 use App\Services\Integration\MilesightOperationalBridgeService;
 use App\Services\Integration\SyncResult;
 use App\Support\SafeOperationalData;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -56,6 +57,7 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
     public function __construct(
         private readonly MilesightOperationalBridgeService $bridge,
         private readonly CanonicalDeviceSiteResolver $siteResolver,
+        private readonly IntegrationSecretMaterialService $secrets,
     ) {}
 
     public function provider(): string
@@ -82,12 +84,12 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
             throw new WebhookRejected('body_size', 413);
         }
 
-        $config = is_array($connection->config) ? $connection->config : [];
-        $encryptedSecret = $config['webhook_secret_encrypted'] ?? null;
         try {
-            $secret = is_string($encryptedSecret) && $encryptedSecret !== ''
-                ? Crypt::decryptString($encryptedSecret)
-                : null;
+            $secret = $this->secrets->application(
+                $connection,
+                IntegrationSecretManager::PURPOSE_WEBHOOK,
+                'webhook_secret',
+            );
         } catch (\Throwable) {
             throw new WebhookRejected('credentials_unavailable');
         }
@@ -575,7 +577,7 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
 
     private function accessToken(IntegrationProviderConnection $connection): ?string
     {
-        $clientSecret = $this->decryptSecret($connection);
+        $clientSecret = $this->providerSecret($connection);
         $config = is_array($connection->config) ? $connection->config : [];
         $clientId = $this->scalarString($config['client_id'] ?? null);
         if ($clientId === null || $clientSecret === null) {
@@ -871,16 +873,16 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
         return $value !== '' ? $value : null;
     }
 
-    private function decryptSecret(IntegrationProviderConnection $connection): ?string
+    private function providerSecret(IntegrationProviderConnection $connection): ?string
     {
-        if (! $connection->secret_encrypted) {
-            return null;
-        }
-
         try {
-            return Crypt::decryptString($connection->secret_encrypted);
+            return $this->secrets->application(
+                $connection,
+                IntegrationSecretManager::PURPOSE_PRIMARY,
+                'client_secret',
+            );
         } catch (\Throwable $e) {
-            Log::warning('Milesight secret decryption failed', SafeOperationalData::logContext([
+            Log::warning('Milesight governed secret is unavailable', SafeOperationalData::logContext([
                 'provider_connection_id' => $connection->id,
                 'error_category' => SafeOperationalData::failureCategory($e),
             ]));

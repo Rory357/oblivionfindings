@@ -14,6 +14,7 @@ describe('app sidebar workforce navigation', () => {
                     maintenanceView: true,
                     integrationsView: true,
                     integrationsManage: true,
+                    monitoringManage: true,
                     reportsView: true,
                 },
             },

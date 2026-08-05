@@ -8,6 +8,7 @@ use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Services\MonitoringCollectorAvailabilityService;
+use App\Domain\Monitoring\Services\NativeMonitoringDefinitionService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Site;
 use App\Models\User;
@@ -28,6 +29,7 @@ class DiscoveryOperationsPresenter
         $siteIds = $this->access->accessibleSiteIds($viewer);
         $canViewAllSites = $this->access->canViewAllSites($viewer);
         $canManageCollectors = $viewer->canDo('securityDevices.integrations.manage');
+        $canManageScopes = $viewer->canDo('securityDevices.integrations.manage');
         $monitors = $visibleDeviceIds->isEmpty()
             ? collect()
             : Monitor::query()
@@ -132,6 +134,18 @@ class DiscoveryOperationsPresenter
             'max_targets_per_run' => (int) $scope->max_targets_per_run,
             'packets_per_second' => (int) $scope->packets_per_second,
             'schedule' => $scope->schedule_cron,
+            'actions' => [
+                'can_manage' => $canManageScopes && $scope->collector_id === null,
+                'update_url' => $canManageScopes && $scope->collector_id === null && $scope->status === 'active'
+                    ? "/security-devices/discovery/scopes/{$scope->id}"
+                    : null,
+                'apply_url' => $canManageScopes && $scope->collector_id === null && $scope->status === 'active'
+                    ? "/security-devices/discovery/scopes/{$scope->id}/apply"
+                    : null,
+                'deactivate_url' => $canManageScopes && $scope->collector_id === null && $scope->status === 'active'
+                    ? "/security-devices/discovery/scopes/{$scope->id}/deactivate"
+                    : null,
+            ],
         ])->values();
         $mappedRuns = $runs->map(fn (DiscoveryRun $run): array => [
             'id' => $run->id,
@@ -242,6 +256,30 @@ class DiscoveryOperationsPresenter
                     : [],
             ],
             'scopes' => $mappedScopes,
+            'scope_management' => [
+                'can_manage' => $canManageScopes,
+                'create_url' => $canManageScopes
+                    ? '/security-devices/discovery/scopes'
+                    : null,
+                'protocols' => $canManageScopes
+                    ? NativeMonitoringDefinitionService::discoveryProtocols()
+                    : [],
+                'sites' => $canManageScopes && $siteIds !== []
+                    ? Site::query()
+                        ->whereIn('id', $siteIds)
+                        ->where('is_active', true)
+                        ->where('archived', false)
+                        ->whereNull('archived_at')
+                        ->orderBy('name')
+                        ->get(['id', 'name'])
+                        ->map(fn (Site $site): array => [
+                            'id' => (int) $site->id,
+                            'name' => $site->name,
+                        ])
+                        ->values()
+                        ->all()
+                    : [],
+            ],
             'runs' => $mappedRuns,
             'candidates' => $mappedCandidates,
             'collection_paths' => $mappedCollectors->map(fn (array $collector): array => [

@@ -39,6 +39,7 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             ['key' => 'securityDevices.maintenance.manage', 'description' => 'Create and manage device maintenance', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.integrations.view', 'description' => 'View integration status and synced devices', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.integrations.manage', 'description' => 'Manage device sync and discovery', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.monitoring.manage', 'description' => 'Author monitoring profiles, coverage, dependencies, maintenance windows, and retention', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.reports.view', 'description' => 'View hardware and compliance reports', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.commands.observe', 'description' => 'View authorised device command history', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.commands.operate', 'description' => 'Run approved low-risk device diagnostics and actions', 'group' => 'security_devices', 'module' => 'Security & Devices'],

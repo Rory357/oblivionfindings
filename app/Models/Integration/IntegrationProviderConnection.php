@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * The one application-level credential connection for a provider.
@@ -63,6 +64,7 @@ class IntegrationProviderConnection extends Model
 
     protected $hidden = [
         'secret_encrypted',
+        'secretReferences',
         'config',
         'last_error',
     ];
@@ -76,6 +78,11 @@ class IntegrationProviderConnection extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function secretReferences(): HasMany
+    {
+        return $this->hasMany(IntegrationSecretReference::class, 'provider_connection_id');
     }
 
     public function scopeForProvider(Builder $query, string $provider): Builder

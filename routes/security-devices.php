@@ -11,6 +11,7 @@ use App\Domain\SecurityDevices\Http\Controllers\DeviceController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceDocumentController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceGroupController;
 use App\Domain\SecurityDevices\Http\Controllers\DiscoveryCollectorController;
+use App\Domain\SecurityDevices\Http\Controllers\DiscoveryScopeLifecycleController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\MilesightController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController;
@@ -19,9 +20,15 @@ use App\Domain\SecurityDevices\Http\Controllers\IntegrationsHubController;
 use App\Domain\SecurityDevices\Http\Controllers\MaintenanceHealthController;
 use App\Domain\SecurityDevices\Http\Controllers\MaintenanceOperationsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringCollectorLifecycleController;
+use App\Domain\SecurityDevices\Http\Controllers\MonitoringCoverageSettingsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringDeadLetterController;
+use App\Domain\SecurityDevices\Http\Controllers\MonitoringDependencySettingsController;
+use App\Domain\SecurityDevices\Http\Controllers\MonitoringMaintenanceSettingsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringOperationsController;
+use App\Domain\SecurityDevices\Http\Controllers\MonitoringProfileSettingsController;
+use App\Domain\SecurityDevices\Http\Controllers\MonitoringRetentionSettingsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringRuntimeHealthController;
+use App\Domain\SecurityDevices\Http\Controllers\NativeMonitorLifecycleController;
 use App\Domain\SecurityDevices\Http\Controllers\ReportsController;
 use App\Domain\SecurityDevices\Http\Controllers\SettingsAuditController;
 use App\Domain\SecurityDevices\Http\Controllers\SiteTechnologyController;
@@ -322,6 +329,22 @@ Route::middleware([
         ->middleware('permission:securityDevices.events.view')
         ->name('security-devices.monitoring');
 
+    Route::prefix('/monitoring/native-monitors')
+        ->middleware([
+            'permission:securityDevices.monitoring.manage',
+            'throttle:30,1',
+        ])
+        ->group(function () {
+            Route::post('/', [NativeMonitorLifecycleController::class, 'store'])
+                ->name('security-devices.monitoring.native-monitors.store');
+            Route::patch('/{monitor}', [NativeMonitorLifecycleController::class, 'update'])
+                ->whereNumber('monitor')
+                ->name('security-devices.monitoring.native-monitors.update');
+            Route::post('/{monitor}/deactivate', [NativeMonitorLifecycleController::class, 'deactivate'])
+                ->whereNumber('monitor')
+                ->name('security-devices.monitoring.native-monitors.deactivate');
+        });
+
     Route::get('/runtime-health', MonitoringRuntimeHealthController::class)
         ->middleware('permission:securityDevices.events.view')
         ->name('security-devices.runtime-health');
@@ -363,6 +386,25 @@ Route::middleware([
         ->middleware('permission:securityDevices.integrations.view')
         ->name('security-devices.discovery');
 
+    Route::prefix('/discovery/scopes')
+        ->middleware([
+            'permission:securityDevices.integrations.manage',
+            'throttle:20,1',
+        ])
+        ->group(function () {
+            Route::post('/', [DiscoveryScopeLifecycleController::class, 'store'])
+                ->name('security-devices.discovery.scopes.store');
+            Route::patch('/{scope}', [DiscoveryScopeLifecycleController::class, 'update'])
+                ->whereNumber('scope')
+                ->name('security-devices.discovery.scopes.update');
+            Route::post('/{scope}/deactivate', [DiscoveryScopeLifecycleController::class, 'deactivate'])
+                ->whereNumber('scope')
+                ->name('security-devices.discovery.scopes.deactivate');
+            Route::post('/{scope}/apply', [DiscoveryScopeLifecycleController::class, 'apply'])
+                ->whereNumber('scope')
+                ->name('security-devices.discovery.scopes.apply');
+        });
+
     Route::prefix('/discovery/collectors')
         ->middleware([
             'permission:securityDevices.integrations.manage',
@@ -381,6 +423,66 @@ Route::middleware([
 
     Route::get('/settings', SettingsAuditController::class)
         ->name('security-devices.settings');
+
+    Route::prefix('/settings/monitoring')
+        ->middleware([
+            'permission:securityDevices.monitoring.manage',
+            'throttle:30,1',
+        ])
+        ->group(function () {
+            Route::post('/profiles', [MonitoringProfileSettingsController::class, 'store'])
+                ->name('security-devices.settings.monitoring.profiles.store');
+            Route::patch('/profiles/{profile}', [MonitoringProfileSettingsController::class, 'update'])
+                ->whereNumber('profile')
+                ->name('security-devices.settings.monitoring.profiles.update');
+            Route::post('/profiles/{profile}/deactivate', [MonitoringProfileSettingsController::class, 'deactivate'])
+                ->whereNumber('profile')
+                ->name('security-devices.settings.monitoring.profiles.deactivate');
+
+            Route::post('/coverage', [MonitoringCoverageSettingsController::class, 'store'])
+                ->name('security-devices.settings.monitoring.coverage.store');
+            Route::patch('/coverage/{expectation}', [MonitoringCoverageSettingsController::class, 'update'])
+                ->whereNumber('expectation')
+                ->name('security-devices.settings.monitoring.coverage.update');
+            Route::post('/coverage/{expectation}/deactivate', [MonitoringCoverageSettingsController::class, 'deactivate'])
+                ->whereNumber('expectation')
+                ->name('security-devices.settings.monitoring.coverage.deactivate');
+            Route::post('/coverage/{expectation}/reactivate', [MonitoringCoverageSettingsController::class, 'reactivate'])
+                ->whereNumber('expectation')
+                ->name('security-devices.settings.monitoring.coverage.reactivate');
+
+            Route::post('/dependencies', [MonitoringDependencySettingsController::class, 'store'])
+                ->name('security-devices.settings.monitoring.dependencies.store');
+            Route::patch('/dependencies/{dependency}', [MonitoringDependencySettingsController::class, 'update'])
+                ->whereNumber('dependency')
+                ->name('security-devices.settings.monitoring.dependencies.update');
+            Route::post('/dependencies/{dependency}/deactivate', [MonitoringDependencySettingsController::class, 'deactivate'])
+                ->whereNumber('dependency')
+                ->name('security-devices.settings.monitoring.dependencies.deactivate');
+
+            Route::post('/maintenance', [MonitoringMaintenanceSettingsController::class, 'store'])
+                ->name('security-devices.settings.monitoring.maintenance.store');
+            Route::patch('/maintenance/{window}', [MonitoringMaintenanceSettingsController::class, 'update'])
+                ->whereNumber('window')
+                ->name('security-devices.settings.monitoring.maintenance.update');
+            Route::post('/maintenance/{window}/cancel', [MonitoringMaintenanceSettingsController::class, 'cancel'])
+                ->whereNumber('window')
+                ->name('security-devices.settings.monitoring.maintenance.cancel');
+
+            Route::post('/retention/preview', [MonitoringRetentionSettingsController::class, 'preview'])
+                ->name('security-devices.settings.monitoring.retention.preview');
+            Route::post('/retention', [MonitoringRetentionSettingsController::class, 'store'])
+                ->name('security-devices.settings.monitoring.retention.store');
+            Route::patch('/retention/{policy}', [MonitoringRetentionSettingsController::class, 'update'])
+                ->whereNumber('policy')
+                ->name('security-devices.settings.monitoring.retention.update');
+            Route::post('/retention/{policy}/deactivate', [MonitoringRetentionSettingsController::class, 'deactivate'])
+                ->whereNumber('policy')
+                ->name('security-devices.settings.monitoring.retention.deactivate');
+            Route::post('/retention/{policy}/reactivate', [MonitoringRetentionSettingsController::class, 'reactivate'])
+                ->whereNumber('policy')
+                ->name('security-devices.settings.monitoring.retention.reactivate');
+        });
 
     Route::prefix('/settings/credential-references')
         ->middleware('permission:securityDevices.commands.admin')

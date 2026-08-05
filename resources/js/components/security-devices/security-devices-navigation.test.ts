@@ -15,6 +15,7 @@ const allPermissions = {
     maintenanceManage: true,
     integrationsView: true,
     integrationsManage: true,
+    monitoringManage: true,
     reportsView: true,
     commandsAdmin: true,
 };
@@ -126,6 +127,19 @@ describe('Security & Devices navigation contract', () => {
         expect(commandAdminOnly.map((group) => group.label)).toEqual(['Setup']);
         expect(
             commandAdminOnly[0]?.items.map((item) => [item.title, item.href]),
+        ).toEqual([['Settings & audit', '/security-devices/settings']]);
+
+        const monitoringManagerOnly = buildSecurityDevicesNavigationGroups({
+            monitoringManage: true,
+        });
+        expect(monitoringManagerOnly.map((group) => group.label)).toEqual([
+            'Setup',
+        ]);
+        expect(
+            monitoringManagerOnly[0]?.items.map((item) => [
+                item.title,
+                item.href,
+            ]),
         ).toEqual([['Settings & audit', '/security-devices/settings']]);
     });
 

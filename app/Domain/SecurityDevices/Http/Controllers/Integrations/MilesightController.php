@@ -16,9 +16,9 @@ use App\Services\Integration\Contracts\ConnectionHealthCapability;
 use App\Services\Integration\Contracts\DeviceSyncCapability;
 use App\Services\Integration\Contracts\InventoryDiscoveryCapability;
 use App\Services\Integration\IntegrationAdapterRegistry;
+use App\Services\Integration\IntegrationSecretManager;
 use App\Support\SafeOperationalData;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Crypt;
 use Inertia\Inertia;
 
 /**
@@ -31,6 +31,7 @@ class MilesightController extends Controller
     public function __construct(
         private readonly IntegrationSiteCredentialsPresenter $siteCredentials,
         private readonly SecurityDevicesAccessService $access,
+        private readonly IntegrationSecretManager $secrets,
     ) {}
 
     public function index(Request $request)
@@ -115,7 +116,10 @@ class MilesightController extends Controller
                 'endpoint_configured' => filled($config['base_url'] ?? null),
                 'client_id_configured' => filled($config['client_id'] ?? null),
                 'applications_synced_at' => $config['applications_synced_at'] ?? null,
-                'webhook_configured' => filled($config['webhook_secret_encrypted'] ?? null),
+                'webhook_configured' => $this->secrets->applicationConfigured(
+                    $providerConnection,
+                    IntegrationSecretManager::PURPOSE_WEBHOOK,
+                ) || filled($config['webhook_secret_encrypted'] ?? null),
                 'webhook_secret_last4' => filled($config['webhook_secret_last4'] ?? null)
                     ? (string) $config['webhook_secret_last4']
                     : null,
@@ -164,19 +168,34 @@ class MilesightController extends Controller
             $config['base_url'] = $baseUrl;
         }
 
-        IntegrationProviderConnection::updateOrCreate(
-            [
+        $connection = $existingConnection
+            ?? IntegrationProviderConnection::create([
                 'provider' => self::PROVIDER,
-            ],
-            [
-                'secret_encrypted' => Crypt::encryptString($clientSecret),
-                'secret_last4' => substr($clientSecret, -4),
                 'status' => IntegrationProviderConnection::STATUS_DISCONNECTED,
-                'last_error' => null,
-                'config' => $config,
                 'created_by' => $user->id,
-            ],
-        );
+            ]);
+        $connectionWasCreated = $existingConnection === null;
+
+        try {
+            $this->secrets->storeApplication(
+                $connection,
+                IntegrationSecretManager::PURPOSE_PRIMARY,
+                ['client_secret' => $clientSecret],
+            );
+        } catch (\Throwable) {
+            if ($connectionWasCreated && $connection->secretReferences()->doesntExist()) {
+                $connection->delete();
+            }
+
+            return redirect()->back()->with('error', 'The governed secret manager is unavailable. No Milesight client secret was stored.');
+        }
+        $connection->update([
+            'secret_last4' => substr($clientSecret, -4),
+            'status' => IntegrationProviderConnection::STATUS_DISCONNECTED,
+            'last_error' => null,
+            'config' => $config,
+            'created_by' => $user->id,
+        ]);
 
         Integration::updateOrCreate(
             [
@@ -265,9 +284,18 @@ class MilesightController extends Controller
             ->forProvider(self::PROVIDER)
             ->firstOrFail();
 
+        $clientSecret = $request->string('client_secret')->toString();
+        try {
+            $this->secrets->storeApplication(
+                $connection,
+                IntegrationSecretManager::PURPOSE_PRIMARY,
+                ['client_secret' => $clientSecret],
+            );
+        } catch (\Throwable) {
+            return redirect()->back()->with('error', 'The governed secret manager is unavailable. The existing Milesight credential remains unchanged.');
+        }
         $connection->update([
-            'secret_encrypted' => Crypt::encryptString($request->string('client_secret')->toString()),
-            'secret_last4' => substr($request->string('client_secret')->toString(), -4),
+            'secret_last4' => substr($clientSecret, -4),
             'rotated_at' => now(),
             'status' => IntegrationProviderConnection::STATUS_DISCONNECTED,
             'last_error' => null,
@@ -289,7 +317,15 @@ class MilesightController extends Controller
             ->firstOrFail();
         $config = is_array($connection->config) ? $connection->config : [];
         $secret = (string) $validated['webhook_secret'];
-        $config['webhook_secret_encrypted'] = Crypt::encryptString($secret);
+        try {
+            $this->secrets->storeApplication(
+                $connection,
+                IntegrationSecretManager::PURPOSE_WEBHOOK,
+                ['webhook_secret' => $secret],
+            );
+        } catch (\Throwable) {
+            return redirect()->back()->with('error', 'The governed secret manager is unavailable. No Milesight webhook secret was stored.');
+        }
         $config['webhook_secret_last4'] = substr($secret, -4);
         $config['webhook_configured_at'] = now()->toIso8601String();
         $connection->update(['config' => $config]);
@@ -305,6 +341,7 @@ class MilesightController extends Controller
         $connection = IntegrationProviderConnection::query()
             ->forProvider(self::PROVIDER)
             ->firstOrFail();
+        $this->secrets->revokeApplication($connection, IntegrationSecretManager::PURPOSE_WEBHOOK);
         $config = is_array($connection->config) ? $connection->config : [];
         unset(
             $config['webhook_secret_encrypted'],
@@ -321,9 +358,15 @@ class MilesightController extends Controller
         $user = $request->user();
         abort_unless($this->userCanManage($user), 403);
 
-        IntegrationProviderConnection::query()
+        $connection = IntegrationProviderConnection::query()
             ->forProvider(self::PROVIDER)
-            ->delete();
+            ->first();
+        if ($connection !== null) {
+            $this->secrets->deleteApplicationConnection($connection, [
+                IntegrationSecretManager::PURPOSE_PRIMARY,
+                IntegrationSecretManager::PURPOSE_WEBHOOK,
+            ]);
+        }
 
         Integration::query()
             ->where('provider', self::PROVIDER)

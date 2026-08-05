@@ -5,6 +5,7 @@ namespace App\Domain\Monitoring\Models;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Topology\Models\TopologyEdge;
 use App\Models\Site;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
@@ -23,11 +24,19 @@ final class MonitorDependency extends Model
         'confidence',
         'topology_edge_id',
         'is_active',
+        'version',
+        'created_by_user_id',
+        'updated_by_user_id',
+        'deactivated_at',
+        'deactivated_by_user_id',
+        'deactivation_reason',
     ];
 
     protected $casts = [
         'confidence' => 'decimal:4',
         'is_active' => 'boolean',
+        'version' => 'integer',
+        'deactivated_at' => 'immutable_datetime',
     ];
 
     protected static function booted(): void
@@ -56,6 +65,21 @@ final class MonitorDependency extends Model
     public function topologyEdge(): BelongsTo
     {
         return $this->belongsTo(TopologyEdge::class, 'topology_edge_id');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by_user_id');
+    }
+
+    public function deactivatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'deactivated_by_user_id');
     }
 
     private function validateScopeAndPolicy(): void

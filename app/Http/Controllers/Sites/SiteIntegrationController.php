@@ -15,10 +15,11 @@ use App\Services\Integration\Contracts\DeviceSyncCapability;
 use App\Services\Integration\Contracts\EventCollectionCapability;
 use App\Services\Integration\Contracts\InventoryDiscoveryCapability;
 use App\Services\Integration\IntegrationAdapterRegistry;
+use App\Services\Integration\IntegrationSecretManager;
+use App\Services\Integration\LegacyIntegrationSiteSecretWriter;
 use App\Support\SafeOperationalData;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 
 class SiteIntegrationController extends Controller
@@ -467,27 +468,63 @@ class SiteIntegrationController extends Controller
         }
     }
 
-    public function updateSecret(Request $request, Site $site, string $provider, string $capability)
-    {
+    public function updateSecret(
+        Request $request,
+        Site $site,
+        string $provider,
+        string $capability,
+        IntegrationSecretManager $secrets,
+        LegacyIntegrationSiteSecretWriter $legacySecrets,
+    ) {
         $this->authorize('update', $site);
+        $provider = strtolower(trim($provider));
 
         $validated = $request->validate([
             'base_url' => 'nullable|string|max:500',
-            'secret' => 'required|string',
+            'secret' => 'required|string|max:4096',
             'is_enabled' => 'boolean',
         ]);
 
-        IntegrationSiteSecret::updateOrCreate(
-            [
-                'site_id' => $site->id,
-                'provider' => $provider,
-                'capability' => $capability,
-            ],
-            [
+        if (in_array($provider, ['unifi', 'milesight'], true)) {
+            $intendedEnabled = $validated['is_enabled'] ?? true;
+            $siteSecret = IntegrationSiteSecret::firstOrCreate(
+                [
+                    'site_id' => $site->id,
+                    'provider' => $provider,
+                    'capability' => $capability,
+                ],
+                [
+                    'is_enabled' => false,
+                ],
+            );
+            $siteSecretWasCreated = $siteSecret->wasRecentlyCreated;
+
+            try {
+                $secrets->storeSite($siteSecret, [
+                    $provider === 'unifi' ? 'api_key' : 'client_secret' => $validated['secret'],
+                ]);
+            } catch (\Throwable) {
+                if ($siteSecretWasCreated && $siteSecret->secretReferences()->doesntExist()) {
+                    $siteSecret->delete();
+                }
+
+                return redirect()->back()->with('error', 'The governed secret manager is unavailable. No provider secret was stored.');
+            }
+            $siteSecret->update([
                 'base_url' => $validated['base_url'] ?? null,
-                'secret_encrypted' => Crypt::encryptString($validated['secret']),
-                'is_enabled' => $validated['is_enabled'] ?? true,
-            ]
+                'is_enabled' => $intendedEnabled,
+            ]);
+
+            return redirect()->back()->with('success', 'Site credential saved successfully.');
+        }
+
+        $legacySecrets->store(
+            siteId: (int) $site->id,
+            provider: $provider,
+            capability: $capability,
+            baseUrl: $validated['base_url'] ?? null,
+            secret: $validated['secret'],
+            enabled: $validated['is_enabled'] ?? true,
         );
 
         return redirect()->back()->with('success', 'Site credential saved successfully.');

@@ -36,7 +36,8 @@ final class HashicorpVaultLeaseIssuer implements SecretManagerLeaseIssuer, Secre
 
     public function issue(SecretLeaseRequest $request): CredentialLease
     {
-        $response = $this->client()->get('/v1/'.$this->path($request->secretManagerReference()));
+        $query = $request->secretVersion() === null ? [] : ['version' => $request->secretVersion()];
+        $response = $this->client()->get('/v1/'.$this->path($request->secretManagerReference()), $query);
         if (! $response->successful()) {
             throw new RuntimeException('Vault did not issue a credential lease.');
         }

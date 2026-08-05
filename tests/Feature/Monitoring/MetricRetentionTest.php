@@ -168,14 +168,17 @@ it('applies the most restrictive matching privacy policy and writes value-free t
         privacyClass: 'sensitive',
     ));
 
-    MonitoringRetentionPolicy::query()->create([
-        'name' => 'Application baseline',
-        'scope_kind' => 'application',
-        'raw_days' => 30,
-        'hourly_days' => 180,
-        'daily_days' => 1825,
-        'is_active' => true,
-    ]);
+    MonitoringRetentionPolicy::query()->updateOrCreate(
+        ['scope_kind' => 'application'],
+        [
+            'name' => 'Application baseline',
+            'raw_days' => 30,
+            'hourly_days' => 180,
+            'daily_days' => 1825,
+            'legal_hold' => false,
+            'is_active' => true,
+        ],
+    );
     MonitoringRetentionPolicy::query()->create([
         'name' => 'Site baseline',
         'scope_kind' => 'site',

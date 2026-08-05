@@ -3,11 +3,18 @@
 namespace App\Domain\SecurityDevices\Presenters;
 
 use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\Monitoring\Models\MonitorDependency;
+use App\Domain\Monitoring\Models\MonitoringCoverageExpectation;
+use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Models\MonitoringRetentionPolicy;
+use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
+use App\Domain\Monitoring\Services\MonitoringPolicyRules;
 use App\Domain\Monitoring\Services\MonitoringRuntimeHealthService;
+use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
 use App\Domain\SecurityDevices\Credentials\Models\CredentialLeaseGrant;
 use App\Domain\SecurityDevices\Credentials\Models\CredentialReference;
+use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -22,7 +29,9 @@ use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Site;
 use App\Models\User;
+use DateTimeZone;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use UnexpectedValueException;
 
 class SettingsAuditPresenter
 {
@@ -33,12 +42,27 @@ class SettingsAuditPresenter
         DeviceGroup::class,
         DeviceMaintenanceRecord::class,
         MonitoringProfile::class,
+        MonitoringCoverageExpectation::class,
+        MonitorDependency::class,
+        MonitoringMaintenanceWindow::class,
+        MonitoringRetentionPolicy::class,
         Monitor::class,
         Integration::class,
         IntegrationProviderConnection::class,
         IntegrationSiteConfig::class,
         IntegrationSiteSecret::class,
         IntegrationSyncLog::class,
+    ];
+
+    private const MONITORING_POLICY_ACTIONS = [
+        'monitoring.profile.created', 'monitoring.profile.updated', 'monitoring.profile.deactivated',
+        'monitoring.coverage.created', 'monitoring.coverage.updated',
+        'monitoring.coverage.deactivated', 'monitoring.coverage.reactivated',
+        'monitoring.dependency.created', 'monitoring.dependency.reactivated',
+        'monitoring.dependency.updated', 'monitoring.dependency.deactivated',
+        'monitoring.maintenance.created', 'monitoring.maintenance.updated', 'monitoring.maintenance.cancelled',
+        'monitoring.retention.created', 'monitoring.retention.updated',
+        'monitoring.retention.deactivated', 'monitoring.retention.reactivated',
     ];
 
     private const SAFE_FIELDS = [
@@ -50,17 +74,31 @@ class SettingsAuditPresenter
         'released_at', 'description', 'interval_seconds', 'failure_confirmations',
         'recovery_confirmations', 'stale_after_seconds', 'current_state', 'is_enabled',
         'last_observation_at', 'last_tested_at', 'last_synced_at', 'rotated_at', 'secret_last4',
+        'version', 'scope_kind', 'device_domain', 'device_category', 'capability', 'monitor_kind',
+        'minimum_count', 'support_status', 'upstream_monitor_id', 'downstream_monitor_id',
+        'confidence', 'source', 'monitor_id', 'device_id', 'starts_at', 'ends_at', 'recurrence',
+        'recurrence_until', 'timezone', 'policy', 'raw_days', 'hourly_days', 'daily_days',
+        'legal_hold', 'data_class', 'privacy_class', 'reason_recorded',
     ];
 
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
         private readonly MonitoringRuntimeHealthService $runtimeHealth,
+        private readonly CanonicalDeviceSiteResolver $siteResolver,
     ) {}
 
     /** @return array<string, mixed> */
     public function present(User $viewer): array
     {
-        $visibleDevices = $this->access->visibleDevices($viewer)->get(['id', 'provider', 'external_ref']);
+        $visibleDevices = $this->access->visibleDevices($viewer)
+            ->with([
+                'assignments' => fn ($query) => $query
+                    ->active()
+                    ->where('assigned_at', '<=', now())
+                    ->orderBy('id'),
+                'activeAssetLinks' => fn ($query) => $query->orderBy('id'),
+            ])
+            ->get(['id', 'name', 'provider', 'external_ref']);
         $deviceIds = $visibleDevices->pluck('id');
         $siteIds = $this->access->accessibleSiteIds($viewer);
         $canReport = $viewer->canDo('securityDevices.reports.view');
@@ -152,6 +190,12 @@ class SettingsAuditPresenter
                 ],
                 'rule' => 'The most restrictive matching policy applies; legal hold preserves matching evidence.',
             ],
+            'monitoringPolicyWorkspace' => $this->monitoringPolicyWorkspace(
+                $viewer,
+                $visibleDevices,
+                $siteIds,
+                $canViewAllSites,
+            ),
             'monitoringRuntime' => $this->runtimeHealth->present($viewer),
             'dataQuality' => [
                 'visible_devices' => $visibleDevices->count(),
@@ -175,6 +219,225 @@ class SettingsAuditPresenter
                 'entries' => $canReport ? $this->auditEntries($deviceIds->all(), $siteIds, $canViewAllSites) : [],
                 'limit' => 50,
             ],
+        ];
+    }
+
+    /** @param list<int> $siteIds
+     * @return array<string, mixed>
+     */
+    private function monitoringPolicyWorkspace(
+        User $viewer,
+        $visibleDevices,
+        array $siteIds,
+        bool $canViewAllSites,
+    ): array {
+        $canManage = $viewer->canDo('securityDevices.monitoring.manage');
+        if (! $canManage) {
+            return [
+                'visible' => false,
+                'can_manage' => false,
+                'can_manage_application' => false,
+                'retention_confirmation' => '',
+                'sites' => [],
+                'devices' => [],
+                'monitors' => [],
+                'catalogs' => [
+                    'domains' => [],
+                    'capabilities' => [],
+                    'data_classes' => [],
+                    'privacy_classes' => [],
+                    'timezones' => [],
+                ],
+                'profiles' => [],
+                'coverage' => [],
+                'dependencies' => [],
+                'maintenance' => [],
+                'retention' => [],
+            ];
+        }
+
+        $sites = Site::query()
+            ->whereIn('id', $siteIds)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (Site $site): array => ['id' => (int) $site->id, 'name' => $site->name]);
+        $siteNames = $sites->pluck('name', 'id');
+
+        $devices = $visibleDevices->map(function (Device $device) use ($siteNames): ?array {
+            try {
+                $siteId = $this->siteResolver->resolveLoadedForContext($device);
+            } catch (UnexpectedValueException) {
+                return null;
+            }
+
+            return [
+                'id' => (int) $device->id,
+                'name' => $device->name,
+                'site_id' => $siteId,
+                'site_name' => $siteNames->get($siteId, 'Site unavailable'),
+            ];
+        })->filter()->values();
+        $deviceIds = $devices->pluck('id');
+        $deviceRows = $devices->keyBy('id');
+
+        $monitors = Monitor::query()
+            ->whereIn('device_id', $deviceIds)
+            ->orderBy('device_id')
+            ->orderBy('name')
+            ->get(['id', 'device_id', 'profile_id', 'name', 'kind', 'is_enabled'])
+            ->map(function (Monitor $monitor) use ($deviceRows): array {
+                $device = $deviceRows->get((int) $monitor->device_id);
+
+                return [
+                    'id' => (int) $monitor->id,
+                    'name' => $monitor->name,
+                    'kind' => $monitor->kind?->value ?? (string) $monitor->kind,
+                    'device_id' => (int) $monitor->device_id,
+                    'device_name' => data_get($device, 'name', 'Device unavailable'),
+                    'site_id' => (int) data_get($device, 'site_id', 0),
+                    'site_name' => data_get($device, 'site_name', 'Site unavailable'),
+                    'enabled' => (bool) $monitor->is_enabled,
+                ];
+            });
+        $monitorNames = $monitors->pluck('name', 'id');
+
+        return [
+            'visible' => $canManage,
+            'can_manage' => $canManage,
+            'can_manage_application' => $canManage && $canViewAllSites,
+            'retention_confirmation' => MonitoringPolicyRules::RETENTION_CONFIRMATION,
+            'sites' => $sites->values()->all(),
+            'devices' => $devices->all(),
+            'monitors' => $monitors->all(),
+            'catalogs' => [
+                'domains' => collect(DeviceDomain::cases())->map(fn (DeviceDomain $domain): array => [
+                    'value' => $domain->value,
+                    'label' => $domain->label(),
+                    'categories' => collect(DeviceTaxonomy::categoriesFor($domain->value))
+                        ->map(fn (string $label, string $value): array => compact('value', 'label'))
+                        ->values()->all(),
+                ])->all(),
+                'capabilities' => [
+                    ['value' => 'reachability', 'label' => 'Reachability', 'monitor_kind' => 'icmp'],
+                    ['value' => 'service_port', 'label' => 'Service port', 'monitor_kind' => 'tcp'],
+                    ['value' => 'dns_resolution', 'label' => 'DNS resolution', 'monitor_kind' => 'dns'],
+                    ['value' => 'web_endpoint', 'label' => 'Web endpoint', 'monitor_kind' => 'http'],
+                    ['value' => 'tls_certificate', 'label' => 'TLS certificate', 'monitor_kind' => 'tls'],
+                    ['value' => 'snmp_inventory', 'label' => 'SNMP inventory', 'monitor_kind' => 'snmp'],
+                    ['value' => 'snmp_interface', 'label' => 'SNMP interface', 'monitor_kind' => 'snmp_interface'],
+                    ['value' => 'ssh_inventory', 'label' => 'Read-only SSH inventory', 'monitor_kind' => 'ssh_inventory'],
+                    ['value' => 'winrm_inventory', 'label' => 'WinRM inventory', 'monitor_kind' => 'winrm_inventory'],
+                    ['value' => 'provider_health', 'label' => 'Provider health', 'monitor_kind' => 'provider'],
+                    ['value' => 'collector_health', 'label' => 'Collector health', 'monitor_kind' => 'collector'],
+                ],
+                'data_classes' => [
+                    'operational', 'tracking_telemetry', 'healthcare_telemetry',
+                    'security_telemetry', 'configuration',
+                ],
+                'privacy_classes' => ['standard', 'sensitive', 'restricted'],
+                'timezones' => DateTimeZone::listIdentifiers(),
+            ],
+            'profiles' => MonitoringProfile::query()
+                ->withCount('monitors')
+                ->orderByDesc('is_active')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (MonitoringProfile $profile): array => [
+                    ...$profile->only([
+                        'id', 'name', 'description', 'interval_seconds', 'failure_confirmations',
+                        'failure_duration_seconds', 'recovery_confirmations', 'recovery_duration_seconds',
+                        'stale_after_seconds', 'rising_threshold', 'falling_threshold',
+                        'baseline_window_seconds', 'baseline_minimum_samples',
+                        'baseline_deviation_multiplier', 'maintenance_policy', 'rollup_policy',
+                        'retention_policy_id', 'version', 'is_active',
+                    ]),
+                    'used_by_count' => (int) $profile->monitors_count,
+                    'state' => $profile->is_active ? 'active' : 'inactive',
+                ])->all(),
+            'coverage' => MonitoringCoverageExpectation::query()
+                ->with('site:id,name')
+                ->where(function ($query) use ($siteIds, $canViewAllSites): void {
+                    $query->whereNull('site_id');
+                    if ($canViewAllSites) {
+                        $query->orWhereNotNull('site_id');
+                    } elseif ($siteIds !== []) {
+                        $query->orWhereIn('site_id', $siteIds);
+                    }
+                })
+                ->orderByDesc('is_active')
+                ->orderBy('site_id')
+                ->get()
+                ->map(fn (MonitoringCoverageExpectation $row): array => [
+                    ...$row->only([
+                        'id', 'site_id', 'device_domain', 'device_category', 'capability',
+                        'monitor_kind', 'minimum_count', 'support_status', 'version', 'is_active',
+                    ]),
+                    'monitor_kind' => $row->monitor_kind?->value,
+                    'site_name' => $row->site?->name ?? 'All Sites',
+                    'rationale' => (string) data_get($row->support_evidence, 'rationale', ''),
+                    'state' => $row->is_active ? 'active' : 'inactive',
+                    'can_manage' => $row->site_id !== null || $canViewAllSites,
+                ])->all(),
+            'dependencies' => MonitorDependency::query()
+                ->with('site:id,name')
+                ->whereIn('site_id', $siteIds)
+                ->orderByDesc('is_active')
+                ->orderBy('site_id')
+                ->get()
+                ->map(fn (MonitorDependency $row): array => [
+                    ...$row->only([
+                        'id', 'site_id', 'upstream_monitor_id', 'downstream_monitor_id',
+                        'policy', 'source', 'confidence', 'version', 'is_active',
+                    ]),
+                    'site_name' => $row->site?->name ?? 'Site unavailable',
+                    'upstream_monitor_name' => $monitorNames->get((int) $row->upstream_monitor_id, 'Monitor unavailable'),
+                    'downstream_monitor_name' => $monitorNames->get((int) $row->downstream_monitor_id, 'Monitor unavailable'),
+                    'state' => $row->is_active ? 'active' : 'inactive',
+                    'can_manage' => $row->source === 'manual',
+                ])->all(),
+            'maintenance' => MonitoringMaintenanceWindow::query()
+                ->with('site:id,name')
+                ->whereIn('site_id', $siteIds)
+                ->orderByDesc('starts_at')
+                ->get()
+                ->map(fn (MonitoringMaintenanceWindow $row): array => [
+                    ...$row->only([
+                        'id', 'site_id', 'monitor_id', 'device_id', 'name', 'recurrence',
+                        'timezone', 'policy', 'status', 'reason', 'version',
+                    ]),
+                    'site_name' => $row->site?->name ?? 'Site unavailable',
+                    'monitor_name' => $row->monitor_id === null ? null : $monitorNames->get((int) $row->monitor_id, 'Monitor unavailable'),
+                    'device_name' => $row->device_id === null ? null : data_get($deviceRows->get((int) $row->device_id), 'name', 'Device unavailable'),
+                    'starts_at' => $row->starts_at?->toISOString(),
+                    'ends_at' => $row->ends_at?->toISOString(),
+                    'recurrence_until' => $row->recurrence_until?->toISOString(),
+                ])->all(),
+            'retention' => MonitoringRetentionPolicy::query()
+                ->with(['site:id,name', 'device:id,name'])
+                ->where(function ($query) use ($canViewAllSites, $siteIds, $deviceIds): void {
+                    $query->where('scope_kind', 'application')
+                        ->orWhere('scope_kind', 'data_class')
+                        ->orWhere('scope_kind', 'privacy');
+                    if ($canViewAllSites) {
+                        $query->orWhereIn('scope_kind', ['site', 'device']);
+                    } else {
+                        $query->orWhereIn('site_id', $siteIds)->orWhereIn('device_id', $deviceIds);
+                    }
+                })
+                ->orderByDesc('is_active')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (MonitoringRetentionPolicy $row): array => [
+                    ...$row->only([
+                        'id', 'name', 'scope_kind', 'site_id', 'device_id', 'data_class',
+                        'privacy_class', 'raw_days', 'hourly_days', 'daily_days', 'legal_hold',
+                        'version', 'is_active',
+                    ]),
+                    'scope_name' => $row->site?->name ?? $row->device?->name
+                        ?? $row->data_class ?? $row->privacy_class ?? 'Application',
+                    'state' => $row->is_active ? 'active' : 'inactive',
+                    'can_manage' => in_array($row->scope_kind, ['site', 'device'], true) || $canViewAllSites,
+                ])->all(),
         ];
     }
 
@@ -276,7 +539,10 @@ class SettingsAuditPresenter
 
         return AuditLog::query()
             ->whereIn('auditable_type', $this->auditTypeNames())
-            ->whereIn('action', collect(self::AUDIT_TYPES)->flatMap(fn (string $type) => collect(['create', 'update', 'delete'])->map(fn (string $verb) => strtolower(class_basename($type)).'.'.$verb)))
+            ->whereIn('action', collect(self::AUDIT_TYPES)
+                ->flatMap(fn (string $type) => collect(['create', 'update', 'delete'])
+                    ->map(fn (string $verb) => strtolower(class_basename($type)).'.'.$verb))
+                ->concat(self::MONITORING_POLICY_ACTIONS))
             ->when($canViewAllSites, fn ($query) => $query, fn ($query) => $query->where(function ($query) use ($visibleDeviceIds, $monitorIds, $siteIds, $deviceChildTypes): void {
                 $query->where(fn ($q) => $q->whereIn('auditable_type', $this->typeNames(Device::class))->whereIn('auditable_id', $visibleDeviceIds))
                     ->orWhere(fn ($q) => $q->whereIn('auditable_type', $this->typeNames(Device::class))->where(function ($scope) use ($visibleDeviceIds, $siteIds): void {
@@ -312,6 +578,16 @@ class SettingsAuditPresenter
                             });
                     })
                     ->orWhere(fn ($q) => $q->where('auditable_type', MonitoringProfile::class)->whereIn('auditable_id', MonitoringProfile::query()->select('id')))
+                    ->orWhere(fn ($q) => $q->whereIn('auditable_type', $this->typeNames(MonitoringCoverageExpectation::class))->where(function ($scope) use ($siteIds): void {
+                        $scope->whereNull('meta->site_id')->orWhereIn('meta->site_id', $siteIds);
+                    }))
+                    ->orWhere(fn ($q) => $q->whereIn('auditable_type', $this->typeNames(MonitorDependency::class))->whereIn('meta->site_id', $siteIds))
+                    ->orWhere(fn ($q) => $q->whereIn('auditable_type', $this->typeNames(MonitoringMaintenanceWindow::class))->whereIn('meta->site_id', $siteIds))
+                    ->orWhere(fn ($q) => $q->whereIn('auditable_type', $this->typeNames(MonitoringRetentionPolicy::class))->where(function ($scope) use ($siteIds, $visibleDeviceIds): void {
+                        $scope->where(fn ($global) => $global->whereNull('meta->site_id')->whereNull('meta->device_id'))
+                            ->orWhereIn('meta->site_id', $siteIds)
+                            ->orWhereIn('meta->device_id', $visibleDeviceIds);
+                    }))
                     ->orWhere(fn ($q) => $q->where('auditable_type', IntegrationSiteConfig::class)->whereIn('auditable_id', IntegrationSiteConfig::query()->whereIn('site_id', $siteIds)->select('id')))
                     ->orWhere(fn ($q) => $q->where('auditable_type', IntegrationSiteConfig::class)->whereIn('meta->scope->site_id', $siteIds))
                     ->orWhere(fn ($q) => $q->where('auditable_type', IntegrationSiteSecret::class)->whereIn('auditable_id', IntegrationSiteSecret::query()->whereIn('site_id', $siteIds)->select('id')))

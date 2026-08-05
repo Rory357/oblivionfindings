@@ -4,6 +4,8 @@ namespace Tests\Feature\SecurityDevices;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Monitoring\Models\ProviderCapabilityCursor;
+use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerLeaseIssuer;
+use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerSecretStore;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\AuditLog;
@@ -21,11 +23,14 @@ use App\Models\User;
 use App\Services\Integration\Contracts\ConnectionHealthCapability;
 use App\Services\Integration\Contracts\DeviceSyncCapability;
 use App\Services\Integration\IntegrationAdapterRegistry;
+use App\Services\Integration\IntegrationSecretManager;
+use App\Services\Integration\IntegrationSecretMaterialService;
 use App\Services\Integration\SyncResult;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
+use Tests\Support\FakeIntegrationSecretBackend;
 use Tests\TestCase;
 
 class UnifiSettingsRefactorTest extends TestCase
@@ -42,6 +47,9 @@ class UnifiSettingsRefactorTest extends TestCase
 
         $this->seed(RbacSeeder::class);
         $this->seed(SecurityDevicesPermissionsSeeder::class);
+        $backend = new FakeIntegrationSecretBackend;
+        $this->app->instance(SecretManagerSecretStore::class, $backend);
+        $this->app->instance(SecretManagerLeaseIssuer::class, $backend);
 
         $this->admin = User::factory()->create();
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -272,7 +280,12 @@ class UnifiSettingsRefactorTest extends TestCase
         $replacement = $connection->fresh();
         $this->assertSame(IntegrationProviderConnection::STATUS_DISCONNECTED, $replacement->status);
         $this->assertFalse($replacement->requires_credential_replacement);
-        $this->assertSame('replacement-unifi-key', Crypt::decryptString($replacement->secret_encrypted));
+        $this->assertSame('disabled-old-key', Crypt::decryptString($replacement->secret_encrypted));
+        $this->assertSame('replacement-unifi-key', app(IntegrationSecretMaterialService::class)->application(
+            $replacement,
+            IntegrationSecretManager::PURPOSE_PRIMARY,
+            'api_key',
+        ));
         $this->assertNotNull($replacement->recovery_credentials_replaced_at);
         $this->assertSame($this->admin->id, $replacement->recovery_credentials_replaced_by);
         $this->assertSame('security_review', $replacement->disabled_reason);

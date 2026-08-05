@@ -29,13 +29,14 @@ use App\Services\Integration\Data\VerifiedProviderEventBatch;
 use App\Services\Integration\Exceptions\WebhookRejected;
 use App\Services\Integration\IntegrationAdapterInterface;
 use App\Services\Integration\IntegrationDiscoveryException;
+use App\Services\Integration\IntegrationSecretManager;
+use App\Services\Integration\IntegrationSecretMaterialService;
 use App\Services\Integration\SyncResult;
 use App\Services\Integration\UnifiOperationalBridgeService;
 use App\Support\SafeOperationalData;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -78,6 +79,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
     public function __construct(
         private readonly UnifiOperationalBridgeService $runtime,
         private readonly CanonicalDeviceSiteResolver $siteResolver,
+        private readonly IntegrationSecretMaterialService $secrets,
     ) {}
 
     /**
@@ -125,7 +127,11 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
         }
 
         try {
-            $secret = Crypt::decryptString($connection->secret_encrypted);
+            $secret = $this->secrets->application(
+                $connection,
+                IntegrationSecretManager::PURPOSE_PRIMARY,
+                'api_key',
+            );
         } catch (\Throwable) {
             throw new WebhookRejected('credentials_unavailable');
         }
@@ -264,7 +270,11 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
     public function testConnection(IntegrationProviderConnection $connection): bool
     {
         try {
-            $apiKey = Crypt::decryptString($connection->secret_encrypted);
+            $apiKey = $this->secrets->application(
+                $connection,
+                IntegrationSecretManager::PURPOSE_PRIMARY,
+                'api_key',
+            );
 
             $response = Http::withHeaders([
                 'Accept' => 'application/json',
@@ -285,7 +295,11 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
     public function discoverSites(IntegrationProviderConnection $connection): array
     {
         try {
-            $apiKey = Crypt::decryptString($connection->secret_encrypted);
+            $apiKey = $this->secrets->application(
+                $connection,
+                IntegrationSecretManager::PURPOSE_PRIMARY,
+                'api_key',
+            );
 
             $headers = [
                 'Accept' => 'application/json',
@@ -499,7 +513,11 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
     public function discoverHosts(IntegrationProviderConnection $connection): array
     {
         try {
-            $apiKey = Crypt::decryptString($connection->secret_encrypted);
+            $apiKey = $this->secrets->application(
+                $connection,
+                IntegrationSecretManager::PURPOSE_PRIMARY,
+                'api_key',
+            );
 
             $response = Http::withHeaders([
                 'Accept' => 'application/json',
@@ -563,7 +581,11 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
     public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationProviderConnection $providerConnection): SyncResult
     {
         try {
-            $apiKey = Crypt::decryptString($providerConnection->secret_encrypted);
+            $apiKey = $this->secrets->application(
+                $providerConnection,
+                IntegrationSecretManager::PURPOSE_PRIMARY,
+                'api_key',
+            );
             $externalSiteId = $siteConfig->mapped_external_site_id;
 
             $sitesResponse = Http::withHeaders([
@@ -675,7 +697,11 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
 
         try {
             $offset = $this->topologyOffset($cursor);
-            $apiKey = Crypt::decryptString($providerConnection->secret_encrypted);
+            $apiKey = $this->secrets->application(
+                $providerConnection,
+                IntegrationSecretManager::PURPOSE_PRIMARY,
+                'api_key',
+            );
             $headers = [
                 'Accept' => 'application/json',
                 'X-API-Key' => $apiKey,
@@ -829,7 +855,11 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
         $pageLimit = min($limit, self::OBSERVATION_MAX_PAGE_SIZE);
 
         try {
-            $apiKey = Crypt::decryptString($providerConnection->secret_encrypted);
+            $apiKey = $this->secrets->application(
+                $providerConnection,
+                IntegrationSecretManager::PURPOSE_PRIMARY,
+                'api_key',
+            );
             $headers = [
                 'Accept' => 'application/json',
                 'X-API-Key' => $apiKey,
@@ -1053,7 +1083,11 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
 
         try {
             $externalSiteId = $this->normalizeRequiredSiteIdentifier($siteConfig->mapped_external_site_id);
-            $apiKey = Crypt::decryptString($providerConnection->secret_encrypted);
+            $apiKey = $this->secrets->application(
+                $providerConnection,
+                IntegrationSecretManager::PURPOSE_PRIMARY,
+                'api_key',
+            );
             $headers = [
                 'Accept' => 'application/json',
                 'X-API-Key' => $apiKey,
@@ -1833,13 +1867,13 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
             ->where('is_enabled', true)
             ->first();
 
-        if (! $accessSecret || empty($accessSecret->base_url) || empty($accessSecret->secret_encrypted)) {
+        if (! $accessSecret || empty($accessSecret->base_url)) {
             throw new \RuntimeException('UniFi Access API credentials are unavailable for this Site.');
         }
 
         try {
             [$since, $until, $pageNumber] = $this->accessEventWindow($cursor);
-            $apiKey = Crypt::decryptString($accessSecret->secret_encrypted);
+            $apiKey = $this->secrets->site($accessSecret, 'api_key');
             $baseUrl = $this->accessBaseUrl($accessSecret->base_url);
             $url = $baseUrl.'/api/v1/developer/system/logs?'.http_build_query([
                 'page_size' => $limit,

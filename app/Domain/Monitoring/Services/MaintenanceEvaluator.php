@@ -45,11 +45,62 @@ final class MaintenanceEvaluator
             return false;
         }
 
-        $duration = $start->diffInSeconds($end);
-        $period = $window->recurrence === 'daily' ? 86400 : 604800;
-        $elapsed = $start->diffInSeconds($at, false);
-        $offset = $elapsed % $period;
+        $timezone = $window->timezone ?: 'UTC';
+        $startLocal = $start->setTimezone($timezone);
+        $endLocal = $end->setTimezone($timezone);
+        $atLocal = $at->setTimezone($timezone);
+        $candidates = $window->recurrence === 'daily'
+            ? $this->dailyCandidates($startLocal, $atLocal)
+            : $this->weeklyCandidates($startLocal, $atLocal);
 
-        return $offset >= 0 && $offset < $duration;
+        foreach ($candidates as $candidateStart) {
+            if ($candidateStart < $startLocal) {
+                continue;
+            }
+            $candidateEnd = $this->recurringEnd($candidateStart, $startLocal, $endLocal);
+            if ($atLocal >= $candidateStart && $atLocal < $candidateEnd) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return list<CarbonImmutable> */
+    private function dailyCandidates(CarbonImmutable $start, CarbonImmutable $at): array
+    {
+        $candidate = $at->setTime(
+            $start->hour,
+            $start->minute,
+            $start->second,
+            $start->micro,
+        );
+
+        return [$candidate, $candidate->subDay()];
+    }
+
+    /** @return list<CarbonImmutable> */
+    private function weeklyCandidates(CarbonImmutable $start, CarbonImmutable $at): array
+    {
+        $elapsedDays = $start->startOfDay()->diffInDays($at->startOfDay(), false);
+        if ($elapsedDays < 0) {
+            return [];
+        }
+        $candidate = $start->addWeeks(intdiv((int) $elapsedDays, 7));
+
+        return [$candidate, $candidate->subWeek()];
+    }
+
+    private function recurringEnd(
+        CarbonImmutable $candidateStart,
+        CarbonImmutable $templateStart,
+        CarbonImmutable $templateEnd,
+    ): CarbonImmutable {
+        $dayOffset = $templateStart->startOfDay()->diffInDays($templateEnd->startOfDay(), false);
+
+        return $candidateStart
+            ->startOfDay()
+            ->addDays((int) $dayOffset)
+            ->setTime($templateEnd->hour, $templateEnd->minute, $templateEnd->second, $templateEnd->micro);
     }
 }

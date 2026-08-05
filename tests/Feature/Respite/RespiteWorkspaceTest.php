@@ -7,19 +7,22 @@ use App\Models\RespiteReferral;
 use App\Models\RespiteTask;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
     $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
     $this->admin->roles()->attach(Role::where('name', 'admin')->first());
 });
 
 test('the respite workspace renders one payload with pipeline lists, homes and counts', function () {
     $client = Client::factory()->create();
+    $requestedStart = now()->addDays(5)->setTime(10, 0);
+    $requestedEnd = now()->addDays(12)->setTime(10, 0);
 
     RespiteReferral::create([
         'client_id' => $client->id,
@@ -32,8 +35,8 @@ test('the respite workspace renders one payload with pipeline lists, homes and c
 
     $request = RespiteBookingRequest::create([
         'client_id' => $client->id,
-        'requested_start' => now()->addDays(5),
-        'requested_end' => now()->addDays(12),
+        'requested_start' => $requestedStart,
+        'requested_end' => $requestedEnd,
         'requirements' => [],
         'status' => 'approved',
     ]);
@@ -42,6 +45,8 @@ test('the respite workspace renders one payload with pipeline lists, homes and c
     $booking = RespiteBooking::factory()->create([
         'client_id' => $client->id,
         'booking_request_id' => $request->id,
+        'start_at' => $requestedStart,
+        'end_at' => $requestedEnd,
         'status' => 'pending',
     ]);
 
