@@ -138,6 +138,9 @@ class EstateOperationsPresenter
             'can' => [
                 'create' => $viewer->canDo('securityDevices.devices.create'),
                 'export' => $viewer->canDo('securityDevices.reports.view'),
+                'view_devices' => $context['canViewDevices'],
+                'view_events' => $context['canViewEvents'],
+                'view_maintenance' => $context['canViewMaintenance'],
             ],
         ];
     }
@@ -380,26 +383,30 @@ class EstateOperationsPresenter
                 [
                     'key' => 'failed_monitors',
                     'label' => 'Failed monitors',
-                    'count' => $failedMonitors->count(),
-                    'href' => '/security-devices/monitoring?state=failed',
+                    'count' => $context['canViewEvents'] ? $failedMonitors->count() : null,
+                    'href' => $context['canViewEvents'] ? '/security-devices/monitoring?state=failed' : null,
+                    'restriction_reason' => $context['canViewEvents'] ? null : 'Monitoring access is required to open this queue.',
                 ],
                 [
                     'key' => 'unmonitored_devices',
                     'label' => 'Devices without monitoring',
-                    'count' => $unmonitoredDevices->count(),
-                    'href' => '/security-devices/devices?view=unmonitored',
+                    'count' => $context['canViewDevices'] ? $unmonitoredDevices->count() : null,
+                    'href' => $context['canViewDevices'] ? '/security-devices/devices?view=unmonitored' : null,
+                    'restriction_reason' => $context['canViewDevices'] ? null : 'Device inventory access is required to open this queue.',
                 ],
                 [
                     'key' => 'overdue_maintenance',
                     'label' => 'Overdue maintenance',
-                    'count' => $overdueMaintenance->count(),
-                    'href' => '/security-devices/maintenance?status=overdue',
+                    'count' => $context['canViewMaintenance'] ? $overdueMaintenance->count() : null,
+                    'href' => $context['canViewMaintenance'] ? '/security-devices/maintenance?status=overdue' : null,
+                    'restriction_reason' => $context['canViewMaintenance'] ? null : 'Maintenance access is required to open this queue.',
                 ],
                 [
                     'key' => 'open_it_work',
                     'label' => 'Open IT work',
                     'count' => $context['canIt'] ? $context['tickets']->count() : null,
-                    'href' => $context['canIt'] ? '/it?view=open' : null,
+                    'href' => $context['canIt'] ? '/it?tab=tickets&view=all_open' : null,
+                    'restriction_reason' => $context['canIt'] ? null : 'IT work access is required to open this queue.',
                 ],
             ])->values(),
             'recent_changes' => $this->recentChanges($context),
@@ -479,7 +486,7 @@ class EstateOperationsPresenter
             'collector' => $collector,
             'last_change_at' => $latestChange?->toIso8601String(),
             'requires_action' => in_array($health, ['critical', 'warning'], true),
-            'href' => "/security-devices/sites/{$site->id}",
+            'href' => $context['canViewDevices'] ? "/security-devices/sites/{$site->id}" : null,
         ];
     }
 
@@ -534,6 +541,10 @@ class EstateOperationsPresenter
                 ->get();
 
         $canIt = $viewer->canDo('it.view');
+        $canViewDevices = $viewer->canDo('securityDevices.devices.view');
+        $canViewEvents = $viewer->canDo('securityDevices.events.view');
+        $canViewMaintenance = $viewer->canDo('securityDevices.maintenance.view')
+            || $viewer->canDo('securityDevices.maintenance.manage');
         $ticketQuery = ItTicket::query()
             ->whereIn('status', ItTicket::OPEN_STATUSES)
             ->with(['links' => fn ($query) => $query->whereIn('relationship', ['affected_site', 'affected_device'])]);
@@ -564,6 +575,9 @@ class EstateOperationsPresenter
             'tickets',
             'alerts',
             'canIt',
+            'canViewDevices',
+            'canViewEvents',
+            'canViewMaintenance',
             'canControlRoom',
         );
     }
@@ -774,7 +788,7 @@ class EstateOperationsPresenter
                 'device_name' => $device->name,
                 'summary' => 'Device record updated',
                 'at' => $device->updated_at?->toIso8601String(),
-                'href' => "/security-devices/devices/{$device->id}",
+                'href' => $context['canViewDevices'] ? "/security-devices/devices/{$device->id}" : null,
             ])
             ->concat($events->map(fn (DeviceEvent $event) => [
                 'key' => "event-{$event->id}",
@@ -783,7 +797,7 @@ class EstateOperationsPresenter
                 'device_name' => $event->device?->name,
                 'summary' => Str::headline($event->event_type),
                 'at' => $event->occurred_at?->toIso8601String(),
-                'href' => "/security-devices/devices/{$event->device_id}",
+                'href' => $context['canViewDevices'] ? "/security-devices/devices/{$event->device_id}" : null,
             ]))
             ->filter(fn (array $change) => $change['at'] !== null)
             ->sortByDesc('at')

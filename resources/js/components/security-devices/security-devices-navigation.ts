@@ -25,6 +25,7 @@ export interface SecurityDevicesPermissions {
     integrationsView?: boolean;
     integrationsManage?: boolean;
     reportsView?: boolean;
+    commandsAdmin?: boolean;
 }
 
 export interface SecurityDevicesNavigationItem extends NavItem {
@@ -161,7 +162,12 @@ const navigationGroups: SecurityDevicesNavigationGroup[] = [
                     '/security-devices/reports',
                 ],
                 icon: Settings,
-                visible: (can) => Boolean(can.groupsManage || can.reportsView),
+                visible: (can) =>
+                    Boolean(
+                        can.groupsManage ||
+                        can.reportsView ||
+                        can.commandsAdmin,
+                    ),
             },
         ],
     },

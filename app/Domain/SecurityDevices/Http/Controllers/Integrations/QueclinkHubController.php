@@ -8,6 +8,7 @@ use App\Domain\SecurityDevices\Management\Models\DeviceConfigurationProfile;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Presenters\IntegrationSiteCredentialsPresenter;
+use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
 use App\Domain\SecurityDevices\Services\DeviceLinkService;
 use App\Domain\SecurityDevices\Services\QueclinkIntegrationAccessService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -62,6 +63,7 @@ class QueclinkHubController extends Controller
         private readonly IntegrationSiteCredentialsPresenter $siteCredentials,
         private readonly SecurityDevicesAccessService $devicesAccess,
         private readonly DeviceLinkService $deviceLinks,
+        private readonly DeviceAssignmentService $deviceAssignments,
         private readonly QueclinkConfigurationProfileService $configurationProfiles,
     ) {}
 
@@ -266,15 +268,14 @@ class QueclinkHubController extends Controller
                 $this->deviceLinks->link($device, $asset, (int) $request->user()->id);
             }
 
-            DeviceAssignment::create([
-                'device_id' => $device->id,
-                'assignable_type' => $pairingType,
-                'assignable_id' => $targetId,
-                'assignment_type' => AssignmentType::Permanent->value,
-                'assigned_at' => now(),
-                'assigned_by_user_id' => $request->user()->id,
-                'consent_id' => $consentId,
-            ]);
+            $this->deviceAssignments->assign(
+                device: $device,
+                assignableType: $pairingType,
+                assignableId: $targetId,
+                assignedByUserId: (int) $request->user()->id,
+                assignmentType: AssignmentType::Permanent,
+                consentId: $consentId,
+            );
 
             $lockedDevice->update([
                 'status' => QueclinkDevice::STATUS_PAIRED,
@@ -383,17 +384,12 @@ class QueclinkHubController extends Controller
                 ->whereKey($lockedDevice->device_id)
                 ->lockForUpdate()
                 ->firstOrFail();
-            $assignments = $this->devicesAccess->assertCanReleaseActiveAssignment(
+            $this->devicesAccess->assertCanReleaseActiveAssignment(
                 $request->user(),
                 $canonicalDevice,
                 true,
             );
-            foreach ($assignments as $assignment) {
-                $assignment->update([
-                    'released_at' => now(),
-                    'released_by_user_id' => $request->user()->id,
-                ]);
-            }
+            $this->deviceAssignments->release($canonicalDevice, (int) $request->user()->id);
 
             $this->deviceLinks->unlinkAllForDevice($canonicalDevice);
 

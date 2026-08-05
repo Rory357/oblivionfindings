@@ -8,6 +8,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceGroup;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -73,6 +74,49 @@ class DashboardControllerTest extends TestCase
                 ->has('recentEvents')
                 ->has('overdueMaintenance')
                 ->has('groupCount')
+                ->has('can')
+            );
+    }
+
+    public function test_dashboard_actions_are_noninteractive_with_plain_reasons_without_destination_permissions(): void
+    {
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        $modulePermission = Permission::query()
+            ->where('key', 'securityDevices.viewAny')
+            ->firstOrFail();
+        $viewer->permissionOverrides()->attach($modulePermission->id, ['allowed' => true]);
+
+        $this->actingAs($viewer)
+            ->get('/security-devices')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('can.view_devices', false)
+                ->where('can.view_events', false)
+                ->where('can.view_maintenance', false)
+                ->where('operations.action_queue.0.href', null)
+                ->where('operations.action_queue.0.restriction_reason', 'Monitoring access is required to open this queue.')
+                ->where('operations.action_queue.1.href', null)
+                ->where('operations.action_queue.1.restriction_reason', 'Device inventory access is required to open this queue.')
+                ->where('operations.action_queue.2.href', null)
+                ->where('operations.action_queue.2.restriction_reason', 'Maintenance access is required to open this queue.')
+                ->where('operations.action_queue.3.href', null)
+                ->where('operations.action_queue.3.restriction_reason', 'IT work access is required to open this queue.')
+            );
+    }
+
+    public function test_dashboard_authorised_actions_target_real_destination_queues(): void
+    {
+        $this->actingAs($this->admin)
+            ->get('/security-devices')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('can.view_devices', true)
+                ->where('can.view_events', true)
+                ->where('can.view_maintenance', true)
+                ->where('operations.action_queue.0.href', '/security-devices/monitoring?state=failed')
+                ->where('operations.action_queue.1.href', '/security-devices/devices?view=unmonitored')
+                ->where('operations.action_queue.2.href', '/security-devices/maintenance?status=overdue')
+                ->where('operations.action_queue.3.href', '/it?tab=tickets&view=all_open')
             );
     }
 

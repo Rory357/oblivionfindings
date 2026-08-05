@@ -56,7 +56,7 @@ type SiteImpact = {
     overdue_maintenance: number;
     collector: { state: string; label: string };
     last_change_at: string | null;
-    href: string;
+    href: string | null;
 };
 
 type Props = {
@@ -122,6 +122,7 @@ type Props = {
             label: string;
             count: number | null;
             href: string | null;
+            restriction_reason: string | null;
         }>;
         recent_changes: Array<{
             key: string;
@@ -132,7 +133,13 @@ type Props = {
             href: string | null;
         }>;
     };
-    can: { create: boolean; export: boolean };
+    can: {
+        create: boolean;
+        export: boolean;
+        view_devices: boolean;
+        view_events: boolean;
+        view_maintenance: boolean;
+    };
 };
 
 const domainIcons: Record<string, LucideIcon> = {
@@ -203,11 +210,19 @@ export default function Dashboard({
                     ]}
                     actions={
                         <div className="flex flex-wrap gap-2">
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href="/security-devices/devices">
-                                    <Cpu className="mr-2 h-4 w-4" /> All devices
-                                </Link>
-                            </Button>
+                            {can.view_devices ? (
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href="/security-devices/devices">
+                                        <Cpu className="mr-2 h-4 w-4" /> All
+                                        devices
+                                    </Link>
+                                </Button>
+                            ) : (
+                                <p className="self-center text-xs text-muted-foreground">
+                                    Device inventory access is required to open
+                                    device records.
+                                </p>
+                            )}
                             {can.create ? (
                                 <Button size="sm" asChild>
                                     <Link href="/security-devices/devices/create">
@@ -262,7 +277,8 @@ export default function Dashboard({
                                         </p>
                                     ) : (
                                         <p className="mt-2 text-xs text-muted-foreground">
-                                            Additional permission required
+                                            {item.restriction_reason ??
+                                                'Additional permission required'}
                                         </p>
                                     )}
                                 </>
@@ -406,78 +422,110 @@ export default function Dashboard({
                                 unmonitored device, stale data, or overdue work
                             </CardDescription>
                         </div>
-                        <Button variant="outline" size="sm" asChild>
-                            <Link href="/security-devices/sites">
-                                View all sites
-                            </Link>
-                        </Button>
+                        {can.view_devices ? (
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href="/security-devices/sites">
+                                    View all sites
+                                </Link>
+                            </Button>
+                        ) : (
+                            <p className="max-w-56 text-right text-xs text-muted-foreground">
+                                Device inventory access is required to open Site
+                                technology.
+                            </p>
+                        )}
                     </CardHeader>
                     <CardContent>
                         {operations.site_impact.length > 0 ? (
                             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                {operations.site_impact.map((site) => (
-                                    <Link
-                                        key={site.id}
-                                        href={site.href}
-                                        className="rounded-lg border p-4 transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <p className="truncate font-semibold">
-                                                    {site.name}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {site.city ||
-                                                        'Location not recorded'}
-                                                </p>
+                                {operations.site_impact.map((site) => {
+                                    const content = (
+                                        <>
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="truncate font-semibold">
+                                                        {site.name}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {site.city ||
+                                                            'Location not recorded'}
+                                                    </p>
+                                                </div>
+                                                <OperationalStateBadge
+                                                    state={site.health}
+                                                />
                                             </div>
-                                            <OperationalStateBadge
-                                                state={site.health}
+                                            <CoverageIndicator
+                                                className="mt-4"
+                                                percent={site.coverage_percent}
+                                                monitored={
+                                                    site.monitored_devices
+                                                }
+                                                total={site.devices}
                                             />
-                                        </div>
-                                        <CoverageIndicator
-                                            className="mt-4"
-                                            percent={site.coverage_percent}
-                                            monitored={site.monitored_devices}
-                                            total={site.devices}
-                                        />
-                                        <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
-                                            <div>
-                                                <p className="font-semibold">
-                                                    {site.active_findings}
-                                                </p>
-                                                <p className="text-muted-foreground">
-                                                    Findings
-                                                </p>
+                                            <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+                                                <div>
+                                                    <p className="font-semibold">
+                                                        {site.active_findings}
+                                                    </p>
+                                                    <p className="text-muted-foreground">
+                                                        Findings
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold">
+                                                        {site.open_it_work ??
+                                                            'Restricted'}
+                                                    </p>
+                                                    <p className="text-muted-foreground">
+                                                        IT work
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold">
+                                                        {
+                                                            site.overdue_maintenance
+                                                        }
+                                                    </p>
+                                                    <p className="text-muted-foreground">
+                                                        Overdue
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="font-semibold">
-                                                    {site.open_it_work ??
-                                                        'Restricted'}
-                                                </p>
-                                                <p className="text-muted-foreground">
-                                                    IT work
-                                                </p>
+                                            <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3 text-xs text-muted-foreground">
+                                                <span>
+                                                    {site.collector.label}
+                                                </span>
+                                                <span>
+                                                    {formatRelative(
+                                                        site.last_change_at,
+                                                    )}
+                                                </span>
                                             </div>
-                                            <div>
-                                                <p className="font-semibold">
-                                                    {site.overdue_maintenance}
+                                            {!site.href ? (
+                                                <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">
+                                                    Device inventory access is
+                                                    required to open Site
+                                                    technology.
                                                 </p>
-                                                <p className="text-muted-foreground">
-                                                    Overdue
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3 text-xs text-muted-foreground">
-                                            <span>{site.collector.label}</span>
-                                            <span>
-                                                {formatRelative(
-                                                    site.last_change_at,
-                                                )}
-                                            </span>
-                                        </div>
-                                    </Link>
-                                ))}
+                                            ) : null}
+                                        </>
+                                    );
+
+                                    return site.href ? (
+                                        <Link
+                                            key={site.id}
+                                            href={site.href}
+                                            className="rounded-lg border p-4 transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                        >
+                                            {content}
+                                        </Link>
+                                    ) : (
+                                        <Card key={site.id} className="p-4">
+                                            {content}
+                                        </Card>
+                                    );
+                                })}
                             </div>
                         ) : (
                             <EmptyState
@@ -556,7 +604,12 @@ export default function Dashboard({
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                {stats.totalDevices > 0 ? (
+                                {!can.view_devices ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        Device inventory access is required to
+                                        open estate workspaces.
+                                    </p>
+                                ) : stats.totalDevices > 0 ? (
                                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                                         {domainSummary.map((domain) => {
                                             const Icon =
@@ -617,14 +670,26 @@ export default function Dashboard({
                                         the last 24 hours
                                     </CardDescription>
                                 </div>
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href="/security-devices/alerts-events">
-                                        View all
-                                    </Link>
-                                </Button>
+                                {can.view_events ? (
+                                    <Button variant="outline" size="sm" asChild>
+                                        <Link href="/security-devices/alerts-events">
+                                            View all
+                                        </Link>
+                                    </Button>
+                                ) : (
+                                    <p className="max-w-56 text-right text-xs text-muted-foreground">
+                                        Event access is required to open
+                                        findings.
+                                    </p>
+                                )}
                             </CardHeader>
                             <CardContent>
-                                {recentEvents.length > 0 ? (
+                                {!can.view_events ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        Event access is required to review
+                                        recent findings.
+                                    </p>
+                                ) : recentEvents.length > 0 ? (
                                     <div className="space-y-2">
                                         {recentEvents.map((event) => (
                                             <div
@@ -640,13 +705,18 @@ export default function Dashboard({
                                                             event.event_type,
                                                         )}
                                                     </span>
-                                                    {event.device_name ? (
+                                                    {event.device_name &&
+                                                    can.view_devices ? (
                                                         <Link
                                                             href={`/security-devices/devices/${event.device_id}`}
                                                             className="truncate text-xs text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                                         >
                                                             {event.device_name}
                                                         </Link>
+                                                    ) : event.device_name ? (
+                                                        <span className="truncate text-xs text-muted-foreground">
+                                                            {event.device_name}
+                                                        </span>
                                                     ) : null}
                                                 </div>
                                                 <span className="shrink-0 text-xs text-muted-foreground">
@@ -681,14 +751,26 @@ export default function Dashboard({
                                             : 's'}
                                     </CardDescription>
                                 </div>
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href="/security-devices/maintenance-health">
-                                        View all
-                                    </Link>
-                                </Button>
+                                {can.view_maintenance ? (
+                                    <Button variant="outline" size="sm" asChild>
+                                        <Link href="/security-devices/maintenance-health">
+                                            View all
+                                        </Link>
+                                    </Button>
+                                ) : (
+                                    <p className="max-w-56 text-right text-xs text-muted-foreground">
+                                        Maintenance access is required to open
+                                        maintenance work.
+                                    </p>
+                                )}
                             </CardHeader>
                             <CardContent>
-                                {overdueMaintenance.length > 0 ? (
+                                {!can.view_maintenance ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        Maintenance access is required to review
+                                        overdue work.
+                                    </p>
+                                ) : overdueMaintenance.length > 0 ? (
                                     <div className="space-y-2">
                                         {overdueMaintenance.map((record) => (
                                             <div
@@ -707,13 +789,18 @@ export default function Dashboard({
                                                     <p className="mt-1 text-xs text-muted-foreground">
                                                         {record.description}
                                                     </p>
-                                                    {record.device_name ? (
+                                                    {record.device_name &&
+                                                    can.view_devices ? (
                                                         <Link
                                                             href={`/security-devices/devices/${record.device_id}`}
                                                             className="mt-1 inline-block text-xs text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                                         >
                                                             {record.device_name}
                                                         </Link>
+                                                    ) : record.device_name ? (
+                                                        <span className="mt-1 inline-block text-xs text-muted-foreground">
+                                                            {record.device_name}
+                                                        </span>
                                                     ) : null}
                                                 </div>
                                                 <span className="shrink-0 text-xs text-muted-foreground">
@@ -766,7 +853,12 @@ export default function Dashboard({
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                {attentionDevices.length > 0 ? (
+                                {!can.view_devices ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        Device inventory access is required to
+                                        open devices needing attention.
+                                    </p>
+                                ) : attentionDevices.length > 0 ? (
                                     <div className="max-h-[32rem] space-y-2 overflow-y-auto">
                                         {attentionDevices.map((device) => (
                                             <Link

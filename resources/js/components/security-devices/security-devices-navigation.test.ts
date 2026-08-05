@@ -16,6 +16,7 @@ const allPermissions = {
     integrationsView: true,
     integrationsManage: true,
     reportsView: true,
+    commandsAdmin: true,
 };
 
 describe('Security & Devices navigation contract', () => {
@@ -118,6 +119,14 @@ describe('Security & Devices navigation contract', () => {
                 integrationsManage: true,
             }),
         ).toEqual([]);
+
+        const commandAdminOnly = buildSecurityDevicesNavigationGroups({
+            commandsAdmin: true,
+        });
+        expect(commandAdminOnly.map((group) => group.label)).toEqual(['Setup']);
+        expect(
+            commandAdminOnly[0]?.items.map((item) => [item.title, item.href]),
+        ).toEqual([['Settings & audit', '/security-devices/settings']]);
     });
 
     it('matches canonical and preserved legacy destinations without making the estate root greedy', () => {

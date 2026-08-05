@@ -2,13 +2,18 @@
 
 namespace App\Domain\SecurityDevices\Console;
 
+use App\Domain\SecurityDevices\Enums\AssignmentType;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
+use App\Models\Client;
+use App\Services\ConsentValidationService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -57,6 +62,12 @@ class MigrateDevicesCommand extends Command
     private int $skipped = 0;
 
     private array $warnings = [];
+
+    public function __construct(
+        private readonly DeviceAssignmentService $deviceAssignments,
+    ) {
+        parent::__construct();
+    }
 
     public function handle(): int
     {
@@ -155,6 +166,7 @@ class MigrateDevicesCommand extends Command
     {
         // Site assignment.
         if ($row->site_id) {
+            $created = $dryRun;
             if (! $dryRun && $device) {
                 $assignableType = 'site';
                 $assignableId = $row->site_id;
@@ -165,14 +177,17 @@ class MigrateDevicesCommand extends Command
                     $assignableId = $row->room_id;
                 }
 
-                DeviceAssignment::create([
-                    'device_id' => $device->id,
-                    'assignable_type' => $assignableType,
-                    'assignable_id' => $assignableId,
-                    'assigned_at' => $row->created_at ?? now(),
-                ]);
+                $created = $this->createAssignment(
+                    $device,
+                    $assignableType,
+                    (int) $assignableId,
+                    $row->created_at ?? now(),
+                    context: "location_hardware #{$row->id}",
+                );
             }
-            $this->assignmentsCreated++;
+            if ($created) {
+                $this->assignmentsCreated++;
+            }
         }
 
         // Person assignment (staff or client).
@@ -184,15 +199,19 @@ class MigrateDevicesCommand extends Command
             };
 
             if ($targetType) {
+                $created = $dryRun;
                 if (! $dryRun && $device) {
-                    DeviceAssignment::create([
-                        'device_id' => $device->id,
-                        'assignable_type' => $targetType,
-                        'assignable_id' => $row->linked_person_id,
-                        'assigned_at' => $row->created_at ?? now(),
-                    ]);
+                    $created = $this->createAssignment(
+                        $device,
+                        $targetType,
+                        (int) $row->linked_person_id,
+                        $row->created_at ?? now(),
+                        context: "location_hardware #{$row->id}",
+                    );
                 }
-                $this->assignmentsCreated++;
+                if ($created) {
+                    $this->assignmentsCreated++;
+                }
             } else {
                 $this->addWarning("location_hardware #{$row->id}: unknown linked_person_type '{$row->linked_person_type}'");
             }
@@ -323,13 +342,15 @@ class MigrateDevicesCommand extends Command
                     ->first();
 
                 if (! $existingAssignment) {
-                    DeviceAssignment::create([
-                        'device_id' => $device->id,
-                        'assignable_type' => 'site',
-                        'assignable_id' => $row->site_id,
-                        'assigned_at' => $row->created_at ?? now(),
-                    ]);
-                    $this->assignmentsCreated++;
+                    if ($this->createAssignment(
+                        $device,
+                        DeviceAssignment::TARGET_SITE,
+                        (int) $row->site_id,
+                        $row->created_at ?? now(),
+                        context: "control_room_device #{$row->id}",
+                    )) {
+                        $this->assignmentsCreated++;
+                    }
                 }
             } else {
                 $this->assignmentsCreated++;
@@ -337,15 +358,19 @@ class MigrateDevicesCommand extends Command
         }
 
         if ($row->client_id) {
+            $created = $dryRun;
             if (! $dryRun && $device) {
-                DeviceAssignment::create([
-                    'device_id' => $device->id,
-                    'assignable_type' => 'client',
-                    'assignable_id' => $row->client_id,
-                    'assigned_at' => $row->created_at ?? now(),
-                ]);
+                $created = $this->createAssignment(
+                    $device,
+                    DeviceAssignment::TARGET_CLIENT,
+                    (int) $row->client_id,
+                    $row->created_at ?? now(),
+                    context: "control_room_device #{$row->id}",
+                );
             }
-            $this->assignmentsCreated++;
+            if ($created) {
+                $this->assignmentsCreated++;
+            }
         }
 
         if ($row->asset_id) {
@@ -494,15 +519,55 @@ class MigrateDevicesCommand extends Command
             ->exists();
 
         if (! $existing) {
-            DeviceAssignment::create([
-                'device_id' => $device->id,
-                'assignable_type' => 'client',
-                'assignable_id' => $consent->client_id,
-                'assigned_at' => $trackerRow->paired_at ?? $trackerRow->created_at ?? now(),
-                'consent_id' => $trackerRow->consent_id,
-            ]);
-            $this->assignmentsCreated++;
+            if ($this->createAssignment(
+                $device,
+                DeviceAssignment::TARGET_CLIENT,
+                (int) $consent->client_id,
+                $trackerRow->paired_at ?? $trackerRow->created_at ?? now(),
+                (int) $trackerRow->consent_id,
+                "asset_tracker #{$trackerRow->id}",
+            )) {
+                $this->assignmentsCreated++;
+            }
         }
+    }
+
+    private function createAssignment(
+        Device $device,
+        string $assignableType,
+        int $assignableId,
+        mixed $assignedAt,
+        ?int $consentId = null,
+        string $context = 'legacy device migration',
+    ): bool {
+        if ($assignableType === DeviceAssignment::TARGET_CLIENT
+            && $device->domain === 'tracking'
+            && $consentId === null) {
+            $client = Client::query()->find($assignableId);
+            $consentId = $client
+                ? ConsentValidationService::latestValidTrackingConsentForClient($client)?->id
+                : null;
+        }
+
+        try {
+            $this->deviceAssignments->assign(
+                device: $device,
+                assignableType: $assignableType,
+                assignableId: $assignableId,
+                assignedByUserId: null,
+                assignmentType: AssignmentType::Permanent,
+                consentId: $consentId,
+                assignedAt: $assignedAt instanceof \DateTimeInterface
+                    ? $assignedAt
+                    : Carbon::parse($assignedAt),
+            );
+        } catch (\InvalidArgumentException $exception) {
+            $this->addWarning("{$context}: assignment skipped — {$exception->getMessage()}");
+
+            return false;
+        }
+
+        return true;
     }
 
     // ── Deduplication ─────────────────────────────────────────────

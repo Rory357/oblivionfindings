@@ -603,6 +603,7 @@ export default function DeviceCommandBatchShow({
                             </label>
                             <textarea
                                 id="batch-decision-comment"
+                                aria-describedby="batch-decision-comment-help"
                                 rows={4}
                                 value={comment}
                                 onChange={(event) =>
@@ -611,6 +612,13 @@ export default function DeviceCommandBatchShow({
                                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                                 placeholder="What did you verify across the target list, Site impact and expected state?"
                             />
+                            <p
+                                id="batch-decision-comment-help"
+                                className="text-xs text-muted-foreground"
+                            >
+                                Minimum 10 characters. {comment.trim().length}{' '}
+                                entered.
+                            </p>
                         </div>
                     </div>
                     <DialogFooter>

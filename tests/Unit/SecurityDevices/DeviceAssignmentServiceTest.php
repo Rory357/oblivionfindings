@@ -11,7 +11,9 @@ use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class DeviceAssignmentServiceTest extends TestCase
@@ -62,6 +64,31 @@ class DeviceAssignmentServiceTest extends TestCase
         $this->assertNotNull($first->released_at);
         $this->assertNull($second->released_at);
         $this->assertEquals(1, $device->assignments()->active()->count());
+    }
+
+    public function test_assign_locks_the_canonical_device_and_accepts_a_historical_assignment_time(): void
+    {
+        $device = Device::factory()->create();
+        $site = Site::factory()->create();
+        $assignedAt = now()->subYears(2)->startOfSecond();
+        $queries = collect();
+        DB::listen(function (QueryExecuted $query) use ($queries): void {
+            $queries->push(strtolower($query->sql));
+        });
+
+        $assignment = $this->service->assign(
+            device: $device,
+            assignableType: DeviceAssignment::TARGET_SITE,
+            assignableId: $site->id,
+            assignedByUserId: null,
+            assignedAt: $assignedAt,
+        );
+
+        $this->assertSame($assignedAt->toDateTimeString(), $assignment->assigned_at->toDateTimeString());
+        $this->assertTrue($queries->contains(
+            fn (string $sql): bool => str_contains($sql, 'from `devices`')
+                && str_contains($sql, 'for update'),
+        ), 'The canonical Device row must be locked before replacing an assignment.');
     }
 
     public function test_release_sets_released_at(): void

@@ -139,10 +139,10 @@ class PersonalTrackingPrivacyService
             );
         }
 
+        $device = Device::query()->lockForUpdate()->findOrFail($assignment->device_id);
         $assignment = DeviceAssignment::query()
             ->lockForUpdate()
             ->findOrFail($assignment->id);
-        $device = Device::query()->lockForUpdate()->findOrFail($assignment->device_id);
 
         if ($device->domain !== 'tracking' || $assignment->released_at !== null) {
             throw new \InvalidArgumentException('Only an active personal-tracker assignment can resume collection.');
@@ -182,13 +182,10 @@ class PersonalTrackingPrivacyService
      */
     public function stopAssignment(
         DeviceAssignment $assignment,
-        int $actorUserId,
+        ?int $actorUserId,
         string $stopReason,
         string $outcome = 'collection_stopped_and_live_projection_revoked',
     ): array {
-        $assignment = DeviceAssignment::query()
-            ->lockForUpdate()
-            ->findOrFail($assignment->id);
         $device = Device::query()
             ->with([
                 'activeAssetLinks:id,device_id,asset_id',
@@ -196,6 +193,13 @@ class PersonalTrackingPrivacyService
             ])
             ->lockForUpdate()
             ->findOrFail($assignment->device_id);
+        $assignment = DeviceAssignment::query()
+            ->lockForUpdate()
+            ->findOrFail($assignment->id);
+
+        if ((int) $assignment->device_id !== (int) $device->id) {
+            throw new \RuntimeException('The tracking assignment device changed while collection was stopping.');
+        }
 
         if ($device->domain !== 'tracking'
             || ! in_array($assignment->assignable_type, [

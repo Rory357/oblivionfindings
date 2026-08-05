@@ -29,6 +29,32 @@ class DeviceRegistryServiceTest extends TestCase
         $this->service = app(DeviceRegistryService::class);
     }
 
+    public function test_register_discovered_device_uses_the_canonical_assignment_boundary(): void
+    {
+        $site = Site::factory()->create([
+            'is_active' => true,
+            'archived' => false,
+            'archived_at' => null,
+        ]);
+        $actor = User::factory()->create(['approved_at' => now()]);
+
+        $device = $this->service->registerDiscoveredDevice([
+            'name' => 'Discovered core switch',
+            'domain' => DeviceDomain::ItInfrastructure->value,
+            'category' => 'network',
+            'provider' => 'native_discovery',
+        ], $site->id, $actor->id);
+
+        $this->assertSame(1, $device->assignments()->count());
+        $this->assertDatabaseHas('device_assignments', [
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_by_user_id' => $actor->id,
+            'released_at' => null,
+        ]);
+    }
+
     public function test_for_site_returns_devices_assigned_to_site(): void
     {
         $site = Site::factory()->create();

@@ -50,12 +50,30 @@ class SettingsAuditTest extends TestCase
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
     }
 
-    public function test_user_without_groups_or_reports_permission_is_forbidden(): void
+    public function test_user_without_any_settings_permission_is_forbidden(): void
     {
         $user = User::factory()->create();
         $user->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
 
         $this->actingAs($user)->get('/security-devices/settings')->assertForbidden();
+    }
+
+    public function test_command_administrator_receives_the_shared_navigation_capability_and_can_open_settings(): void
+    {
+        $user = User::factory()->create(['approved_at' => now()]);
+        foreach (['securityDevices.viewAny', 'securityDevices.commands.admin'] as $permissionKey) {
+            $permission = Permission::query()->where('key', $permissionKey)->firstOrFail();
+            $user->permissionOverrides()->attach($permission->id, ['allowed' => true]);
+        }
+
+        $this->actingAs($user)
+            ->get('/security-devices/settings')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('auth.can.securityDevices.viewAny', true)
+                ->where('auth.can.securityDevices.commandsAdmin', true)
+                ->where('auth.can.securityDevices.groupsManage', false)
+                ->where('auth.can.securityDevices.reportsView', false));
     }
 
     public function test_settings_projects_real_safe_defaults_profiles_exceptions_and_feature_support(): void

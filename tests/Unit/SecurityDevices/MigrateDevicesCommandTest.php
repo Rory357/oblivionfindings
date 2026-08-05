@@ -210,6 +210,15 @@ class MigrateDevicesCommandTest extends TestCase
     public function test_creates_person_assignment_from_location_hardware(): void
     {
         $client = Client::factory()->create();
+        $consent = ClientConsent::create([
+            'client_id' => $client->id,
+            'consent_type_id' => ConsentType::factory()->create([
+                'name' => 'Personal Tracker (Wandering Risk)',
+            ])->id,
+            'status' => 'given',
+            'given_at' => now(),
+            'given_method' => 'verbal',
+        ]);
         $lhId = $this->insertLocationHardware([
             'category' => 'tracker',
             'linked_person_type' => 'client',
@@ -225,6 +234,7 @@ class MigrateDevicesCommandTest extends TestCase
 
         $this->assertNotNull($clientAssignment);
         $this->assertEquals($client->id, $clientAssignment->assignable_id);
+        $this->assertEquals($consent->id, $clientAssignment->consent_id);
     }
 
     public function test_creates_asset_link_from_location_hardware(): void
@@ -422,7 +432,9 @@ class MigrateDevicesCommandTest extends TestCase
         $user = User::factory()->create();
         $consent = ClientConsent::create([
             'client_id' => $client->id,
-            'consent_type_id' => ConsentType::factory()->create()->id,
+            'consent_type_id' => ConsentType::factory()->create([
+                'name' => 'Asset Location Tracking (Safety)',
+            ])->id,
             'status' => 'given',
             'given_at' => now(),
             'given_by_user_id' => $user->id,

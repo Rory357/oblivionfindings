@@ -25,28 +25,29 @@ class DeviceAssignmentService
         Device $device,
         string $assignableType,
         int $assignableId,
-        int $assignedByUserId,
+        ?int $assignedByUserId,
         AssignmentType $assignmentType = AssignmentType::Permanent,
         ?\DateTimeInterface $expectedReturnAt = null,
         ?int $consentId = null,
         ?string $notes = null,
+        ?\DateTimeInterface $assignedAt = null,
     ): DeviceAssignment {
         $this->validateTarget($assignableType);
-        $this->validateConsent($device, $assignableType, $assignableId, $consentId);
 
         return DB::transaction(function () use (
             $device, $assignableType, $assignableId, $assignedByUserId,
-            $assignmentType, $expectedReturnAt, $consentId, $notes,
+            $assignmentType, $expectedReturnAt, $consentId, $notes, $assignedAt,
         ) {
-            // Release any existing active assignment first.
-            $this->releaseActiveAssignment($device, $assignedByUserId);
+            $lockedDevice = $this->lockDevice($device);
+            $this->validateConsent($lockedDevice, $assignableType, $assignableId, $consentId);
+            $this->releaseActiveAssignments($lockedDevice, $assignedByUserId, 'assignment_replaced');
 
             return DeviceAssignment::create([
-                'device_id' => $device->id,
+                'device_id' => $lockedDevice->id,
                 'assignable_type' => $assignableType,
                 'assignable_id' => $assignableId,
                 'assignment_type' => $assignmentType,
-                'assigned_at' => now(),
+                'assigned_at' => $assignedAt ?? now(),
                 'expected_return_at' => $expectedReturnAt,
                 'assigned_by_user_id' => $assignedByUserId,
                 'consent_id' => $consentId,
@@ -60,26 +61,15 @@ class DeviceAssignmentService
      */
     public function release(Device $device, int $releasedByUserId): ?DeviceAssignment
     {
-        $active = $device->assignments()->active()->first();
+        return DB::transaction(function () use ($device, $releasedByUserId): ?DeviceAssignment {
+            $lockedDevice = $this->lockDevice($device);
 
-        if (! $active) {
-            return null;
-        }
-
-        $releasedAt = now();
-
-        $active->update([
-            'released_at' => $releasedAt,
-            'released_by_user_id' => $releasedByUserId,
-        ]);
-        $this->stopPersonalTrackingCollection(
-            $active,
-            $releasedByUserId,
-            'assignment_released',
-        );
-        app(SiteTypePlanPinStatusService::class)->markDevicePinsStale($device, 'assignment_released', $releasedAt);
-
-        return $active->fresh();
+            return $this->releaseActiveAssignments(
+                $lockedDevice,
+                $releasedByUserId,
+                'assignment_released',
+            );
+        });
     }
 
     /**
@@ -94,34 +84,60 @@ class DeviceAssignmentService
         ?\DateTimeInterface $expectedReturnAt = null,
         ?int $consentId = null,
         ?string $notes = null,
+        ?\DateTimeInterface $assignedAt = null,
     ): DeviceAssignment {
         return $this->assign(
             $device, $assignableType, $assignableId, $userId,
-            $assignmentType, $expectedReturnAt, $consentId, $notes,
+            $assignmentType, $expectedReturnAt, $consentId, $notes, $assignedAt,
         );
     }
 
     /**
-     * Release the active assignment if one exists.
+     * Release every active row for this device. The database constraint prevents
+     * new duplicates; handling every row here also repairs any pre-constraint
+     * data that reaches a supervised runtime during a rolling deployment.
      */
-    private function releaseActiveAssignment(Device $device, int $userId): void
-    {
-        $active = $device->assignments()->active()->first();
+    private function releaseActiveAssignments(
+        Device $device,
+        ?int $userId,
+        string $reason,
+    ): ?DeviceAssignment {
+        $activeAssignments = DeviceAssignment::query()
+            ->where('device_id', $device->id)
+            ->active()
+            ->orderByDesc('assigned_at')
+            ->orderByDesc('id')
+            ->lockForUpdate()
+            ->get();
 
-        if ($active) {
-            $releasedAt = now();
+        if ($activeAssignments->isEmpty()) {
+            return null;
+        }
 
-            $active->update([
+        $releasedAt = now();
+        foreach ($activeAssignments as $assignment) {
+            $assignment->update([
                 'released_at' => $releasedAt,
                 'released_by_user_id' => $userId,
             ]);
             $this->stopPersonalTrackingCollection(
-                $active,
+                $assignment,
                 $userId,
-                'assignment_replaced',
+                $reason,
             );
-            app(SiteTypePlanPinStatusService::class)->markDevicePinsStale($device, 'assignment_replaced', $releasedAt);
         }
+
+        app(SiteTypePlanPinStatusService::class)->markDevicePinsStale($device, $reason, $releasedAt);
+
+        return $activeAssignments->first()->fresh();
+    }
+
+    private function lockDevice(Device $device): Device
+    {
+        return Device::query()
+            ->whereKey($device->getKey())
+            ->lockForUpdate()
+            ->firstOrFail();
     }
 
     private function validateTarget(string $assignableType): void
@@ -162,7 +178,7 @@ class DeviceAssignmentService
 
     private function stopPersonalTrackingCollection(
         DeviceAssignment $assignment,
-        int $actorUserId,
+        ?int $actorUserId,
         string $reason,
     ): void {
         if (! in_array($assignment->assignable_type, [

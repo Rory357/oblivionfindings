@@ -79,4 +79,49 @@ describe('Security & Devices canonical workflow links', () => {
         );
         expect(dashboard).not.toContain('Live operational queues');
     });
+
+    it('routes SLA policy navigation through the supported ticket workspace and opens the real editor', () => {
+        const navigation = source('app/Domain/It/ItModuleNavigation.php');
+        const itWorkspace = source('resources/js/pages/it/index.tsx');
+
+        expect(navigation).not.toContain('/it?tab=sla');
+        expect(navigation).toContain('/it?tab=tickets&action=sla');
+        expect(itWorkspace).toContain(
+            "url.searchParams.get('action') !== 'sla'",
+        );
+        expect(itWorkspace).toContain("setModal({ type: 'sla' })");
+    });
+
+    it('keeps estate actions permission-aware and points open IT work at the supported queue', () => {
+        const presenter = source(
+            'app/Domain/SecurityDevices/Presenters/EstateOperationsPresenter.php',
+        );
+        const dashboard = source(
+            'resources/js/pages/security-devices/dashboard.tsx',
+        );
+
+        expect(presenter).toContain('/it?tab=tickets&view=all_open');
+        expect(presenter).not.toContain('/it?view=open');
+        expect(presenter).toContain("'restriction_reason'");
+        expect(dashboard).toContain('item.restriction_reason');
+        expect(dashboard).toContain('can.view_devices');
+        expect(dashboard).toContain('can.view_events');
+        expect(dashboard).toContain('can.view_maintenance');
+        expect(dashboard).toContain(
+            'Device inventory access is required to open Site',
+        );
+    });
+
+    it('explains the command-batch decision minimum accessibly', () => {
+        const commandBatch = source(
+            'resources/js/pages/security-devices/command-batches/show.tsx',
+        );
+
+        expect(commandBatch).toContain(
+            'aria-describedby="batch-decision-comment-help"',
+        );
+        expect(commandBatch).toContain('id="batch-decision-comment-help"');
+        expect(commandBatch).toContain('Minimum 10 characters.');
+        expect(commandBatch).toContain('comment.trim().length < 10');
+    });
 });

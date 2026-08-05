@@ -12,6 +12,12 @@ final class ItModuleNavigation
         $canView = $user->canDo('it.view');
         $canManage = $user->canDo('it.manage');
         $canRequest = $user->canDo('it.request');
+        $canOpenSecurityDevices = $user->canDo('securityDevices.viewAny');
+        $canOpenMonitoring = $canOpenSecurityDevices
+            && $user->canDo('securityDevices.events.view');
+        $canOpenIntegrations = $canOpenSecurityDevices
+            && $user->canDo('securityDevices.integrations.view');
+        $canEditSla = $canManage && $user->hasRole('admin');
 
         if (! $canView && ! $canRequest) {
             return [];
@@ -37,22 +43,28 @@ final class ItModuleNavigation
             ];
             $groups[] = [
                 'label' => 'Operations',
-                'items' => [
+                'items' => array_values(array_filter([
                     self::item('Problems & known errors', '/it/problems', 'book-open-check'),
                     self::item('Changes', '/it/changes', 'calendar-clock'),
                     self::item('Major incidents', '/it/major-incidents', 'siren'),
-                    self::item('Monitoring', '/security-devices/monitoring', 'activity'),
-                ],
+                    $canOpenMonitoring
+                        ? self::item('Monitoring', '/security-devices/monitoring', 'activity')
+                        : null,
+                ])),
             ];
         }
         if ($canManage) {
             $groups[] = [
                 'label' => 'Setup',
-                'items' => [
+                'items' => array_values(array_filter([
                     self::item('Teams, queues & services', '/it/setup', 'settings-2'),
-                    self::item('SLA policies', '/it?tab=sla', 'timer'),
-                    self::item('Integrations & API', '/security-devices/integrations', 'plug'),
-                ],
+                    $canEditSla
+                        ? self::item('SLA policies', '/it?tab=tickets&action=sla', 'timer')
+                        : null,
+                    $canOpenIntegrations
+                        ? self::item('Integrations & API', '/security-devices/integrations', 'plug')
+                        : null,
+                ])),
             ];
         }
 

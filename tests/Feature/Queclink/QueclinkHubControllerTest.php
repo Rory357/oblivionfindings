@@ -969,6 +969,52 @@ class QueclinkHubControllerTest extends TestCase
         ]);
     }
 
+    public function test_claim_reuses_the_assignment_service_and_preserves_released_canonical_history(): void
+    {
+        $site = Site::factory()->create(['tenant_id' => 1]);
+        $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle']);
+        $canonical = Device::factory()->tracking()->create([
+            'provider' => 'queclink',
+            'category' => 'vehicle_tracker',
+            'imei' => '864696060004176',
+            'device_uid' => '864696060004176',
+        ]);
+        $original = DeviceAssignment::query()->create([
+            'device_id' => $canonical->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now()->subDay(),
+        ]);
+        $providerDevice = QueclinkDevice::query()->create([
+            'tenant_id' => 1,
+            'imei' => '864696060004176',
+            'status' => QueclinkDevice::STATUS_PENDING,
+            'model_hint' => 'GV500CG',
+        ]);
+        $queries = collect();
+        DB::listen(function (QueryExecuted $query) use ($queries): void {
+            $queries->push(strtolower($query->sql));
+        });
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/integrations/queclink/devices/{$providerDevice->id}/claim", [
+                'pairing_type' => 'vehicle',
+                'target_id' => $asset->id,
+            ])
+            ->assertRedirect();
+
+        $this->assertNotNull($original->fresh()->released_at);
+        $this->assertSame(2, $canonical->assignments()->count());
+        $this->assertSame(1, $canonical->assignments()->active()->count());
+        $this->assertDatabaseHas('device_assignments', [
+            'device_id' => $canonical->id,
+            'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
+            'assignable_id' => $asset->id,
+            'released_at' => null,
+        ]);
+        $this->assertForUpdateQuery($queries, 'devices');
+    }
+
     public function test_vehicle_claim_rechecks_the_locked_asset_after_stale_authorization_provenance_changes(): void
     {
         $localSite = Site::factory()->create(['tenant_id' => 1]);

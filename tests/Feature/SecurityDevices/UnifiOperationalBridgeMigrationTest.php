@@ -234,6 +234,38 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
         $this->assertSame(LocationHardware::STATUS_ONLINE, $shadow->status);
     }
 
+    public function test_unifi_room_reassignment_preserves_history_and_keeps_one_active_row(): void
+    {
+        $site = Site::factory()->create(['name' => 'Assignment integrity site']);
+        $room = SiteRoom::create([
+            'site_id' => $site->id,
+            'name' => 'Network room',
+        ]);
+        $device = Device::factory()->itInfrastructure()->create([
+            'provider' => 'unifi',
+            'external_ref' => ['provider_entity_id' => 'integrity-switch'],
+        ]);
+        $original = DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now()->subDay(),
+        ]);
+
+        $replacement = app(UnifiOperationalBridgeService::class)->syncRoomAssignment(
+            $device,
+            $room,
+            null,
+            $site->id,
+        );
+
+        $this->assertNotNull($original->fresh()->released_at);
+        $this->assertSame(DeviceAssignment::TARGET_ROOM, $replacement->assignable_type);
+        $this->assertSame($room->id, $replacement->assignable_id);
+        $this->assertSame(2, $device->assignments()->count());
+        $this->assertSame(1, $device->assignments()->active()->count());
+    }
+
     public function test_unifi_sync_never_relocates_a_matching_device_from_another_site(): void
     {
         $sourceSite = Site::factory()->create(['name' => 'Source Site']);

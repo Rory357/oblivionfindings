@@ -1,15 +1,18 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\ItModuleNavigation;
 use App\Models\AuditLog;
 use App\Models\ItQueue;
 use App\Models\ItService;
 use App\Models\ItTeam;
 use App\Models\ItTicket;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Database\Seeders\SecurityDevicesPermissionsSeeder;
 
 function serviceManagementSetupUser(string $role = 'hr'): User
 {
@@ -78,6 +81,59 @@ test('IT pages share the approved grouped navigation while preserving existing d
         ->assertInertia(fn ($page) => $page
             ->has('itNavigation', 1)
             ->where('itNavigation.0.label', 'Service Desk'));
+});
+
+test('IT navigation never produces an unsupported SLA tab', function () {
+    $admin = serviceManagementSetupUser('admin');
+    serviceManagementAssignSite($admin, $this->site);
+
+    $items = collect(ItModuleNavigation::forUser($admin))
+        ->flatMap(fn (array $group): array => $group['items']);
+    $sla = $items->firstWhere('label', 'SLA policies');
+
+    expect($sla)->not->toBeNull()
+        ->and($sla['href'])->toBe('/it?tab=tickets&action=sla')
+        ->and($items->pluck('href'))->not->toContain('/it?tab=sla');
+});
+
+test('IT navigation requires the exact Security destination permissions and module access', function () {
+    $this->seed(SecurityDevicesPermissionsSeeder::class);
+
+    $viewer = serviceManagementSetupUser();
+    serviceManagementAssignSite($viewer, $this->site);
+
+    $destinationPermissions = Permission::query()
+        ->whereIn('key', [
+            'securityDevices.events.view',
+            'securityDevices.integrations.view',
+        ])
+        ->pluck('id')
+        ->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])
+        ->all();
+    $viewer->permissionOverrides()->syncWithoutDetaching($destinationPermissions);
+
+    $labelsWithoutModuleAccess = collect(ItModuleNavigation::forUser($viewer))
+        ->flatMap(fn (array $group): array => $group['items'])
+        ->pluck('label');
+
+    expect($labelsWithoutModuleAccess)
+        ->not->toContain('Monitoring')
+        ->not->toContain('Integrations & API');
+
+    $modulePermission = Permission::query()
+        ->where('key', 'securityDevices.viewAny')
+        ->firstOrFail();
+    $viewer->permissionOverrides()->syncWithoutDetaching([
+        $modulePermission->id => ['allowed' => true],
+    ]);
+
+    $labelsWithExactAccess = collect(ItModuleNavigation::forUser($viewer->fresh()))
+        ->flatMap(fn (array $group): array => $group['items'])
+        ->pluck('label');
+
+    expect($labelsWithExactAccess)
+        ->toContain('Monitoring')
+        ->toContain('Integrations & API');
 });
 
 test('agents configure application teams membership roles services and queue routing with audit', function () {

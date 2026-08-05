@@ -422,6 +422,23 @@ export default function ItIndex({
     const [peekId, setPeekId] = useState<number | null>(null);
     const ctx = useLeaveContextMenu();
 
+    useEffect(() => {
+        if (
+            !can.edit_sla ||
+            tab !== 'tickets' ||
+            typeof window === 'undefined'
+        ) {
+            return;
+        }
+
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('action') !== 'sla') return;
+
+        setModal({ type: 'sla' });
+        url.searchParams.delete('action');
+        window.history.replaceState(window.history.state, '', url.toString());
+    }, [can.edit_sla, tab]);
+
     /** Row click: quick-peek drawer; Ctrl/⌘-click or double-click: full page. */
     const openTicket = (id: number, e?: React.MouseEvent) => {
         if (e && (e.ctrlKey || e.metaKey)) {

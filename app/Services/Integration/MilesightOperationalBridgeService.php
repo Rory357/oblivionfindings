@@ -11,6 +11,7 @@ use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\SiteRoom;
 use Illuminate\Database\QueryException;
@@ -27,6 +28,10 @@ use Illuminate\Support\Str;
 final class MilesightOperationalBridgeService
 {
     private const MONITORING_PROFILE_NAME = 'Milesight provider status';
+
+    public function __construct(
+        private readonly DeviceAssignmentService $deviceAssignments,
+    ) {}
 
     /**
      * @return array{device: Device, created: bool}
@@ -219,13 +224,13 @@ final class MilesightOperationalBridgeService
             throw new \RuntimeException('Milesight device belongs to another Site and requires reconciliation.');
         }
 
-        DeviceAssignment::query()->create([
-            'device_id' => $device->id,
-            'assignable_type' => DeviceAssignment::TARGET_SITE,
-            'assignable_id' => $siteId,
-            'assignment_type' => AssignmentType::Permanent,
-            'assigned_at' => now(),
-        ]);
+        $this->deviceAssignments->assign(
+            device: $device,
+            assignableType: DeviceAssignment::TARGET_SITE,
+            assignableId: $siteId,
+            assignedByUserId: null,
+            assignmentType: AssignmentType::Permanent,
+        );
     }
 
     /** @return array{string, string, string|null} */

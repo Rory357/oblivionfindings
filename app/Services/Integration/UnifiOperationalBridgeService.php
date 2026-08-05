@@ -11,11 +11,11 @@ use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\LocationHardware;
 use App\Models\Site;
 use App\Models\SiteRoom;
-use App\Services\Sites\SiteTypePlanPinStatusService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +26,10 @@ class UnifiOperationalBridgeService
     private const MONITORING_PROFILE_NAME = 'UniFi Network provider status';
 
     private const WAN_MONITORING_PROFILE_NAME = 'UniFi WAN performance';
+
+    public function __construct(
+        private readonly DeviceAssignmentService $deviceAssignments,
+    ) {}
 
     /**
      * @return array{device: Device, created: bool}
@@ -391,29 +395,13 @@ class UnifiOperationalBridgeService
 
     private function replaceActiveAssignment(Device $device, string $targetType, int $targetId, ?int $userId): DeviceAssignment
     {
-        return DB::transaction(function () use ($device, $targetType, $targetId, $userId) {
-            $releasedAt = now();
-            $released = DeviceAssignment::query()
-                ->where('device_id', $device->id)
-                ->whereNull('released_at')
-                ->update([
-                    'released_at' => $releasedAt,
-                    'released_by_user_id' => $userId,
-                    'updated_at' => now(),
-                ]);
-            if ($released > 0) {
-                app(SiteTypePlanPinStatusService::class)->markDevicePinsStale($device, 'assignment_replaced', $releasedAt);
-            }
-
-            return DeviceAssignment::create([
-                'device_id' => $device->id,
-                'assignable_type' => $targetType,
-                'assignable_id' => $targetId,
-                'assignment_type' => AssignmentType::Permanent,
-                'assigned_at' => now(),
-                'assigned_by_user_id' => $userId,
-            ]);
-        });
+        return $this->deviceAssignments->assign(
+            device: $device,
+            assignableType: $targetType,
+            assignableId: $targetId,
+            assignedByUserId: $userId,
+            assignmentType: AssignmentType::Permanent,
+        );
     }
 
     /**

@@ -42,6 +42,10 @@ class DeviceAssignment extends Model
         'notes',
     ];
 
+    protected $hidden = [
+        'active_device_id',
+    ];
+
     protected $casts = [
         'assignment_type' => AssignmentType::class,
         'assigned_at' => 'datetime',

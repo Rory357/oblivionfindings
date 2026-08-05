@@ -17,7 +17,10 @@ use UnexpectedValueException;
 
 class DeviceRegistryService
 {
-    public function __construct(private readonly SecurityDevicesAccessService $access) {}
+    public function __construct(
+        private readonly SecurityDevicesAccessService $access,
+        private readonly DeviceAssignmentService $deviceAssignments,
+    ) {}
 
     /** Base query for the single application registry. */
     public function query(): Builder
@@ -68,14 +71,13 @@ class DeviceRegistryService
 
         return DB::transaction(function () use ($allowed, $site, $actor): Device {
             $device = Device::query()->create($allowed);
-            DeviceAssignment::query()->create([
-                'device_id' => $device->id,
-                'assignable_type' => DeviceAssignment::TARGET_SITE,
-                'assignable_id' => $site->id,
-                'assignment_type' => AssignmentType::Permanent,
-                'assigned_at' => now(),
-                'assigned_by_user_id' => $actor->id,
-            ]);
+            $this->deviceAssignments->assign(
+                device: $device,
+                assignableType: DeviceAssignment::TARGET_SITE,
+                assignableId: (int) $site->id,
+                assignedByUserId: (int) $actor->id,
+                assignmentType: AssignmentType::Permanent,
+            );
 
             return $device;
         }, 3);
