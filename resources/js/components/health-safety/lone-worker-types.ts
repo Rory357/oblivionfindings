@@ -5,6 +5,15 @@ import type { Tone } from '@/pages/health-safety/components/register-row-kit';
 
 export const LONE_WORKER_ROUTE = '/health-safety/lone-workers';
 
+export function canonicalControlRoomAlertId(reference: string): number | null {
+    const match = /^cr_([1-9]\d*)$/.exec(reference);
+    if (!match) return null;
+
+    const id = Number(match[1]);
+
+    return Number.isSafeInteger(id) ? id : null;
+}
+
 export type Entity = { id: number; name: string };
 
 export type SessionStatus = 'active' | 'overdue' | 'emergency' | 'completed';
@@ -40,9 +49,18 @@ export type CheckIn = {
     location_lng: string | number | null;
 };
 
-export type AlertType = 'emergency' | 'overdue_check_in' | 'no_response' | string;
-export type AlertStatus = 'active' | 'acknowledged' | 'resolved' | string;
-export type AlertSource = 'control_room' | 'legacy';
+export type AlertType =
+    | 'emergency'
+    | 'overdue_check_in'
+    | 'no_response'
+    | string;
+export type AlertStatus =
+    | 'active'
+    | 'acknowledged'
+    | 'resolved'
+    | 'historical'
+    | string;
+export type AlertSource = 'control_room' | 'legacy_history';
 
 export type AlertSession = {
     id: number | null;
@@ -61,7 +79,7 @@ export type AlertSession = {
 };
 
 export type Alert = {
-    id: string; // prefixed: cr_<id> / legacy_<id>
+    id: string; // canonical operational reference: cr_<id>
     session: AlertSession | null;
     type: AlertType;
     triggered_at: string | null;
@@ -77,6 +95,11 @@ export type SessionAlertRef = {
     triggered_at: string | null;
     status: AlertStatus;
     source: AlertSource;
+};
+
+export type HistoricalAlertRef = SessionAlertRef & {
+    source: 'legacy_history';
+    label: string;
 };
 
 export type LinkedShift = {
@@ -106,8 +129,10 @@ export type SessionDetail = Session & {
     emergency_notes: string | null;
     check_ins: CheckIn[];
     alerts: SessionAlertRef[];
+    legacy_alert_history: HistoricalAlertRef[];
     shift: LinkedShift | null;
     tracker: WorkerTracker | null;
+    tracker_state: 'available' | 'not_assigned' | 'integrity_error';
 };
 
 export type AlertDetail = Alert & {
@@ -115,6 +140,7 @@ export type AlertDetail = Alert & {
     cr_id: number | null;
     can_view_control_room: boolean;
     incident_id: number | null;
+    is_historical?: boolean;
 };
 
 export type Detail = SessionDetail | AlertDetail;
@@ -149,12 +175,26 @@ export type Options = {
     shifts: ShiftOption[];
 };
 
-export type Can = { manage: boolean; view: boolean; view_control_room: boolean };
+export type Can = {
+    manage: boolean;
+    view: boolean;
+    view_control_room: boolean;
+};
 
 export type Hero = {
     clusters: {
-        live: { active: number; overdue: number; emergency: number; ending_soon: number };
-        alerts: { today: number; awaiting_ack: number; unresolved: number; no_recent_checkin: number };
+        live: {
+            active: number;
+            overdue: number;
+            emergency: number;
+            ending_soon: number;
+        };
+        alerts: {
+            today: number;
+            awaiting_ack: number;
+            unresolved: number;
+            no_recent_checkin: number;
+        };
     };
     badges: {
         checked_in: number;
@@ -186,11 +226,21 @@ export type Paginator<T> = {
 };
 
 /** Lifecycle action launched from the row menu or the detail Options bar. */
-export type ActionKind = 'checkin' | 'extend' | 'end' | 'emergency' | 'delete' | 'acknowledge' | 'resolve';
+export type ActionKind =
+    | 'checkin'
+    | 'extend'
+    | 'end'
+    | 'emergency'
+    | 'delete'
+    | 'acknowledge'
+    | 'resolve';
 
-/** Target for an action modal — a session (lifecycle) or a legacy alert (ack/resolve). */
+/** Target for an action modal — a session or its canonical Control Room alert. */
 export type ActionTarget =
-    | { kind: 'checkin' | 'extend' | 'end' | 'emergency' | 'delete'; session: Session | SessionDetail }
+    | {
+          kind: 'checkin' | 'extend' | 'end' | 'emergency' | 'delete';
+          session: Session | SessionDetail;
+      }
     | { kind: 'acknowledge' | 'resolve'; alert: Alert | AlertDetail };
 
 /* ── Shared display maps (tone + label) ─────────────────────────────── */
@@ -215,14 +265,24 @@ export const ALERT_TYPE_META: Record<string, { tone: Tone; label: string }> = {
     no_response: { tone: 'warning', label: 'No response' },
 };
 
-export const ALERT_STATUS_META: Record<string, { tone: Tone; label: string }> = {
-    active: { tone: 'critical', label: 'Active' },
-    acknowledged: { tone: 'warning', label: 'Acknowledged' },
-    resolved: { tone: 'success', label: 'Resolved' },
-};
+export const ALERT_STATUS_META: Record<string, { tone: Tone; label: string }> =
+    {
+        active: { tone: 'critical', label: 'Active' },
+        acknowledged: { tone: 'warning', label: 'Acknowledged' },
+        resolved: { tone: 'success', label: 'Resolved' },
+        historical: { tone: 'neutral', label: 'Historical' },
+    };
 
 /** Minutes the check-in is overdue, for the "overdue by Xm" row hint (0 if not overdue). */
-export function overdueByMinutes(s: Pick<Session, 'last_check_in_at' | 'started_at' | 'check_in_interval_minutes' | 'status'>): number {
+export function overdueByMinutes(
+    s: Pick<
+        Session,
+        | 'last_check_in_at'
+        | 'started_at'
+        | 'check_in_interval_minutes'
+        | 'status'
+    >,
+): number {
     if (s.status !== 'overdue' && s.status !== 'active') return 0;
     const base = s.last_check_in_at ?? s.started_at;
     if (!base || !s.check_in_interval_minutes) return 0;

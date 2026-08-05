@@ -151,7 +151,7 @@ class HsWorksafeConsistencyTest extends TestCase
         $this->assertNotNull(data_get($legacy->authority_response_tracking, 'worksafe_acknowledged_at'));
     }
 
-    public function test_existing_hs_event_remains_authoritative_when_legacy_incident_fields_are_stale_and_the_direct_link_beats_the_source_tuple(): void
+    public function test_a_direct_hs_link_to_another_incident_fails_safe_without_disclosing_the_foreign_journey(): void
     {
         $site = Site::factory()->create();
         $reporter = User::factory()->create();
@@ -187,16 +187,44 @@ class HsWorksafeConsistencyTest extends TestCase
                     $row = collect($rows)->firstWhere('id', $incident->id);
 
                     return $row !== null
+                        && $row['journey_repair_required'] === true
                         && $row['is_notifiable'] === false
                         && $row['worksafe_notification_status'] === null;
                 })
-                ->where('detail.hs_event.id', $event->id)
-                ->where('detail.hs_event.reference_number', $event->reference_number)
+                ->where('detail.journey_repair_required', true)
+                ->where('detail.journey_state', 'Journey repair required')
+                ->where('detail.hs_event', null)
+                ->where('detail.control_room_alert', null)
+                ->where('detail.close_gate.allowed', false)
+                ->where('detail.close_gate.requirements.0.key', 'journey_integrity')
                 ->where('detail.is_notifiable', false)
                 ->where('detail.worksafe_notification_status', null)
                 ->where('detail.worksafe_reference', null)
                 ->where('detail.worksafe_notified_at', null)
             );
+
+        $this->assertSame($event->id, $incident->fresh()->hs_event_id);
+        $this->assertSame($otherIncident->id, $event->fresh()->source_id);
+    }
+
+    public function test_a_direct_hs_link_with_the_wrong_category_is_withheld_and_requires_repair(): void
+    {
+        $this->assertNoncanonicalDirectHsEventIsWithheld([
+            'event_category' => HsEvent::CATEGORY_NEAR_MISS,
+        ]);
+    }
+
+    public function test_a_direct_hs_link_with_the_wrong_idempotency_key_is_withheld_and_requires_repair(): void
+    {
+        $this->assertNoncanonicalDirectHsEventIsWithheld(
+            fn (ClientIncident $incident): array => [
+                'idempotency_key' => HsEvent::buildIdempotencyKey(
+                    ClientIncident::class,
+                    $incident->id,
+                    HsEvent::CATEGORY_NEAR_MISS,
+                ),
+            ],
+        );
     }
 
     public function test_submitted_incident_cannot_mutate_the_legacy_worksafe_projection_inward(): void
@@ -399,6 +427,39 @@ class HsWorksafeConsistencyTest extends TestCase
         $incident->updateQuietly(['hs_event_id' => $event->id]);
 
         return $event;
+    }
+
+    /**
+     * @param  array<string, mixed>|callable(ClientIncident): array<string, mixed>  $eventOverrides
+     */
+    private function assertNoncanonicalDirectHsEventIsWithheld(array|callable $eventOverrides): void
+    {
+        $site = Site::factory()->create();
+        $reporter = User::factory()->create();
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()
+            ->atSite($site)
+            ->submitted()
+            ->create(['reported_by' => $reporter->id]));
+        $overrides = is_callable($eventOverrides)
+            ? $eventOverrides($incident)
+            : $eventOverrides;
+        $event = HsEvent::factory()->forClientIncident($incident)->create($overrides);
+        $incident->updateQuietly(['hs_event_id' => $event->id]);
+
+        $this->actingAs($this->admin())
+            ->get('/incidents?q='.urlencode($incident->reference_number)."&incident={$incident->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('rows.data', fn ($rows): bool => collect($rows)
+                    ->contains(fn (array $row): bool => $row['id'] === $incident->id
+                        && $row['journey_repair_required'] === true))
+                ->where('detail.journey_repair_required', true)
+                ->where('detail.journey_state', 'Journey repair required')
+                ->where('detail.hs_event', null)
+                ->where('detail.close_gate.allowed', false)
+            );
+
+        $this->assertSame($event->id, $incident->fresh()->hs_event_id);
     }
 
     private function admin(): User

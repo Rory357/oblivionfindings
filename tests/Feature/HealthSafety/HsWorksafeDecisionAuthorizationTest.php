@@ -24,10 +24,9 @@ class HsWorksafeDecisionAuthorizationTest extends TestCase
 
     public function test_decision_requires_hazards_manage(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
-        $user = $this->siteBoundUser($site, 1, ['hazards.view']);
+        $site = Site::factory()->create();
+        $user = $this->siteBoundUser($site, ['hazards.view']);
         $event = HsEvent::factory()->worksafeUndecided()->create([
-            'organization_id' => 1,
             'site_id' => $site->id,
         ]);
 
@@ -38,30 +37,12 @@ class HsWorksafeDecisionAuthorizationTest extends TestCase
         $this->assertNull($event->fresh()->worksafe_notifiable);
     }
 
-    public function test_site_bound_manager_cannot_record_a_decision_for_another_site(): void
+    public function test_site_bound_manager_receives_direct_object_denial_for_a_different_site(): void
     {
-        $siteA = Site::factory()->create(['tenant_id' => 1]);
-        $siteB = Site::factory()->create(['tenant_id' => 1]);
-        $user = $this->siteBoundUser($siteA, 1, ['hazards.manage']);
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $user = $this->siteBoundUser($siteA, ['hazards.manage']);
         $event = HsEvent::factory()->worksafeUndecided()->create([
-            'organization_id' => 1,
-            'site_id' => $siteB->id,
-        ]);
-
-        $this->actingAs($user)
-            ->post("/health-safety/events/{$event->id}/worksafe/decision", $this->decisionPayload())
-            ->assertNotFound();
-
-        $this->assertNull($event->fresh()->worksafe_notifiable);
-    }
-
-    public function test_manager_cannot_record_a_decision_across_tenants(): void
-    {
-        $siteA = Site::factory()->create(['tenant_id' => 1]);
-        $siteB = Site::factory()->create(['tenant_id' => 2]);
-        $user = $this->siteBoundUser($siteA, 1, ['hazards.manage']);
-        $event = HsEvent::factory()->worksafeUndecided()->create([
-            'organization_id' => 2,
             'site_id' => $siteB->id,
         ]);
 
@@ -75,10 +56,9 @@ class HsWorksafeDecisionAuthorizationTest extends TestCase
     /**
      * @param  array<int, string>  $permissionKeys
      */
-    private function siteBoundUser(Site $site, int $organizationId, array $permissionKeys): User
+    private function siteBoundUser(Site $site, array $permissionKeys): User
     {
         $user = User::factory()->create([
-            'organization_id' => $organizationId,
             'approved_at' => now(),
         ]);
         $permissions = Permission::query()->whereIn('key', $permissionKeys)->pluck('id');
@@ -87,7 +67,6 @@ class HsWorksafeDecisionAuthorizationTest extends TestCase
         );
 
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => $organizationId,
             'user_id' => $user->id,
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],

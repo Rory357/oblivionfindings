@@ -266,7 +266,13 @@ class ComprehensiveAlertBridgeService
             ->where('alert_type', $alertType)
             ->where('triggered_at', '>=', now()->subMinutes(30));
 
-        if ($clientId) {
+        // Workplace injuries are independent records. Deduplicate against the
+        // source injury, not every application-wide operational injury alert.
+        if (! empty($context['workplace_injury_id'])) {
+            $dedupQuery
+                ->where('context->workplace_injury_id', (int) $context['workplace_injury_id'])
+                ->actionable();
+        } elseif ($clientId) {
             $dedupQuery->where('client_id', $clientId);
         } elseif ($assetId) {
             $dedupQuery->where('asset_id', $assetId);

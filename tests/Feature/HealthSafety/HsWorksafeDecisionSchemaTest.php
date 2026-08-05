@@ -51,7 +51,6 @@ class HsWorksafeDecisionSchemaTest extends TestCase
 
         $creator = User::factory()->create();
         $base = [
-            'organization_id' => 1,
             'source_type' => HsEvent::class,
             'event_category' => HsEvent::CATEGORY_INCIDENT,
             'severity' => HsEvent::SEVERITY_HIGH,

@@ -265,8 +265,8 @@ class HsCorrectiveActionTest extends TestCase
     public function test_rejects_ineligible_or_cross_site_owner(): void
     {
         ['investigation' => $investigation, 'actor' => $actor, 'site' => $site] = $this->recommendationJourney();
-        $otherSite = Site::factory()->create(['tenant_id' => $site->tenant_id]);
-        $ineligible = $this->siteBoundUser($otherSite, [], $site->tenant_id);
+        $otherSite = Site::factory()->create();
+        $ineligible = $this->siteBoundUser($otherSite, []);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('eligible');
@@ -279,33 +279,30 @@ class HsCorrectiveActionTest extends TestCase
         );
     }
 
-    public function test_platform_admin_cannot_assign_an_owner_from_another_tenant_to_a_site_less_event(): void
+    public function test_application_admin_can_assign_an_eligible_site_bound_owner_to_a_site_less_event(): void
     {
         $actor = User::factory()->create([
-            'organization_id' => null,
             'role' => 'admin',
             'approved_at' => now(),
         ]);
         $actor->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
-        $foreignSite = Site::factory()->create(['tenant_id' => 2]);
-        $foreignOwner = $this->siteBoundUser($foreignSite, ['hazards.manage'], 2);
+        $site = Site::factory()->create();
+        $owner = $this->siteBoundUser($site, ['hazards.manage']);
         $event = HsEvent::factory()->create([
-            'organization_id' => 1,
             'site_id' => null,
         ]);
         $investigation = HsInvestigation::factory()->completed()->create([
             'hs_event_id' => $event->id,
         ]);
 
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('eligible');
-
-        $this->service->createFromRecommendation(
+        $action = $this->service->createFromRecommendation(
             $investigation,
             0,
-            $this->newResponsibilityPayload($foreignOwner),
+            $this->newResponsibilityPayload($owner),
             $actor,
         );
+
+        $this->assertSame($owner->id, $action->assigned_to_user_id);
     }
 
     public function test_rejects_an_owner_with_an_inactive_hr_profile(): void
@@ -398,13 +395,10 @@ class HsCorrectiveActionTest extends TestCase
 
     public function test_creates_standalone_action(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create();
         $actor = $this->siteBoundUser($site, ['hazards.manage']);
         $owner = $this->siteBoundUser($site, ['hazards.manage']);
-        $event = HsEvent::factory()->high()->create([
-            'organization_id' => 1,
-            'site_id' => $site->id,
-        ]);
+        $event = HsEvent::factory()->high()->create(['site_id' => $site->id]);
 
         $action = $this->service->createStandalone($event, [
             'title' => 'Install wet floor signage protocol',
@@ -424,13 +418,10 @@ class HsCorrectiveActionTest extends TestCase
 
     public function test_standalone_creation_rejects_missing_owner_or_due_date(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create();
         $actor = $this->siteBoundUser($site, ['hazards.manage']);
         $owner = $this->siteBoundUser($site, ['hazards.manage']);
-        $event = HsEvent::factory()->high()->create([
-            'organization_id' => 1,
-            'site_id' => $site->id,
-        ]);
+        $event = HsEvent::factory()->high()->create(['site_id' => $site->id]);
 
         foreach ([
             ['title' => 'Missing owner', 'priority' => 'high', 'due_date' => '2026-08-31'],
@@ -449,12 +440,9 @@ class HsCorrectiveActionTest extends TestCase
 
     public function test_standalone_request_requires_owner_and_due_date(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create();
         $actor = $this->siteBoundUser($site, ['hazards.manage']);
-        $event = HsEvent::factory()->high()->create([
-            'organization_id' => 1,
-            'site_id' => $site->id,
-        ]);
+        $event = HsEvent::factory()->high()->create(['site_id' => $site->id]);
 
         $this->actingAs($actor)
             ->post("/health-safety/events/{$event->id}/corrective-actions", [
@@ -471,10 +459,9 @@ class HsCorrectiveActionTest extends TestCase
 
     public function test_standalone_action_moves_event_to_corrective_action_status(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create();
         $actor = $this->siteBoundUser($site, ['hazards.manage']);
         $event = HsEvent::factory()->high()->create([
-            'organization_id' => 1,
             'site_id' => $site->id,
             'status' => HsEvent::STATUS_OPEN,
         ]);
@@ -492,12 +479,9 @@ class HsCorrectiveActionTest extends TestCase
 
     public function test_cannot_create_action_on_closed_event(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create();
         $actor = $this->siteBoundUser($site, ['hazards.manage']);
-        $event = HsEvent::factory()->closed()->create([
-            'organization_id' => 1,
-            'site_id' => $site->id,
-        ]);
+        $event = HsEvent::factory()->closed()->create(['site_id' => $site->id]);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('closed');
@@ -903,12 +887,11 @@ class HsCorrectiveActionTest extends TestCase
      */
     private function recommendationJourney(bool $accepted = true): array
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create();
         $actor = $this->siteBoundUser($site, ['hazards.manage']);
         $owner = $this->siteBoundUser($site, ['hazards.manage']);
         $alert = ControlRoomAlert::factory()->triaging()->create(['site_id' => $site->id]);
         $eventFactory = HsEvent::factory()->state([
-            'organization_id' => 1,
             'site_id' => $site->id,
             'control_room_alert_id' => $alert->id,
         ]);
@@ -962,10 +945,9 @@ class HsCorrectiveActionTest extends TestCase
     }
 
     /** @param list<string> $permissionKeys */
-    private function siteBoundUser(Site $site, array $permissionKeys, ?int $organizationId = null): User
+    private function siteBoundUser(Site $site, array $permissionKeys): User
     {
         $user = User::factory()->create([
-            'organization_id' => $organizationId ?? $site->tenant_id,
             'approved_at' => now(),
         ]);
         $permissions = Permission::query()->whereIn('key', $permissionKeys)->pluck('id');
@@ -973,7 +955,6 @@ class HsCorrectiveActionTest extends TestCase
             $permissions->mapWithKeys(fn ($id) => [$id => ['allowed' => true]]),
         );
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => $organizationId ?? $site->tenant_id,
             'user_id' => $user->id,
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],

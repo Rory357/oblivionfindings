@@ -180,7 +180,11 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
         $this->assertNotNull($firstTriggeredAt);
         $this->assertTrue($session->emergency_triggered_at->equalTo($firstTriggeredAt));
         $this->assertSame('Worker requested urgent help.', $session->emergency_notes);
-        $this->assertSame(1, $session->alerts()->where('alert_type', 'emergency')->count());
+        $this->assertSame(0, $session->alerts()->count());
+        $this->assertSame(1, ControlRoomAlert::query()
+            ->where('source', 'lone_worker')
+            ->where('context->normalized_data->lone_worker_session_id', $session->id)
+            ->count());
     }
 
     public function test_stale_session_update_cannot_clear_an_emergency_transition(): void
@@ -216,21 +220,27 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
         $this->assertSame('Emergency won the race.', $session->emergency_notes);
     }
 
-    public function test_session_detail_does_not_expose_a_foreign_tenant_worker_tracker(): void
+    public function test_session_detail_does_not_expose_a_tracker_with_another_site_assignment(): void
     {
         $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
         $worker = $this->siteScopedUser($site);
-        $coordinator = $this->siteScopedUser($site, ['hazards.view']);
+        $coordinator = $this->siteScopedUser($site, ['hazards.view', 'hazards.manage']);
         $session = $this->makeSession($worker, $site);
-        $foreignTracker = Device::factory()->create([
-            'tenant_id' => 999,
+        $otherSiteTracker = Device::factory()->create([
             'domain' => 'tracking',
-            'imei' => 'FOREIGN-TENANT-IMEI',
+            'imei' => 'OTHER-SITE-IMEI',
         ]);
         DeviceAssignment::create([
-            'device_id' => $foreignTracker->id,
+            'device_id' => $otherSiteTracker->id,
             'assignable_type' => DeviceAssignment::TARGET_STAFF,
             'assignable_id' => $worker->id,
+            'assigned_at' => now(),
+        ]);
+        DeviceAssignment::create([
+            'device_id' => $otherSiteTracker->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $otherSite->id,
             'assigned_at' => now(),
         ]);
 
@@ -240,7 +250,12 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('detail.id', $session->id)
                 ->where('detail.tracker', null)
+                ->where('detail.tracker_state', 'integrity_error')
             );
+
+        $this->actingAs($coordinator)
+            ->post("/health-safety/lone-workers/sessions/{$session->id}/locate")
+            ->assertForbidden();
     }
 
     public function test_session_creation_cannot_leave_a_site_scoped_coordinator_with_an_active_orphan(): void
@@ -274,11 +289,10 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
 
     public function test_integration_context_uses_the_supplied_canonical_site_for_devices(): void
     {
-        $tenantId = 37;
-        $site = Site::factory()->create(['tenant_id' => $tenantId]);
-        $this->assignDeviceToSite($tenantId, $site);
-        $this->assignDeviceToSite($tenantId, $site);
-        $this->assignDeviceToSite(1, $site);
+        $site = Site::factory()->create();
+        $this->assignDeviceToSite($site);
+        $this->assignDeviceToSite($site);
+        $this->assignDeviceToSite($site);
 
         $context = app(IntegrationContextProvider::class)->getContext($site->id);
 
@@ -289,14 +303,12 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
 
     public function test_integration_context_returns_the_requested_canonical_site(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 42]);
+        $site = Site::factory()->create();
         IntegrationEvent::factory()->create([
-            'tenant_id' => 42,
             'site_id' => $site->id,
             'event_type' => 'site_event',
         ]);
         SiteRoom::create([
-            'tenant_id' => 42,
             'site_id' => $site->id,
             'name' => 'Site room',
         ]);
@@ -314,36 +326,30 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
         $this->assertCount(1, $context['rooms']);
     }
 
-    public function test_integration_context_does_not_follow_poisoned_cross_tenant_room_or_hardware_links(): void
+    public function test_integration_context_does_not_follow_poisoned_cross_site_room_or_hardware_links(): void
     {
-        $tenantId = 51;
-        $foreignTenantId = 52;
-        $site = Site::factory()->create(['tenant_id' => $tenantId]);
-        $foreignSite = Site::factory()->create(['tenant_id' => $foreignTenantId]);
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
         $localRoom = SiteRoom::create([
-            'tenant_id' => $tenantId,
             'site_id' => $site->id,
             'name' => 'Local room',
         ]);
-        $foreignRoom = SiteRoom::create([
-            'tenant_id' => $foreignTenantId,
-            'site_id' => $foreignSite->id,
-            'name' => 'Foreign room name',
+        $otherSiteRoom = SiteRoom::create([
+            'site_id' => $otherSite->id,
+            'name' => 'Other Site room name',
         ]);
-        $foreignHardware = LocationHardware::create([
-            'tenant_id' => $foreignTenantId,
-            'site_id' => $foreignSite->id,
+        $otherSiteHardware = LocationHardware::create([
+            'site_id' => $otherSite->id,
             'room_id' => $localRoom->id,
             'provider' => 'manual',
             'category' => 'sensor',
-            'name' => 'Foreign hardware name',
+            'name' => 'Other Site hardware name',
             'status' => 'online',
         ]);
         IntegrationEvent::factory()->create([
-            'tenant_id' => $tenantId,
             'site_id' => $site->id,
-            'room_id' => $foreignRoom->id,
-            'hardware_id' => $foreignHardware->id,
+            'room_id' => $otherSiteRoom->id,
+            'hardware_id' => $otherSiteHardware->id,
             'event_type' => 'poisoned_relation_event',
         ]);
 
@@ -405,9 +411,9 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
         ], $overrides));
     }
 
-    private function assignDeviceToSite(int $tenantId, Site $site): Device
+    private function assignDeviceToSite(Site $site): Device
     {
-        $device = Device::factory()->create(['tenant_id' => $tenantId]);
+        $device = Device::factory()->create();
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_SITE,

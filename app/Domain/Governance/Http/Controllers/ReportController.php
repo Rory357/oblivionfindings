@@ -74,13 +74,13 @@ class ReportController extends Controller
             ->get();
 
         $this->syncBudgetActuals($request);
-        $widgets = match($committee) {
+        $widgets = match ($committee) {
             'audit_risk' => [
                 'top_risks' => $this->aggregator->getTopRisks(),
                 'compliance_calendar' => $this->aggregator->getComplianceCalendar(),
                 'it_cyber' => $this->aggregator->getItCyberMetrics($range),
                 'privacy_data' => $this->aggregator->getPrivacyMetrics($range),
-                'hs_backbone' => $this->aggregator->getHsBackboneMetrics($range),
+                'hs_backbone' => $this->aggregator->getHsBackboneMetrics($range, $request->user()),
             ],
             'people' => [
                 'workforce' => $this->aggregator->getWorkforceMetrics($range),
@@ -129,7 +129,7 @@ class ReportController extends Controller
             ->limit(10)
             ->get();
 
-        $narrative = $risks->map(fn($r) => [
+        $narrative = $risks->map(fn ($r) => [
             'id' => $r->id,
             'reference' => $r->risk_reference,
             'title' => $r->title,
@@ -176,7 +176,7 @@ class ReportController extends Controller
 
         return response()->json([
             'pack_id' => $pack->id,
-            'download_url' => route('governance.reports.export', ['type' => 'evidence-pack-' . $pack->id]),
+            'download_url' => route('governance.reports.export', ['type' => 'evidence-pack-'.$pack->id]),
         ]);
     }
 
@@ -184,7 +184,7 @@ class ReportController extends Controller
     {
         $range = ['start' => now()->subMonths(3), 'end' => now()];
 
-        return match(true) {
+        return match (true) {
             str_starts_with($type, 'evidence-pack-') => $this->evidenceService->download((int) str_replace('evidence-pack-', '', $type)),
             $type === 'risks-csv' => $this->exportRisksCsv(),
             $type === 'compliance-csv' => $this->exportComplianceCsv(),
@@ -199,7 +199,7 @@ class ReportController extends Controller
         $csv = "Reference,Title,Category,Likelihood,Impact,Inherent Score,Control Effectiveness,Residual Score,Within Appetite,Owner,Status,Next Review\n";
         foreach ($risks as $r) {
             $csv .= sprintf(
-                '"%s","%s","%s",%d,%d,%d,"%s",%d,%s,"%s","%s","%s"' . "\n",
+                '"%s","%s","%s",%d,%d,%d,"%s",%d,%s,"%s","%s","%s"'."\n",
                 $r->risk_reference, $r->title, $r->category,
                 $r->likelihood_score, $r->impact_score, $r->inherent_score,
                 $r->control_effectiveness, $r->residual_score,
@@ -211,7 +211,7 @@ class ReportController extends Controller
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="risk-register-' . now()->format('Y-m-d') . '.csv"',
+            'Content-Disposition' => 'attachment; filename="risk-register-'.now()->format('Y-m-d').'.csv"',
         ]);
     }
 
@@ -222,7 +222,7 @@ class ReportController extends Controller
         $csv = "Framework,Title,Owner,Due Date,Status,Frequency\n";
         foreach ($obligations as $o) {
             $csv .= sprintf(
-                '"%s","%s","%s","%s","%s","%s"' . "\n",
+                '"%s","%s","%s","%s","%s","%s"'."\n",
                 $o->getFrameworkLabel(), $o->obligation_title,
                 $o->owner?->name ?? '', $o->due_date?->toDateString() ?? '',
                 $o->status, $o->review_frequency ?? '',
@@ -231,7 +231,7 @@ class ReportController extends Controller
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="compliance-register-' . now()->format('Y-m-d') . '.csv"',
+            'Content-Disposition' => 'attachment; filename="compliance-register-'.now()->format('Y-m-d').'.csv"',
         ]);
     }
 

@@ -16,6 +16,7 @@ use App\Models\ShiftReplacementRequest;
 use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Models\WorkplaceInjury;
 use Illuminate\Database\Eloquent\Builder;
 
 class UserSiteAccessService
@@ -184,6 +185,97 @@ class UserSiteAccessService
         $this->assertCanAccessSiteId(
             $user,
             $siteId ? (int) $siteId : null,
+            $bypassPermissions,
+        );
+    }
+
+    /**
+     * Resolve the one canonical Site represented by a client incident.
+     * Direct, Shift, Client and Shift-Client provenance must converge.
+     *
+     * @throws \LogicException when provenance is missing or conflicting
+     */
+    public function effectiveClientIncidentSiteId(ClientIncident $incident): int
+    {
+        $canonical = ClientIncident::query()->with([
+            'client:id,site_id',
+            'shift:id,site_id,client_id',
+            'shift.client:id,site_id',
+        ])->find($incident->getKey());
+
+        if (! $canonical || ! $canonical->client) {
+            throw new \LogicException('Client incident provenance could not be resolved.');
+        }
+
+        if ($canonical->shift && (int) $canonical->shift->client_id !== (int) $canonical->client_id) {
+            throw new \LogicException('Client incident Shift and Client provenance conflicts.');
+        }
+
+        $siteIds = collect([
+            $this->nullablePositiveId($canonical->getAttribute('site_id')),
+            $this->nullablePositiveId($canonical->client->site_id),
+            $this->nullablePositiveId($canonical->shift?->site_id),
+            $this->nullablePositiveId($canonical->shift?->client?->site_id),
+        ])->filter()->unique()->values();
+
+        if ($siteIds->count() !== 1) {
+            throw new \LogicException('Client incident provenance does not converge on one Site.');
+        }
+
+        return (int) $siteIds->first();
+    }
+
+    /**
+     * Validate a linked incident against both viewer access and the selected Site.
+     *
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function assertCanUseClientIncidentAtSite(
+        ?User $user,
+        ClientIncident $incident,
+        int $siteId,
+        array $bypassPermissions = [],
+    ): void {
+        $this->assertCanAccessSiteId($user, $siteId, $bypassPermissions);
+
+        try {
+            $incidentSiteId = $this->effectiveClientIncidentSiteId($incident);
+        } catch (\LogicException) {
+            abort(403, self::DEFAULT_MESSAGE);
+        }
+
+        abort_unless($incidentSiteId === $siteId, 403, self::DEFAULT_MESSAGE);
+    }
+
+    /**
+     * Canonical Site scope for the workplace-injury register.
+     * Missing-Site rows are deliberately excluded from interactive access.
+     *
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function applyWorkplaceInjuryScope(
+        Builder $query,
+        ?User $user,
+        array $bypassPermissions = [],
+    ): Builder {
+        $siteIds = $this->accessibleSiteIds($user, $bypassPermissions);
+
+        return $siteIds === []
+            ? $query->whereRaw('1 = 0')
+            : $query->whereIn($query->qualifyColumn('site_id'), $siteIds);
+    }
+
+    /**
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function assertCanAccessWorkplaceInjury(
+        ?User $user,
+        WorkplaceInjury $injury,
+        array $bypassPermissions = [],
+    ): void {
+        $this->assertCanAccessSiteId(
+            $user,
+            $this->nullablePositiveId($injury->site_id),
             $bypassPermissions,
         );
     }
@@ -863,6 +955,37 @@ SQL;
                 }
             });
         });
+    }
+
+    /**
+     * Validate that a selected person is current approved staff assigned to the
+     * exact injury Site. Application-wide visibility never relaxes that
+     * staff-to-Site provenance invariant.
+     *
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function assertCanUseCurrentStaffAtSite(
+        ?User $viewer,
+        int $staffId,
+        int $siteId,
+        array $bypassPermissions = [],
+    ): void {
+        $this->assertCanAccessSiteId($viewer, $siteId, $bypassPermissions);
+
+        $query = $this->applyStaffScope(
+            User::query()->whereKey($staffId),
+            $viewer,
+            $bypassPermissions,
+        );
+
+        $query->whereHas('hrEmployeeProfile', function (Builder $profileQuery) use ($siteId): void {
+            $profileQuery->where(function (Builder $siteQuery) use ($siteId): void {
+                $siteQuery->where('primary_site_id', $siteId)
+                    ->orWhereJsonContains('secondary_site_ids', $siteId);
+            });
+        });
+
+        abort_unless($query->exists(), 403, self::DEFAULT_MESSAGE);
     }
 
     /**

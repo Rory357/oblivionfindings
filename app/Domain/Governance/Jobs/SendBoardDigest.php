@@ -20,10 +20,8 @@ class SendBoardDigest implements ShouldQueue
     {
         $boardMembers = BoardMember::active()
             ->with(['preferences', 'user.notifications'])
-            ->whereHas('preferences', fn($q) => $q->where('digest_enabled', true))
+            ->whereHas('preferences', fn ($q) => $q->where('digest_enabled', true))
             ->get();
-
-        $metrics = null;
 
         foreach ($boardMembers as $member) {
             $preferences = $member->preferences;
@@ -36,7 +34,10 @@ class SendBoardDigest implements ShouldQueue
                 continue;
             }
 
-            $metrics ??= ($aggregator->captureSnapshot('week')->snapshot_data['widgets'] ?? []);
+            $metrics = $aggregator->captureSnapshot(
+                'week',
+                viewer: $member->user,
+            )->snapshot_data['widgets'] ?? [];
             $member->user->notify(new BoardDigestNotification($member, $metrics));
         }
     }

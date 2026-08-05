@@ -12,6 +12,7 @@ use App\Models\HsInvestigation;
 use App\Models\IncidentFollowup;
 use App\Models\IncidentTemplate;
 use App\Models\ItTicket;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\SafeguardingConcern;
 use App\Models\Shift;
@@ -116,7 +117,6 @@ class IncidentControllerTest extends TestCase
     private function assignCoordinatorToPrimarySite(): void
     {
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => (int) $this->site->tenant_id,
             'user_id' => $this->coordinator->id,
             'primary_site_id' => $this->site->id,
             'secondary_site_ids' => [],
@@ -202,7 +202,6 @@ class IncidentControllerTest extends TestCase
         $this->mockNotificationService();
         $officer = User::factory()->create([
             'role' => 'health_safety_officer',
-            'organization_id' => $this->site->tenant_id,
             'approved_at' => now(),
             'email_verified_at' => now(),
         ]);
@@ -258,14 +257,12 @@ class IncidentControllerTest extends TestCase
 
     public function test_task5_hardening_health_safety_create_permission_does_not_widen_incident_list_or_detail_visibility(): void
     {
-        $this->client->update(['organization_id' => 1]);
-        $sameOrganizationIncident = ClientIncident::factory()->create([
+        $localIncident = ClientIncident::factory()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
         ]);
         $foreignSite = Site::factory()->create();
         $foreignClient = Client::factory()->create([
-            'organization_id' => 2,
             'site_id' => $foreignSite->id,
         ]);
         $foreignIncident = ClientIncident::factory()->create([
@@ -274,14 +271,13 @@ class IncidentControllerTest extends TestCase
         ]);
         $officer = User::factory()->create([
             'role' => 'health_safety_officer',
-            'organization_id' => 1,
             'approved_at' => now(),
             'email_verified_at' => now(),
         ]);
         $officer->roles()->attach(Role::where('name', 'health_safety_officer')->firstOrFail());
 
         $this->actingAs($officer)->get('/incidents')->assertForbidden();
-        $this->actingAs($officer)->get("/incidents/{$sameOrganizationIncident->id}")->assertForbidden();
+        $this->actingAs($officer)->get("/incidents/{$localIncident->id}")->assertForbidden();
         $this->actingAs($officer)->get("/incidents/{$foreignIncident->id}")->assertForbidden();
     }
 
@@ -316,8 +312,6 @@ class IncidentControllerTest extends TestCase
 
     public function test_task5_hardening_store_rejects_site_scoped_coordinator_foreign_site_crafted_post(): void
     {
-        $this->coordinator->update(['organization_id' => 1]);
-        $this->client->update(['organization_id' => 1]);
         HrEmployeeProfile::factory()->create([
             'user_id' => $this->coordinator->id,
             'primary_site_id' => $this->site->id,
@@ -326,7 +320,6 @@ class IncidentControllerTest extends TestCase
         ]);
         $foreignSite = Site::factory()->create(['is_active' => true]);
         $foreignSiteClient = Client::factory()->create([
-            'organization_id' => 1,
             'site_id' => $foreignSite->id,
         ]);
 
@@ -340,26 +333,22 @@ class IncidentControllerTest extends TestCase
         $this->assertSame(0, ClientIncident::query()->count());
     }
 
-    public function test_task5_hardening_report_picker_scopes_cross_site_provider_manager_by_organization(): void
+    public function test_report_picker_allows_an_application_wide_manager_to_see_clients_at_all_sites(): void
     {
         $this->client->update([
             'first_name' => 'Aroha',
-            'organization_id' => 1,
         ]);
         $otherSite = Site::factory()->create();
-        $sameOrganizationClient = Client::factory()->create([
+        $otherSiteClient = Client::factory()->create([
             'first_name' => 'Bella',
-            'organization_id' => 1,
             'site_id' => $otherSite->id,
         ]);
-        Client::factory()->create([
+        $thirdClient = Client::factory()->create([
             'first_name' => 'Charlie',
-            'organization_id' => 2,
             'site_id' => $otherSite->id,
         ]);
         $manager = User::factory()->create([
             'role' => 'provider_manager',
-            'organization_id' => 1,
             'approved_at' => now(),
             'email_verified_at' => now(),
         ]);
@@ -369,9 +358,10 @@ class IncidentControllerTest extends TestCase
             ->get('/incidents')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('reportClients', 2)
+                ->has('reportClients', 3)
                 ->where('reportClients.0.id', $this->client->id)
-                ->where('reportClients.1.id', $sameOrganizationClient->id));
+                ->where('reportClients.1.id', $otherSiteClient->id)
+                ->where('reportClients.2.id', $thirdClient->id));
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -783,10 +773,19 @@ class IncidentControllerTest extends TestCase
             ->assertRedirect(route('incidents.index', ['report' => 'incident', 'report_client_id' => $this->client->id]));
     }
 
-    public function test_task5_review_fix_create_shift_prefill_scopes_view_any_users_to_their_accessible_same_organization_sites(): void
+    public function test_create_client_prefill_withholds_a_foreign_site_direct_object(): void
     {
-        $this->client->update(['organization_id' => 1]);
-        $this->coordinator->update(['organization_id' => 1]);
+        $this->assignCoordinatorToPrimarySite();
+        $foreignSite = Site::factory()->create();
+        $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
+
+        $this->actingAs($this->coordinator)
+            ->get('/incidents/create?client_id='.$foreignClient->id)
+            ->assertRedirect(route('incidents.index', ['report' => 'incident']));
+    }
+
+    public function test_create_shift_prefill_scopes_view_any_users_to_their_accessible_sites(): void
+    {
         HrEmployeeProfile::factory()->create([
             'user_id' => $this->coordinator->id,
             'primary_site_id' => $this->site->id,
@@ -794,19 +793,16 @@ class IncidentControllerTest extends TestCase
             'updated_by' => $this->admin->id,
         ]);
         $accessibleShift = Shift::factory()->create([
-            'organization_id' => 1,
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
             'user_id' => $this->staff->id,
         ]);
         $foreignSite = Site::factory()->create();
-        $sameOrganizationForeignSiteClient = Client::factory()->create([
-            'organization_id' => 1,
+        $foreignSiteClient = Client::factory()->create([
             'site_id' => $foreignSite->id,
         ]);
         $foreignSiteShift = Shift::factory()->create([
-            'organization_id' => 1,
-            'client_id' => $sameOrganizationForeignSiteClient->id,
+            'client_id' => $foreignSiteClient->id,
             'site_id' => $foreignSite->id,
             'user_id' => $this->staff->id,
         ]);
@@ -857,22 +853,31 @@ class IncidentControllerTest extends TestCase
             ->assertRedirect(route('incidents.index', ['report' => 'incident']));
     }
 
-    public function test_task5_review_fix_create_shift_prefill_is_nondisclosing_for_missing_and_foreign_organization_shifts(): void
+    public function test_create_shift_prefill_is_nondisclosing_when_missing_and_allows_an_application_wide_remote_site(): void
     {
         $foreignSite = Site::factory()->create();
         $foreignClient = Client::factory()->create([
-            'organization_id' => 2,
             'site_id' => $foreignSite->id,
         ]);
         $officer = User::factory()->create([
             'role' => 'health_safety_officer',
-            'organization_id' => 1,
             'approved_at' => now(),
             'email_verified_at' => now(),
         ]);
         $officer->roles()->attach(Role::where('name', 'health_safety_officer')->firstOrFail());
+        $allSites = Permission::query()->where('key', 'healthSafety.viewAllSites')->firstOrFail();
+        $officer->permissionOverrides()->syncWithoutDetaching([
+            $allSites->id => ['allowed' => true],
+        ]);
+        $officer->refresh();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $officer->id,
+            'primary_site_id' => $foreignSite->id,
+            'secondary_site_ids' => [],
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
         $foreignShift = Shift::factory()->create([
-            'organization_id' => 2,
             'client_id' => $foreignClient->id,
             'site_id' => $foreignSite->id,
             'user_id' => $officer->id,
@@ -885,7 +890,11 @@ class IncidentControllerTest extends TestCase
 
         $this->actingAs($officer)
             ->get('/incidents/create?shift_id='.$foreignShift->id)
-            ->assertRedirect($nondisclosingRedirect);
+            ->assertRedirect(route('incidents.index', [
+                'report' => 'incident',
+                'report_shift_id' => $foreignShift->id,
+                'report_client_id' => $foreignClient->id,
+            ]));
     }
 
     public function test_create_resume_draft_redirects_to_detail(): void
@@ -1269,7 +1278,6 @@ class IncidentControllerTest extends TestCase
     {
         $officer = User::factory()->create([
             'role' => 'health_safety_officer',
-            'organization_id' => $this->client->organization_id,
             'approved_at' => now(),
             'email_verified_at' => now(),
         ]);
@@ -2232,7 +2240,10 @@ class IncidentControllerTest extends TestCase
 
     public function test_review_requires_authentication(): void
     {
-        $incident = ClientIncident::factory()->submitted()->create();
+        $incident = ClientIncident::factory()->submitted()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
         $this->post("/incidents/{$incident->id}/review")->assertRedirect('/login');
     }
 
@@ -2240,7 +2251,10 @@ class IncidentControllerTest extends TestCase
     {
         $this->mockNotificationService();
 
-        $incident = ClientIncident::factory()->submitted()->create();
+        $incident = ClientIncident::factory()->submitted()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/review", [
@@ -2307,7 +2321,10 @@ class IncidentControllerTest extends TestCase
         $mock = $this->mockNotificationService();
         $mock->shouldReceive('notifyCrud')->once()->andReturnNull();
 
-        $incident = ClientIncident::factory()->submitted()->create();
+        $incident = ClientIncident::factory()->submitted()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/review")
@@ -2329,7 +2346,10 @@ class IncidentControllerTest extends TestCase
 
     public function test_cannot_review_reviewed_incident(): void
     {
-        $incident = ClientIncident::factory()->reviewed()->create();
+        $incident = ClientIncident::factory()->reviewed()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/review")
@@ -2370,7 +2390,10 @@ class IncidentControllerTest extends TestCase
     {
         $this->mockNotificationService();
 
-        $incident = ClientIncident::factory()->reviewed()->create();
+        $incident = ClientIncident::factory()->reviewed()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
         $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         $this->actingAs($this->coordinator)
@@ -2444,8 +2467,15 @@ class IncidentControllerTest extends TestCase
     {
         $this->mockNotificationService();
 
-        $alert = ControlRoomAlert::factory()->open()->create();
-        $incident = ClientIncident::factory()->reviewed()->create(['control_room_alert_id' => $alert->id]);
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
+        $incident = ClientIncident::factory()->reviewed()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'control_room_alert_id' => $alert->id,
+        ]);
         $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         $this->actingAs($this->coordinator)
@@ -2524,7 +2554,10 @@ class IncidentControllerTest extends TestCase
 
     public function test_close_requires_closed_outcome(): void
     {
-        $incident = ClientIncident::factory()->reviewed()->create();
+        $incident = ClientIncident::factory()->reviewed()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/close", [])
@@ -2616,7 +2649,6 @@ class IncidentControllerTest extends TestCase
 
         HsInvestigation::create([
             'hs_event_id' => $hsEvent->id,
-            'organization_id' => $hsEvent->organization_id,
             'reference_number' => HsInvestigation::generateReferenceNumber(),
             'investigation_type' => 'standard',
             'status' => HsInvestigation::STATUS_COMPLETED,
@@ -2679,7 +2711,10 @@ class IncidentControllerTest extends TestCase
     {
         $this->mockNotificationService();
 
-        $incident = ClientIncident::factory()->reviewed()->create();
+        $incident = ClientIncident::factory()->reviewed()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
         $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         IncidentFollowup::factory()->create([
@@ -2702,7 +2737,10 @@ class IncidentControllerTest extends TestCase
     {
         $this->mockNotificationService();
 
-        $incident = ClientIncident::factory()->reviewed()->create();
+        $incident = ClientIncident::factory()->reviewed()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
         $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         IncidentFollowup::factory()->create([
@@ -3706,7 +3744,10 @@ class IncidentControllerTest extends TestCase
         $mock = $this->mockNotificationService();
         $mock->shouldReceive('notifyCrud')->once()->andReturnNull();
 
-        $incident = ClientIncident::factory()->reviewed()->create();
+        $incident = ClientIncident::factory()->reviewed()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
         $this->markLinkedHealthSafetyGovernanceClosed($incident);
 
         $this->actingAs($this->coordinator)
@@ -3767,6 +3808,8 @@ class IncidentControllerTest extends TestCase
         $this->mockNotificationService();
 
         $incident = ClientIncident::factory()->submitted()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'review_notes' => 'Existing notes',
         ]);
 

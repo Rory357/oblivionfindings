@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\HsEvent;
+use App\Models\Permission;
 use App\Models\SafeguardingConcern;
 use App\Models\Site;
+use App\Models\User;
 use App\Services\HealthSafety\HsCorrectiveActionService;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\HealthSafety\HsInvestigationService;
@@ -54,20 +57,40 @@ class HsLegacyStorageCompatibilityTest extends TestCase
         ]);
         $this->assertLegacyStorageIsWriteOnly($replacement, $legacyColumn);
 
+        $actor = User::factory()->create(['approved_at' => now()]);
+        $permission = Permission::query()->create([
+            'key' => 'hazards.manage',
+            'description' => 'Manage health and safety hazards',
+            'group' => 'Health & Safety',
+            'module' => 'health_safety',
+        ]);
+        $actor->permissionOverrides()->sync([$permission->id => ['allowed' => true]]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $actor->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
         $action = app(HsCorrectiveActionService::class)->createStandalone($event, [
             'title' => 'Verify the compatibility boundary',
-        ]);
+            'assigned_to_user_id' => $actor->id,
+            'due_date' => now()->addDay()->toDateString(),
+            'priority' => 'high',
+        ], $actor);
         $this->assertLegacyStorageIsWriteOnly($action, $legacyColumn);
     }
 
-    public function test_safeguarding_has_no_nonexistent_legacy_storage_contract(): void
+    public function test_safeguarding_uses_hidden_inert_legacy_storage_compatibility(): void
     {
         $legacyColumn = 'organization'.'_id';
-        $concern = new SafeguardingConcern;
+        $concern = SafeguardingConcern::factory()->create([
+            'reference_number' => 'SG-LEGACY-STORAGE-COMPATIBILITY',
+        ]);
 
         $this->assertNotContains($legacyColumn, $concern->getFillable());
         $this->assertFalse(method_exists($concern, 'organization'));
-        $this->assertFalse(Schema::hasColumn($concern->getTable(), $legacyColumn));
+        $this->assertTrue(Schema::hasColumn($concern->getTable(), $legacyColumn));
+        $this->assertLegacyStorageIsWriteOnly($concern, $legacyColumn);
     }
 
     private function assertLegacyStorageIsWriteOnly(Model $model, string $legacyColumn): void

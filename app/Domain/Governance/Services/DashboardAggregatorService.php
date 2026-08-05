@@ -19,6 +19,7 @@ use App\Models\PrivacyImpactAssessment;
 use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Timesheet;
+use App\Models\User;
 use App\Services\HealthSafety\HsGovernanceService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -28,12 +29,21 @@ use Illuminate\Support\Facades\Schema;
 class DashboardAggregatorService
 {
     public function __construct(
+        protected HsGovernanceService $hsGovernanceService,
         protected ?RoadmapDashboardService $roadmapDashboardService = null,
-        protected ?HsGovernanceService $hsGovernanceService = null,
     ) {}
 
-    public function captureSnapshot(string $periodType, ?Carbon $start = null, ?Carbon $end = null): DashboardSnapshot
-    {
+    public function captureSnapshot(
+        string $periodType,
+        ?Carbon $start = null,
+        ?Carbon $end = null,
+        ?User $viewer = null,
+    ): DashboardSnapshot {
+        $viewer ??= auth()->user();
+        if (! $viewer instanceof User || ! $viewer->exists || $viewer->approved_at === null) {
+            throw new \LogicException('Dashboard snapshots require an approved authorized viewer.');
+        }
+
         $range = $this->getDateRange($periodType, $start, $end);
 
         $widgets = [];
@@ -54,7 +64,7 @@ class DashboardAggregatorService
             'control_room' => fn () => $this->getControlRoomMetrics($range),
             'incidents' => fn () => $this->getIncidentMetrics($range),
             'safeguarding' => fn () => $this->getSafeguardingMetrics($range),
-            'hs_backbone' => fn () => $this->getHsBackboneMetrics($range),
+            'hs_backbone' => fn () => $this->getHsBackboneMetrics($range, $viewer),
         ];
 
         foreach ($widgetMethods as $key => $callback) {
@@ -83,7 +93,7 @@ class DashboardAggregatorService
             'period_end' => $range['end'],
             'checksum' => DashboardSnapshot::generateChecksum($data),
             'captured_at' => now(),
-            'captured_by' => auth()->id() ?? 1,
+            'captured_by' => $viewer->id,
             'data_freshness' => $this->getDataFreshness(),
         ]);
     }
@@ -576,13 +586,17 @@ class DashboardAggregatorService
         ];
     }
 
-    public function getHsBackboneMetrics(array $range): array
+    public function getHsBackboneMetrics(array $range, ?User $viewer = null): array
     {
-        if (! $this->hsGovernanceService) {
-            return ['status' => 'unavailable', 'reason' => 'HsGovernanceService not injected'];
+        if (! $viewer) {
+            return [
+                'status' => 'unavailable',
+                'reason_code' => 'authorized_viewer_required',
+                'reason' => 'Health and safety metrics require an authorized Site-scoped viewer.',
+            ];
         }
 
-        return $this->hsGovernanceService->getWidgetData($range);
+        return $this->hsGovernanceService->getWidgetData($range, $viewer);
     }
 
     protected function determineStatus(int $value, array $thresholds): string
