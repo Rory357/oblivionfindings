@@ -274,6 +274,7 @@ function isAllowedSourcePath(string $path): bool
         'vite.config.ts',
         'vitest.config.ts',
         'docs/it-support-security-devices-completion-goal.md',
+        'docs/hero-unification-v3-handoff.md',
     ];
 
     if (in_array($path, $rootFiles, true)) {
@@ -287,6 +288,21 @@ function isAllowedSourcePath(string $path): bool
     }
 
     return false;
+}
+
+function requireSanitisedCredentialRemediation(string $path, string $candidatePath): void
+{
+    if ($path !== 'docs/hero-unification-v3-handoff.md') {
+        return;
+    }
+
+    $contents = file_get_contents($candidatePath);
+    if ($contents === false
+        || ! str_contains($contents, '- SSH: [removed; use approved secure deployment access]')
+        || ! str_contains($contents, '- Login: use an approved dev/demo application account from the secure credential channel.')
+        || preg_match('/^\- (?:SSH|Login): .*\s\/\s.+$/m', $contents) === 1) {
+        refuse('the credential-remediation handoff is not sanitised.');
+    }
 }
 
 function gitObjectExists(string $checkout, string $revision, string $path): bool
@@ -443,6 +459,7 @@ function verifyRows(array $rows, string $checkout, string $baseRevision, string 
             if ($actualHash === false) {
                 refuse('a candidate source path could not be hashed.');
             }
+            requireSanitisedCredentialRemediation($path, $candidatePath);
         }
         if (! hash_equals($hash, $actualHash)) {
             refuse('a manifest SHA-256 hash does not match the reviewed source.');

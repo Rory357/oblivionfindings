@@ -108,6 +108,7 @@ A cross-module projection may read or link the canonical owner. It must not intr
 - Source fixtures under `tests/fixtures/**` only when they are static, synthetic, reviewed inputs. For example, the checked-in RFC syslog fixture files are source inputs, not runtime log output.
 - `resources/js/**/*.test.ts`, `resources/js/**/*.test.tsx`, and reviewed browser test source under `tests/Browser/**`.
 - `docs/it-support-security-devices-completion-goal.md` when the release owner explicitly includes the reviewed ledger update.
+- `docs/hero-unification-v3-handoff.md` only for the exact current credential-remediation change; the verifier requires both safe replacement lines and rejects the prior credential-shaped form.
 - Reviewed operator documentation under `docs/runbooks/monitoring/**`, `docs/runbooks/security-devices/**`, and the named IT/Security release runbooks.
 
 Browser test source is allowed. Browser test output is not.
@@ -220,6 +221,8 @@ php /absolute/candidate/scripts/release/verify-source-manifest.php \
 The verifier performs read-only Git and filesystem inspection. It requires a clean checkout including no untracked files, exact `HEAD` and `origin/main` revisions, a valid base ancestor, unique literal paths, source classification, approved source families, no excluded or generated path, exact source hashes, and an exact match between all manifest rows and the complete base-to-candidate Git diff. Therefore an unlisted changed file also fails verification. It fails closed on duplicate paths, globs, missing files or fields, mismatched hashes, generated classification, revision mismatch, dirty state, and unsupported change types. Known Wayfinder output paths and browser/manual evidence extensions are rejected from the revision diff itself, so relabelling force-added generated or evidence files as `source` cannot bypass the gate.
 
 The verifier does not create a manifest, stage, commit, push, delete, clean, reset, move, build, deploy, or contact a live service. A successful read-only result authorises no later phase; staging still requires separate approval and exact pathspecs.
+
+The exact legacy handoff exception exists only to remove the already exposed deployment and demo-login values from the current tree. It does not make repository history safe and does not prove credential rotation. Rotate both affected credentials through the approved secure channel and record value-free containment evidence separately; never copy their values into the manifest, issue, PR, logs, or browser evidence.
 
 ## Read-only inventory procedure
 

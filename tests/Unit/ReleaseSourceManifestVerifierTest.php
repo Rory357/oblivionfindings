@@ -26,8 +26,10 @@ function runReleaseManifestFixtureCommand(array $command, string $workingDirecto
  *     manifest: array<string, mixed>
  * }
  */
-function makeReleaseManifestFixture(string $repositoryPath = 'app/Domain/It/ReleaseProof.php'): array
-{
+function makeReleaseManifestFixture(
+    string $repositoryPath = 'app/Domain/It/ReleaseProof.php',
+    ?string $candidateContents = null,
+): array {
     $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'oblivion-release-manifest-'.bin2hex(random_bytes(8));
     $checkout = $root.DIRECTORY_SEPARATOR.'candidate';
     $sourcePath = $checkout.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $repositoryPath);
@@ -47,7 +49,7 @@ function makeReleaseManifestFixture(string $repositoryPath = 'app/Domain/It/Rele
     runReleaseManifestFixtureCommand(['git', 'commit', '--quiet', '-m', 'base'], $checkout);
     $baseRevision = runReleaseManifestFixtureCommand(['git', 'rev-parse', 'HEAD'], $checkout);
 
-    file_put_contents($sourcePath, "<?php\n\nreturn 'candidate';\n");
+    file_put_contents($sourcePath, $candidateContents ?? "<?php\n\nreturn 'candidate';\n");
     runReleaseManifestFixtureCommand(['git', 'add', '--force', '--', $repositoryPath], $checkout);
     runReleaseManifestFixtureCommand(['git', 'commit', '--quiet', '-m', 'candidate'], $checkout);
     $candidateRevision = runReleaseManifestFixtureCommand(['git', 'rev-parse', 'HEAD'], $checkout);
@@ -159,6 +161,38 @@ it('accepts an exact reviewed source manifest for a clean candidate revision', f
         expect($process->isSuccessful())->toBeTrue()
             ->and($process->getOutput())->toContain('Release source manifest verified: 1 exact source entries')
             ->and($process->getErrorOutput())->toBe('');
+    } finally {
+        removeReleaseManifestFixture($fixture['root']);
+    }
+});
+
+it('accepts only the sanitised legacy credential handoff as an exact security remediation', function (): void {
+    $fixture = makeReleaseManifestFixture(
+        'docs/hero-unification-v3-handoff.md',
+        "# Legacy handoff\n\n- SSH: [removed; use approved secure deployment access]\n- Login: use an approved dev/demo application account from the secure credential channel.\n",
+    );
+
+    try {
+        $process = executeReleaseManifestVerifier($fixture);
+
+        expect($process->isSuccessful())->toBeTrue()
+            ->and($process->getOutput())->toContain('Release source manifest verified: 1 exact source entries');
+    } finally {
+        removeReleaseManifestFixture($fixture['root']);
+    }
+});
+
+it('rejects an unsanitised legacy credential handoff', function (): void {
+    $fixture = makeReleaseManifestFixture(
+        'docs/hero-unification-v3-handoff.md',
+        "# Legacy handoff\n\n- SSH: access details still present\n- Login: access details still present\n",
+    );
+
+    try {
+        $process = executeReleaseManifestVerifier($fixture);
+
+        expect($process->isSuccessful())->toBeFalse()
+            ->and($process->getErrorOutput())->toContain('credential-remediation handoff is not sanitised');
     } finally {
         removeReleaseManifestFixture($fixture['root']);
     }

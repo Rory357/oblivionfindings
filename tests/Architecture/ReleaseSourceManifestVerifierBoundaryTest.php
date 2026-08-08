@@ -33,6 +33,9 @@ it('keeps the release source manifest verifier fail closed and read only', funct
         'png|jpe?g|gif|webp|mp4|webm|mov|har',
         'requireApprovedReview',
         'requirePassedVerification',
+        'requireSanitisedCredentialRemediation',
+        'docs/hero-unification-v3-handoff.md',
+        'the credential-remediation handoff is not sanitised',
         "'.decision must be approved.'",
         "'.result must be passed.'",
     );
@@ -67,6 +70,7 @@ it('keeps the release source manifest verifier fail closed and read only', funct
         '"decision": "approved"',
         '"result": "passed"',
         'Non-empty placeholder text is not approval evidence',
+        'The exact legacy handoff exception exists only to remove the already exposed deployment and demo-login values',
         'php /absolute/candidate/scripts/release/verify-source-manifest.php',
         '--manifest=/absolute/external/release-source-manifest.json',
         '--checkout=/absolute/candidate',

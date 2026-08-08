@@ -1,3 +1,4 @@
+
 # Hero Banner & Page Layout Unification — v3 Handoff
 
 **Status:** Phase 4 complete · platform-wide sweep done · only cleanup + intentional skips remain
@@ -159,8 +160,8 @@ or page-shell.tsx — those are out of scope.
 ## Test credentials (dev)
 
 - Dev URL: `https://oblivionfindings.com`
-- SSH: `oblivion@oblivionfindings.com` / `Sheila1983@#$!`
-- Login: `admin@demo.test` / `Sheila1983@#$!`
+- SSH: [removed; use approved secure deployment access]
+- Login: use an approved dev/demo application account from the secure credential channel.
 - Workflow: commit + push to `main` → wait ~5 min for deploy → hard-refresh browser to bust asset cache.
 
 ## Verify cumulative status
