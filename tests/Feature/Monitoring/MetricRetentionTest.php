@@ -14,11 +14,15 @@ use App\Domain\Monitoring\Models\MetricCurrentSummary;
 use App\Domain\Monitoring\Models\MetricRollupCoverage;
 use App\Domain\Monitoring\Models\MetricSeries;
 use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\Monitoring\Models\MonitoringRetentionDeletionIntent;
 use App\Domain\Monitoring\Models\MonitoringRetentionPolicy;
 use App\Domain\Monitoring\Models\MonitoringRetentionTombstone;
 use App\Domain\Monitoring\Services\CapacityProjectionService;
 use App\Domain\Monitoring\Services\MetricIngestService;
 use App\Domain\Monitoring\Services\MonitoringObservationIngestor;
+use App\Domain\Monitoring\Services\ProductionRetentionEndpointAttestation;
+use App\Domain\Monitoring\Services\ProductionRetentionEndpointGuard;
+use App\Domain\Monitoring\Services\ProductionRetentionEvidenceVerifier;
 use App\Domain\Monitoring\Services\RetentionEnforcer;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -42,6 +46,90 @@ beforeEach(function (): void {
 
 afterEach(function (): void {
     CarbonImmutable::setTestNow();
+});
+
+it('refuses to label a local fixture runtime as production retention evidence', function (): void {
+    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'retention-command-'.bin2hex(random_bytes(8));
+    mkdir($directory, 0700);
+    if (DIRECTORY_SEPARATOR !== '\\') {
+        chmod($directory, 0700);
+    }
+
+    try {
+        $this->artisan('monitoring:record-production-retention-evidence', [
+            '--output-directory' => $directory,
+            '--json' => true,
+        ])->expectsOutputToContain('"a05_release_evidence":false')
+            ->assertFailed();
+
+        expect(glob($directory.DIRECTORY_SEPARATOR.'*') ?: [])->toBe([])
+            ->and(MonitoringRetentionTombstone::query()->count())->toBe(0);
+    } finally {
+        rmdir($directory);
+    }
+});
+
+it('rejects reserved production endpoints and endpoint attestations that do not match their signature or live pins', function (): void {
+    $guard = new ProductionRetentionEndpointGuard;
+    $settings = [
+        'driver' => 'influxdb',
+        'url' => 'https://localhost:8086',
+        'token' => 'configured-secret',
+        'organisation' => 'configured-org',
+        'bucket' => 'configured-bucket',
+    ];
+
+    expect($guard->errors(
+        'production',
+        false,
+        'mysql',
+        InfluxDbTimeSeriesStore::class,
+        $settings,
+        ['host' => 'mysql.invalid', 'database' => 'oblivion'],
+    ))->toContain('pinned_mysql_endpoint_required', 'secure_influxdb_url_required');
+
+    $attestation = new ProductionRetentionEndpointAttestation;
+    $keyPair = sodium_crypto_sign_seed_keypair(str_repeat("\x63", SODIUM_CRYPTO_SIGN_SEEDBYTES));
+    $publicKey = sodium_crypto_sign_publickey($keyPair);
+    $secretKey = sodium_crypto_sign_secretkey($keyPair);
+    $releaseRevision = str_repeat('d', 40);
+    $observed = [
+        'mysql_endpoint_sha256' => str_repeat('a', 64),
+        'influx_scope_sha256' => str_repeat('b', 64),
+        'influx_tls_certificate_sha256' => str_repeat('c', 64),
+    ];
+    $document = [
+        'schema' => 'monitoring-production-retention-endpoint-attestation-v1',
+        'run_id' => '018f47a8-674f-7d2c-9f1c-9d5f82f7d128',
+        'release_revision' => $releaseRevision,
+        'valid_from_utc' => CarbonImmutable::now()->subHour()->toIso8601ZuluString(),
+        'valid_until_utc' => CarbonImmutable::now()->addHour()->toIso8601ZuluString(),
+        ...$observed,
+        'key_reference' => 'ATTEST-'.substr(hash('sha256', $publicKey), 0, 32),
+    ];
+    $document['signature_base64'] = base64_encode(sodium_crypto_sign_detached(
+        "oblivion-a05-production-endpoints-v1\n".$attestation->canonicalJson($document),
+        $secretKey,
+    ));
+
+    $wrongPins = $observed;
+    $wrongPins['influx_scope_sha256'] = str_repeat('f', 64);
+    expect(fn () => $attestation->verify(
+        $document,
+        $wrongPins,
+        $releaseRevision,
+        CarbonImmutable::now(),
+        $publicKey,
+    ))->toThrow(RuntimeException::class, 'does not match the live endpoints');
+
+    $document['signature_base64'] = base64_encode(str_repeat("\x00", SODIUM_CRYPTO_SIGN_BYTES));
+    expect(fn () => $attestation->verify(
+        $document,
+        $observed,
+        $releaseRevision,
+        CarbonImmutable::now(),
+        $publicKey,
+    ))->toThrow(RuntimeException::class, 'signature is invalid');
 });
 
 it('stores samples outside MySQL and retains only canonical pointers and current summaries', function (): void {
@@ -292,6 +380,8 @@ it('applies the most restrictive matching privacy policy and writes value-free t
     $encoded = json_encode($tombstone->toArray(), JSON_THROW_ON_ERROR);
 
     expect($result['metric_payloads_deleted'])->toBe(1)
+        ->and($result['rollup_coverage_verified_series'])->toBe(1)
+        ->and($result['occupied_rollup_buckets_verified'])->toBe(1)
         ->and($this->store->deletions)->toHaveCount(1)
         ->and($tombstone->policy_id)->toBe($privacy->id)
         ->and($tombstone->site_id)->toBe($site->id)
@@ -398,6 +488,50 @@ it('fails closed without complete downstream coverage and deletes a half-open so
 
     $this->store->points[] = $missingLaterHourly;
 
+    /** @var TimeSeriesPoint $corruptedSource */
+    $corruptedSource = $deletionIntervalHourlyPoints->first();
+    $corruptedRollup = new TimeSeriesPoint(
+        externalKey: $corruptedSource->externalKey,
+        seriesId: $corruptedSource->seriesId,
+        siteId: $corruptedSource->siteId,
+        deviceId: $corruptedSource->deviceId,
+        monitorId: $corruptedSource->monitorId,
+        metric: $corruptedSource->metric,
+        value: $corruptedSource->value + 1,
+        unit: $corruptedSource->unit,
+        dimensions: $corruptedSource->dimensions,
+        tier: $corruptedSource->tier,
+        observedAt: $corruptedSource->observedAt,
+        idempotencyKey: $corruptedSource->idempotencyKey,
+        statistics: [
+            ...$corruptedSource->statistics,
+            'p95' => (float) $corruptedSource->statistics['p95'] + 1,
+        ],
+    );
+    $this->store->points = collect($this->store->points)
+        ->map(fn (TimeSeriesPoint $point): TimeSeriesPoint => $point->idempotencyKey === $corruptedSource->idempotencyKey
+            ? $corruptedRollup
+            : $point)
+        ->values()
+        ->all();
+
+    $corrupted = app(RetentionEnforcer::class)->enforce(
+        CarbonImmutable::now(),
+        jobReference: 'retention-downstream-corrupted',
+    );
+    expect($corrupted['metric_payloads_deleted'])->toBe(0)
+        ->and($corrupted['rollup_coverage_blocked_series'])->toBe(1)
+        ->and($this->store->deletions)->toBe([])
+        ->and(MonitoringRetentionDeletionIntent::query()->count())->toBe(0)
+        ->and(MonitoringRetentionTombstone::query()->count())->toBe(0);
+
+    $this->store->points = collect($this->store->points)
+        ->map(fn (TimeSeriesPoint $point): TimeSeriesPoint => $point->idempotencyKey === $corruptedSource->idempotencyKey
+            ? $corruptedSource
+            : $point)
+        ->values()
+        ->all();
+
     $deleted = app(RetentionEnforcer::class)->enforce(
         CarbonImmutable::now(),
         jobReference: 'retention-coverage-complete',
@@ -410,6 +544,8 @@ it('fails closed without complete downstream coverage and deletes a half-open so
 
     expect($deleted['metric_payloads_deleted'])->toBe(1)
         ->and($deleted['rollup_coverage_blocked_series'])->toBe(0)
+        ->and($deleted['rollup_coverage_verified_series'])->toBe(1)
+        ->and($deleted['occupied_rollup_buckets_verified'])->toBe(2)
         ->and($this->store->deletions)->toHaveCount(1)
         ->and($this->store->deletions[0]['from']->toIso8601String())->toBe('2026-07-18T12:00:00+00:00')
         ->and($this->store->deletions[0]['to']->equalTo($cutoff))->toBeTrue()
@@ -421,6 +557,243 @@ it('fails closed without complete downstream coverage and deletes a half-open so
         ->and($tombstone->period_end->equalTo($cutoff))->toBeTrue()
         ->and(json_encode($tombstone->toArray(), JSON_THROW_ON_ERROR))
         ->not->toContain('111111.125', '166666.5', '222222.25', 'value');
+});
+
+it('recovers a durable deletion intent after external deletion succeeds before database finalisation', function (): void {
+    [, , $monitor] = metricRetentionMonitor();
+    $ingest = app(MetricIngestService::class);
+    $cutoff = CarbonImmutable::parse('2026-07-21T12:00:00Z');
+
+    foreach ([
+        '2026-07-18T12:00:00Z' => 12,
+        $cutoff->toIso8601ZuluString() => 24,
+    ] as $observedAt => $value) {
+        $ingest->write($monitor, new MetricSample(
+            metric: 'occupancy.count',
+            value: $value,
+            unit: 'count',
+            observedAt: CarbonImmutable::parse($observedAt),
+            privacyClass: 'sensitive',
+        ));
+    }
+    MonitoringRetentionPolicy::query()->create([
+        'name' => 'Durable deletion intent proof',
+        'scope_kind' => 'privacy',
+        'privacy_class' => 'sensitive',
+        'raw_days' => 2,
+        'hourly_days' => 30,
+        'daily_days' => 365,
+        'is_active' => true,
+    ]);
+    app(DownsampleMetrics::class)->handle($this->store, $ingest);
+    $raw = MetricSeries::query()->where('retention_tier', 'raw')->sole();
+    $this->store->failNextExistenceCheckAfterDeletion = true;
+
+    $interrupted = app(RetentionEnforcer::class)->enforce(
+        CarbonImmutable::now(),
+        jobReference: 'retention-intent-recovery',
+        includeSnapshots: false,
+    );
+    $intent = MonitoringRetentionDeletionIntent::query()->sole();
+    $failedVerification = app(ProductionRetentionEvidenceVerifier::class)->verify(
+        'retention-intent-recovery',
+        CarbonImmutable::now()->subMinute(),
+        CarbonImmutable::now()->addMinute(),
+        ['held' => []],
+        $interrupted,
+    );
+
+    expect($interrupted['metric_payloads_deleted'])->toBe(0)
+        ->and($interrupted['unresolved_deletion_intents'])->toBe(1)
+        ->and($intent->state)->toBe('pending')
+        ->and($this->store->deletions)->toHaveCount(1)
+        ->and($this->store->exists(
+            (string) $raw->external_key,
+            'raw',
+            CarbonImmutable::parse('2026-07-18T12:00:00Z'),
+            $cutoff,
+        ))->toBeFalse()
+        ->and(MonitoringRetentionTombstone::query()->count())->toBe(0)
+        ->and($failedVerification['errors'])->toContain('deletion_intent_unresolved');
+
+    $recovered = app(RetentionEnforcer::class)->enforce(
+        CarbonImmutable::now(),
+        jobReference: 'retention-intent-recovery',
+        includeSnapshots: false,
+    );
+    $intent->refresh();
+    $tombstone = MonitoringRetentionTombstone::query()->sole();
+    $raw->refresh();
+
+    expect($recovered['reconciled_deletion_intents'])->toBe(1)
+        ->and($recovered['unresolved_deletion_intents'])->toBe(0)
+        ->and($recovered['metric_payloads_deleted'])->toBe(1)
+        ->and($intent->state)->toBe('completed')
+        ->and($intent->delete_acknowledged_at)->not->toBeNull()
+        ->and($intent->completed_at)->not->toBeNull()
+        ->and($tombstone->deletion_intent_id)->toBe($intent->id)
+        ->and($tombstone->deletionIntent?->is($intent))->toBeTrue()
+        ->and($raw->first_point_at->equalTo($cutoff))->toBeTrue();
+});
+
+it('exercises the production retention verifier contract locally without creating release evidence', function (): void {
+    [, , $privacyMonitor] = metricRetentionMonitor();
+    [, , $heldMonitor] = metricRetentionMonitor();
+    $ingest = app(MetricIngestService::class);
+
+    foreach (['2026-07-18T12:00:00Z', '2026-07-22T13:00:00Z'] as $observedAt) {
+        $ingest->write($privacyMonitor, new MetricSample(
+            metric: 'occupancy.count',
+            value: 12,
+            unit: 'count',
+            observedAt: CarbonImmutable::parse($observedAt),
+            privacyClass: 'sensitive',
+        ));
+        $ingest->write($heldMonitor, new MetricSample(
+            metric: 'device.temperature',
+            value: 18,
+            unit: 'celsius',
+            observedAt: CarbonImmutable::parse($observedAt),
+        ));
+    }
+
+    MonitoringRetentionPolicy::query()->create([
+        'name' => 'Sensitive minimisation verifier fixture',
+        'scope_kind' => 'privacy',
+        'privacy_class' => 'sensitive',
+        'raw_days' => 2,
+        'hourly_days' => 1,
+        'daily_days' => 365,
+        'is_active' => true,
+    ]);
+    MonitoringRetentionPolicy::query()->create([
+        'name' => 'Held verifier fixture',
+        'scope_kind' => 'device',
+        'device_id' => $heldMonitor->device_id,
+        'raw_days' => 1,
+        'hourly_days' => 1,
+        'daily_days' => 1,
+        'legal_hold' => true,
+        'is_active' => true,
+    ]);
+
+    $started = CarbonImmutable::now()->subMinute();
+    $verifier = app(ProductionRetentionEvidenceVerifier::class);
+    $before = $verifier->captureBefore(CarbonImmutable::now());
+    app(DownsampleMetrics::class)->handle($this->store, $ingest);
+    $retention = app(RetentionEnforcer::class)->enforce(
+        CarbonImmutable::now(),
+        jobReference: 'local-retention-verifier-contract',
+        includeSnapshots: false,
+    );
+    $verification = $verifier->verify(
+        'local-retention-verifier-contract',
+        $started,
+        CarbonImmutable::now()->addMinute(),
+        $before,
+        $retention,
+    );
+
+    expect($verification['errors'])->toBe([])
+        ->and($verification['execution']['raw_to_hourly_chain_count'])->toBeGreaterThanOrEqual(1)
+        ->and($verification['execution']['hourly_to_daily_chain_count'])->toBeGreaterThanOrEqual(1)
+        ->and($verification['execution']['privacy_tombstone_count'])->toBe(2)
+        ->and($verification['execution']['held_record_count'])->toBe(1)
+        ->and($verification['integrity'])->each->toBe(0)
+        ->and(MonitoringRetentionTombstone::query()
+            ->where('job_reference', 'local-retention-verifier-contract')
+            ->count())->toBe(2);
+});
+
+it('detects both count loss and payload mutation anywhere inside a due legal-hold range', function (): void {
+    [, , $monitor] = metricRetentionMonitor();
+    $ingest = app(MetricIngestService::class);
+    foreach ([
+        '2026-07-18T12:00:00Z' => 18.1,
+        '2026-07-19T12:00:00Z' => 18.2,
+        '2026-07-22T12:00:00Z' => 18.3,
+    ] as $observedAt => $value) {
+        $ingest->write($monitor, new MetricSample(
+            metric: 'device.temperature',
+            value: $value,
+            unit: 'celsius',
+            observedAt: CarbonImmutable::parse($observedAt),
+        ));
+    }
+    MonitoringRetentionPolicy::query()->create([
+        'name' => 'Legal-hold range commitment proof',
+        'scope_kind' => 'device',
+        'device_id' => $monitor->device_id,
+        'raw_days' => 1,
+        'hourly_days' => 1,
+        'daily_days' => 1,
+        'legal_hold' => true,
+        'is_active' => true,
+    ]);
+
+    $verifier = app(ProductionRetentionEvidenceVerifier::class);
+    $before = $verifier->captureBefore(CarbonImmutable::now());
+    $originalPoints = $this->store->points;
+    /** @var TimeSeriesPoint $middle */
+    $middle = collect($originalPoints)
+        ->sortBy(fn (TimeSeriesPoint $point): int => $point->observedAt->getTimestamp())
+        ->values()
+        ->get(1);
+    $mutated = new TimeSeriesPoint(
+        externalKey: $middle->externalKey,
+        seriesId: $middle->seriesId,
+        siteId: $middle->siteId,
+        deviceId: $middle->deviceId,
+        monitorId: $middle->monitorId,
+        metric: $middle->metric,
+        value: $middle->value + 0.5,
+        unit: $middle->unit,
+        dimensions: $middle->dimensions,
+        tier: $middle->tier,
+        observedAt: $middle->observedAt,
+        idempotencyKey: $middle->idempotencyKey,
+        statistics: $middle->statistics,
+    );
+    $this->store->points = collect($originalPoints)
+        ->map(fn (TimeSeriesPoint $point): TimeSeriesPoint => $point->idempotencyKey === $middle->idempotencyKey
+            ? $mutated
+            : $point)
+        ->values()
+        ->all();
+
+    $retention = [
+        'metric_payloads_deleted' => 0,
+        'rollup_coverage_blocked_series' => 0,
+        'rollup_coverage_verified_series' => 0,
+        'occupied_rollup_buckets_verified' => 0,
+        'reconciled_deletion_intents' => 0,
+        'unresolved_deletion_intents' => 0,
+    ];
+    $digestMismatch = $verifier->verify(
+        'legal-hold-digest-mismatch',
+        CarbonImmutable::now()->subMinute(),
+        CarbonImmutable::now()->addMinute(),
+        $before,
+        $retention,
+    );
+
+    $this->store->points = collect($originalPoints)
+        ->reject(fn (TimeSeriesPoint $point): bool => $point->idempotencyKey === $middle->idempotencyKey)
+        ->values()
+        ->all();
+    $countMismatch = $verifier->verify(
+        'legal-hold-count-mismatch',
+        CarbonImmutable::now()->subMinute(),
+        CarbonImmutable::now()->addMinute(),
+        $before,
+        $retention,
+    );
+
+    expect($before['held'])->toHaveCount(1)
+        ->and($digestMismatch['integrity']['legal_hold_gap_count'])->toBe(1)
+        ->and($digestMismatch['errors'])->toContain('legal_hold_preservation_gap')
+        ->and($countMismatch['integrity']['legal_hold_gap_count'])->toBe(1)
+        ->and($countMismatch['errors'])->toContain('legal_hold_preservation_gap');
 });
 
 it('preserves payloads under legal hold and identifies missing restored pointers', function (): void {
@@ -664,6 +1037,10 @@ final class MetricRetentionFakeTimeSeriesStore implements TimeSeriesStore
 
     public bool $missingAll = false;
 
+    public bool $failNextExistenceCheckAfterDeletion = false;
+
+    private bool $failNextExistenceCheck = false;
+
     public function writePoints(array $points): void
     {
         if ($this->failWrites) {
@@ -721,6 +1098,10 @@ final class MetricRetentionFakeTimeSeriesStore implements TimeSeriesStore
                 && $point->observedAt->lessThan($to))
             ->values()
             ->all();
+        if ($this->failNextExistenceCheckAfterDeletion) {
+            $this->failNextExistenceCheckAfterDeletion = false;
+            $this->failNextExistenceCheck = true;
+        }
     }
 
     public function exists(
@@ -729,6 +1110,12 @@ final class MetricRetentionFakeTimeSeriesStore implements TimeSeriesStore
         ?CarbonImmutable $from = null,
         ?CarbonImmutable $to = null,
     ): bool {
+        if ($this->failNextExistenceCheck) {
+            $this->failNextExistenceCheck = false;
+
+            throw new TimeSeriesUnavailable('Time-series storage failed after deleting the requested range.');
+        }
+
         return ! $this->missingAll && collect($this->points)->contains(
             fn (TimeSeriesPoint $point): bool => $point->externalKey === $externalKey
                 && $point->tier === $tier

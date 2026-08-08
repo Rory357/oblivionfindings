@@ -10,9 +10,54 @@ on:
       - develop
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci:
     runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: foundation
+            shard_index: 0
+            shard_count: 1
+            batch_size: 30
+          - suite: feature
+            shard_index: 0
+            shard_count: 8
+            batch_size: 12
+          - suite: feature
+            shard_index: 1
+            shard_count: 8
+            batch_size: 12
+          - suite: feature
+            shard_index: 2
+            shard_count: 8
+            batch_size: 12
+          - suite: feature
+            shard_index: 3
+            shard_count: 8
+            batch_size: 12
+          - suite: feature
+            shard_index: 4
+            shard_count: 8
+            batch_size: 12
+          - suite: feature
+            shard_index: 5
+            shard_count: 8
+            batch_size: 12
+          - suite: feature
+            shard_index: 6
+            shard_count: 8
+            batch_size: 12
+          - suite: feature
+            shard_index: 7
+            shard_count: 8
+            batch_size: 12
 
     services:
       mysql:
@@ -39,7 +84,7 @@ jobs:
         with:
           php-version: 8.4
           tools: composer:v2
-          coverage: xdebug
+          coverage: none
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -69,7 +114,7 @@ jobs:
         run: |
           mysql --host=127.0.0.1 --port=3306 -uroot -proot -e "GRANT ALL PRIVILEGES ON *.* TO 'testUser'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;"
 
-      - name: Tests
+      - name: Crash-safe tests (${{ matrix.suite }} ${{ matrix.shard_index }}/${{ matrix.shard_count }})
         env:
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
@@ -77,4 +122,9 @@ jobs:
           DB_DATABASE: oblivion_findings_codex_test
           DB_USERNAME: testUser
           DB_PASSWORD: test101
-        run: ./vendor/bin/pest
+        run: >-
+          php scripts/ci/run-pest-shard.php
+          --suite=${{ matrix.suite }}
+          --shard-index=${{ matrix.shard_index }}
+          --shard-count=${{ matrix.shard_count }}
+          --batch-size=${{ matrix.batch_size }}

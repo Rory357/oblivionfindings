@@ -17,6 +17,7 @@ final class MonitoringRetentionTombstone extends Model
         'tombstone_uuid',
         'series_id',
         'snapshot_id',
+        'deletion_intent_id',
         'site_id',
         'device_id',
         'monitor_id',
@@ -77,6 +78,11 @@ final class MonitoringRetentionTombstone extends Model
     public function series(): BelongsTo
     {
         return $this->belongsTo(MetricSeries::class, 'series_id');
+    }
+
+    public function deletionIntent(): BelongsTo
+    {
+        return $this->belongsTo(MonitoringRetentionDeletionIntent::class, 'deletion_intent_id');
     }
 
     public function snapshot(): BelongsTo

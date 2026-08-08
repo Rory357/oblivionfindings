@@ -198,6 +198,7 @@ return [
         'downsample_raw_window_hours' => 24,
         'downsample_hourly_window_days' => 31,
         'downsample_max_windows_per_series' => 32,
+        'production_evidence_attestation_public_key' => env('MONITORING_A05_ATTESTATION_PUBLIC_KEY'),
     ],
     'storage' => [
         'timeseries' => [

@@ -22,13 +22,15 @@ class VotingReminderNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $deadline = $this->resolution->deadline?->format('j F Y g:i A') ?? 'No deadline';
+
         return (new MailMessage)
             ->subject("Reminder: Vote Required — {$this->resolution->resolution_reference}")
             ->line('This is a reminder that your vote is required on the following resolution:')
             ->line('')
             ->line("**{$this->resolution->title}**")
             ->line("Reference: {$this->resolution->resolution_reference}")
-            ->line("Deadline: {$this->resolution->deadline?->format('j F Y g:i A') ?? 'No deadline'}")
+            ->line("Deadline: {$deadline}")
             ->action('Cast Your Vote', url("/governance/resolutions/{$this->resolution->id}"))
             ->line('If you have any conflicts of interest, please declare them before voting.');
     }

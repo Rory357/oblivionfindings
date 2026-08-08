@@ -9,6 +9,7 @@ use App\Domain\Monitoring\Models\MetricCurrentSummary;
 use App\Domain\Monitoring\Models\MetricRollupCoverage;
 use App\Domain\Monitoring\Models\MetricSeries;
 use App\Domain\Monitoring\Services\MetricIngestService;
+use App\Domain\Monitoring\Services\MetricRollupStatistics;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -162,7 +163,7 @@ final class DownsampleMetrics implements ShouldQueue
                                 $series,
                                 $targetTier,
                                 $bucket($first->observedAt),
-                                $this->statistics($group->all()),
+                                MetricRollupStatistics::calculate($group->all()),
                             );
                             $writtenTargetId = (int) $summary->series_id;
                             if ($targetSeriesId !== null && $targetSeriesId !== $writtenTargetId) {
@@ -295,48 +296,5 @@ final class DownsampleMetrics implements ShouldQueue
             && $target->source === $source->source
             && $target->data_class === $source->data_class
             && $target->privacy_class === $source->privacy_class;
-    }
-
-    /**
-     * @param  list<TimeSeriesPoint>  $points
-     * @return array{p50: float, p95: float, min: float, max: float, count: int}
-     */
-    private function statistics(array $points): array
-    {
-        $p50Values = [];
-        $p95Values = [];
-        $minimums = [];
-        $maximums = [];
-        $count = 0;
-
-        foreach ($points as $point) {
-            $p50Values[] = (float) ($point->statistics['p50'] ?? $point->value);
-            $p95Values[] = (float) ($point->statistics['p95'] ?? $point->value);
-            $minimums[] = (float) ($point->statistics['min'] ?? $point->value);
-            $maximums[] = (float) ($point->statistics['max'] ?? $point->value);
-            $count += (int) ($point->statistics['count'] ?? 1);
-        }
-
-        return [
-            'p50' => $this->percentile($p50Values, 0.50),
-            'p95' => $this->percentile($p95Values, 0.95),
-            'min' => min($minimums),
-            'max' => max($maximums),
-            'count' => $count,
-        ];
-    }
-
-    /** @param list<float> $values */
-    private function percentile(array $values, float $percentile): float
-    {
-        sort($values, SORT_NUMERIC);
-        $rank = ($percentile * (count($values) - 1));
-        $lower = (int) floor($rank);
-        $upper = (int) ceil($rank);
-        if ($lower === $upper) {
-            return (float) $values[$lower];
-        }
-
-        return (float) ($values[$lower] + (($values[$upper] - $values[$lower]) * ($rank - $lower)));
     }
 }
