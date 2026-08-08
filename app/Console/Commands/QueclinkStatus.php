@@ -8,7 +8,7 @@ use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkRawFrame;
 use App\Services\Queclink\Listener\QueclinkListenerRuntimeProbe;
 use Illuminate\Console\Command;
-use Throwable;
+use UnexpectedValueException;
 
 /**
  * Diagnostic / status check, also used as the data source for the
@@ -125,7 +125,8 @@ class QueclinkStatus extends Command
         int $maxFrameAge,
         CanonicalDeviceSiteResolver $siteResolver,
     ): array {
-        $canonicalTrackers = 0;
+        $pairedTrackers = 0;
+        $resolvedTrackers = 0;
         $observedTrackers = 0;
         $siteIds = [];
         $canonicalRoster = [];
@@ -137,22 +138,22 @@ class QueclinkStatus extends Command
 
         $trackers = QueclinkDevice::query()
             ->paired()
-            ->whereNotNull('device_id')
             ->with('device:id,status')
             ->get();
+        $pairedTrackers = $trackers->count();
 
         foreach ($trackers as $tracker) {
-            if ($tracker->device === null) {
+            if ($tracker->device_id === null || $tracker->device === null) {
                 continue;
             }
 
             try {
                 $siteId = $siteResolver->resolve((int) $tracker->device_id);
-            } catch (Throwable) {
+            } catch (UnexpectedValueException) {
                 continue;
             }
 
-            $canonicalTrackers++;
+            $resolvedTrackers++;
             $canonicalRoster[] = implode(':', [
                 $tracker->id,
                 $tracker->device_id,
@@ -196,11 +197,13 @@ class QueclinkStatus extends Command
         if ($canonicalRosterFingerprint === null || $frameExecutionFingerprint === null) {
             $reasonCodes[] = 'evidence_key_missing';
         }
-        if ($canonicalTrackers === 0) {
+        if ($pairedTrackers === 0) {
             $reasonCodes[] = 'canonical_paired_tracker_missing';
+        } elseif ($resolvedTrackers !== $pairedTrackers) {
+            $reasonCodes[] = 'canonical_tracker_resolution_incomplete';
         } elseif ($observedTrackers === 0) {
             $reasonCodes[] = 'current_canonical_frame_missing';
-        } elseif ($observedTrackers !== $canonicalTrackers) {
+        } elseif ($observedTrackers !== $pairedTrackers) {
             $reasonCodes[] = 'canonical_tracker_evidence_incomplete';
         }
 
@@ -208,7 +211,7 @@ class QueclinkStatus extends Command
             'state' => $reasonCodes === [] ? 'verified' : 'unverified',
             'listener_state' => $serviceState,
             'max_frame_age_seconds' => $maxFrameAge,
-            'canonical_paired_trackers' => $canonicalTrackers,
+            'canonical_paired_trackers' => $pairedTrackers,
             'canonical_sites_observed' => count($siteIds),
             'fresh_trackers_observed' => $observedTrackers,
             'canonical_roster_fingerprint' => $canonicalRosterFingerprint,

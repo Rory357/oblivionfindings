@@ -18,6 +18,12 @@ php artisan queclink:status --json
 php artisan queclink:status --evidence-json --max-frame-age=900
 ```
 
+`queclink:install --check` is an installer-readiness check only. It exits
+non-zero on an unsupported platform, missing systemd, a missing unit, a failed
+`systemctl` command, or any service state other than exact `active`. It does not
+prove that the listener accepted a tracker frame and must not replace the
+sustained release verifier below.
+
 `queclink:status --json` includes the configured public hostname for an authorised operator. Do not copy its complete output into an incident or release record; retain only the service state, port, bounded Device counts, frame count, and last-frame time.
 
 The `--evidence-json` check is a value-free diagnostic snapshot. It exits
@@ -61,6 +67,11 @@ journalctl -u oblivion-queclink --since "-15 min" --no-pager
 ```
 
 The installer writes and restarts `oblivion-queclink.service`, running `php artisan queclink:listen` on the configured TCP port. Re-running it after an application or port change is supported. Use `--no-firewall` only when the local firewall is managed separately. The installer does not replace the approved perimeter firewall, NAT, source restriction, or change record.
+
+The server deployment treats Queclink as release-required. Passing
+`--skip-queclink` delegates management of the same systemd unit to the approved
+external manager; it does not bypass the consecutive-active and final readiness
+checks. This is a native-listener runtime decision, never a cloud/API fallback.
 
 On a non-systemd host, supervise the command printed by the installer rather than leaving an interactive shell responsible for production intake:
 

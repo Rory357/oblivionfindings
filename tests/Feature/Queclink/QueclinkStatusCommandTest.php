@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Queclink\QueclinkDevice;
@@ -160,6 +161,61 @@ it('fails closed when any canonical paired tracker lacks current listener eviden
         ->and($evidence['acceptance']['fresh_trackers_observed'])->toBe(1)
         ->and($evidence['acceptance']['reason_codes'])->toContain('canonical_tracker_evidence_incomplete')
         ->and($output)->not->toContain('860000000000902', '860000000000903');
+});
+
+it('fails closed without identifiers when any paired tracker lacks operational canonical provenance', function () {
+    $this->mock(QueclinkListenerRuntimeProbe::class)
+        ->shouldReceive('serviceState')
+        ->once()
+        ->andReturn('active');
+
+    $site = Site::factory()->create();
+    foreach ([
+        ['860000000000904', DeviceStatus::Active],
+        ['860000000000905', DeviceStatus::Maintenance],
+    ] as [$imei, $status]) {
+        $device = Device::factory()->tracking()->create([
+            'provider' => 'queclink',
+            'status' => $status,
+        ]);
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now(),
+        ]);
+        $tracker = QueclinkDevice::query()->create([
+            'device_id' => $device->id,
+            'imei' => $imei,
+            'status' => QueclinkDevice::STATUS_PAIRED,
+            'connection_state' => QueclinkDevice::CONN_CONNECTED,
+        ]);
+        QueclinkRawFrame::query()->create([
+            'queclink_device_id' => $tracker->id,
+            'imei' => $imei,
+            'direction' => QueclinkRawFrame::DIRECTION_INBOUND,
+            'frame_type' => QueclinkRawFrame::FRAME_RESP,
+            'command_word' => 'GTHBD',
+            'raw_frame' => "+RESP:GTHBD,{$imei},0100,0001$",
+            'parse_ok' => true,
+            'created_at' => now(),
+        ]);
+    }
+
+    $exitCode = Artisan::call('queclink:status', [
+        '--evidence-json' => true,
+        '--max-frame-age' => 300,
+    ]);
+    $output = Artisan::output();
+    $evidence = json_decode($output, true, 32, JSON_THROW_ON_ERROR);
+
+    expect($exitCode)->toBe(1)
+        ->and($evidence['acceptance']['state'])->toBe('unverified')
+        ->and($evidence['acceptance']['canonical_paired_trackers'])->toBe(2)
+        ->and($evidence['acceptance']['fresh_trackers_observed'])->toBe(1)
+        ->and($evidence['acceptance']['reason_codes'])->toContain('canonical_tracker_resolution_incomplete')
+        ->and($output)->not->toContain('860000000000904', '860000000000905')
+        ->and($evidence['acceptance'])->not->toHaveKeys(['site_id', 'site_ids', 'device_id', 'device_ids']);
 });
 
 it('rejects an unsafe live-evidence freshness window', function () {

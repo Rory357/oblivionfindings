@@ -102,7 +102,7 @@ it('fails closed into the monitoring Supervisor installer unless explicitly skip
         ->toBeLessThan(strpos($script, 'run_app php artisan queue:restart', $installer));
 });
 
-it('fails closed into the native Queclink listener install unless explicitly skipped', function () {
+it('fails closed through stable Queclink readiness even when installation is externally managed', function () {
     $script = file_get_contents(__DIR__.'/../../scripts/deploy-server.sh');
 
     expect($script)->toContain(
@@ -111,31 +111,50 @@ it('fails closed into the native Queclink listener install unless explicitly ski
         'Re-run with privilege or explicitly pass --skip-queclink',
         'sudo -E php artisan queclink:install',
         'php artisan queclink:install',
+        'skipping application-owned Queclink install (--skip-queclink; externally managed runtime)',
+        'verifying consecutive Queclink listener readiness',
         'systemctl is-active --quiet oblivion-queclink.service',
-        'Queclink listener did not reach active systemd state',
-        'skipping queclink:install (--skip-queclink)',
-    )->not->toContain('Skipping — re-run with sudo');
+        '"$queclink_consecutive_active" -ge 3',
+        'Queclink listener did not remain active for three consecutive readiness samples',
+        'run_app php artisan queclink:install --check',
+        'final Queclink listener readiness check',
+    )->not->toContain(
+        'Skipping — re-run with sudo',
+        'QUECLINK_RELEASE_REQUIRED',
+        'Queclink listener is not required for this approved release',
+    );
 
     $defaultInstall = strpos($script, 'if [ "$SKIP_QUECLINK" -eq 0 ]; then');
     $privilegeFailure = strpos($script, 'queclink:install requires root or sudo', $defaultInstall);
     $fatalExit = strpos($script, "\n        exit 1\n", $privilegeFailure);
     $sudoInstall = strpos($script, 'sudo -E php artisan queclink:install', $fatalExit);
-    $activeStateProbe = strpos($script, 'systemctl is-active --quiet oblivion-queclink.service', $sudoInstall);
-    $runtimeFailure = strpos($script, 'Queclink listener did not reach active systemd state', $activeStateProbe);
-    $runtimeFatalExit = strpos($script, "\n        exit 1\n", $runtimeFailure);
-    $explicitSkip = strpos($script, 'skipping queclink:install (--skip-queclink)', $runtimeFatalExit);
-    $success = strpos($script, 'Server provisioning complete', $explicitSkip);
+    $explicitSkip = strpos($script, 'skipping application-owned Queclink install', $sudoInstall);
+    $readinessStart = strpos($script, 'verifying consecutive Queclink listener readiness', $explicitSkip);
+    $activeStateProbe = strpos($script, 'systemctl is-active --quiet oblivion-queclink.service', $readinessStart);
+    $consecutiveGate = strpos($script, '"$queclink_consecutive_active" -ge 3', $activeStateProbe);
+    $runtimeFailure = strpos($script, 'Queclink listener did not remain active for three consecutive readiness samples', $consecutiveGate);
+    $readinessCheck = strpos($script, 'run_app php artisan queclink:install --check', $runtimeFailure);
+    $queueRestart = strpos($script, 'run_app php artisan queue:restart', $readinessCheck);
+    $finalReadinessCheck = strpos($script, 'run_app php artisan queclink:install --check', $queueRestart);
+    $applicationUp = strpos($script, 'run_app php artisan up', $finalReadinessCheck);
+    $success = strpos($script, 'Server provisioning complete', $applicationUp);
 
     expect($defaultInstall)
         ->not->toBeFalse()
         ->and($privilegeFailure)->toBeGreaterThan($defaultInstall)
         ->and($fatalExit)->toBeGreaterThan($privilegeFailure)
         ->and($sudoInstall)->toBeGreaterThan($fatalExit)
-        ->and($activeStateProbe)->toBeGreaterThan($sudoInstall)
-        ->and($runtimeFailure)->toBeGreaterThan($activeStateProbe)
-        ->and($runtimeFatalExit)->toBeGreaterThan($runtimeFailure)
-        ->and($explicitSkip)->toBeGreaterThan($runtimeFatalExit)
-        ->and($success)->toBeGreaterThan($explicitSkip);
+        ->and($explicitSkip)->toBeGreaterThan($sudoInstall)
+        ->and($readinessStart)->toBeGreaterThan($explicitSkip)
+        ->and($activeStateProbe)->toBeGreaterThan($readinessStart)
+        ->and($consecutiveGate)->toBeGreaterThan($activeStateProbe)
+        ->and($runtimeFailure)->toBeGreaterThan($consecutiveGate)
+        ->and($readinessCheck)->toBeGreaterThan($runtimeFailure)
+        ->and($queueRestart)->toBeGreaterThan($readinessCheck)
+        ->and($finalReadinessCheck)->toBeGreaterThan($queueRestart)
+        ->and($applicationUp)->toBeGreaterThan($finalReadinessCheck)
+        ->and($success)->toBeGreaterThan($applicationUp)
+        ->and(substr_count($script, 'run_app php artisan queclink:install --check'))->toBe(2);
 });
 
 it('creates deploy artifacts with web-readable permissions even under a restrictive login umask', function () {

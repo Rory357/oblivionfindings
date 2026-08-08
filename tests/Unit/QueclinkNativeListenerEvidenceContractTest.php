@@ -14,6 +14,13 @@ it('requires sustained value-free native-listener evidence without inventing a c
         "'evidence_key_missing'",
         "->where('created_at', '<=', \$observedAt)",
         "hash_hmac('sha256'",
+        '$pairedTrackers = $trackers->count();',
+        'catch (UnexpectedValueException)',
+        "'canonical_tracker_resolution_incomplete'",
+        "'canonical_paired_trackers' => \$pairedTrackers",
+    )->not->toContain(
+        "->whereNotNull('device_id')",
+        'catch (Throwable)',
     );
     expect($script)->toContain(
         'queclink:status',

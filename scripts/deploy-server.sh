@@ -22,8 +22,9 @@
 # and Supervisor for the Inertia SSR and native monitoring runtimes unless
 # explicitly skipped.
 # If running on a server with sudo available the queclink:install step
-# will write to /etc/systemd/system — invoke this script with sudo or
-# pass --skip-queclink to defer.
+# will write to /etc/systemd/system. Pass --skip-queclink only when an
+# approved external manager owns that unit; release-required deployments
+# still prove the externally managed listener is active.
 # ──────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -312,22 +313,32 @@ if [ "$SKIP_QUECLINK" -eq 0 ]; then
     else
         php artisan queclink:install
     fi
-
-    queclink_running=false
-    for attempt in {1..10}; do
-        if systemctl is-active --quiet oblivion-queclink.service; then
-            queclink_running=true
-            break
-        fi
-        sleep 1
-    done
-    if [ "$queclink_running" != true ]; then
-        echo "✗ Queclink listener did not reach active systemd state."
-        exit 1
-    fi
 else
-    echo "▶ skipping queclink:install (--skip-queclink)"
+    echo "▶ skipping application-owned Queclink install (--skip-queclink; externally managed runtime)"
 fi
+
+echo "▶ verifying consecutive Queclink listener readiness"
+queclink_consecutive_active=0
+queclink_readiness_attempt=0
+while [ "$queclink_readiness_attempt" -lt 10 ]; do
+    queclink_readiness_attempt=$((queclink_readiness_attempt + 1))
+    if systemctl is-active --quiet oblivion-queclink.service; then
+        queclink_consecutive_active=$((queclink_consecutive_active + 1))
+    else
+        queclink_consecutive_active=0
+    fi
+    if [ "$queclink_consecutive_active" -ge 3 ]; then
+        break
+    fi
+    if [ "$queclink_readiness_attempt" -lt 10 ]; then
+        sleep 1
+    fi
+done
+if [ "$queclink_consecutive_active" -lt 3 ]; then
+    echo "✗ Queclink listener did not remain active for three consecutive readiness samples."
+    exit 1
+fi
+run_app php artisan queclink:install --check
 
 echo "▶ php artisan queue:restart"
 run_app php artisan queue:restart
@@ -337,6 +348,8 @@ run_app php artisan about --only=environment --json >/dev/null
 run_app php artisan database:verify-lifecycle-triggers postflight --json
 
 echo "▶ leaving maintenance mode"
+echo "▶ final Queclink listener readiness check"
+run_app php artisan queclink:install --check
 run_app php artisan up
 MAINTENANCE_ACTIVE=0
 
