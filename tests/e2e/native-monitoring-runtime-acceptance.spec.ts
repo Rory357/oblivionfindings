@@ -241,7 +241,7 @@ test.describe('native monitoring runtime desktop acceptance', () => {
 
         await page.goto('/security-devices/integrations');
         const unifiRuntime = page.getByLabel('UniFi runtime capabilities');
-        await expect(unifiRuntime).toContainText('Runtime contract v1.1');
+        await expect(unifiRuntime).toContainText('Runtime contract v1.5');
         await expect(unifiRuntime).toContainText('device sync');
         await expect(unifiRuntime).toContainText('Page limit');
         await expect(unifiRuntime).toContainText('backfill limit');
@@ -250,6 +250,7 @@ test.describe('native monitoring runtime desktop acceptance', () => {
         await expectSafePage(page, rawSentinels);
 
         await page.goto('/security-devices/settings');
+        await page.getByRole('tab', { name: 'Retention' }).click();
         await expect(page.getByText(fixture.retentionPolicyName)).toBeVisible();
         await expect(
             page.getByText('Runtime workers, queues and dead letters', {

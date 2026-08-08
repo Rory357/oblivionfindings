@@ -20,6 +20,7 @@ use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\HealthSafety\LoneWorkerSignalService;
 use App\Services\Integration\IntegrationContextProvider;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
@@ -74,6 +75,9 @@ class DismissedAlertScopeTest extends TestCase
     {
         $open = $this->makeAlert([
             'source' => 'lone_worker',
+            'alert_type' => LoneWorkerSignalService::canonicalAlertType(
+                LoneWorkerSignalService::TYPE_EMERGENCY,
+            ),
             'status' => ControlRoomAlert::STATUS_OPEN,
             'triggered_at' => now(),
         ]);
@@ -218,6 +222,9 @@ class DismissedAlertScopeTest extends TestCase
 
         $open = $this->makeAlert([
             'source' => 'lone_worker',
+            'alert_type' => LoneWorkerSignalService::canonicalAlertType(
+                LoneWorkerSignalService::TYPE_EMERGENCY,
+            ),
             'status' => ControlRoomAlert::STATUS_OPEN,
             'context' => $context,
         ]);
@@ -226,6 +233,9 @@ class DismissedAlertScopeTest extends TestCase
         $triageAcknowledgedAt = now()->subHour()->startOfSecond();
         $triaging = $this->makeAlert([
             'source' => 'lone_worker',
+            'alert_type' => LoneWorkerSignalService::canonicalAlertType(
+                LoneWorkerSignalService::TYPE_EMERGENCY,
+            ),
             'status' => ControlRoomAlert::STATUS_TRIAGING,
             'context' => $context,
             'acknowledged_at' => $triageAcknowledgedAt,
@@ -233,6 +243,9 @@ class DismissedAlertScopeTest extends TestCase
         ]);
         $dismissed = $this->makeAlert([
             'source' => 'lone_worker',
+            'alert_type' => LoneWorkerSignalService::canonicalAlertType(
+                LoneWorkerSignalService::TYPE_EMERGENCY,
+            ),
             'status' => ControlRoomAlert::STATUS_DISMISSED,
             'context' => $context,
         ]);
@@ -565,12 +578,12 @@ class DismissedAlertScopeTest extends TestCase
 
         $this->actingAs($officer)
             ->post("/health-safety/lone-workers/alerts/{$ackAlert->id}/acknowledge")
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($officer)
             ->post("/health-safety/lone-workers/alerts/{$resolveAlert->id}/resolve", [
                 'resolution_notes' => 'Attempted cross-site resolution.',
             ])
-            ->assertForbidden();
+            ->assertNotFound();
 
         $this->assertSame('active', $ackAlert->fresh()->status);
         $this->assertNull($ackAlert->fresh()->acknowledged_at);

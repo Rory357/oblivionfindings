@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController;
@@ -151,11 +152,22 @@ class AssetTrackerRetirementTest extends TestCase
 
     public function test_asset_index_marks_technology_restricted_without_device_permission(): void
     {
-        $vehicle = Asset::factory()->vehicle()->create(['name' => 'Restricted Technology Vehicle']);
+        $vehicle = Asset::factory()->vehicle()->create([
+            'name' => 'Restricted Technology Vehicle',
+            'site_id' => $this->site->id,
+        ]);
         $viewer = User::factory()->create(['approved_at' => now()]);
         $viewAssets = Permission::query()->where('key', 'assets.viewAny')->firstOrFail();
+        $viewDevices = Permission::query()->where('key', 'securityDevices.devices.view')->firstOrFail();
         $viewer->permissionOverrides()->sync([
             $viewAssets->id => ['allowed' => true],
+            $viewDevices->id => ['allowed' => false],
+        ]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
         ]);
 
         $this->actingAs($viewer)

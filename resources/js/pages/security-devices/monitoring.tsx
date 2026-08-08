@@ -765,7 +765,9 @@ function ExternalHistoryCard({
     return (
         <Card>
             <CardHeader>
-                <CardTitle>External history and retention</CardTitle>
+                <CardTitle role="heading" aria-level={2}>
+                    External history and retention
+                </CardTitle>
                 <CardDescription>
                     {storage.retention.explanation}
                 </CardDescription>
@@ -938,7 +940,9 @@ export function MonitoringContent({
             <div className="space-y-4">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Collection-path findings</CardTitle>
+                        <CardTitle role="heading" aria-level={2}>
+                            Collection-path findings
+                        </CardTitle>
                         <CardDescription>
                             {workspace.findings.note}
                         </CardDescription>
@@ -964,7 +968,9 @@ export function MonitoringContent({
                 </Card>
                 <Card>
                     <CardHeader>
-                        <CardTitle>Independent monitor findings</CardTitle>
+                        <CardTitle role="heading" aria-level={2}>
+                            Independent monitor findings
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                         {workspace.findings.monitors.length ? (
@@ -992,7 +998,9 @@ export function MonitoringContent({
             <div className="grid gap-4 lg:grid-cols-2">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Monitoring coverage by site</CardTitle>
+                        <CardTitle role="heading" aria-level={2}>
+                            Monitoring coverage by site
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                         {workspace.coverage.by_site.map((row) => (
@@ -1029,7 +1037,9 @@ export function MonitoringContent({
                 </Card>
                 <Card>
                     <CardHeader>
-                        <CardTitle>Known coverage limits</CardTitle>
+                        <CardTitle role="heading" aria-level={2}>
+                            Known coverage limits
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
                         <div className="flex items-center justify-between">
@@ -1064,7 +1074,9 @@ export function MonitoringContent({
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Dependency evidence</CardTitle>
+                    <CardTitle role="heading" aria-level={2}>
+                        Dependency evidence
+                    </CardTitle>
                     <CardDescription>
                         {workspace.dependencies.note}
                     </CardDescription>
@@ -1121,7 +1133,9 @@ export function MonitoringContent({
             <div className="space-y-4">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Retained trends</CardTitle>
+                        <CardTitle role="heading" aria-level={2}>
+                            Retained trends
+                        </CardTitle>
                         <CardDescription>
                             Safe summaries from retained native observations;
                             raw probe messages and metrics stay private.
@@ -1179,7 +1193,9 @@ export function MonitoringContent({
             <div className="space-y-4">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Central Site readiness</CardTitle>
+                        <CardTitle role="heading" aria-level={2}>
+                            Central Site readiness
+                        </CardTitle>
                         <CardDescription>
                             Site-by-Site proof that Oblivion Findings is
                             scheduling checks, consuming runtime work, and
@@ -1214,7 +1230,9 @@ export function MonitoringContent({
                 <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Main application</CardTitle>
+                            <CardTitle role="heading" aria-level={2}>
+                                Main application
+                            </CardTitle>
                             <CardDescription>
                                 {workspace.collection.direct.label}
                             </CardDescription>
@@ -1234,7 +1252,9 @@ export function MonitoringContent({
                     </Card>
                     <Card>
                         <CardHeader>
-                            <CardTitle>Remote collection paths</CardTitle>
+                            <CardTitle role="heading" aria-level={2}>
+                                Remote collection paths
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             {workspace.collection.remote_paths.length ? (
@@ -1291,7 +1311,9 @@ export function MonitoringContent({
             <Filters workspace={workspace} />
             <Card>
                 <CardHeader>
-                    <CardTitle>Monitor states</CardTitle>
+                    <CardTitle role="heading" aria-level={2}>
+                        Monitor states
+                    </CardTitle>
                     <CardDescription>
                         {workspace.inventory.total} matching checks. Collection
                         failures are shown as uncertainty, not duplicated device
@@ -1326,7 +1348,9 @@ export function MonitoringContent({
             </Card>
             <Card>
                 <CardHeader>
-                    <CardTitle>Runtime health</CardTitle>
+                    <CardTitle role="heading" aria-level={2}>
+                        Runtime health
+                    </CardTitle>
                     <CardDescription>
                         Bounded worker, queue, listener, storage, and collector
                         evidence. Restricted users do not receive global queue

@@ -26,6 +26,8 @@ final readonly class HeartbeatReporter
             'spool_bytes' => $spool['bytes'],
             'oldest_spool_item_at' => $spool['oldest_at'],
             'corrupted_frames' => $spool['corrupted_frames'],
+            'acknowledged_source_sequence' => $spool['acknowledged_source_sequence'],
+            'highest_seen_source_sequence' => $spool['highest_seen_source_sequence'],
             'runtime' => array_slice($runtime, 0, 16, true),
         ]);
     }

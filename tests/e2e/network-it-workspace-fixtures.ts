@@ -91,14 +91,17 @@ $printer = $upsertDevice('PW-NET-PRINTER', $printerName, 'network_printer', [
     'config' => null,
 ]);
 
-\\App\\Domain\\SecurityDevices\\Models\\DeviceRelationship::query()->updateOrCreate(
-    ['parent_device_id' => $gateway->id, 'child_device_id' => $switch->id],
-    [
-        'relationship_type' => 'uplinks_to',
-        'port' => 'PW-WAN1',
-        'notes' => $rawSentinel,
-    ],
-);
+\\App\\Domain\\SecurityDevices\\Models\\DeviceRelationship::query()
+    ->whereNull('unlinked_at')
+    ->firstOrCreate(
+        ['parent_device_id' => $gateway->id, 'child_device_id' => $switch->id],
+        [
+            'relationship_type' => 'uplinks_to',
+            'port' => 'PW-WAN1',
+            'notes' => $rawSentinel,
+            'created_by_user_id' => $admin->id,
+        ],
+    );
 
 $profile = \\App\\Domain\\Monitoring\\Models\\MonitoringProfile::query()->updateOrCreate(
     ['name' => 'Playwright native network profile'],

@@ -305,6 +305,7 @@ it('requires trusted proxy mTLS identity request signature and a fresh unique no
     $heartbeat['spool_items'] = 3;
     $heartbeat['spool_bytes'] = 4096;
     $heartbeat['oldest_spool_item_at'] = CarbonImmutable::now('UTC')->subMinute()->format(DATE_ATOM);
+    $heartbeat['highest_seen_source_sequence'] = 3;
     $payload = [
         'collector_id' => $record['collector']->collector_uuid,
         'status' => $heartbeat,
@@ -793,6 +794,8 @@ function collectorHeartbeatPayload(): array
         'spool_bytes' => 0,
         'oldest_spool_item_at' => null,
         'corrupted_frames' => 0,
+        'acknowledged_source_sequence' => 0,
+        'highest_seen_source_sequence' => 0,
         'runtime' => ['checks_executed' => 1],
     ];
 }

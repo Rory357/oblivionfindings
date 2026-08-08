@@ -91,16 +91,15 @@ test.describe('Network & IT specialist workspace', () => {
             }),
         ).toBeVisible();
         await expect(page.getByText(fixture.topologyPort)).toBeVisible();
+        const topologyOverview = page.getByLabel('Topology visual overview');
         await expect(
-            page.getByRole('link', {
+            topologyOverview.getByRole('link', {
                 name: fixture.gatewayName,
-                exact: true,
             }),
         ).toBeVisible();
         await expect(
-            page.getByRole('link', {
+            topologyOverview.getByRole('link', {
                 name: fixture.switchName,
-                exact: true,
             }),
         ).toBeVisible();
         await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);

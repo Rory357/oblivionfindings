@@ -1,6 +1,8 @@
 <?php
 
+use Oblivion\Collector\Contracts\CentralApi;
 use Oblivion\Collector\Exceptions\SpoolFull;
+use Oblivion\Collector\Runtime\HeartbeatReporter;
 use Oblivion\Collector\Spool\CheckpointFile;
 use Oblivion\Collector\Spool\EncryptedSpool;
 
@@ -38,7 +40,52 @@ it('deduplicates item IDs and removes frames only after an acknowledged checkpoi
 
         expect($spool->count(collectorNow()))->toBe(0)
             ->and($checkpoint->read()['acknowledged_source_sequence'])->toBe(3)
-            ->and($spool->nextSourceSequence())->toBe(4);
+            ->and($spool->nextSourceSequence())->toBe(4)
+            ->and($spool->status(collectorNow())['acknowledged_source_sequence'])->toBe(3)
+            ->and($spool->status(collectorNow())['highest_seen_source_sequence'])->toBe(3);
+    } finally {
+        removeCollectorDirectory($directory);
+    }
+});
+
+it('reports the collector checkpoint and spool high-water mark in every heartbeat', function () {
+    $directory = collectorTempDirectory('heartbeat-checkpoint');
+    try {
+        $checkpoint = new CheckpointFile($directory.'/checkpoint.json');
+        $checkpoint->merge(['acknowledged_source_sequence' => 2]);
+        $spool = new EncryptedSpool($directory, $checkpoint, 65536, 10, 3600);
+        $spool->append('item-3', 3, ['value' => 3], collectorNow());
+        $central = new class implements CentralApi
+        {
+            /** @var array<string, mixed> */
+            public array $heartbeat = [];
+
+            public function enrol(string $oneTimeToken, string $collectorId, string $collectorPublicKey): array
+            {
+                return [];
+            }
+
+            public function configuration(string $collectorId, int $afterSequence): string
+            {
+                return '';
+            }
+
+            public function upload(string $collectorId, array $items): array
+            {
+                return ['acknowledged_ids' => [], 'acknowledged_source_sequence' => 0];
+            }
+
+            public function heartbeat(string $collectorId, array $status): void
+            {
+                $this->heartbeat = $status;
+            }
+        };
+
+        (new HeartbeatReporter($central, 'collector-checkpoint-fixture', $spool))->report([], collectorNow());
+
+        expect($central->heartbeat['acknowledged_source_sequence'])->toBe(2)
+            ->and($central->heartbeat['highest_seen_source_sequence'])->toBe(3)
+            ->and($central->heartbeat['spool_items'])->toBe(1);
     } finally {
         removeCollectorDirectory($directory);
     }

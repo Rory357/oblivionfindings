@@ -223,6 +223,12 @@ test('a business-hours policy rolls SLA targets onto working time', function () 
 test('SLA targets skip a public holiday', function () {
     $monday = CarbonImmutable::parse('2026-07-06 00:00', 'Pacific/Auckland')->startOfWeek();
     $tuesday = $monday->addDay();
+    $accessStart = $monday->subMonth();
+
+    $this->worker->forceFill(['approved_at' => $accessStart])->save();
+    $this->worker->hrEmployeeProfile()->update([
+        'start_date' => $accessStart->toDateString(),
+    ]);
 
     ItSlaPolicy::query()->create([
         'priority' => 'high',

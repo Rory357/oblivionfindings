@@ -24,18 +24,39 @@ uses(TestCase::class);
 /** @return array<string, mixed> */
 function monitoringConfigurationWithSigningKeys(?string $encodedKeyRing): array
 {
-    $original = getenv('MONITORING_SIGNING_KEYS');
+    $originalProcessValue = getenv('MONITORING_SIGNING_KEYS');
+    $originalEnvExists = array_key_exists('MONITORING_SIGNING_KEYS', $_ENV);
+    $originalEnvValue = $_ENV['MONITORING_SIGNING_KEYS'] ?? null;
+    $originalServerExists = array_key_exists('MONITORING_SIGNING_KEYS', $_SERVER);
+    $originalServerValue = $_SERVER['MONITORING_SIGNING_KEYS'] ?? null;
 
     try {
-        $encodedKeyRing === null
-            ? putenv('MONITORING_SIGNING_KEYS')
-            : putenv('MONITORING_SIGNING_KEYS='.$encodedKeyRing);
+        if ($encodedKeyRing === null) {
+            putenv('MONITORING_SIGNING_KEYS');
+            unset($_ENV['MONITORING_SIGNING_KEYS'], $_SERVER['MONITORING_SIGNING_KEYS']);
+        } else {
+            putenv('MONITORING_SIGNING_KEYS='.$encodedKeyRing);
+            $_ENV['MONITORING_SIGNING_KEYS'] = $encodedKeyRing;
+            $_SERVER['MONITORING_SIGNING_KEYS'] = $encodedKeyRing;
+        }
 
         return require base_path('config/monitoring.php');
     } finally {
-        $original === false
+        $originalProcessValue === false
             ? putenv('MONITORING_SIGNING_KEYS')
-            : putenv('MONITORING_SIGNING_KEYS='.$original);
+            : putenv('MONITORING_SIGNING_KEYS='.$originalProcessValue);
+
+        if ($originalEnvExists) {
+            $_ENV['MONITORING_SIGNING_KEYS'] = $originalEnvValue;
+        } else {
+            unset($_ENV['MONITORING_SIGNING_KEYS']);
+        }
+
+        if ($originalServerExists) {
+            $_SERVER['MONITORING_SIGNING_KEYS'] = $originalServerValue;
+        } else {
+            unset($_SERVER['MONITORING_SIGNING_KEYS']);
+        }
     }
 }
 
@@ -79,6 +100,10 @@ it('defines runtime contract egress and retention defaults', function () {
             'raw_days' => 14,
             'hourly_days' => 180,
             'daily_days' => 1825,
+            'downsample_raw_window_hours' => 24,
+            'downsample_hourly_window_days' => 31,
+            'downsample_max_windows_per_series' => 32,
+            'production_evidence_attestation_public_key' => null,
         ])->and(config('monitoring.runtime.worker_heartbeat_stale_seconds'))->toBe(180)
         ->and(config('monitoring.external_heartbeat'))->toMatchArray([
             'enabled' => false,

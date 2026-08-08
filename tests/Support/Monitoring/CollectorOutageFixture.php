@@ -80,8 +80,10 @@ final class CollectorOutageFixture
     }
 
     /** @return array<string, mixed> */
-    public static function heartbeat(): array
-    {
+    public static function heartbeat(
+        int $acknowledgedSourceSequence = 0,
+        int $highestSeenSourceSequence = 0,
+    ): array {
         return [
             'reported_at' => CarbonImmutable::now('UTC')->format(DATE_ATOM),
             'state' => 'writable',
@@ -89,6 +91,8 @@ final class CollectorOutageFixture
             'spool_bytes' => 0,
             'oldest_spool_item_at' => null,
             'corrupted_frames' => 0,
+            'acknowledged_source_sequence' => $acknowledgedSourceSequence,
+            'highest_seen_source_sequence' => $highestSeenSourceSequence,
             'runtime' => ['checks_executed' => 1],
         ];
     }

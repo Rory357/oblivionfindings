@@ -217,8 +217,13 @@ class DeviceAssignment extends Model
         }
 
         if ($isClient && ! $validConsent) {
+            $isWithdrawnConsent = $consent
+                && ($consent->withdrawn_at !== null || $consent->status === 'withdrawn');
+
             $this->collection_stopped_at ??= $consent?->withdrawn_at ?? now();
-            $this->collection_stop_reason ??= 'consent_not_active';
+            $this->collection_stop_reason ??= $isWithdrawnConsent
+                ? 'consent_withdrawn'
+                : 'consent_not_active';
             $this->withdrawal_outcome ??= 'collection_stopped_and_live_projection_revoked';
         }
     }

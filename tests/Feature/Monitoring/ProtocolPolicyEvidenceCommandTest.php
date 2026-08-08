@@ -8,6 +8,7 @@ use App\Domain\Monitoring\Models\MonitoringCoverageExpectation;
 use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Models\ProviderCapabilityCursor;
+use App\Domain\Monitoring\Models\ProviderCapabilityException;
 use App\Domain\Monitoring\Services\ProtocolPolicyEvidenceService;
 use App\Domain\SecurityDevices\Enums\AssignmentType;
 use App\Domain\SecurityDevices\Models\Device;
@@ -157,6 +158,7 @@ it('requires fresh provider monitor evidence at every mapped site', function () 
         'secret_encrypted' => 'encrypted-provider-evidence-secret',
         'secret_last4' => 'cret',
         'status' => IntegrationProviderConnection::STATUS_CONNECTED,
+        'last_tested_at' => now()->subMinutes(3),
         'requires_credential_replacement' => false,
     ]);
     foreach ($sites as $index => $site) {
@@ -207,8 +209,9 @@ it('requires fresh provider monitor evidence at every mapped site', function () 
 
     expect($partial)->toMatchArray([
         'state' => 'not_verified',
+        'credential_tested' => 1,
         'mapped_sites' => 2,
-        'completed_sites' => 2,
+        'successful_sites' => 2,
         'configured' => 1,
         'fresh' => 1,
         'fresh_sites' => 1,
@@ -219,10 +222,64 @@ it('requires fresh provider monitor evidence at every mapped site', function () 
 
     expect($complete)->toMatchArray([
         'state' => 'verified',
+        'credential_tested' => 1,
         'mapped_sites' => 2,
-        'completed_sites' => 2,
+        'successful_sites' => 2,
         'configured' => 2,
         'fresh' => 2,
+        'fresh_sites' => 2,
+    ]);
+
+    IntegrationProviderConnection::query()
+        ->forProvider('unifi')
+        ->update(['last_tested_at' => now()->subHours(2)]);
+    $staleCredential = app(ProtocolPolicyEvidenceService::class)->report(60)['protocols']['provider_unifi'];
+
+    expect($staleCredential)->toMatchArray([
+        'state' => 'not_verified',
+        'connected' => 1,
+        'credential_tested' => 0,
+    ]);
+
+    IntegrationProviderConnection::query()
+        ->forProvider('unifi')
+        ->update(['last_tested_at' => now()]);
+    $failedCursor = ProviderCapabilityCursor::query()
+        ->where('provider', 'unifi')
+        ->where('site_id', $sites->last()->id)
+        ->where('capability', ObservationCollectionCapability::class)
+        ->firstOrFail();
+    ProviderCapabilityException::query()->create([
+        'site_id' => $sites->last()->id,
+        'provider' => 'unifi',
+        'capability' => ObservationCollectionCapability::class,
+        'code' => 'provider_rate_limited',
+        'item_reference' => null,
+        'occurred_at' => now()->subSeconds(30),
+    ]);
+    $failedCursor->forceFill(['retry_not_before' => now()->addMinute()])->save();
+    $partialExecution = app(ProtocolPolicyEvidenceService::class)->report(60)['protocols']['provider_unifi'];
+
+    expect($partialExecution)->toMatchArray([
+        'state' => 'not_verified',
+        'credential_tested' => 1,
+        'mapped_sites' => 2,
+        'successful_sites' => 1,
+        'fresh_sites' => 2,
+    ]);
+
+    $failedCursor->forceFill([
+        'last_started_at' => now()->subSeconds(10),
+        'last_completed_at' => now(),
+        'retry_not_before' => null,
+    ])->save();
+    $recoveredExecution = app(ProtocolPolicyEvidenceService::class)->report(60)['protocols']['provider_unifi'];
+
+    expect($recoveredExecution)->toMatchArray([
+        'state' => 'verified',
+        'credential_tested' => 1,
+        'mapped_sites' => 2,
+        'successful_sites' => 2,
         'fresh_sites' => 2,
     ]);
 });

@@ -18,6 +18,15 @@ canonical provider monitor observation; currently this applies to UniFi and
 Milesight. Never create a cloud capability for a provider whose official
 contract does not support it.
 
+For both UniFi and Milesight, run the real provider connection test inside the
+same bounded evidence window. Every active mapped Site must then complete a
+fresh observation-capability pull after it started, without a partial page,
+retry deferral or capability exception. A retained `connected` flag, an old
+credential test, or a cursor timestamp from a partial/rate-limited execution is
+not provider acceptance. Queclink is proved separately with the native-listener
+runbook and authentic tracker frames; it must not be added to this cloud/API
+provider matrix.
+
 Use dedicated non-customer-impacting monitors for the policy drill. Exercise a
 confirmed failure and recovery, all three hysteresis regions, an approved
 maintenance suppression, a same-Site dependency suppression, a derived stale
@@ -40,8 +49,7 @@ bash scripts/monitoring/verify-protocol-policy-evidence.sh \
   --window-minutes=60
 ```
 
-The wrapper refuses fewer than five samples or intervals below one minute. Every sample must retain the complete direct-protocol and policy matrix plus both currently required provider rows, UniFi and Milesight. It pins the sorted evidence-key matrix for the whole observation period, so a disappearing provider or changing evidence roster fails acceptance rather than being hidden by the remaining verified rows. It
-also requires an opaque cursor derived from persisted monitor observations, listener deliveries, provider completions and dependency/maintenance suppressions to advance at least once. Merely rerunning the report advances its report timestamp but not this cursor, so one old in-window evidence set cannot satisfy every sustained sample. The cursor and its Site/Device-free inputs are never printed by the wrapper. It emits only aggregate timestamps and counts. The underlying read-only report can
+The wrapper refuses fewer than five samples or intervals below one minute. Every sample must retain the complete direct-protocol and policy matrix plus both currently required provider rows, UniFi and Milesight. It pins an application-keyed fingerprint of the actual enabled monitor, profile, coverage, dependency, maintenance and provider-mapping roster for the whole observation period, so replacing or reconfiguring evidence cannot be hidden behind unchanged row names or counts. Each direct protocol, listener and provider row also has its own opaque roster and oldest/newest persisted-evidence window. At the final sample, that row's oldest evidence must be newer than its initial newest evidence. This proves every configured monitor, every mapped provider-Site execution and every listener advanced; one busy monitor can no longer mask idle peers. The underlying cursor remains derived only from persisted execution evidence, and merely rerunning the report cannot advance any of these windows. No Site, Device, target or provider identity used to form the keyed fingerprints is printed by the wrapper. It emits only aggregate timestamps and counts. The underlying read-only report can
 be inspected without displaying Site, Device, target, credential, provider
 response, event payload or observation values:
 

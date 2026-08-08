@@ -12,6 +12,7 @@ use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Models\ProviderCapabilityCursor;
+use App\Domain\Monitoring\Models\ProviderCapabilityException;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
@@ -22,6 +23,7 @@ use App\Services\Integration\Contracts\ObservationCollectionCapability;
 use App\Services\Integration\IntegrationAdapterRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use RuntimeException;
 use Throwable;
 
 final class ProtocolPolicyEvidenceService
@@ -71,6 +73,7 @@ final class ProtocolPolicyEvidenceService
 
         $protocols = $this->protocolEvidence($monitors, $freshMonitorIds, $since, $now);
         $policy = $this->policyEvidence($monitors, $since, $now);
+        $continuousExecution = $this->continuousExecutionEvidence($monitors, $latestObservations, $since, $now);
         $allVerified = collect($protocols)
             ->merge($policy)
             ->every(fn (array $row): bool => ($row['state'] ?? null) === 'verified');
@@ -78,7 +81,9 @@ final class ProtocolPolicyEvidenceService
         return [
             'observed_at' => $now->toIso8601String(),
             'window_minutes' => $windowMinutes,
+            'evidence_roster_fingerprint' => $this->evidenceRosterFingerprint($monitors, $since, $now),
             'execution_cursor' => $this->executionCursor($monitors, $latestObservations),
+            'continuous_execution' => $continuousExecution,
             'all_verified' => $allVerified,
             'protocols' => $protocols,
             'policy' => $policy,
@@ -96,25 +101,11 @@ final class ProtocolPolicyEvidenceService
         CarbonImmutable $since,
         CarbonImmutable $now,
     ): array {
-        $definitions = [
-            'icmp' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::Icmp,
-            'tcp' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::Tcp,
-            'dns' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::Dns,
-            'http' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::Http
-                && $this->httpScheme($monitor) === 'http',
-            'https' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::Http
-                && $this->httpScheme($monitor) === 'https',
-            'tls' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::Tls,
-            'snmp_v3' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::Snmp
-                && strtolower((string) data_get($monitor->config, 'version')) === 'v3',
-            'ssh_read_only' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::SshInventory,
-            'winrm_read_only' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::WinRmInventory,
-        ];
         $rows = [];
-        foreach ($definitions as $key => $matches) {
+        foreach ($this->protocolDefinitions() as $key => $matches) {
             $configured = $monitors->filter($matches);
             $fresh = $configured->filter(fn (Monitor $monitor): bool => $freshMonitorIds->has((int) $monitor->id));
-            $rows[$key] = $this->row($fresh->isNotEmpty(), [
+            $rows[$key] = $this->row($configured->isNotEmpty() && $fresh->count() === $configured->count(), [
                 'configured' => $configured->count(),
                 'fresh' => $fresh->count(),
             ]);
@@ -159,26 +150,57 @@ final class ProtocolPolicyEvidenceService
                 ->unique()
                 ->values();
             $freshMappedSites = $mappedSiteIds->intersect($freshSiteIds)->count();
-            $completedSites = ProviderCapabilityCursor::query()
+            $capabilityCursors = ProviderCapabilityCursor::query()
                 ->where('provider', $provider)
                 ->where('capability', ObservationCollectionCapability::class)
                 ->whereIn('site_id', $mappedSiteIds)
-                ->whereBetween('last_completed_at', [$since, $now])
-                ->distinct()
-                ->count('site_id');
-            $connected = IntegrationProviderConnection::query()
+                ->get();
+            $capabilityExceptions = ProviderCapabilityException::query()
+                ->where('provider', $provider)
+                ->where('capability', ObservationCollectionCapability::class)
+                ->whereIn('site_id', $mappedSiteIds)
+                ->whereBetween('occurred_at', [$since, $now])
+                ->get(['site_id', 'occurred_at'])
+                ->groupBy(fn (ProviderCapabilityException $exception): int => (int) $exception->site_id);
+            $successfulSiteIds = $capabilityCursors
+                ->filter(function (ProviderCapabilityCursor $cursor) use ($capabilityExceptions, $since, $now): bool {
+                    if ($cursor->last_started_at === null
+                        || $cursor->last_completed_at === null
+                        || ! $cursor->last_started_at->betweenIncluded($since, $now)
+                        || ! $cursor->last_completed_at->betweenIncluded($since, $now)
+                        || $cursor->last_completed_at->lt($cursor->last_started_at)
+                        || $cursor->retry_not_before !== null) {
+                        return false;
+                    }
+
+                    return ! $capabilityExceptions
+                        ->get((int) $cursor->site_id, collect())
+                        ->contains(fn (ProviderCapabilityException $exception): bool => $exception->occurred_at->gte($cursor->last_started_at));
+                })
+                ->pluck('site_id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->unique()
+                ->values();
+            $connection = IntegrationProviderConnection::query()
                 ->forProvider($provider)
                 ->connected()
-                ->exists();
+                ->first();
+            $credentialTested = $connection !== null
+                && $connection->last_tested_at !== null
+                && $connection->last_tested_at->betweenIncluded($since, $now)
+                && blank($connection->last_error);
             $rows['provider_'.$provider] = $this->row(
-                $connected
+                $credentialTested
                     && $mappedSiteIds->isNotEmpty()
-                    && $completedSites === $mappedSiteIds->count()
+                    && $configured->isNotEmpty()
+                    && $fresh->count() === $configured->count()
+                    && $successfulSiteIds->count() === $mappedSiteIds->count()
                     && $freshMappedSites === $mappedSiteIds->count(),
                 [
-                    'connected' => $connected ? 1 : 0,
+                    'connected' => $connection !== null ? 1 : 0,
+                    'credential_tested' => $credentialTested ? 1 : 0,
                     'mapped_sites' => $mappedSiteIds->count(),
-                    'completed_sites' => $completedSites,
+                    'successful_sites' => $successfulSiteIds->count(),
                     'configured' => $configured->count(),
                     'fresh' => $fresh->count(),
                     'fresh_sites' => $freshMappedSites,
@@ -371,6 +393,207 @@ final class ProtocolPolicyEvidenceService
         $url = data_get($monitor->config, 'url', $monitor->target);
 
         return is_string($url) ? strtolower((string) parse_url($url, PHP_URL_SCHEME)) : '';
+    }
+
+    /** @return array<string, callable(Monitor): bool> */
+    private function protocolDefinitions(): array
+    {
+        return [
+            'icmp' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::Icmp,
+            'tcp' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::Tcp,
+            'dns' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::Dns,
+            'http' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::Http
+                && $this->httpScheme($monitor) === 'http',
+            'https' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::Http
+                && $this->httpScheme($monitor) === 'https',
+            'tls' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::Tls,
+            'snmp_v3' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::Snmp
+                && strtolower((string) data_get($monitor->config, 'version')) === 'v3',
+            'ssh_read_only' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::SshInventory,
+            'winrm_read_only' => fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::WinRmInventory,
+        ];
+    }
+
+    /**
+     * Return value-free execution windows for every continuously exercised
+     * protocol. The release wrapper compares the first sample's newest
+     * evidence with the last sample's oldest evidence, proving every member in
+     * the pinned roster advanced rather than accepting one busy monitor.
+     *
+     * @param  Collection<int, Monitor>  $monitors
+     * @param  Collection<int, MonitorObservation>  $latestObservations
+     * @return array<string, array<string, int|string|null>>
+     */
+    private function continuousExecutionEvidence(
+        Collection $monitors,
+        Collection $latestObservations,
+        CarbonImmutable $since,
+        CarbonImmutable $now,
+    ): array {
+        $latestByMonitor = $latestObservations->keyBy(
+            fn (MonitorObservation $observation): int => (int) $observation->monitor_id,
+        );
+        $rows = [];
+
+        foreach ($this->protocolDefinitions() as $key => $matches) {
+            $members = $monitors->filter($matches)->map(function (Monitor $monitor) use ($latestByMonitor): array {
+                $observation = $latestByMonitor->get((int) $monitor->id);
+
+                return [
+                    'member' => 'monitor:'.(int) $monitor->id,
+                    'at' => $observation?->observed_at,
+                ];
+            })->values()->all();
+            $rows[$key] = $this->executionWindow($members);
+        }
+
+        foreach ([
+            'snmp_traps' => 'central:snmp-traps:site:%',
+            'syslog' => 'central:syslog:site:%',
+            'flow' => 'central:flow:site:%',
+        ] as $key => $source) {
+            $latest = MonitoringInbox::query()
+                ->where('source', 'like', $source)
+                ->whereBetween('processed_at', [$since, $now])
+                ->orderByDesc('processed_at')
+                ->orderByDesc('id')
+                ->first(['processed_at']);
+            $rows[$key] = $this->executionWindow([[
+                'member' => 'listener:'.$key,
+                'at' => $latest?->processed_at,
+            ]]);
+        }
+
+        foreach ($this->providers->providers() as $provider) {
+            if (! $this->providers->hasCapability($provider, ObservationCollectionCapability::class)) {
+                continue;
+            }
+            $mappedSiteIds = IntegrationSiteConfig::query()
+                ->forProvider($provider)
+                ->active()
+                ->whereHas('site')
+                ->pluck('site_id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->unique()
+                ->values();
+            $cursors = ProviderCapabilityCursor::query()
+                ->where('provider', $provider)
+                ->where('capability', ObservationCollectionCapability::class)
+                ->whereIn('site_id', $mappedSiteIds)
+                ->get(['site_id', 'last_completed_at'])
+                ->keyBy(fn (ProviderCapabilityCursor $cursor): int => (int) $cursor->site_id);
+            $configured = $monitors->filter(fn (Monitor $monitor): bool => $monitor->kind === MonitorKind::Provider
+                && data_get($monitor->config, 'provider') === $provider);
+            $members = $mappedSiteIds->map(fn (int $siteId): array => [
+                'member' => 'provider-site:'.$provider.':'.$siteId,
+                'at' => $cursors->get($siteId)?->last_completed_at,
+            ]);
+            foreach ($configured as $monitor) {
+                $members->push([
+                    'member' => 'provider-monitor:'.$provider.':'.(int) $monitor->id,
+                    'at' => $latestByMonitor->get((int) $monitor->id)?->observed_at,
+                ]);
+            }
+            $rows['provider_'.$provider] = $this->executionWindow($members->values()->all());
+        }
+
+        ksort($rows);
+
+        return $rows;
+    }
+
+    /**
+     * @param  array<int, array{member: string, at: mixed}>  $members
+     * @return array{roster_fingerprint: string, members: int, missing: int, oldest_evidence_at: ?string, newest_evidence_at: ?string}
+     */
+    private function executionWindow(array $members): array
+    {
+        $roster = array_map(fn (array $member): string => $member['member'], $members);
+        sort($roster, SORT_STRING);
+        $timestamps = collect($members)->pluck('at')->filter()->sort()->values();
+
+        return [
+            'roster_fingerprint' => $this->opaqueFingerprint($roster),
+            'members' => count($members),
+            'missing' => count($members) - $timestamps->count(),
+            'oldest_evidence_at' => $timestamps->first()?->toISOString(),
+            'newest_evidence_at' => $timestamps->last()?->toISOString(),
+        ];
+    }
+
+    /** @param Collection<int, Monitor> $monitors */
+    private function evidenceRosterFingerprint(Collection $monitors, CarbonImmutable $since, CarbonImmutable $now): string
+    {
+        $components = $monitors->map(fn (Monitor $monitor): string => json_encode([
+            'kind' => 'monitor',
+            'id' => (int) $monitor->id,
+            'device' => (int) $monitor->device_id,
+            'profile' => (int) $monitor->profile_id,
+            'monitor_kind' => $monitor->kind->value,
+            'target' => $monitor->target,
+            'config' => $monitor->config,
+        ], JSON_THROW_ON_ERROR))->all();
+
+        foreach ($monitors->pluck('profile')->filter()->unique('id') as $profile) {
+            $components[] = json_encode([
+                'kind' => 'profile',
+                'id' => (int) $profile->id,
+                'failure_confirmations' => (int) $profile->failure_confirmations,
+                'failure_duration_seconds' => (int) $profile->failure_duration_seconds,
+                'recovery_confirmations' => (int) $profile->recovery_confirmations,
+                'recovery_duration_seconds' => (int) $profile->recovery_duration_seconds,
+                'stale_after_seconds' => (int) $profile->stale_after_seconds,
+                'rollup_policy' => $profile->rollup_policy,
+                'rising_threshold' => $profile->rising_threshold,
+                'falling_threshold' => $profile->falling_threshold,
+                'baseline_window_seconds' => $profile->baseline_window_seconds,
+                'baseline_minimum_samples' => $profile->baseline_minimum_samples,
+                'baseline_deviation_multiplier' => $profile->baseline_deviation_multiplier,
+            ], JSON_THROW_ON_ERROR);
+        }
+        foreach (Device::query()
+            ->whereIn('status', [
+                DeviceStatus::Active->value,
+                DeviceStatus::Degraded->value,
+                DeviceStatus::Offline->value,
+            ])
+            ->pluck('id') as $deviceId) {
+            $components[] = 'operational-device:'.(int) $deviceId;
+        }
+        foreach (MonitoringCoverageExpectation::query()->where('is_active', true)->get() as $expectation) {
+            $components[] = json_encode(['kind' => 'coverage', 'attributes' => $expectation->getAttributes()], JSON_THROW_ON_ERROR);
+        }
+        foreach (MonitorDependency::query()->where('is_active', true)->get() as $dependency) {
+            $components[] = json_encode(['kind' => 'dependency', 'attributes' => $dependency->getAttributes()], JSON_THROW_ON_ERROR);
+        }
+        foreach (MonitoringMaintenanceWindow::query()
+            ->whereIn('status', ['active', 'completed'])
+            ->where('starts_at', '<=', $now)
+            ->where('ends_at', '>=', $since)
+            ->get() as $window) {
+            $components[] = json_encode(['kind' => 'maintenance', 'attributes' => $window->getAttributes()], JSON_THROW_ON_ERROR);
+        }
+        foreach (IntegrationSiteConfig::query()->active()->whereHas('site')->get() as $mapping) {
+            $components[] = json_encode(['kind' => 'provider_mapping', 'attributes' => $mapping->getAttributes()], JSON_THROW_ON_ERROR);
+        }
+
+        return $this->opaqueFingerprint($components);
+    }
+
+    /** @param array<int, string> $components */
+    private function opaqueFingerprint(array $components): string
+    {
+        $key = (string) config('app.key');
+        if ($key === '') {
+            throw new RuntimeException('The application key is required for value-free monitoring evidence fingerprints.');
+        }
+        sort($components, SORT_STRING);
+
+        return hash_hmac(
+            'sha256',
+            "oblivion:monitoring:protocol-policy-evidence:v1\n".implode("\n", $components),
+            $key,
+        );
     }
 
     /**

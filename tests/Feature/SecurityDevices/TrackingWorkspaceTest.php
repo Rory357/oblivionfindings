@@ -240,6 +240,69 @@ class TrackingWorkspaceTest extends TestCase
             });
     }
 
+    public function test_assignment_created_after_withdrawal_preserves_withdrawn_privacy_without_relabelling_other_inactive_consent(): void
+    {
+        $site = $this->site('Rimu House');
+        $withdrawnClient = Client::factory()->create([
+            'site_id' => $site->id,
+            'preferred_name' => 'Hana',
+        ]);
+        $inactiveClient = Client::factory()->create([
+            'site_id' => $site->id,
+            'preferred_name' => 'Matiu',
+        ]);
+        $withdrawnConsent = $this->trackingConsent($withdrawnClient, [
+            'status' => 'withdrawn',
+            'withdrawn_at' => now()->subHour(),
+        ]);
+        $expiredConsent = $this->trackingConsent($inactiveClient, [
+            'expires_at' => now()->subMinute(),
+        ]);
+        $withdrawnDevice = $this->trackingDevice('Hana safety pendant', [
+            'category' => 'personal_tracker',
+        ]);
+        $inactiveDevice = $this->trackingDevice('Matiu safety pendant', [
+            'category' => 'personal_tracker',
+        ]);
+
+        $this->assign(
+            $withdrawnDevice,
+            DeviceAssignment::TARGET_CLIENT,
+            $withdrawnClient->id,
+            $withdrawnConsent->id,
+        );
+        $this->assign(
+            $inactiveDevice,
+            DeviceAssignment::TARGET_CLIENT,
+            $inactiveClient->id,
+            $expiredConsent->id,
+        );
+
+        $withdrawnAssignment = DeviceAssignment::query()
+            ->where('device_id', $withdrawnDevice->id)
+            ->sole();
+        $inactiveAssignment = DeviceAssignment::query()
+            ->where('device_id', $inactiveDevice->id)
+            ->sole();
+
+        $this->assertSame('consent_withdrawn', $withdrawnAssignment->collection_stop_reason);
+        $this->assertSame('consent_not_active', $inactiveAssignment->collection_stop_reason);
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/tracking?tab=personal-safety')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($inactiveDevice, $withdrawnDevice): void {
+                $rows = collect($page->toArray()['props']['trackingWorkspace']['activeTab']['devices']);
+                $withdrawn = $rows->firstWhere('id', $withdrawnDevice->id);
+                $inactive = $rows->firstWhere('id', $inactiveDevice->id);
+
+                $this->assertSame('withdrawn', $withdrawn['privacy']['state']);
+                $this->assertSame('Tracking consent was withdrawn.', $withdrawn['privacy']['reason']);
+                $this->assertSame('inactive', $inactive['privacy']['state']);
+                $this->assertSame('No active tracking consent is available.', $inactive['privacy']['reason']);
+            });
+    }
+
     public function test_staff_tracker_location_requires_an_authorised_live_lone_worker_purpose(): void
     {
         $site = $this->site('Totara House');

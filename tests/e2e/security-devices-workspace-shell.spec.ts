@@ -54,11 +54,27 @@ test.describe('Security & Devices specialist workspace shell', () => {
                 level: 2,
             }),
         ).toBeVisible();
-        await expect(
-            page.getByText(
-                'No retained traffic or capacity metrics are available.',
-            ),
-        ).toBeVisible();
+        const trafficPanel = page
+            .getByRole('heading', {
+                name: 'Traffic and capacity evidence',
+                level: 2,
+            })
+            .locator('..')
+            .locator('..');
+        const retainedRows = trafficPanel.getByRole('article');
+        const emptyState = trafficPanel.getByText(
+            'No retained traffic or capacity metrics are available.',
+        );
+        const retainedRowCount = await retainedRows.count();
+
+        if (retainedRowCount > 0) {
+            await expect(retainedRows.first()).toContainText(
+                'Retained native observation',
+            );
+            await expect(emptyState).toHaveCount(0);
+        } else {
+            await expect(emptyState).toBeVisible();
+        }
         await expect(
             page.getByText(
                 /Missing discovery, protocol, interface, capacity, configuration, or firmware collection stays visible/,

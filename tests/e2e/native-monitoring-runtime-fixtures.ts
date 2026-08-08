@@ -349,7 +349,7 @@ $retention = \\App\\Domain\\Monitoring\\Models\\MonitoringRetentionPolicy::query
         'created_by_user_id' => $admin->id,
     ],
 );
-\\App\\Domain\\Monitoring\\Models\\ConfigurationSnapshot::query()->updateOrCreate(
+\\App\\Domain\\Monitoring\\Models\\ConfigurationSnapshot::query()->firstOrCreate(
     ['snapshot_uuid' => '30000000-0000-4000-8000-000000000019'],
     [
         'site_id' => $allowedSite->id,

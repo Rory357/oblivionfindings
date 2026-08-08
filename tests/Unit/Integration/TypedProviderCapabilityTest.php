@@ -156,6 +156,7 @@ it('rejects unsafe or unbounded provider observation page content', function (ar
     ]]]],
     'cursor' => [['next_cursor' => str_repeat('x', 2049)]],
     'retry' => [['retry_after' => 86401]],
+    'unexplained partial page' => [['partial' => true]],
     'exception' => [['exceptions' => [['code' => 'not bounded', 'item_reference' => null]]]],
 ]);
 

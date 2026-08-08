@@ -56,6 +56,7 @@ final readonly class ProviderObservationPage implements JsonSerializable
             || ! $this->validCursor($this->nextCursor)
             || ($this->retryAfterSeconds !== null
                 && ($this->retryAfterSeconds < 1 || $this->retryAfterSeconds > 86400))
+            || ($this->partial && $this->retryAfterSeconds === null && $this->exceptions === [])
             || ! array_is_list($this->exceptions) || count($this->exceptions) > 100) {
             return false;
         }

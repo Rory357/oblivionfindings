@@ -43,6 +43,10 @@ beforeEach(function (): void {
 
 it('audits single-application collisions and provenance without mutating data or exposing values', function () {
     $canSeedTicketReferenceCollision = ! auditColumnHasGlobalUniqueIndex('it_tickets', 'reference');
+    $canSeedActiveDeviceCollision = ! auditHasIndexNamed(
+        'device_assignments',
+        'device_assignments_one_active_device_uq',
+    );
     $canSeedMissingAssignmentDevice = ! auditColumnHasForeignKey('device_assignments', 'device_id');
     $canSeedMissingLinkedTicket = ! auditColumnHasForeignKey('it_ticket_links', 'ticket_id');
 
@@ -216,7 +220,7 @@ it('audits single-application collisions and provenance without mutating data or
             'created_at' => now(),
             'updated_at' => now(),
         ],
-        [
+        ...($canSeedActiveDeviceCollision ? [[
             'device_id' => $ambiguousId,
             'assignable_type' => 'site',
             'assignable_id' => $otherSiteId,
@@ -224,7 +228,7 @@ it('audits single-application collisions and provenance without mutating data or
             'assigned_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
-        ],
+        ]] : []),
         [
             'device_id' => $orphanedId,
             'assignable_type' => 'site',
@@ -360,7 +364,7 @@ it('audits single-application collisions and provenance without mutating data or
     expect(collect($report['provenance_checks'])->firstWhere('check', 'ticket_team_legacy_id_mismatch')['count'])
         ->toBe(1)
         ->and(collect($report['provenance_checks'])->firstWhere('check', 'device_active_site_assignment_conflict')['count'])
-        ->toBeGreaterThanOrEqual(1)
+        ->toBe($canSeedActiveDeviceCollision ? 1 : 0)
         ->and(collect($report['provenance_checks'])->firstWhere('check', 'device_assignment_vehicle_site_legacy_id_mismatch')['count'])
         ->toBe(0)
         ->and(collect($report['provenance_checks'])->firstWhere('check', 'device_assignment_vehicle_home_site_legacy_id_mismatch')['count'])
@@ -372,7 +376,7 @@ it('audits single-application collisions and provenance without mutating data or
         ->and(collect($report['provenance_checks'])->firstWhere('check', 'vehicle_site_client_site_canonical_conflict')['count'])
         ->toBe(1)
         ->and(collect($report['provenance_checks'])->firstWhere('check', 'device_active_canonical_site_conflict')['count'])
-        ->toBeGreaterThanOrEqual(2)
+        ->toBe($canSeedActiveDeviceCollision ? 2 : 1)
         ->and(collect($report['provenance_checks'])->firstWhere('check', 'provider_site_mapping_site_legacy_id_mismatch')['count'])
         ->toBe(0)
         ->and(collect($report['orphan_checks'])->firstWhere('check', 'device_assignment_site_target_missing')['count'])
@@ -400,7 +404,8 @@ it('audits single-application collisions and provenance without mutating data or
         ->and($report['null_site_tickets']['total'])->toBe(1)
         ->and($report['null_site_tickets']['without_explicit_organisation_wide_evidence'])->toBe(1)
         ->and($report['device_assignments']['unassigned_devices'])->toBeGreaterThanOrEqual(1)
-        ->and($report['device_assignments']['ambiguously_assigned_devices'])->toBeGreaterThanOrEqual(1);
+        ->and($report['device_assignments']['ambiguously_assigned_devices'])
+        ->toBe($canSeedActiveDeviceCollision ? 1 : 0);
 
     expect($output)
         ->not->toContain('TOP-SECRET-COLLISION')
@@ -473,6 +478,7 @@ it('uses current assignment time scope while auditing orphan targets across all 
     $firstSiteId = DB::table('sites')->insertGetId(['tenant_id' => 11, 'name' => 'Current site']);
     $futureSiteId = DB::table('sites')->insertGetId(['tenant_id' => 11, 'name' => 'Future site']);
     $futureOnlyDeviceId = insertAuditDevice('audit-device-future-only', 11);
+    $additionalFutureDeviceId = insertAuditDevice('audit-device-additional-future', 11);
     $currentDeviceId = insertAuditDevice('audit-device-current-plus-future', 11);
 
     DB::table('device_assignments')->insert([
@@ -502,12 +508,12 @@ it('uses current assignment time scope while auditing orphan targets across all 
             'assignable_id' => $firstSiteId,
             'assignment_type' => 'permanent',
             'assigned_at' => now()->subDay(),
-            'released_at' => null,
+            'released_at' => now()->subHour(),
             'created_at' => now(),
             'updated_at' => now(),
         ],
         [
-            'device_id' => $currentDeviceId,
+            'device_id' => $additionalFutureDeviceId,
             'assignable_type' => 'site',
             'assignable_id' => $futureSiteId,
             'assignment_type' => 'permanent',
@@ -532,7 +538,7 @@ it('uses current assignment time scope while auditing orphan targets across all 
     $report = json_decode(trim(Artisan::output()), true, flags: JSON_THROW_ON_ERROR);
 
     expect($exit)->toBe(0)
-        ->and($report['device_assignments']['unassigned_devices'])->toBe(1)
+        ->and($report['device_assignments']['unassigned_devices'])->toBe(2)
         ->and($report['device_assignments']['ambiguously_assigned_devices'])->toBe(0)
         ->and($report['device_assignments']['future_assignment_rows'])->toBe(2)
         ->and(collect($report['provenance_checks'])->firstWhere('check', 'device_active_site_assignment_conflict')['count'])
@@ -659,6 +665,13 @@ function auditColumnHasGlobalUniqueIndex(string $table, string $column): bool
 
         return (bool) ($index['unique'] ?? false) && $columns === [strtolower($column)];
     });
+}
+
+function auditHasIndexNamed(string $table, string $name): bool
+{
+    return collect(Schema::getIndexes($table))->contains(
+        fn (array $index): bool => strtolower((string) ($index['name'] ?? '')) === strtolower($name),
+    );
 }
 
 /** @param array<string, mixed> $values

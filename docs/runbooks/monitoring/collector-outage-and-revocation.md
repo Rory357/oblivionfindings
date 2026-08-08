@@ -62,7 +62,7 @@ appear healthy.
 
 ## Validation
 
-Confirm heartbeat is current, backlog trends to zero, acknowledged equals highest seen, gap/corruption states clear, configuration sequence never regresses, and downstream monitors recover only after contiguous evidence returns. Verify unrelated approved Sites and collectors continued normally.
+Confirm heartbeat is current, backlog trends to zero, and the collector-reported acknowledged/highest source sequences exactly mirror the central collector/checkpoint pair. An empty writable spool is not recovery evidence when either sequence is behind or ahead: the collector stays unavailable, the existing root path correlation remains active, and downstream monitors remain stale. Confirm gaps/corruption clear, configuration sequence never regresses, and downstream monitors recover only after the exact sequence mirrors and contiguous evidence return. Verify unrelated approved Sites and collectors continued normally.
 
 ## Deployed acceptance sequence
 
@@ -106,9 +106,12 @@ files, request headers, or Redis keys into the evidence record.
    collector/path finding while affected Device evidence becomes stale rather
    than newly failed. Confirm an unrelated Site continues collecting. Restore
    connectivity, run `doctor`, start one service cycle, and confirm backlog
-   drains in source-sequence order until acknowledged equals highest seen,
+   drains in source-sequence order until the collector-reported acknowledged
+   and highest source sequences exactly match both central mirrors,
    gaps/corruption are zero, one recovery is recorded, and downstream monitors
-   leave stale state. Then restore the timer.
+   leave stale state. A zero-item heartbeat with a lagging local checkpoint must
+   keep the same root path correlation open rather than record recovery. Then
+   restore the timer.
 
 3. The restored signed configuration must contain only the approved Site,
    networks, Devices and protocols. Exercise at least one approved

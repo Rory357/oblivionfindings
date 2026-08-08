@@ -73,13 +73,19 @@ final class CollectorHealthService
                     === (int) $locked->acknowledged_source_sequence
                 && (int) $checkpoint->highest_seen_source_sequence
                     === (int) $locked->highest_seen_source_sequence;
-            $recoveryReady = ! $hasGap
+            $collectorMirrorsCheckpoint = $heartbeat['acknowledged_source_sequence']
+                    === (int) $checkpoint->acknowledged_source_sequence
+                && $heartbeat['highest_seen_source_sequence']
+                    === (int) $checkpoint->highest_seen_source_sequence;
+            $pathIsContiguous = ! $hasGap
                 && $checkpointIsContiguous
+                && $collectorMirrorsCheckpoint;
+            $recoveryReady = $pathIsContiguous
                 && $heartbeat['state'] === 'writable'
                 && $heartbeat['spool_items'] === 0
                 && $heartbeat['spool_bytes'] === 0
                 && $heartbeat['corrupted_frames'] === 0;
-            $nextStatus = $wasUnavailable && ! $recoveryReady
+            $nextStatus = ! $pathIsContiguous || ($wasUnavailable && ! $recoveryReady)
                 ? 'unavailable'
                 : ($heartbeat['state'] === 'buffer_full' ? 'degraded' : 'online');
             $locked->forceFill([
@@ -95,6 +101,22 @@ final class CollectorHealthService
                 'last_clock_drift_seconds' => $receivedAt->diffInSeconds($heartbeat['reported_at'], false) * -1,
                 'last_recovered_at' => $wasUnavailable && $recoveryReady ? $receivedAt : $locked->last_recovered_at,
             ])->save();
+            if (! $wasUnavailable && ! $pathIsContiguous) {
+                $affected = $locked->monitors()->where('is_enabled', true)->get(['id', 'device_id']);
+                $locked->monitors()->where('is_enabled', true)->update([
+                    'effective_state' => MonitorState::Stale->value,
+                    'suppression_reason' => 'collector_path',
+                    'suppressed_at' => $receivedAt,
+                ]);
+                $this->event($locked, 'offline', 'high', [
+                    'affected_device_count' => $affected->pluck('device_id')->unique()->count(),
+                    'affected_monitor_count' => $affected->count(),
+                    'backlog_items' => $heartbeat['spool_items'],
+                    'gap_count' => (int) $locked->gap_count,
+                    'sequence_path_incomplete' => 1,
+                    'collector_checkpoint_mismatch' => $collectorMirrorsCheckpoint ? 0 : 1,
+                ], $receivedAt);
+            }
             if ($wasUnavailable && $recoveryReady) {
                 DB::table('monitors')->where('collector_id', $locked->id)->where('is_enabled', true)->update([
                     'effective_state' => DB::raw('current_state'),
@@ -118,7 +140,7 @@ final class CollectorHealthService
         }, 3);
     }
 
-    /** @param array<string, mixed> $status @return array{reported_at: CarbonImmutable, state: string, spool_items: int, spool_bytes: int, corrupted_frames: int, oldest_spool_item_at: ?CarbonImmutable, runtime: array<string, int|string|bool|null>} */
+    /** @param array<string, mixed> $status @return array{reported_at: CarbonImmutable, state: string, spool_items: int, spool_bytes: int, corrupted_frames: int, acknowledged_source_sequence: int, highest_seen_source_sequence: int, oldest_spool_item_at: ?CarbonImmutable, runtime: array<string, int|string|bool|null>} */
     private function validatedHeartbeat(array $status): array
     {
         $reportedAt = $status['reported_at'] ?? null;
@@ -126,11 +148,15 @@ final class CollectorHealthService
         $items = $status['spool_items'] ?? null;
         $bytes = $status['spool_bytes'] ?? null;
         $corrupt = $status['corrupted_frames'] ?? null;
+        $acknowledged = $status['acknowledged_source_sequence'] ?? null;
+        $highestSeen = $status['highest_seen_source_sequence'] ?? null;
         $runtime = $status['runtime'] ?? null;
         if (! is_string($reportedAt) || ! in_array($state, ['writable', 'buffer_full'], true)
             || ! is_int($items) || $items < 0 || $items > 100_000
             || ! is_int($bytes) || $bytes < 0 || $bytes > 67_108_864
             || ! is_int($corrupt) || $corrupt < 0 || $corrupt > 100_000
+            || ! is_int($acknowledged) || $acknowledged < 0
+            || ! is_int($highestSeen) || $highestSeen < $acknowledged
             || ! is_array($runtime) || array_is_list($runtime) || count($runtime) > 16
             || array_any($runtime, fn (mixed $value, mixed $key): bool => ! is_string($key)
                 || preg_match('/\A[a-z][a-z0-9_]{0,63}\z/', $key) !== 1
@@ -149,6 +175,12 @@ final class CollectorHealthService
         if (($items === 0 && $oldest !== null) || ($items > 0 && $oldest === null)) {
             throw new DomainException('Collector heartbeat backlog evidence is invalid.');
         }
+        if ($items === 0 && $acknowledged !== $highestSeen) {
+            throw new DomainException('Collector heartbeat checkpoint evidence is invalid.');
+        }
+        if ($items > 0 && $highestSeen <= $acknowledged) {
+            throw new DomainException('Collector heartbeat checkpoint evidence is invalid.');
+        }
 
         return [
             'reported_at' => $reported,
@@ -156,6 +188,8 @@ final class CollectorHealthService
             'spool_items' => $items,
             'spool_bytes' => $bytes,
             'corrupted_frames' => $corrupt,
+            'acknowledged_source_sequence' => $acknowledged,
+            'highest_seen_source_sequence' => $highestSeen,
             'oldest_spool_item_at' => $oldest,
             'runtime' => $runtime,
         ];

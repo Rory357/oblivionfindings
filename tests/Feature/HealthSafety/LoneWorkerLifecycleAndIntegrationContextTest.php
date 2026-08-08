@@ -231,18 +231,28 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
             'domain' => 'tracking',
             'imei' => 'OTHER-SITE-IMEI',
         ]);
-        DeviceAssignment::create([
-            'device_id' => $otherSiteTracker->id,
-            'assignable_type' => DeviceAssignment::TARGET_STAFF,
-            'assignable_id' => $worker->id,
-            'assigned_at' => now(),
-        ]);
+        $reassignedAt = now()->subMinute();
         DeviceAssignment::create([
             'device_id' => $otherSiteTracker->id,
             'assignable_type' => DeviceAssignment::TARGET_SITE,
             'assignable_id' => $otherSite->id,
-            'assigned_at' => now(),
+            'assigned_at' => now()->subHours(2),
+            'released_at' => $reassignedAt,
         ]);
+        $worker->hrEmployeeProfile()->update([
+            'primary_site_id' => $otherSite->id,
+            'secondary_site_ids' => [$site->id],
+        ]);
+        DeviceAssignment::create([
+            'device_id' => $otherSiteTracker->id,
+            'assignable_type' => DeviceAssignment::TARGET_STAFF,
+            'assignable_id' => $worker->id,
+            'assigned_at' => $reassignedAt->copy()->addSecond(),
+        ]);
+        $this->assertSame(1, DeviceAssignment::query()
+            ->where('device_id', $otherSiteTracker->id)
+            ->active()
+            ->count());
 
         $this->actingAs($coordinator)
             ->get("/health-safety/lone-workers?session={$session->id}")

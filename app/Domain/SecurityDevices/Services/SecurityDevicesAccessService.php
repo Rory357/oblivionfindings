@@ -508,12 +508,16 @@ class SecurityDevicesAccessService
         $roomIds = $siteIds === []
             ? []
             : SiteRoom::query()->whereIn('site_id', $siteIds)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
-        $assetIds = $this->authorizedAssetIds($user);
+        $assetIds = array_values(array_unique([
+            ...$this->authorizedAssetIds($user),
+            ...$this->accessibleHistoricalLinkedAssetIds($user),
+        ]));
         $assetTargets = $assetIds === []
             ? collect()
             : Asset::query()->whereKey($assetIds)->get(['client_id', 'primary_driver_user_id']);
         $clientIds = array_values(array_unique([
             ...$this->authorizedClientIds($user),
+            ...$this->accessibleHistoricalAssignedClientIds($user),
             ...$assetTargets->pluck('client_id')->filter()->map(fn (mixed $id): int => (int) $id)->all(),
         ]));
         $staffIds = array_values(array_unique([
@@ -653,6 +657,75 @@ class SecurityDevicesAccessService
             ->whereKey($candidateIds)
             ->get()
             ->filter(fn (Client $client): bool => Gate::forUser($user)->allows('view', $client))
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+    }
+
+    /** @return list<int> */
+    private function accessibleHistoricalAssignedClientIds(User $user): array
+    {
+        $candidateIds = DeviceAssignment::query()
+            ->active()
+            ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+            ->distinct()
+            ->pluck('assignable_id');
+        if ($candidateIds->isEmpty()) {
+            return [];
+        }
+
+        $siteIds = $this->accessibleSiteIds($user);
+        if ($siteIds === []) {
+            return [];
+        }
+
+        return Client::withTrashed()
+            ->whereKey($candidateIds)
+            ->whereNotNull('site_id')
+            ->whereIn('site_id', $siteIds)
+            ->whereHas('site', fn (Builder $site): Builder => $this->applyOperationalSiteScope($site))
+            ->get()
+            ->filter(fn (Client $client): bool => Gate::forUser($user)->allows('view', $client))
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+    }
+
+    /** @return list<int> */
+    private function accessibleHistoricalLinkedAssetIds(User $user): array
+    {
+        $candidateIds = DeviceAssetLink::query()
+            ->active()
+            ->distinct()
+            ->pluck('asset_id');
+        if ($candidateIds->isEmpty()) {
+            return [];
+        }
+
+        $siteIds = $this->accessibleSiteIds($user);
+        if ($siteIds === []) {
+            return [];
+        }
+
+        $assets = Asset::query()
+            ->whereKey($candidateIds)
+            ->whereNotNull('site_id')
+            ->whereIn('site_id', $siteIds)
+            ->whereHas('site', fn (Builder $site): Builder => $this->applyOperationalSiteScope($site))
+            ->get();
+        $historicalClientSiteIds = Client::withTrashed()
+            ->whereKey($assets->pluck('client_id')->filter()->unique())
+            ->pluck('site_id', 'id');
+
+        return $assets
+            ->filter(function (Asset $asset) use ($historicalClientSiteIds, $user): bool {
+                $historicalSiteId = $asset->client_id
+                    ? $historicalClientSiteIds->get($asset->client_id)
+                    : $asset->site_id;
+
+                return (int) $historicalSiteId === (int) $asset->site_id
+                    && Gate::forUser($user)->allows('view', $asset);
+            })
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->all();

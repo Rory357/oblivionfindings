@@ -172,19 +172,26 @@ final class EncryptedSpool
         return $highest + 1;
     }
 
-    /** @return array{state: string, items: int, bytes: int, oldest_at: ?string, corrupted_frames: int} */
+    /** @return array{state: string, items: int, bytes: int, oldest_at: ?string, corrupted_frames: int, acknowledged_source_sequence: int, highest_seen_source_sequence: int} */
     public function status(?DateTimeImmutable $at = null): array
     {
         $at ??= new DateTimeImmutable('now');
         $frames = $this->readFrames();
         $oldest = $frames === [] ? null : $frames[0]['item']['created_at'];
+        $checkpoint = $this->checkpoint->read();
+        $highestSeen = $checkpoint['acknowledged_source_sequence'];
+        foreach ($frames as $frame) {
+            $highestSeen = max($highestSeen, $frame['item']['source_sequence']);
+        }
 
         return [
             'state' => $this->atCapacity($frames, $at) ? 'buffer_full' : 'writable',
             'items' => count($frames),
             'bytes' => is_file($this->spoolPath) ? (int) filesize($this->spoolPath) : 0,
             'oldest_at' => $oldest,
-            'corrupted_frames' => $this->checkpoint->read()['corrupted_frames'],
+            'corrupted_frames' => $checkpoint['corrupted_frames'],
+            'acknowledged_source_sequence' => $checkpoint['acknowledged_source_sequence'],
+            'highest_seen_source_sequence' => $highestSeen,
         ];
     }
 

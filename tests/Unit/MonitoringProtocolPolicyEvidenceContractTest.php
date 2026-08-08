@@ -35,6 +35,17 @@ it('requires a complete value-free sustained protocol and policy evidence matrix
     expect($command)
         ->toContain('monitoring:protocol-policy-evidence', 'all_verified', 'JSON_THROW_ON_ERROR')
         ->not->toContain('target', 'payload', 'site_id', 'device_id', 'credential');
+    expect($service)
+        ->toContain(
+            "'evidence_roster_fingerprint'",
+            "'continuous_execution'",
+            '$fresh->count() === $configured->count()',
+            'private function continuousExecutionEvidence(',
+            'private function executionWindow(',
+            'private function opaqueFingerprint(',
+            "'oldest_evidence_at'",
+            "'newest_evidence_at'",
+        );
     expect($script)
         ->toContain(
             'samples must be an integer of at least 5.',
@@ -44,12 +55,14 @@ it('requires a complete value-free sustained protocol and policy evidence matrix
             '$requiredProtocols',
             '$requiredPolicy',
             '$requiredProviders = ["provider_unifi", "provider_milesight"]',
-            'evidence_matrix_fingerprint',
-            'the protocol, provider, or policy evidence set changed during the observation period.',
+            '$report["evidence_roster_fingerprint"] ?? null',
+            '$report["continuous_execution"] ?? null',
+            '$executionKeys !== $protocolKeys',
+            'the configured monitor, provider, or policy roster changed during the observation period.',
             '$report["execution_cursor"] ?? null',
-            'previous_execution_cursor',
-            'execution_advanced=false',
-            'persisted protocol, listener, provider, or policy execution evidence did not advance during the observation period.',
+            'initial_newest_evidence',
+            'latest_oldest_evidence',
+            'not every pinned $execution_key execution member produced newer evidence during the observation period.',
             'observation_seconds',
         )
         ->not->toContain('echo "$report"', '--insecure');
