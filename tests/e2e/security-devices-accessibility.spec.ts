@@ -199,7 +199,7 @@ test.describe('Security & Devices accessibility', () => {
         fixture = seedSecurityDevicesOperationsReadinessFixtures();
     });
 
-    test.beforeEach((_fixtures, testInfo) => {
+    test.beforeEach(({}, testInfo) => {
         test.skip(!testInfo.project.name.includes('desktop'), 'Desktop only.');
         test.setTimeout(600_000);
     });

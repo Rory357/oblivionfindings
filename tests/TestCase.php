@@ -331,12 +331,17 @@ abstract class TestCase extends BaseTestCase
             return;
         }
 
-        try {
-            $kernel = $app->make(Kernel::class);
-            $kernel->call('migrate', ['--force' => true, '--no-interaction' => true]);
-        } catch (\Throwable) {
-            // Best-effort: if the migrator can't run here we fall back to the
-            // schema-dump-only state, which matches the prior behaviour.
+        $kernel = $app->make(Kernel::class);
+        $exitCode = $kernel->call('migrate', ['--force' => true, '--no-interaction' => true]);
+
+        if ($exitCode !== 0) {
+            $output = trim($kernel->output());
+
+            throw new \RuntimeException(sprintf(
+                'Pending test database migrations failed with exit code %d.%s',
+                $exitCode,
+                $output === '' ? '' : PHP_EOL.$output,
+            ));
         }
 
         static::$pendingMigrationsApplied = true;
