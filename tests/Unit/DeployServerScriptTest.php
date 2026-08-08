@@ -89,8 +89,9 @@ it('fails closed into the monitoring Supervisor installer unless explicitly skip
         )
         ->not->toContain('sudo -E bash scripts/monitoring/install-supervisor.sh');
 
-    expect(strpos($script, 'scripts/monitoring/install-supervisor.sh'))
-        ->toBeLessThan(strpos($script, 'run_app php artisan queue:restart'));
+    $installer = strpos($script, 'scripts/monitoring/install-supervisor.sh');
+    expect($installer)
+        ->toBeLessThan(strpos($script, 'run_app php artisan queue:restart', $installer));
 });
 
 it('fails closed into the native Queclink listener install unless explicitly skipped', function () {

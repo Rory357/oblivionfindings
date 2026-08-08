@@ -4,6 +4,28 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
     $root = dirname(__DIR__, 2);
     $runbook = (string) file_get_contents($root.'/docs/runbooks/it-security-desktop-release-acceptance.md');
     $rbac = (string) file_get_contents($root.'/database/seeders/RbacSeeder.php');
+    $playwrightConfig = (string) file_get_contents($root.'/playwright.config.ts');
+    $package = json_decode(
+        (string) file_get_contents($root.'/package.json'),
+        true,
+        flags: JSON_THROW_ON_ERROR,
+    );
+    $expectedDesktopOnlySpecs = [
+        'device-profile-acceptance',
+        'facilities-workspace-acceptance',
+        'healthcare-workspace-acceptance',
+        'it-service-management-acceptance',
+        'it-service-management-navigation',
+        'native-monitoring-runtime-acceptance',
+        'network-it-workspace-acceptance',
+        'operations-workspaces-acceptance',
+        'security-devices-accessibility',
+        'security-devices-estate-operations',
+        'security-devices-navigation',
+        'security-devices-workspace-shell',
+        'security-workspace-acceptance',
+        'tracking-workspace-acceptance',
+    ];
 
     expect($runbook)->toContain(
         'desktop/web only',
@@ -90,5 +112,74 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
             'Local Unit, Feature, Architecture, React, type, lint/format, client-build, SSR-build, and local Dusk results are prerequisite regression evidence only',
             'Never relabel a local Dusk result as deployed browser proof',
             'V10 remains open unless D01-D18 pass at both viewports against the deployed release',
+        );
+
+    $inventoryMatch = [];
+    expect(preg_match(
+        '/const itSecurityDesktopOnlySpecs = \[(.*?)\];/s',
+        $playwrightConfig,
+        $inventoryMatch,
+    ))->toBe(1);
+
+    $inventoryNames = [];
+    expect(preg_match_all("/'([^']+)'/", $inventoryMatch[1], $inventoryNames))->toBe(14)
+        ->and($inventoryNames[1])->toBe($expectedDesktopOnlySpecs);
+
+    foreach ($expectedDesktopOnlySpecs as $desktopOnlySpec) {
+        expect(is_file($root.'/tests/e2e/'.$desktopOnlySpec.'.spec.ts'))->toBeTrue();
+    }
+
+    expect($package['scripts']['visual:test:it-security'] ?? null)
+        ->toBe('playwright test -c playwright.config.ts --project=it-security-desktop-1440 --project=it-security-desktop-1280')
+        ->and($runbook)->toContain(
+            'npm run visual:test:it-security',
+            'The retained legacy mobile project remains outside IT/Security acceptance.',
+        )
+        ->and($playwrightConfig)->toContain(
+            "name: 'it-security-desktop-1440'",
+            "name: 'it-security-desktop-1280'",
+            "name: 'chromium-desktop'",
+            "name: 'chromium-mobile'",
+            "devices['Pixel 7']",
+        )
+        ->and(substr_count($playwrightConfig, 'testMatch: itSecurityDesktopOnlyTestMatch'))->toBe(2)
+        ->and(substr_count($playwrightConfig, 'testIgnore: itSecurityDesktopOnlyTestMatch'))->toBe(2)
+        ->and(preg_match(
+            "/name: 'chromium-desktop',\\s+testIgnore: itSecurityDesktopOnlyTestMatch,\\s+use:/s",
+            $playwrightConfig,
+        ))->toBe(1)
+        ->and(preg_match(
+            "/name: 'it-security-desktop-1440',\\s+testMatch: itSecurityDesktopOnlyTestMatch,\\s+use:.*?viewport: \\{ width: 1440, height: 900 \\}/s",
+            $playwrightConfig,
+        ))->toBe(1)
+        ->and(preg_match(
+            "/name: 'it-security-desktop-1280',\\s+testMatch: itSecurityDesktopOnlyTestMatch,\\s+use:.*?viewport: \\{ width: 1280, height: 800 \\}/s",
+            $playwrightConfig,
+        ))->toBe(1)
+        ->and(preg_match(
+            "/name: 'chromium-mobile',\\s+testIgnore: itSecurityDesktopOnlyTestMatch,\\s+use: \\{ \.\.\.devices\['Pixel 7'\] \\}/s",
+            $playwrightConfig,
+        ))->toBe(1);
+
+    foreach ([
+        'device-profile-acceptance.spec.ts',
+        'it-service-management-navigation.spec.ts',
+        'security-devices-navigation.spec.ts',
+    ] as $desktopOnlySpec) {
+        $source = (string) file_get_contents($root.'/tests/e2e/'.$desktopOnlySpec);
+
+        expect($source)->not->toMatch('/\\bmobile\\b/i');
+    }
+
+    $nativeMonitoringSource = (string) file_get_contents(
+        $root.'/tests/e2e/native-monitoring-runtime-acceptance.spec.ts',
+    );
+
+    expect($nativeMonitoringSource)
+        ->not->toContain('page.setViewportSize(')
+        ->toContain(
+            "projectName === 'it-security-desktop-1440'",
+            "projectName === 'it-security-desktop-1280'",
+            'approvedDesktopViewport(testInfo.project.name)',
         );
 });

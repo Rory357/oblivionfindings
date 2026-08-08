@@ -139,6 +139,14 @@ After the restore companion is green, run D07 configuration/firmware history, D1
 
 Local Unit, Feature, Architecture, React, type, lint/format, client-build, SSR-build, and local Dusk results are prerequisite regression evidence only. They do not prove that the deployed URL is running the reviewed source revision, production assets, supervised workers/listeners/SSR, real provider protocols, or restored stores.
 
+Run the dedicated IT/Security Playwright regression at both approved desktop viewports with:
+
+```bash
+npm run visual:test:it-security
+```
+
+This command runs only `it-security-desktop-1440` and `it-security-desktop-1280`. The retained legacy mobile project remains outside IT/Security acceptance.
+
 Record the local gate by source revision and attach its summaries without copying test databases, `.env.dusk.local`, Playwright state, screenshots, logs, SQLite files, or command-output files into the release. Never relabel a local Dusk result as deployed browser proof.
 
 ## Completion record

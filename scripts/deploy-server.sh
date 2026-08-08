@@ -9,7 +9,7 @@
 #   1. git fetch + fast-forward pull from origin/main
 #   2. composer install --no-dev
 #   3. npm ci && npm run build:ssr
-#   4. php artisan migrate --force
+#   4. rootless lifecycle-trigger preflight, isolated migrate, and exact postflight
 #   5. php artisan storage:link
 #   6. php artisan optimize:clear
 #   7. optional Nominatim install or geocoder health check
@@ -65,6 +65,76 @@ run_app() {
     fi
 }
 
+MAINTENANCE_ACTIVE=0
+DEPLOY_WRITER_DRAIN_TIMEOUT_SECONDS="${DEPLOY_WRITER_DRAIN_TIMEOUT_SECONDS:-390}"
+DEPLOY_WEB_DRAIN_SECONDS="${DEPLOY_WEB_DRAIN_SECONDS:-5}"
+
+assert_bounded_seconds() {
+    local name="$1"
+    local value="$2"
+    local maximum="$3"
+
+    if [[ ! "$value" =~ ^[0-9]+$ ]] || [ "$value" -gt "$maximum" ]; then
+        echo "✗ deployment refused: $name must be an integer from 0 to $maximum."
+        exit 1
+    fi
+}
+
+queue_writer_pids() {
+    local release_artisan
+    release_artisan="$(pwd -P)/artisan"
+
+    ps -eo pid=,user=,args= | awk \
+        -v artisan="$release_artisan" \
+        '$3 ~ /(^|\/)php([0-9.]+)?$/ && index($0, artisan) > 0 && index($0, "queue:work") > 0 { print $1 }'
+}
+
+wait_for_queue_writer_exit() {
+    local deadline=$((SECONDS + DEPLOY_WRITER_DRAIN_TIMEOUT_SECONDS))
+    local pid
+    local process_command
+    local release_artisan
+    local writer_alive
+    release_artisan="$(pwd -P)/artisan"
+
+    while true; do
+        writer_alive=0
+        for pid in "$@"; do
+            process_command="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+            if [[ "$process_command" == *"$release_artisan"* && "$process_command" == *"queue:work"* ]]; then
+                writer_alive=1
+                break
+            fi
+        done
+
+        if [ "$writer_alive" -eq 0 ]; then
+            return 0
+        fi
+        if [ "$SECONDS" -ge "$deadline" ]; then
+            echo "✗ deployment stopped: pre-migration queue writers did not drain before the bounded timeout."
+            return 1
+        fi
+
+        sleep 1
+    done
+}
+
+report_maintenance_on_failure() {
+    local exit_code=$?
+
+    if [ "$exit_code" -ne 0 ] && [ "$MAINTENANCE_ACTIVE" -eq 1 ]; then
+        echo "✗ deployment failed after maintenance began; the application remains in maintenance mode."
+        echo "  Complete reviewed forward recovery and validation before running php artisan up."
+    fi
+}
+
+trap report_maintenance_on_failure EXIT
+
+assert_bounded_seconds "DEPLOY_WRITER_DRAIN_TIMEOUT_SECONDS" "$DEPLOY_WRITER_DRAIN_TIMEOUT_SECONDS" 900
+assert_bounded_seconds "DEPLOY_WEB_DRAIN_SECONDS" "$DEPLOY_WEB_DRAIN_SECONDS" 60
+command -v ps >/dev/null || { echo "✗ deployment refused: ps is required for writer drain verification."; exit 1; }
+command -v awk >/dev/null || { echo "✗ deployment refused: awk is required for writer drain verification."; exit 1; }
+
 assert_clean_release_checkout() {
     local checkout_status
     checkout_status="$(run_app git status --porcelain=v1 --untracked-files=all)"
@@ -111,13 +181,29 @@ fi
 echo "▶ composer install"
 run_app composer install --no-dev --optimize-autoloader --no-interaction
 
+echo "▶ lifecycle trigger database preflight"
+run_app php artisan database:verify-lifecycle-triggers preflight --json
+
 echo "▶ npm ci && npm run build:ssr"
 run_app npm ci
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}"
 run_app env NODE_OPTIONS="$NODE_OPTIONS" npm run build:ssr
 
-echo "▶ php artisan migrate --force"
-run_app php artisan migrate --force
+echo "▶ entering maintenance mode and draining active writers"
+run_app php artisan down --retry=60
+MAINTENANCE_ACTIVE=1
+if [ "$DEPLOY_WEB_DRAIN_SECONDS" -gt 0 ]; then
+    sleep "$DEPLOY_WEB_DRAIN_SECONDS"
+fi
+mapfile -t pre_migration_queue_writer_pids < <(queue_writer_pids)
+run_app php artisan queue:restart
+wait_for_queue_writer_exit "${pre_migration_queue_writer_pids[@]}"
+
+echo "▶ php artisan migrate --force --isolated=75"
+run_app php artisan migrate --force --isolated=75
+
+echo "▶ lifecycle trigger database postflight"
+run_app php artisan database:verify-lifecycle-triggers postflight --json
 
 echo "▶ php artisan storage:link"
 run_app php artisan storage:link 2>/dev/null || true
@@ -242,6 +328,14 @@ fi
 
 echo "▶ php artisan queue:restart"
 run_app php artisan queue:restart
+
+echo "▶ final application and lifecycle runtime validation"
+run_app php artisan about --only=environment --json >/dev/null
+run_app php artisan database:verify-lifecycle-triggers postflight --json
+
+echo "▶ leaving maintenance mode"
+run_app php artisan up
+MAINTENANCE_ACTIVE=0
 
 echo
 echo "✓ Server provisioning complete."

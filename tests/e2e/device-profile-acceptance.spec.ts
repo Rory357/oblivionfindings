@@ -44,50 +44,22 @@ test.describe('Capability-driven device profile', () => {
         ).toBeVisible();
         await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
 
-        const mobile = (page.viewportSize()?.width ?? 1440) < 768;
-        if (mobile) {
-            const selector = page.getByTestId('device-profile-mobile-select');
-            await expect(selector).toBeVisible();
-            await selector.click();
-            await page.getByRole('option', { name: /Monitors/ }).click();
-        } else {
-            await page.getByTestId('device-profile-section-monitors').click();
-        }
+        await page.getByTestId('device-profile-section-monitors').click();
         await expect(page.getByText(fixture.monitorName).first()).toBeVisible();
 
-        if (mobile) {
-            const selector = page.getByTestId('device-profile-mobile-select');
-            await selector.click();
-            await page
-                .getByRole('option', { name: 'Interfaces & sensors' })
-                .click();
-        } else {
-            await page.getByTestId('device-profile-group-technical').click();
-            await page
-                .getByTestId('device-profile-section-interfaces-sensors')
-                .click();
-        }
+        await page.getByTestId('device-profile-group-technical').click();
+        await page
+            .getByTestId('device-profile-section-interfaces-sensors')
+            .click();
         await expect(
             page.getByText(fixture.interfaceName).first(),
         ).toBeVisible();
 
-        if (mobile) {
-            const selector = page.getByTestId('device-profile-mobile-select');
-            await selector.click();
-            await page.getByRole('option', { name: /Tickets/ }).click();
-        } else {
-            await page.getByTestId('device-profile-group-operations').click();
-            await page.getByTestId('device-profile-section-tickets').click();
-        }
+        await page.getByTestId('device-profile-group-operations').click();
+        await page.getByTestId('device-profile-section-tickets').click();
         await expect(page.getByText(fixture.ticketTitle)).toBeVisible();
 
-        if (mobile) {
-            const selector = page.getByTestId('device-profile-mobile-select');
-            await selector.click();
-            await page.getByRole('option', { name: /Events/ }).click();
-        } else {
-            await page.getByTestId('device-profile-section-events').click();
-        }
+        await page.getByTestId('device-profile-section-events').click();
         await expect(
             page.getByText(fixture.controlRoomReference),
         ).toBeVisible();
@@ -102,36 +74,11 @@ test.describe('Capability-driven device profile', () => {
             ),
         ).toBeVisible();
 
-        if (mobile) {
-            const selector = page.getByTestId('device-profile-mobile-select');
-            await selector.click();
-            await page.getByRole('option', { name: /Audit/ }).click();
-        } else {
-            await page.getByTestId('device-profile-group-records').click();
-            await page.getByTestId('device-profile-section-audit').click();
-        }
+        await page.getByTestId('device-profile-group-records').click();
+        await page.getByTestId('device-profile-section-audit').click();
         await expect(
             page.getByText(fixture.auditAction, { exact: true }),
         ).toBeVisible();
-        if (mobile) {
-            for (const section of [
-                'Health',
-                'Topology',
-                'Configuration',
-                'Assignments',
-                'Maintenance',
-                'Documents',
-            ]) {
-                const selector = page.getByTestId(
-                    'device-profile-mobile-select',
-                );
-                await selector.click();
-                await page
-                    .getByRole('option', { name: new RegExp(section) })
-                    .click();
-                await expectNoPageOverflow(page);
-            }
-        }
         await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
         await expect(
             page.getByRole('button', { name: /restart|reboot|push|upgrade/i }),

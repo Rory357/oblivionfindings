@@ -11,9 +11,9 @@ test.describe('IT & Support service management navigation', () => {
         await loginAsStaff(page);
     });
 
-    test('keeps setup and service-delivery workspaces understandable on desktop and mobile', async ({
+    test('keeps setup and service-delivery workspaces understandable on desktop', async ({
         page,
-    }, testInfo) => {
+    }) => {
         const errors = collectConsoleErrors(page);
 
         await page.goto('/it/setup');
@@ -109,43 +109,27 @@ test.describe('IT & Support service management navigation', () => {
             page.getByText(/does not create a second scheduler/),
         ).toBeVisible();
 
-        if (testInfo.project.name.includes('desktop')) {
-            const sidebar = page.locator('aside').filter({
-                has: page.getByRole('navigation', { name: 'IT & Support' }),
-            });
+        const sidebar = page.locator('aside').filter({
+            has: page.getByRole('navigation', { name: 'IT & Support' }),
+        });
 
-            await expect(sidebar).toBeVisible();
-            for (const group of [
-                'Service Desk',
-                'Service Delivery',
-                'Operations',
-                'Setup',
-            ]) {
-                await expect(
-                    sidebar.getByText(group, { exact: true }),
-                ).toBeVisible();
-            }
+        await expect(sidebar).toBeVisible();
+        for (const group of [
+            'Service Desk',
+            'Service Delivery',
+            'Operations',
+            'Setup',
+        ]) {
             await expect(
-                sidebar.getByRole('link', {
-                    name: 'Teams, queues & services',
-                }),
-            ).toHaveAttribute('aria-current', 'page');
-            await sidebar
-                .getByRole('link', { name: 'Service catalogue' })
-                .click();
-        } else {
-            const mobileMenu = page.locator('details').filter({
-                hasText: 'IT & Support navigation',
-            });
-            await mobileMenu.getByText('IT & Support navigation').click();
-            await expect(mobileMenu).toHaveAttribute('open', '');
-            await expect(
-                mobileMenu.getByText('Service Delivery', { exact: true }),
+                sidebar.getByText(group, { exact: true }),
             ).toBeVisible();
-            await mobileMenu
-                .getByRole('link', { name: 'Service catalogue' })
-                .click();
         }
+        await expect(
+            sidebar.getByRole('link', {
+                name: 'Teams, queues & services',
+            }),
+        ).toHaveAttribute('aria-current', 'page');
+        await sidebar.getByRole('link', { name: 'Service catalogue' }).click();
 
         await expect(page).toHaveURL(/\/it\?.*tab=catalog/);
         await expect(

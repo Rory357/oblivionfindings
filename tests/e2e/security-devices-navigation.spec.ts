@@ -67,10 +67,9 @@ async function expectGroupedNavigation(page: Page) {
 }
 
 test.describe('Security & Devices grouped navigation', () => {
-    test('desktop keeps the grouped secondary navigation visible across every destination', async ({
+    test('keeps the grouped secondary navigation visible across every destination', async ({
         page,
-    }, testInfo) => {
-        test.skip(!testInfo.project.name.includes('desktop'), 'Desktop only.');
+    }) => {
         test.setTimeout(150_000);
         const errors = collectConsoleErrors(page);
 
@@ -81,30 +80,6 @@ test.describe('Security & Devices grouped navigation', () => {
             await expect(
                 page.getByRole('heading', { name: title, level: 1 }),
             ).toBeVisible();
-            await expectGroupedNavigation(page);
-            await expectNoPageOverflow(page);
-        }
-
-        expectNoConsoleErrors(errors);
-    });
-
-    test('mobile uses one understandable expandable menu across every destination', async ({
-        page,
-    }, testInfo) => {
-        test.skip(!testInfo.project.name.includes('mobile'), 'Mobile only.');
-        test.setTimeout(150_000);
-        const errors = collectConsoleErrors(page);
-
-        await loginAsStaff(page);
-
-        for (const [route, title] of destinations) {
-            await page.goto(route);
-            await expect(
-                page.getByRole('heading', { name: title, level: 1 }),
-            ).toBeVisible();
-            await page
-                .getByText('Security & Devices navigation', { exact: true })
-                .click();
             await expectGroupedNavigation(page);
             await expectNoPageOverflow(page);
         }

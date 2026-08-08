@@ -15,6 +15,27 @@ const webServerEnv = Object.fromEntries(
     ),
 );
 
+const itSecurityDesktopOnlySpecs = [
+    'device-profile-acceptance',
+    'facilities-workspace-acceptance',
+    'healthcare-workspace-acceptance',
+    'it-service-management-acceptance',
+    'it-service-management-navigation',
+    'native-monitoring-runtime-acceptance',
+    'network-it-workspace-acceptance',
+    'operations-workspaces-acceptance',
+    'security-devices-accessibility',
+    'security-devices-estate-operations',
+    'security-devices-navigation',
+    'security-devices-workspace-shell',
+    'security-workspace-acceptance',
+    'tracking-workspace-acceptance',
+];
+
+const itSecurityDesktopOnlyTestMatch = new RegExp(
+    `tests[\\\\/]e2e[\\\\/](?:${itSecurityDesktopOnlySpecs.join('|')})\\.spec\\.ts$`,
+);
+
 export default defineConfig({
     testDir: './tests',
     testMatch: /.*\.spec\.ts/,
@@ -44,13 +65,31 @@ export default defineConfig({
     projects: [
         {
             name: 'chromium-desktop',
+            testIgnore: itSecurityDesktopOnlyTestMatch,
             use: {
                 ...devices['Desktop Chrome'],
                 viewport: { width: 1440, height: 900 },
             },
         },
         {
+            name: 'it-security-desktop-1440',
+            testMatch: itSecurityDesktopOnlyTestMatch,
+            use: {
+                ...devices['Desktop Chrome'],
+                viewport: { width: 1440, height: 900 },
+            },
+        },
+        {
+            name: 'it-security-desktop-1280',
+            testMatch: itSecurityDesktopOnlyTestMatch,
+            use: {
+                ...devices['Desktop Chrome'],
+                viewport: { width: 1280, height: 800 },
+            },
+        },
+        {
             name: 'chromium-mobile',
+            testIgnore: itSecurityDesktopOnlyTestMatch,
             use: { ...devices['Pixel 7'] },
         },
     ],
