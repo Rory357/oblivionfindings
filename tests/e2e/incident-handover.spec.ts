@@ -45,7 +45,7 @@ function scalar<T>(php: string): T {
 test.describe('desktop incident handover journeys', () => {
     test.describe.configure({ timeout: 120_000 });
 
-    test.beforeEach(async (_fixtures, testInfo) => {
+    test.beforeEach(async ({ browserName: _browserName }, testInfo) => {
         test.skip(
             !testInfo.project.name.includes('desktop'),
             'The Control Room/incident/H&S acceptance audit is desktop only.',

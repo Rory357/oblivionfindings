@@ -128,8 +128,12 @@ class QueclinkStatus extends Command
         $canonicalTrackers = 0;
         $observedTrackers = 0;
         $siteIds = [];
+        $canonicalRoster = [];
+        $frameExecutions = [];
+        $oldestFrameAt = null;
         $freshestFrameAt = null;
-        $cutoff = now()->subSeconds($maxFrameAge);
+        $observedAt = now();
+        $cutoff = $observedAt->copy()->subSeconds($maxFrameAge);
 
         $trackers = QueclinkDevice::query()
             ->paired()
@@ -149,32 +153,55 @@ class QueclinkStatus extends Command
             }
 
             $canonicalTrackers++;
+            $canonicalRoster[] = implode(':', [
+                $tracker->id,
+                $tracker->device_id,
+                $siteId,
+            ]);
             $latestFrame = QueclinkRawFrame::query()
                 ->where('queclink_device_id', $tracker->id)
                 ->inbound()
                 ->where('parse_ok', true)
                 ->where('created_at', '>=', $cutoff)
+                ->where('created_at', '<=', $observedAt)
                 ->latest('created_at')
-                ->first(['created_at']);
+                ->latest('id')
+                ->first(['id', 'created_at']);
             if ($latestFrame === null) {
                 continue;
             }
 
             $observedTrackers++;
             $siteIds[$siteId] = true;
+            $frameExecutions[] = implode(':', [
+                $tracker->id,
+                $latestFrame->id,
+                $latestFrame->created_at->utc()->format('U.u'),
+            ]);
+            if ($oldestFrameAt === null || $latestFrame->created_at->lt($oldestFrameAt)) {
+                $oldestFrameAt = $latestFrame->created_at;
+            }
             if ($freshestFrameAt === null || $latestFrame->created_at->gt($freshestFrameAt)) {
                 $freshestFrameAt = $latestFrame->created_at;
             }
         }
 
+        $canonicalRosterFingerprint = $this->evidenceFingerprint('canonical-roster', $canonicalRoster);
+        $frameExecutionFingerprint = $this->evidenceFingerprint('frame-execution', $frameExecutions);
+
         $reasonCodes = [];
         if ($serviceState !== 'active') {
             $reasonCodes[] = 'listener_not_active';
+        }
+        if ($canonicalRosterFingerprint === null || $frameExecutionFingerprint === null) {
+            $reasonCodes[] = 'evidence_key_missing';
         }
         if ($canonicalTrackers === 0) {
             $reasonCodes[] = 'canonical_paired_tracker_missing';
         } elseif ($observedTrackers === 0) {
             $reasonCodes[] = 'current_canonical_frame_missing';
+        } elseif ($observedTrackers !== $canonicalTrackers) {
+            $reasonCodes[] = 'canonical_tracker_evidence_incomplete';
         }
 
         return [
@@ -184,10 +211,29 @@ class QueclinkStatus extends Command
             'canonical_paired_trackers' => $canonicalTrackers,
             'canonical_sites_observed' => count($siteIds),
             'fresh_trackers_observed' => $observedTrackers,
+            'canonical_roster_fingerprint' => $canonicalRosterFingerprint,
+            'frame_execution_fingerprint' => $frameExecutionFingerprint,
+            'frame_window' => [
+                'oldest_observed_at' => $oldestFrameAt?->utc()->toIso8601String(),
+                'newest_observed_at' => $freshestFrameAt?->utc()->toIso8601String(),
+            ],
             'freshest_frame_age_seconds' => $freshestFrameAt === null
                 ? null
-                : (int) $freshestFrameAt->diffInSeconds(now()),
+                : (int) $freshestFrameAt->diffInSeconds($observedAt),
             'reason_codes' => $reasonCodes,
         ];
+    }
+
+    /** @param list<string> $members */
+    private function evidenceFingerprint(string $purpose, array $members): ?string
+    {
+        $key = (string) config('app.key', '');
+        if ($key === '') {
+            return null;
+        }
+
+        sort($members, SORT_STRING);
+
+        return hash_hmac('sha256', $purpose."\n".implode("\n", $members), $key);
     }
 }

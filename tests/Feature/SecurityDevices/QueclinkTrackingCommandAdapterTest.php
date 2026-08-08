@@ -304,7 +304,7 @@ function requestGovernedReboot(array $fixture): array
 function requestGovernedConfigurationApply(array $fixture): array
 {
     $profile = app(QueclinkConfigurationProfileService::class)->createProfile(
-        profileKey: 'queclink:test:'.$fixture['device']->id,
+        profileKey: 'queclink:device-'.$fixture['device']->id.':draft:test',
         name: 'Approved safety tracking profile',
         description: 'Two-section desired state for governed lifecycle verification.',
         targetCategory: 'personal_tracker',

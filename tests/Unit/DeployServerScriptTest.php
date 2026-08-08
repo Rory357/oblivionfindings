@@ -39,7 +39,7 @@ it('refuses a dirty or non-exact release before dependencies and assets are buil
         ->and($composer)->toBeLessThan($npm);
 });
 
-it('builds and fails closed into the supervised Inertia SSR runtime unless explicitly skipped', function () {
+it('builds and proves the Inertia SSR runtime even when Supervisor installation is explicitly skipped', function () {
     $script = file_get_contents(__DIR__.'/../../scripts/deploy-server.sh');
     $package = json_decode((string) file_get_contents(__DIR__.'/../../package.json'), true, flags: JSON_THROW_ON_ERROR);
 
@@ -56,20 +56,28 @@ it('builds and fails closed into the supervised Inertia SSR runtime unless expli
             'Inertia SSR Supervisor install requires root or sudo',
             'Re-run with privilege or explicitly pass --skip-inertia-ssr',
             'skipping Inertia SSR Supervisor install (--skip-inertia-ssr)',
+            'run_app php artisan inertia:check-ssr',
         )->not->toContain('sudo -E bash scripts/inertia/install-supervisor.sh');
 
     $build = strpos($script, 'run_app env NODE_OPTIONS="$NODE_OPTIONS" npm run build:ssr');
     $optimise = strpos($script, 'run_app php artisan optimize:clear', $build);
+    $skipBranch = strpos($script, 'if [ "$SKIP_INERTIA_SSR" -eq 1 ]; then', $optimise);
     $installer = strpos($script, 'bash scripts/inertia/install-supervisor.sh', $optimise);
-    $monitoringInstaller = strpos($script, 'bash scripts/monitoring/install-supervisor.sh', $installer);
+    $supervisorBranchEnd = strpos($script, "\nfi\n\n", $installer);
+    $health = strpos($script, 'run_app php artisan inertia:check-ssr', $supervisorBranchEnd);
+    $monitoringInstaller = strpos($script, 'bash scripts/monitoring/install-supervisor.sh', $health);
     $queueRestart = strpos($script, 'run_app php artisan queue:restart', $monitoringInstaller);
     $success = strpos($script, 'Server provisioning complete', $queueRestart);
 
     expect($build)
         ->not->toBeFalse()
         ->and($optimise)->toBeGreaterThan($build)
-        ->and($installer)->toBeGreaterThan($optimise)
-        ->and($monitoringInstaller)->toBeGreaterThan($installer)
+        ->and($skipBranch)->toBeGreaterThan($optimise)
+        ->and($installer)->toBeGreaterThan($skipBranch)
+        ->and($supervisorBranchEnd)->toBeGreaterThan($installer)
+        ->and($health)->toBeGreaterThan($supervisorBranchEnd)
+        ->and(substr_count($script, 'run_app php artisan inertia:check-ssr'))->toBe(1)
+        ->and($monitoringInstaller)->toBeGreaterThan($health)
         ->and($queueRestart)->toBeGreaterThan($monitoringInstaller)
         ->and($success)->toBeGreaterThan($queueRestart);
 });

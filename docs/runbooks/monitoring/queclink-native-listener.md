@@ -20,13 +20,37 @@ php artisan queclink:status --evidence-json --max-frame-age=900
 
 `queclink:status --json` includes the configured public hostname for an authorised operator. Do not copy its complete output into an incident or release record; retain only the service state, port, bounded Device counts, frame count, and last-frame time.
 
-The `--evidence-json` check is the release-safe proof. It exits non-zero unless
-the systemd listener is active and at least one genuinely paired canonical
-Device resolves to one active Site and has a parsed inbound frame inside the
-approved freshness window. Its output contains aggregate counts, reason codes
-and timestamps only—never an IMEI, Site/Device ID, endpoint, credential or raw
-frame. Use a tighter window when the approved tracker heartbeat contract
-requires it; never use a value below 60 seconds or above one day.
+The `--evidence-json` check is a value-free diagnostic snapshot. It exits
+non-zero unless the supervised listener is active and at least one paired
+canonical Device resolves to one active Site and has a parsed inbound frame
+inside the approved freshness window. Its output contains aggregate counts,
+application-keyed roster and execution fingerprints, reason codes and
+timestamps only—never an IMEI, Site/Device ID, endpoint, credential or raw
+frame. A diagnostic snapshot can reuse a frame that arrived before the command
+started, so it does not prove sustained release acceptance by itself. Use a
+tighter window when the approved tracker heartbeat contract requires it; never
+use a value below 60 seconds or above one day.
+
+For release evidence, run the sustained verifier from the deployed release:
+
+```bash
+bash scripts/monitoring/verify-queclink-native-listener-evidence.sh \
+  --application-path=/var/www/oblivionfindings \
+  --samples=5 \
+  --interval-seconds=60 \
+  --max-frame-age=900
+```
+
+The verifier refuses fewer than five samples or intervals below one minute. It
+pins the application-keyed canonical paired-tracker roster for the whole
+period, requires every canonical tracker to retain current frame evidence at
+every sample, and fails unless the persisted frame-execution fingerprint changes
+and the final oldest per-tracker frame is newer than the initial newest frame.
+This proves every stable roster member advanced and prevents one busy tracker or
+a pre-existing frame from proving listener execution for the whole roster. The
+value-free result still needs the approved target-side record and supervised
+process timestamps to establish that the new frames were authentic; never
+insert or replay a frame to satisfy the gate.
 
 The normal approved Linux/systemd deployment path is:
 
@@ -121,6 +145,6 @@ For a lost, replaced, wrongly assigned, or deliberately re-enrolled tracker:
 
 ## Closure evidence
 
-Record the release version, approved change/incident, Site and canonical Device references in the governed release record, supported family, approved port, start/stop/recovery times, the value-free `--evidence-json` result, first authentic heartbeat/location times, governed command UUID, final reconciliation outcome, credential-reference version/test state, and pairing audit IDs.
+Record the release version, approved change/incident, Site and canonical Device references in the governed release record, supported family, approved port, start/stop/recovery times, the value-free sustained-verifier result, first authentic heartbeat/location times, governed command UUID, final reconciliation outcome, credential-reference version/test state, and pairing audit IDs. Retain a single `--evidence-json` result only as a diagnostic sample, not as the release decision.
 
 Do not attach complete status JSON, listener journals, browser network payloads, raw history, or screenshots containing identifiers or endpoint settings. Close with explicit confirmation that no cloud API was used, no raw command was replayed, no duplicate Device was created, and Site/privacy boundaries remained intact.

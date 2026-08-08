@@ -271,6 +271,9 @@ else
     fi
 fi
 
+echo "▶ php artisan inertia:check-ssr"
+run_app php artisan inertia:check-ssr
+
 if [ "$SKIP_MONITORING_SUPERVISOR" -eq 1 ]; then
     echo "▶ skipping monitoring Supervisor install (--skip-monitoring-supervisor)"
 else
